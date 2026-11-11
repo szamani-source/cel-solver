@@ -1,0 +1,3 @@
+celFoam.C
+
+EXE = $(FOAM_USER_APPBIN)/celFoam

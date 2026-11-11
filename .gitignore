@@ -1,0 +1,9 @@
+Make/linux*
+lnInclude/
+*.o
+*.dep
+tests/*.log
+tutorials/**/log.*
+tutorials/**/constant/polyMesh/
+tutorials/**/[1-9]*/
+tutorials/**/0.[0-9]*/

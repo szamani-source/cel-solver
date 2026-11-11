@@ -1,0 +1,5 @@
+#!/bin/sh
+# Build everything in this repository. Needs an OpenFOAM v2512 environment.
+cd "${0%/*}" || exit
+set -e
+wmake applications/solvers/celFoam

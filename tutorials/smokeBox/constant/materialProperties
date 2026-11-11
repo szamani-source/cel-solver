@@ -1,0 +1,12 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      materialProperties;
+}
+
+// Soft soil-like elastic material for the smoke test
+rho     1800;      // kg/m^3
+E       1e7;       // Pa
+nu      0.3;
