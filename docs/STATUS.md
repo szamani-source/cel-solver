@@ -12,7 +12,7 @@ Phase 0, project setup.
 
 | WP | Title | State | Notes |
 | --- | --- | --- | --- |
-| 0.1 | Repository, build against pinned OpenFOAM, CI | In progress | Skeleton solver and smoke test written; local build being verified; GitHub repository not yet created, so CI has not run |
+| 0.1 | Repository, build against pinned OpenFOAM, CI | In progress | celFoam builds against v2512 and test_smokeBox passes locally (2026-11-11); CI has not run because no GitHub repository exists yet |
 | 0.2 | CLAUDE.md, STATUS.md, decisions folder | Done | |
 | 0.3 | Target problems, units, material data | Draft | `docs/spec/target-problems.md` waits for Sia's answers |
 
