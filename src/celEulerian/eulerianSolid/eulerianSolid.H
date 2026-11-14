@@ -10,7 +10,7 @@ Description
 
     - stableDeltaT()   implemented (WP 2.1)
     - lagrangeStep(dt) implemented (WP 2.3, eulerianSolidLagrange.C)
-    - remap(dt)        empty, WP 2.4 (advection back onto the fixed mesh)
+    - remap(dt)        implemented (WP 2.4, eulerianSolidRemap.C)
 
     Fields (cell-centred, read from the time directory if present, otherwise
     created with the default shown, written at output times):
@@ -29,6 +29,9 @@ Description
     Dictionaries read:
     - constant/materialProperties: rho [kg/m^3] plus the constitutive model
       entries (type, E, nu, ...; see constitutiveModel.H).
+      Optional subdictionary remapLimiters (WP 2.4), for example
+      remapLimiters { rho MC; U MC; sigma MC; epsP superbee; epsPEq superbee; }
+      (these are the defaults; also minmod and upwind).
     - system/controlDict:
         maxCo (default 0.4, decision 0018), the fraction of the CFL
         limit (stableDeltaT);
@@ -39,6 +42,7 @@ Description
 SourceFiles
     eulerianSolid.C
     eulerianSolidLagrange.C
+    eulerianSolidRemap.C
 \*---------------------------------------------------------------------------*/
 
 #ifndef Foam_eulerianSolid_H
@@ -105,6 +109,18 @@ class eulerianSolid
         //  WP 2.3 fills lagrangeStep().
         surfaceScalarField phiL_;
 
+        //- Remap limiter per field (rho, U, sigma, epsP, epsPEq):
+        //  upwind, minmod, MC or superbee. Optional subdictionary
+        //  remapLimiters in materialProperties; defaults MC for rho, U and
+        //  sigma, superbee for epsP and epsPEq (decision 0013 item 5).
+        HashTable<word> remapLimiter_;
+
+
+    // Private Member Functions
+
+        //- Limiters from materialProperties, with the defaults
+        static HashTable<word> readRemapLimiters(const dictionary& dict);
+
 
 public:
 
@@ -167,8 +183,14 @@ public:
         //  the owner side only, so both sides hold identical face values.
         void lagrangeStep(const scalar dt);
 
-        //- Remap the Lagrange-step state back onto the fixed mesh (WP 2.4).
-        //  Empty in WP 2.1.
+        //- Remap the Lagrange-step state back onto the fixed mesh (WP 2.4,
+        //  eulerianSolidRemap.C): moves the volume dt*phiL back across each
+        //  face (internal and coupled; across other boundary faces material
+        //  leaves or enters with the boundary cell's own values).
+        //  Density by volume flux, U, sigma, epsP and epsPEq mass-weighted,
+        //  limited linear reconstruction at the swept-region centroid.
+        //  Conserves mass and sum(m q) for every field; a cell with no flux
+        //  through any face is left bit-identical (decision 0017).
         void remap(const scalar dt);
 
 
