@@ -1,6 +1,6 @@
 # WP 1.4: Single-point constitutive driver (elastic, J2, Drucker-Prager, Mohr-Coulomb)
 
-State: done (pending PR merge and CI)
+State: done (CI green on PR #2, waiting for merge)
 Branch: `claude/project-thread-w8f1nv` (the session's assigned branch; the brief had proposed `wp-1.4-constitutive-driver`)
 
 ## Goal
@@ -64,7 +64,7 @@ Learned:
 - Stale `__pycache__` can hide an edit of the same size made within one second; it is
   now ignored by git.
 
-Not verified: CI run (waits for the pull request). No separate tension cut-off yet
+CI: green on PR #2 (build-and-test, 2026-11-14). No separate tension cut-off yet
 (see decision 0004).
 
 Next: WP 2.2 / 2.5a / 2.5b port these models to C++ and reuse `check_models.py` values

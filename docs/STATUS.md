@@ -15,7 +15,7 @@ Phase 0, project setup.
 | 0.1 | Repository, build against pinned OpenFOAM, CI | Done | Repository szamani-source/cel-solver; CI builds celFoam in opencfd/openfoam-dev:2512 and test_smokeBox passes (2026-11-14) |
 | 0.2 | CLAUDE.md, STATUS.md, decisions folder | Done | |
 | 0.3 | Target problems, units, material data | Draft | `docs/spec/target-problems.md` waits for Sia's answers |
-| 1.4 | Single-point constitutive driver: elastic, J2, Drucker-Prager, Mohr-Coulomb | Done, PR open | `prototype/constitutive/`; `tests/test_proto_constitutive.sh` passes locally, CI pending (2026-11-14) |
+| 1.4 | Single-point constitutive driver: elastic, J2, Drucker-Prager, Mohr-Coulomb | Done, PR open | `prototype/constitutive/`; `tests/test_proto_constitutive.sh` passes in CI on PR #2 (2026-11-14) |
 
 ## Waiting on Sia
 
