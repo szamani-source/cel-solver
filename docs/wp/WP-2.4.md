@@ -81,7 +81,7 @@ Done in one session. `src/celEulerian/eulerianSolid/eulerianSolidRemap.C` (stub 
 out of `eulerianSolid.C`), `tests/eulerian/remapCheck/` (`celRemapCheck`: reads a
 prescribed motion from `system/remapCheckDict`, sets `rho_L = rho V/V_L`, calls
 `remap`), `tests/eulerian/remap_test.py` (writes meshes and initial fields, checks),
-`tests/test_remap.sh`. Decision 0016 has the method and every number.
+`tests/test_remap.sh`. Decision 0017 has the method and every number.
 
 - Geometry from `phiL` alone (least-squares cell velocity, full face displacement
   vector), so the contract (decision 0014) is unchanged.
