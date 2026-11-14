@@ -44,12 +44,13 @@ In a new `prototype/silo2d.py` that reuses `lr2d_plastic.py`:
 - Lake at rest: a column started in exact K0 equilibrium under gravity between smooth
   walls keeps velocities below 1e-10 m/s for 1000 steps.
 - Smooth walls, settled from zero stress: vertical stress at the bottom within 2 percent
-  of `rho g H`; horizontal stress consistent with the material (state the expected
-  ratio and check it within 5 percent).
+  of `rho g H`; horizontal stress consistent with the material: ratio nu/(1 - nu) =
+  0.4286 within 5 percent (elastic, no yield; `docs/spec/silo-reference.md` section 2).
 - Frictional walls (20 degrees), T0 geometry with a tall fill (H = 3 W) so saturation
   shows: mean vertical stress against depth follows Janssen within 10 percent below one
   width from the top, and the wall shear to normal stress ratio is `tan(delta_w)` within
-  5 percent where the wall slips. Record the K that fits.
+  5 percent where the wall slips. Record the K that fits; it must lie in 0.27 to 0.45
+  (between the wall-yield value 0.29 and the elastic value 0.43, decision 0019).
 - Total vertical force balance: weight = bottom force + wall friction, within 1 percent.
 - Settled state reached (kinetic energy criterion) and unchanged over a further 10 percent
   of the run with damping off.

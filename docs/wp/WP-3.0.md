@@ -1,6 +1,6 @@
 # WP 3.0: Silo benchmark definition and reference values
 
-State: not started
+State: done
 Branch: `wp-3.0-silo-reference`
 
 ## Goal
@@ -50,4 +50,22 @@ Branch: `wp-3.0-silo-reference`
 
 ## Log
 
-(none yet)
+2026-11-14: Done in one session (thread "Collect silo reference values"; pushed on the
+thread branch, not `wp-3.0-silo-reference`).
+
+- Wrote `docs/spec/silo-reference.md` from 10 opened sources (Janssen via Sperl's
+  translation; Staron, Lagree, Popinet 2012 and 2013/14; Dunatunga and Kamrin 2015;
+  Janda et al. 2012; Mankoc et al. 2007; Bhateja 2017; Lajeunesse et al. 2005; Staron
+  and Hinch 2005; Wikipedia for Jaky's references).
+- `tools/silo_reference.py` (Janssen for a plane bin, four K values, Beverloo) with
+  `--check` self-tests; `tests/test_silo_reference.sh` also checks that the page's
+  tables are byte-identical to the script output.
+- Learned: the smooth-wall settled ratio is nu/(1 - nu) = 0.4286, elastic, not a yield
+  value. At T0's fill (1.5 W) Janssen gives only 14 to 20 percent below hydrostatic;
+  saturation needs about 8 W. All published continuum silo constants (1.40 to 1.55) are
+  mu(I) with low friction; MC at 35 deg is untested in the literature I found, so the C
+  band is wide (decision 0019).
+- Not verified: Lube et al. 2005 and Lajeunesse et al. 2005 prefactors in the original
+  papers (Lube's 1.2 a and 1.9 a^(2/3) are quoted by two secondary sources);
+  Jaky's formula; stagnant-zone angle. Cohesive arching values are left to the 3.5 brief.
+- Next: WP 3.1p and 3.2p use section 6 of the spec.
