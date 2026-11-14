@@ -168,7 +168,7 @@ public:
         //  Density by volume flux, U, sigma, epsP and epsPEq mass-weighted,
         //  limited linear reconstruction at the swept-region centroid.
         //  Conserves mass and sum(m q) for every field; a cell with no flux
-        //  through any face is left bit-identical (decision 0016).
+        //  through any face is left bit-identical (decision 0017).
         void remap(const scalar dt);
 
 

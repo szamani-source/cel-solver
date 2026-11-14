@@ -91,7 +91,7 @@ prescribed motion from `system/remapCheckDict`, sets `rho_L = rho V/V_L`, calls
 - Limiters per field in `materialProperties`, subdictionary `remapLimiters`
   (documented in the smokeBox tutorial's materialProperties).
 - All "done when" items pass; density under compress-then-reverse is reported, not
-  required to round-off (it cannot be; see decision 0016). Stability: summed Courant
+  required to round-off (it cannot be; see decision 0017). Stability: summed Courant
   about 0.9 (`remap_test.py --study`). Test takes about 2 minutes.
 - Next: WP 2.4b once WP 2.3 merges. Velocity/stress are reconstructed in space, not
   in mass coordinates as the 1D prototype does (equal when density is uniform).

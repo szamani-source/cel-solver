@@ -1,7 +1,7 @@
 /*---------------------------------------------------------------------------*\
     eulerianSolid::remap (WP 2.4): see eulerianSolid.H and
     docs/decisions/0014-lagrange-remap-contract.md (what remap receives) and
-    docs/decisions/0016-remap-cpp.md (how it is done).
+    docs/decisions/0017-remap-cpp.md (how it is done).
 
     One unsplit, face-based, second-order remap on any fvMesh:
 
