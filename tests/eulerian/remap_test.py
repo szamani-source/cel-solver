@@ -593,6 +593,26 @@ def case_uniform(work):
     return drho
 
 
+def case_walls(work):
+    """G. Compression along x in a box with walls: every row along x stays the
+    same (round-off fluxes on faces parallel to the motion must not matter)."""
+    case = make_case(work, "walls_rows", (40, 10, 1), periodic=False)
+    i = case["idx"][0]
+    sq = ((i >= 10) & (i < 20)).astype(float)
+    write_fields(case, fill(sq, sq, len(sq)))
+    remap_dict(case, motion="compress", A=0.5, L=1, endTime=0.1, nSteps=16)
+    res = parse(run(case["path"], "celRemapCheck", log="log.remapCheck"))
+    out = read_all(case)
+    worst = 0.0
+    for k, v in out.items():
+        a = v.reshape(10, 40, -1)
+        worst = max(worst, float(np.max(np.abs(a - a[0])))
+                    / max(float(np.max(np.abs(a))), 1e-300))
+    check(f"G. compression along x between walls: rows agree to 1e-12 "
+          f"(largest difference {worst:.1e})", worst <= 1e-12)
+    check_conservation("G", res)
+
+
 def study(work):
     """Largest stable material Courant number (report only)."""
     for dim, n in ((2, 64), (3, 24)):
@@ -620,6 +640,7 @@ def main():
     try:
         case_1d(work)
         case_uniform(work)
+        case_walls(work)
         case_square(work)
         case_disc(work)
         case_order(work, "--quick" in args)

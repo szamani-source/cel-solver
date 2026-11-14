@@ -14,6 +14,7 @@
 #   E. uniform state stays uniform under a non-uniform divergence-free flux,
 #      and (velocity, stress, history) under a compressing flux and its reverse
 #   F. case C on 2 and 4 processors matches serial to 1e-12
+#   G. compression along x between walls keeps every row the same to 1e-12
 #   Every case: mass, momentum and sum(m q) conserved to 1e-12 relative.
 # Default material Courant number 0.25 per direction. Takes about 2 minutes.
 set -eu

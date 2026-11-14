@@ -95,3 +95,7 @@ prescribed motion from `system/remapCheckDict`, sets `rho_L = rho V/V_L`, calls
   about 0.9 (`remap_test.py --study`). Test takes about 2 minutes.
 - Next: WP 2.4b once WP 2.3 merges. Velocity/stress are reconstructed in space, not
   in mass coordinates as the 1D prototype does (equal when density is uniform).
+- Later the same day, after merging WP 2.3: `test_eulerian_skeleton.sh` (serial vs
+  2 processors to 1e-12) failed by 1.6e-10. Cause: round-off-sized fluxes on faces
+  parallel to the motion switched the swept-centroid cap on and off (decision 0017,
+  item 3). Fixed with a flux threshold; y-z momentum back to 1e-14.

@@ -54,6 +54,9 @@ namespace remapDetail
 // gradient): such faces do not constrain the limiter.
 static const scalar perpTol = 1e-10;
 
+// Relative size below which a face flux counts as round-off noise
+static const scalar fluxTol = 1e-10;
+
 //- Limiter types, see the file header
 enum class limiterType { upwind, minmod, MC, superbee };
 
@@ -143,6 +146,12 @@ struct remapGeometry
     //- Swept-region centroid minus the donor's Lagrangian centroid
     vectorField rInt;
     List<vectorField> rPatch;
+
+    //- Faces whose flux is not round-off: |phiL| > fluxTol * sum|phiL| of
+    //  the donor cell. Only these cap the donor's gradient (a face whose
+    //  flux is round-off noise would switch the cap on and off at random)
+    boolList fluxInt;
+    List<boolList> fluxPatch;
 
     //- Directions without cells (2D): gradient component forced to 0
     vector emptyMask;
@@ -302,6 +311,42 @@ static remapGeometry makeGeometry
         }
     }
 
+    // Faces carrying more than round-off flux, relative to the donor cell
+    scalarField sumAbs(nCells, Zero);
+    forAll(own, facei)
+    {
+        sumAbs[own[facei]] += mag(phiI[facei]);
+        sumAbs[nei[facei]] += mag(phiI[facei]);
+    }
+    forAll(bm, patchi)
+    {
+        const labelUList& fc = bm[patchi].faceCells();
+        const scalarField& pPhi = phi.boundaryField()[patchi];
+        forAll(fc, i)
+        {
+            sumAbs[fc[i]] += mag(pPhi[i]);
+        }
+    }
+    geo.fluxInt.setSize(own.size());
+    forAll(own, facei)
+    {
+        const label donor = (phiI[facei] > 0 ? own[facei] : nei[facei]);
+        geo.fluxInt[facei] = mag(phiI[facei]) > fluxTol*sumAbs[donor];
+    }
+    geo.fluxPatch.setSize(bm.size());
+    forAll(bm, patchi)
+    {
+        if (!bm[patchi].coupled()) continue;
+        const labelUList& fc = bm[patchi].faceCells();
+        const scalarField& pPhi = phi.boundaryField()[patchi];
+        boolList& fp = geo.fluxPatch[patchi];
+        fp.setSize(fc.size());
+        forAll(fc, i)
+        {
+            fp[i] = pPhi[i] > fluxTol*sumAbs[fc[i]];
+        }
+    }
+
     geo.DInv.setSize(nCells);
     forAll(D, celli)
     {
@@ -426,13 +471,13 @@ static vectorField limitedGradient
     {
         addFace(own[facei], geo.dInt[facei]);
         addFace(nei[facei], -geo.dInt[facei]);
-        if (phiI[facei] > 0)
+        if (geo.fluxInt[facei])
         {
-            addSwept(own[facei], geo.rInt[facei]);
-        }
-        else if (phiI[facei] < 0)
-        {
-            addSwept(nei[facei], geo.rInt[facei]);
+            addSwept
+            (
+                phiI[facei] > 0 ? own[facei] : nei[facei],
+                geo.rInt[facei]
+            );
         }
     }
     forAll(bm, patchi)
@@ -440,11 +485,10 @@ static vectorField limitedGradient
         if (!bm[patchi].coupled()) continue;
         const labelUList& fc = bm[patchi].faceCells();
         const vectorField& dp = geo.dPatch[patchi];
-        const scalarField& pPhi = phi.boundaryField()[patchi];
         forAll(fc, i)
         {
             addFace(fc[i], dp[i]);
-            if (pPhi[i] > 0)
+            if (geo.fluxPatch[patchi][i])
             {
                 addSwept(fc[i], geo.rPatch[patchi][i]);
             }

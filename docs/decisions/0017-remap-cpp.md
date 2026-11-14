@@ -43,7 +43,13 @@ item 5 per field. Brief: `docs/wp/WP-2.4.md`. Numbers below come from
    motion, and the rows of the x-translation case drifted apart by 3 percent of the
    jump within 20 steps. With the neighbour range the rows agree to 4e-15. The factor
    is also capped so the value at every swept centroid the cell donates to stays in
-   the neighbour range (never active in 1D).
+   the neighbour range (never active in 1D). Only faces whose flux is more than
+   1e-10 of the cell's total `sum |phiL|` count for this cap: with WP 2.3's Lagrange
+   step merged, the smokeBox case (motion along x between walls) broke its y-z
+   symmetry by 2e-6 of the momentum, because faces parallel to the motion carry
+   flux of round-off size and random sign, and whether they counted as outflow
+   switched the cap between about 4 and 1e-10 at random. With the threshold the
+   momentum normal to the motion stays at 1e-14 and serial and 2 processors agree.
 4. **Limiters are chosen in `constant/materialProperties`**, optional subdictionary
    `remapLimiters { rho MC; U MC; sigma MC; epsP superbee; epsPEq superbee; }` (these
    are the defaults). `system/fvSchemes` was not used: these are not OpenFOAM schemes,
