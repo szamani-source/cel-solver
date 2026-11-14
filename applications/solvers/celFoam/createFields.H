@@ -16,6 +16,10 @@ const dimensionedScalar rho("rho", dimDensity, materialProperties);
 const dimensionedScalar E("E", dimPressure, materialProperties);
 const dimensionedScalar nu("nu", dimless, materialProperties);
 
+// Constitutive model, selected by keyword "type" (WP 2.2). Not yet called in
+// the time loop (WP 2.3).
+autoPtr<constitutiveModel> material(constitutiveModel::New(materialProperties));
+
 // Bulk and shear moduli, and the elastic P-wave speed
 const dimensionedScalar K(E/(3.0*(1.0 - 2.0*nu)));
 const dimensionedScalar G(E/(2.0*(1.0 + nu)));

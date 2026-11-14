@@ -1,0 +1,10 @@
+kernel/celConstitutiveKernel.C
+kernel/celLinearElastic.C
+kernel/celVonMises.C
+
+constitutiveModel/constitutiveModel.C
+constitutiveModel/constitutiveModelNew.C
+constitutiveModels/linearElastic/linearElasticModel.C
+constitutiveModels/vonMises/vonMisesModel.C
+
+LIB = $(FOAM_USER_LIBBIN)/libcelConstitutive
