@@ -1,6 +1,6 @@
 # WP 2.2: Constitutive library interface in C++, elastic and J2
 
-State: in progress (PR open, waiting on CI and review)
+State: done in CI (PR #4 open, waiting on Sia's review)
 Branch: `claude/project-thread-85watz` (thread sessions can only push their assigned branch)
 
 ## Goal
@@ -87,8 +87,9 @@ CI run 1: library and celFoam built; `wrapperCheck.C` failed to compile (`sqrt(1
 ambiguous between `::sqrt` and `Foam::sqrt` under `using namespace Foam`); fixed with
 `Foam::sqrt(scalar(1.5))`.
 
-Not verified locally: the OpenFOAM wrapper, `wrapperCheck` and celFoam build (no OpenFOAM
-in the session). CI result to be recorded here.
+CI run 2 (commit 774460d, runs 43572399974 and 43572404111): green. `libcelConstitutive.so`
+and celFoam build, `wrapperCheck` and the smokeBox model check pass (that part is required
+when `CI` is set), all earlier tests still pass. The wrapper was not run outside CI.
 
-Next: confirm CI green, record it here and in STATUS.md, Sia reviews and merges. Then
+Next: Sia reviews and merges PR #4. Then
 2.5a (Drucker-Prager in C++) adds a kernel class and its reference paths.
