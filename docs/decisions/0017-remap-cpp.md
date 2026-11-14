@@ -1,7 +1,7 @@
 # 0017 C++ remap: geometry from face fluxes, Barth-Jespersen form of MC and superbee
 
 Date: 2026-11-14. Status: accepted (WP 2.4; Sia's standing rule: proceed and merge on
-green CI). Numbers 0015 and 0016 are taken by WP 2.5c and WP 2.3.
+green CI). Numbers 0015 and 0016 are taken by WP 2.5c and the silo re-plan (WP 2.3 also drafted a 0016).
 
 ## Context
 
