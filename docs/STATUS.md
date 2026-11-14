@@ -30,8 +30,8 @@ Phase 2 (the C++ Eulerian solver: 2.3 done, 2.4 running) and Phase 3 (silo disch
 | 2.5b | Mohr-Coulomb in C++ | Done | `kernel/celMohrCoulomb`, Jacobi eigen-solver `kernel/celEigen` (decision 0011); `tests/test_constitutive_cpp.sh` matches Python on 10 MC paths to 1e-14, edge and apex returns required. Tension cut-off split to 2.5c |
 | 2.5c | Mohr-Coulomb tension cut-off (Python, then C++) | Done | Optional `sigma_t` / `sigmaT` (Rankine planes, active-set return, decision 0015). Python checks pass (strengths, caps, unloading, 4 x 10,000 tension-biased increments, associated return = independent closest point to 1e-15); C++ matches Python on 10 new paths to 2e-14 with every tension return exercised; celFoam reads `sigmaT`. Merged on green CI (2026-11-14) |
 | 3.0 | Silo benchmark definition and reference values | Done | `docs/spec/silo-reference.md` (10 sources opened 2026-11-14; unread values marked not verified), `tools/silo_reference.py`, `tests/test_silo_reference.sh` passes. T0: Janssen K 0.29 to 0.43, bottom stress 80 to 86 percent of hydrostatic; Beverloo C = 1.45 (continuum mu(I) 1.40 to 1.55) gives 65, 120, 185 kg/s/m for D = 0.04, 0.06, 0.08 m. Tolerances: decision 0019 |
-| 3.1p | Prototype gravity, walls and settling | Next | Brief: `docs/wp/WP-3.1p.md` |
-| 3.2p | Prototype free surface (material plus void) | Blocked on 3.1p | Brief: `docs/wp/WP-3.2p.md` |
+| 3.1p | Prototype gravity, walls and settling | Done | `prototype/silo2d.py`; `tests/test_proto_silo_settle.sh` passes (about 3 min): lake at rest 3e-18 m/s, smooth walls 0.13 % from rho g H with K0 = 0.4286 exact, frictional tank (H = 3 W, 10 mm cells) within 1.7 % of Janssen with K = 0.425 measured at the walls, wall ratio within 1.8 % of tan 20 deg, force balance 0.08 %. Gravity by subtracting the discrete weight, walls as one-sided Riemann solutions, ramp 0.1 s plus damping 250 1/s (decision 0020). Mohr-Coulomb vectorised in `constitutive/batch.py` |
+| 3.2p | Prototype free surface (material plus void) | Next | Brief: `docs/wp/WP-3.2p.md` |
 | 3.3p | Prototype silo discharge (target T0) | Blocked on 3.2p | Brief: `docs/wp/WP-3.3p.md` |
 
 ## Standing instruction from Sia (2026-11-14)
@@ -57,8 +57,8 @@ are done. Next: WP 2.4b (`docs/wp/WP-2.4b.md`).
 Silo track (decision 0016), one thread each:
 
 1. WP 3.0: reference values. Done (`docs/spec/silo-reference.md`).
-2. WP 3.1p: prototype gravity, walls, settling (`docs/wp/WP-3.1p.md`). Start now.
-3. WP 3.2p: prototype free surface (`docs/wp/WP-3.2p.md`). After 3.1p.
+2. WP 3.1p: prototype gravity, walls, settling. Done (decision 0020).
+3. WP 3.2p: prototype free surface (`docs/wp/WP-3.2p.md`). Start now; build on `prototype/silo2d.py`.
 4. WP 3.3p: prototype silo discharge, the first end-to-end result for Sia
    (`docs/wp/WP-3.3p.md`). After 3.2p.
 
@@ -67,6 +67,12 @@ Then the C++ counterparts 3.1 to 3.4 (after 2.4b; briefs not written yet) and 3.
 
 ## Known issues
 
+- WP 3.1p prototype: the free top of a full tank is a zero-traction face with no mass
+  flux, so top cells lose density as the column settles (7 % in the top cell for 1.2 m).
+  WP 3.2p replaces it. After settling the frictional tank creeps slowly (3e-4 m/s, 1.5 %
+  of rho g H over a further 10 % of the run undamped) because the walls sit at the limit.
+  A fast ramp (0.05 s) with light damping lets the column rebound and unload the upper
+  wall (ratio 10 to 25 % below tan delta_w): use the 0.1 s ramp (decision 0020).
 - Silo reference (WP 3.0): every published continuum discharge constant used mu(I)
   with friction 0.32 to 0.38; T0 is Mohr-Coulomb with tan 35 = 0.70. The test band for C
   is therefore wide (1.0 to 1.9); the exponent is the real check. Lube et al. 2005 and

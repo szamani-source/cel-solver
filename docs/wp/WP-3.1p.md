@@ -1,6 +1,6 @@
 # WP 3.1p: Prototype gravity, walls and settling (Janssen)
 
-State: not started
+State: done (2026-11-14)
 Branch: `wp-3.1p-gravity-walls`
 
 ## Goal
@@ -65,4 +65,38 @@ step (cost note in the spec).
 
 ## Log
 
-(none yet)
+### 2026-11-14 (thread "Prototype gravity, walls and settling")
+
+Done. `prototype/silo2d.py` (class `SiloBox`, a `PlasticBox2D` with its own sweep
+`silo_sweep`), `tests/test_proto_silo_settle.sh` passes in about 170 s here. Decision 0020.
+Branch was `claude/project-thread-ql1dhs` (thread branch), not `wp-3.1p-gravity-walls`.
+
+- Mohr-Coulomb vectorised in `constitutive/batch.py`, `check_batch_mc()`: three cases
+  (T0 c = 0 with sigma_t = 0; c = 5 kPa psi = 10; c = 5 kPa with sigma_t = 2 kPa) match
+  `models.py` to 3e-14 with edge and apex returns exercised. For c = 0 the tension
+  cut-off at 0 is redundant (the cone already implies s1 <= 0). `check_batch()` is
+  unchanged, so the WP 1.3b test is unchanged.
+- Well-balanced gravity: Lagrange step on s_yy - G (discrete weight profile per column).
+  Lake at rest (0.1 x 0.6 m, 10 mm, K0 state, 1000 steps): 2.5e-18 m/s.
+- Smooth walls, 0.1 x 1.2 m, 10 x 120 cells, from zero stress: settled in 2780 steps
+  (dt 57.8 us, 0.161 s, 35 s wall clock); bottom s_yy 0.126 % from rho g H; s_xx/s_yy =
+  0.4286 = nu/(1 - nu) everywhere below the top 10 percent (elastic, as expected: the
+  active Rankine limit is 0.271).
+- Frictional walls and bottom (20 deg), 0.4 x 1.2 m, 40 x 120 cells: settled in 2520
+  steps (0.146 s, 109 s wall clock). K measured at the walls 0.425, best fit 0.411; mean
+  s_v within 1.67 % of Janssen (measured K) below z = W (bottom 14.0 kPa against 21.1 kPa
+  hydrostatic). Wall shear/normal (cells extrapolated to the wall) 0.985 to 1.018 of
+  tan 20 deg on the slipping faces below z = W (the wall slips on 110 of 120 faces; the
+  bottom corner sticks). Weight = bottom + wall friction to 0.08 %. Mass exact.
+- Damping used: gravity ramp 0.1 s (1 - cos), damping alpha 250 1/s, settled at
+  KE <= 1e-6 strain energy. Without damping for a further 10 % of the steps: stress
+  change 1.5 % (frictional) and 0.24 % (smooth) of rho g H, KE stays about 1e-6.
+- Tried: ramp 0.05 s with alpha 200 settles faster (0.08 s) but the column rebounds and
+  the upper wall unloads to 0.76 to 0.98 of the friction limit, failing the 5 % check;
+  alpha 500 with ramp 0.08 s passes but takes 3660 steps. 20 x 60 cells: Janssen 7 %
+  with the measured K, wall ratio down to 0.53 near the bottom: too coarse.
+- Cost note: at 5 mm cells the frictional tank would be about 8 times the work
+  (4 times the cells, twice the steps), about 15 minutes in this Python.
+
+Next: WP 3.2p (free surface) starts from `SiloBox`; replace the no-flux free top.
+
