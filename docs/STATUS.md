@@ -22,7 +22,7 @@ Phase 0, project setup. Phase 1 prototypes started.
 
 - Answers to the open questions in `docs/spec/target-problems.md`.
 - Confirm GPL-3.0 (decision 0003).
-- Review the WP 1.1 pull request, including decision 0005 (cell-centred Lagrange step instead of the staggered grid in the brief).
+- Review and merge the WP 1.1 pull request (#3). Decision 0005 (cell-centred step) is approved.
 
 ## Next
 

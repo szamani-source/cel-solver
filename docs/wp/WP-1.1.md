@@ -58,5 +58,8 @@ Learned:
 - Smooth order is limited by peak clipping. It is 1.78 at 0.5 c streaming
   (`--v0 0.5` fails the 1.8 bar). An extremum-preserving limiter would fix it if needed.
 
-Next: Sia reviews the PR and decision 0005. WP 1.2 (plasticity and history remap) builds
+Update: Sia approved the switch to cell-centred fields with a Riemann-solver step
+(decision 0005 accepted). Decision renumbered from 0004 because WP 1.4 took 0004.
+
+Next: Sia merges PR #3. WP 1.2 (plasticity and history remap) builds
 on this file.

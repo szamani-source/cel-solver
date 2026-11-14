@@ -1,6 +1,6 @@
 # 0005 Cell-centred Godunov Lagrange step in the 1D prototype
 
-Date: 2026-11-14. Status: accepted for WP 1.1 (Sia to confirm in the PR review);
+Date: 2026-11-14. Status: accepted (Sia approved the switch on 2026-11-14);
 revisit in WP 1.3.
 
 ## Context
