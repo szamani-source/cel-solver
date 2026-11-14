@@ -12,6 +12,7 @@ Description
 \*---------------------------------------------------------------------------*/
 
 #include "fvCFD.H"
+#include "constitutiveModel.H"
 
 int main(int argc, char *argv[])
 {
