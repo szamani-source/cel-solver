@@ -21,7 +21,8 @@ Constitutive models for bulk solids are tracked in `docs/constitutive-models.md`
 | 2.3 | Stress update with objective rate | Rigid rotation produces no spurious stress |
 | 2.4 | Single-material remap of all fields | 1D wave reproduced in 3D mesh |
 | 2.5a | Drucker-Prager in C++ | Matches the 1.4 reference on all paths |
-| 2.5b | Mohr-Coulomb in C++ (corners, apex, tension cut-off) | Matches the 1.4 reference on all paths |
+| 2.5b | Mohr-Coulomb in C++ (corners, apex) | Matches the 1.4 reference on all paths |
+| 2.5c | Mohr-Coulomb tension cut-off (Python reference, then C++); split from 2.5b, decision 0011 | Cut-off returns match the reference; uniaxial tension stops at the cut-off |
 | 2.6 | Phase 2 benchmarks | Taylor bar within tolerance |
 | 3.1 | N-material volume fractions with isoAdvector | Pure advection keeps interfaces sharp |
 | 3.2 | Void cells | Free surface holds with zero stress |

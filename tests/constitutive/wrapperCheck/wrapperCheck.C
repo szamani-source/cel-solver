@@ -13,11 +13,15 @@ Description
     - A large shear in xz takes vonMises to the yield surface: q = sigma_y.
     - WP 2.5a: druckerPrager is selected with its word option fit; a large
       xz shear returns to the cone, a large volumetric extension to the apex.
+    - WP 2.5b: run-time selection of mohrCoulomb; an isochoric axial compression
+      from an isotropic state returns to the triaxial compression edge
+      (sxx = syy) on the yield surface f = 0.
 \*---------------------------------------------------------------------------*/
 
 #include "constitutiveModel.H"
 #include "celDruckerPrager.H"
 #include "IOstreams.H"
+#include "unitConversion.H"
 
 using namespace Foam;
 
@@ -175,6 +179,42 @@ int main()
                 mag(sigNew - pApex*symmTensor(I)) < 1e-9*pApex
             );
         }
+    }
+
+    // Mohr-Coulomb (WP 2.5b): selection and a compression edge return
+    {
+        const scalar phi = 30, c = 10e3, psi = 5;
+        dictionary mcDict(elDict);
+        mcDict.set("type", word("mohrCoulomb"));
+        mcDict.add("phi", phi);
+        mcDict.add("c", c);
+        mcDict.add("psi", psi);
+        autoPtr<constitutiveModel> mc(constitutiveModel::New(mcDict));
+        check("selected mohrCoulomb", word(mc->kernel().name()) == "mohrCoulomb");
+
+        // Isochoric axial compression (uniaxial strain alone stays elastic)
+        symmTensor deps(Zero);
+        deps.xx() = deps.yy() = 0.005;
+        deps.zz() = -0.01;
+        const symmTensor sig0(-1e5*symmTensor(I));
+        symmTensor sigNew;
+        constitutiveModel::history h, hNew;
+        mc->update(deps, sig0, h, sigNew, hNew);
+
+        const vector w = eigenValues(sigNew);   // ascending
+        const scalar sp = Foam::sin(degToRad(phi));
+        const scalar f =
+            (w.z() - w.x()) + (w.z() + w.x())*sp
+          - 2*c*Foam::cos(degToRad(phi));
+        Info<< "    mohrCoulomb axial compression: sigma = " << sigNew
+            << "  f = " << f << "  epsPEq = " << hNew.epsPEq << nl;
+        check("mohrCoulomb returns to f = 0", mag(f) < 1e-9*mag(w.x()));
+        check
+        (
+            "mohrCoulomb on the compression edge sxx = syy",
+            mag(sigNew.xx() - sigNew.yy()) < 1e-9*mag(w.x())
+        );
+        check("mohrCoulomb plastic strain grows", hNew.epsPEq > 0);
     }
 
     Info<< nl << (nFail ? "FAILED" : "All wrapper checks passed") << endl;

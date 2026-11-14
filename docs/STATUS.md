@@ -24,7 +24,8 @@ Phase 1 (2D prototype) and Phase 2 (C++ material models, Eulerian library skelet
 | 2.1 | Eulerian library skeleton and solver fields | Done | `src/celEulerian` (class `eulerianSolid`), celFoam is a thin driver; `tests/test_eulerian_skeleton.sh` passes serial and on 2 processors (decision 0010). PR #8 |
 | 2.2 | Constitutive library interface in C++, elastic and J2 | Done | `src/celConstitutive/` (plain C++ kernel + OpenFOAM wrapper, decision 0006); `tests/test_constitutive_cpp.sh` passes in CI (kernel matches Python to 3e-15; wrapper and celFoam checks pass). PR #4 merged (2026-11-14) |
 | 2.5a | Drucker-Prager in C++ | Done | `kernel/celDruckerPrager`, wrapper `druckerPrager` (`fit` word option, decision 0009); 14 new reference paths match Python to 2e-15 with apex returns; celFoam selects it. Merged on green CI (2026-11-14) |
-| 2.5b | Mohr-Coulomb in C++ | Next | Brief: `docs/wp/WP-2.5b.md` |
+| 2.5b | Mohr-Coulomb in C++ | Done | `kernel/celMohrCoulomb`, Jacobi eigen-solver `kernel/celEigen` (decision 0011); `tests/test_constitutive_cpp.sh` matches Python on 10 MC paths to 1e-14, edge and apex returns required. Tension cut-off split to 2.5c |
+| 2.5c | Mohr-Coulomb tension cut-off | Not started | Needs a Python reference first; brief not written |
 
 ## Standing instruction from Sia (2026-11-14)
 
@@ -47,7 +48,7 @@ Started 2026-11-14, one thread each, independent of each other:
 
 1. WP 1.3a: 2D plane-strain prototype, elastic waves (`docs/wp/WP-1.3a.md`). Done.
 2. WP 2.5a: Drucker-Prager in C++ (`docs/wp/WP-2.5a.md`). Done.
-3. WP 2.5b: Mohr-Coulomb in C++ (`docs/wp/WP-2.5b.md`).
+3. WP 2.5b: Mohr-Coulomb in C++ (`docs/wp/WP-2.5b.md`). Done.
 4. WP 2.1: Eulerian library skeleton and solver fields (`docs/wp/WP-2.1.md`): done.
 
 After those: 1.3b (brief `docs/wp/WP-1.3b.md`) is next now that 1.3a is done. 2.3 (stress update with objective rate) and 2.4 (remap)
@@ -62,7 +63,8 @@ follow the 1.3b formulation decision (2.1 is done; each fills one `eulerianSolid
   percent of the jump at the impact plane for the first 5 to 10 cells of wave travel
   (1.7 percent elastic). Matters for contact (WP 4.x); revisit in WP 1.3 (decision 0008).
 - WP 1.2 prototype: history is remapped with superbee, stress with MC (decision 0008).
-- Mohr-Coulomb prototype has no separate tension cut-off below the apex (decision 0004).
+- Mohr-Coulomb (Python and C++) has no separate tension cut-off below the apex
+  (decisions 0004, 0011): cohesive material carries tension up to c cot(phi). WP 2.5c.
 - WP 1.3a prototype: a step P-wave at 45 degrees to the mesh overshoots by up to 13 percent
   of the jump at start-up, settling to about 5 percent; along an axis there is none. Cause:
   the direction-by-direction Riemann solver, not the splitting or the time step. To be
