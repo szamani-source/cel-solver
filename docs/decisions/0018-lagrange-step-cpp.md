@@ -1,8 +1,8 @@
-# 0016 Lagrange step in C++: face states, boundaries, time step (WP 2.3)
+# 0018 Lagrange step in C++: face states, boundaries, time step (WP 2.3)
 
 Date: 2026-11-14. Status: accepted (Sia's standing rule: proceed and merge on green CI).
 
-Number 0015 is taken by WP 2.5c (Mohr-Coulomb tension cut-off).
+Numbers 0015 to 0017 are taken by WP 2.5c, the silo re-plan and WP 2.4.
 
 ## Context
 

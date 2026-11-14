@@ -1,5 +1,5 @@
 #!/bin/bash
-# WP 2.3: Lagrange step in C++ (eulerianSolid::lagrangeStep, decisions 0013, 0014, 0016).
+# WP 2.3: Lagrange step in C++ (eulerianSolid::lagrangeStep, decisions 0013, 0014, 0018).
 #
 # Builds the test driver tests/lagrange/lagrangeStepCheck (celLagrangeStepCheck: sets a
 # state by hand and runs Lagrange steps only, no remap) and runs

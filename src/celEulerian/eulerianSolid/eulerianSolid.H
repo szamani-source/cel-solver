@@ -30,7 +30,7 @@ Description
     - constant/materialProperties: rho [kg/m^3] plus the constitutive model
       entries (type, E, nu, ...; see constitutiveModel.H).
     - system/controlDict:
-        maxCo (default 0.4, decision 0016), the fraction of the CFL
+        maxCo (default 0.4, decision 0018), the fraction of the CFL
         limit (stableDeltaT);
         solveMomentum (default yes): no holds U fixed (prescribed motion);
         secondOrder (default yes): no uses first-order (piecewise constant)
@@ -160,7 +160,7 @@ public:
         scalar stableDeltaT() const;
 
         //- Lagrange step over dt (WP 2.3, decision 0013, boundary
-        //  conditions decision 0016): MUSCL-Hancock face states, acoustic
+        //  conditions decision 0018): MUSCL-Hancock face states, acoustic
         //  Riemann solver per face, momentum, Hughes-Winget rotation and one
         //  constitutive call per cell. Fills phiL and leaves the Lagrangian
         //  state (decision 0014). Parallel-safe; coupled faces are solved on

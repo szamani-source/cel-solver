@@ -17,7 +17,7 @@
        velocity and normal traction with the P impedance rho c_p, tangential
        velocity and shear traction with the S impedance rho c_s. Result: face
        velocity vStar and the traction tStar = sigma* & n on the owner side.
-       Boundary faces from the patch type of U (decision 0016).
+       Boundary faces from the patch type of U (decision 0018).
     3. phiL = vStar & Sf (decision 0014); face force F = tStar |Sf|.
        Coupled faces (cyclic, processor, processorCyclic) are solved on the
        owner side only; the other side receives vStar and -F, -phiL, so both
@@ -356,7 +356,7 @@ inline void riemann
 }
 
 
-//- Boundary kinds (decision 0016)
+//- Boundary kinds (decision 0018)
 enum class boundaryKind { coupled, empty, velocity, symmetry, traction };
 
 

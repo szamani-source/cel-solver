@@ -9,7 +9,7 @@
 # C. Case B decomposed on 2 processors prints the same time steps, mass and
 #    momentum as the serial run (1e-12 relative).
 #
-# WP 2.3 (decision 0016): since the Lagrange step is in, case B moves (the moving
+# WP 2.3 (decision 0018): since the Lagrange step is in, case B moves (the moving
 # half meets the fixed walls), so its time step, mass and momentum change during
 # the run. Case A (at rest) still checks that every step and value stays constant;
 # B checks the start values against the hand calculation; C now compares every

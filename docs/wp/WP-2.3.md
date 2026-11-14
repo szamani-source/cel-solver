@@ -86,7 +86,7 @@ and parallel.
 Built:
 
 - `src/celEulerian/eulerianSolid/eulerianSolidLagrange.C`: the whole step (stub moved
-  out of `eulerianSolid.C`). Choices in decision 0016: per-face MC slopes along the
+  out of `eulerianSolid.C`). Choices in decision 0018: per-face MC slopes along the
   cell-centre line from Gauss gradients, Hancock predictor, mirror ghost cells at
   boundaries, boundary kinds from the U patch type, owner-side solve plus exchange on
   coupled faces, default `maxCo` 0.4, `solveMomentum` and `secondOrder` switches.
@@ -116,7 +116,7 @@ Results (`tests/test_lagrange_step.sh`, all pass):
 
 Measured for the record:
 
-- Stable Courant number (decision 0016 item 4): 2D 0.65, 3D 0.50 over 2 crossings;
+- Stable Courant number (decision 0018 item 4): 2D 0.65, 3D 0.50 over 2 crossings;
   over 8 crossings 3D grows at 0.50 and stays bounded at 0.45. Default 0.4.
 - Overshoot of a 45 degree step at maxCo 0.4: 0.46 % (first crossing), 0.44 % in the
   second (decision 0013 prototype: 2.7 % at start-up, below 0.3 % after). 3D
@@ -124,7 +124,7 @@ Measured for the record:
 - Run time 1.2e-6 s per cell per step (serial, 2D 100 x 100, linear elastic,
   second order), on the cloud container.
 - smokeBox (moving half against fixed walls) now really moves: `test_eulerian_skeleton.sh`
-  case B adjusted (decision 0016 item 6).
+  case B adjusted (decision 0018 item 6).
 
 Not verified: graded or distorted meshes, non-Cartesian cells, plastic waves (need
 the remap: WP 2.4b).
