@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-11-14
+Last updated: 2026-11-14 (WP 2.4)
 
 Plan doc: https://claude.ai/artifact/DTT6kSikz9ZUTBkUxY6Grr
 
@@ -24,7 +24,7 @@ Phase 1 is complete (formulation fixed in decision 0013). Phase 2: the C++ Euler
 | 2.1 | Eulerian library skeleton and solver fields | Done | `src/celEulerian` (class `eulerianSolid`), celFoam is a thin driver; `tests/test_eulerian_skeleton.sh` passes serial and on 2 processors (decision 0010). PR #8 |
 | 2.2 | Constitutive library interface in C++, elastic and J2 | Done | `src/celConstitutive/` (plain C++ kernel + OpenFOAM wrapper, decision 0006); `tests/test_constitutive_cpp.sh` passes in CI (kernel matches Python to 3e-15; wrapper and celFoam checks pass). PR #4 merged (2026-11-14) |
 | 2.3 | Lagrange step in C++ | Next | Brief: `docs/wp/WP-2.3.md` |
-| 2.4 | Remap in C++, single material | Next | Brief: `docs/wp/WP-2.4.md` |
+| 2.4 | Remap in C++, single material | Done | `eulerianSolidRemap.C`: unsplit face-based remap, geometry from `phiL` only, Barth-Jespersen form of MC/superbee per field (`remapLimiters` in materialProperties), decision 0016. `tests/test_remap.sh` passes: 1D prototype match 7e-14, order 2.7 (2D) / 2.3 (3D), no new extrema, history edge 2 cells, slotted disc, 2 and 4 processors match serial to 3e-14, conservation 1e-13. Stable to summed Courant about 0.9. Merged on green CI (2026-11-14) |
 | 2.4b | Lagrange step plus remap, integration checks | Blocked on 2.3 and 2.4 | Brief: `docs/wp/WP-2.4b.md` |
 | 2.5a | Drucker-Prager in C++ | Done | `kernel/celDruckerPrager`, wrapper `druckerPrager` (`fit` word option, decision 0009); 14 new reference paths match Python to 2e-15 with apex returns; celFoam selects it. Merged on green CI (2026-11-14) |
 | 2.5b | Mohr-Coulomb in C++ | Done | `kernel/celMohrCoulomb`, Jacobi eigen-solver `kernel/celEigen` (decision 0011); `tests/test_constitutive_cpp.sh` matches Python on 10 MC paths to 1e-14, edge and apex returns required. Tension cut-off split to 2.5c |
@@ -50,7 +50,7 @@ anything that cannot be undone outside this repository.
 Started 2026-11-14, one thread each, independent of each other:
 
 1. WP 2.3: Lagrange step in C++ (`docs/wp/WP-2.3.md`).
-2. WP 2.4: remap in C++ (`docs/wp/WP-2.4.md`).
+2. WP 2.4: remap in C++: done (2026-11-14).
 3. WP 2.5c: Mohr-Coulomb tension cut-off: done (2026-11-14).
 
 2.3 and 2.4 are built in parallel against the contract in decision 0014 (`phiL` face
@@ -72,6 +72,11 @@ After that, Phase 3 (materials and void): briefs not written yet.
 - 2D prototype: a step at 45 degrees overshoots 2.7 percent during its first cell of
   travel, then below 0.3 percent (decision 0013; the 13 percent in decision 0012 was a
   jagged test step). Like the 1D impact start-up, accepted; contact (WP 4.3) re-measures.
+- C++ remap (WP 2.4) has no corner transport: stable up to a summed outflow material
+  Courant number of about 0.9 (2D 0.45 and 3D 0.30 per direction on a diagonal), far
+  above what the acoustic step gives except for near-sonic material speeds. Density
+  is not returned to uniform exactly by a compress-then-reverse flux (1e-3 at Courant
+  0.2); velocity, stress and history are (decision 0016).
 - The C++ solver will be unsplit, which the prototype is not; an unsplit proxy needs
   CFL about 0.3 in 2D. WP 2.3 must re-run the disc, shear and 45 degree checks on the
   C++ scheme and measure its stable Courant number (decision 0013, item 2).

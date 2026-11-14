@@ -1,7 +1,7 @@
 # WP 2.4: Remap in C++ (single material)
 
-State: not started
-Branch: `wp-2.4-remap`
+State: done (2026-11-14)
+Branch: `claude/project-thread-4tw65y` (thread branch; the brief planned `wp-2.4-remap`)
 
 ## Goal
 
@@ -75,4 +75,23 @@ Courant numbers far below that except for supersonic motion. Record what was mea
 
 ## Log
 
-(none yet)
+### 2026-11-14
+
+Done in one session. `src/celEulerian/eulerianSolid/eulerianSolidRemap.C` (stub moved
+out of `eulerianSolid.C`), `tests/eulerian/remapCheck/` (`celRemapCheck`: reads a
+prescribed motion from `system/remapCheckDict`, sets `rho_L = rho V/V_L`, calls
+`remap`), `tests/eulerian/remap_test.py` (writes meshes and initial fields, checks),
+`tests/test_remap.sh`. Decision 0016 has the method and every number.
+
+- Geometry from `phiL` alone (least-squares cell velocity, full face displacement
+  vector), so the contract (decision 0014) is unchanged.
+- First limiter (each face's own difference) let round-off between identical rows
+  switch the gradient off: rows drifted 3 percent apart in 20 steps. Fixed with the
+  Barth-Jespersen form (neighbour range), which still equals MC/superbee in 1D.
+- Limiters per field in `materialProperties`, subdictionary `remapLimiters`
+  (documented in the smokeBox tutorial's materialProperties).
+- All "done when" items pass; density under compress-then-reverse is reported, not
+  required to round-off (it cannot be; see decision 0016). Stability: summed Courant
+  about 0.9 (`remap_test.py --study`). Test takes about 2 minutes.
+- Next: WP 2.4b once WP 2.3 merges. Velocity/stress are reconstructed in space, not
+  in mass coordinates as the 1D prototype does (equal when density is uniform).
