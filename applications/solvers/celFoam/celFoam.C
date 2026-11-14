@@ -7,9 +7,9 @@ Description
 
     Thin driver (WP 2.1): the Eulerian state and the steps of the explicit
     cycle live in library celEulerian (class eulerianSolid). Each cycle:
-    stable time step, Lagrange step, remap, write. The Lagrange step
-    (WP 2.3) and remap (WP 2.4) are still empty; contact comes in WP 4.x
-    (see docs/work-packages.md).
+    stable time step, Lagrange step (WP 2.3), remap (WP 2.4), write. The
+    two together are checked by tests/test_eulerian_cycle.sh (WP 2.4b);
+    contact comes in WP 4.x (see docs/work-packages.md).
 \*---------------------------------------------------------------------------*/
 
 #include "fvCFD.H"
