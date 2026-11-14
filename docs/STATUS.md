@@ -21,7 +21,7 @@ Phase 1 (2D prototype) and Phase 2 (C++ material models, Eulerian library skelet
 | 1.3a | 2D plane-strain prototype, elastic waves | Next | Brief: `docs/wp/WP-1.3a.md` |
 | 1.3b | 2D rotation, plasticity and formulation decision | Blocked on 1.3a | Brief: `docs/wp/WP-1.3b.md` |
 | 1.4 | Single-point constitutive driver: elastic, J2, Drucker-Prager, Mohr-Coulomb | Done | `prototype/constitutive/`; `tests/test_proto_constitutive.sh` passes in CI; PR #2 merged (2026-11-14) |
-| 2.1 | Eulerian library skeleton and solver fields | Next | Brief: `docs/wp/WP-2.1.md` |
+| 2.1 | Eulerian library skeleton and solver fields | Done | `src/celEulerian` (class `eulerianSolid`), celFoam is a thin driver; `tests/test_eulerian_skeleton.sh` passes serial and on 2 processors (decision 0009). PR: see brief |
 | 2.2 | Constitutive library interface in C++, elastic and J2 | Done | `src/celConstitutive/` (plain C++ kernel + OpenFOAM wrapper, decision 0006); `tests/test_constitutive_cpp.sh` passes in CI (kernel matches Python to 3e-15; wrapper and celFoam checks pass). PR #4 merged (2026-11-14) |
 | 2.5a | Drucker-Prager in C++ | Next | Brief: `docs/wp/WP-2.5a.md` |
 | 2.5b | Mohr-Coulomb in C++ | Next | Brief: `docs/wp/WP-2.5b.md` |
@@ -48,10 +48,10 @@ Started 2026-11-14, one thread each, independent of each other:
 1. WP 1.3a: 2D plane-strain prototype, elastic waves (`docs/wp/WP-1.3a.md`).
 2. WP 2.5a: Drucker-Prager in C++ (`docs/wp/WP-2.5a.md`).
 3. WP 2.5b: Mohr-Coulomb in C++ (`docs/wp/WP-2.5b.md`).
-4. WP 2.1: Eulerian library skeleton and solver fields (`docs/wp/WP-2.1.md`).
+4. WP 2.1: Eulerian library skeleton and solver fields (`docs/wp/WP-2.1.md`): done.
 
 After those: 1.3b follows 1.3a. 2.3 (stress update with objective rate) and 2.4 (remap)
-follow 2.1 and the 1.3b formulation decision; briefs not written yet.
+follow the 1.3b formulation decision (2.1 is done; each fills one `eulerianSolid` method); briefs not written yet.
 
 ## Known issues
 
