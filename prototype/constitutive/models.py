@@ -201,16 +201,59 @@ def _mc_principal_planes(sphi, spsi):
     return main, edge_12, edge_23
 
 
+def mc_tension_cutoff(params):
+    """Tensile strength sigma_t (Pa) of Mohr-Coulomb, or None without a cut-off.
+
+    Must satisfy 0 <= sigma_t <= c cot(phi) (the apex); anything else is rejected.
+    """
+    st = params.get("sigma_t")
+    if st is None:
+        return None
+    st = float(st)
+    phi = math.radians(params["phi"])
+    apex = math.inf if params["phi"] == 0.0 else params["c"] * math.cos(phi) / math.sin(phi)
+    if not (0.0 <= st <= apex * (1.0 + 1e-12)):
+        raise ValueError("Mohr-Coulomb sigma_t = %g Pa must be in [0, c cot(phi)] = [0, %g] Pa"
+                         % (st, apex))
+    return st
+
+
+# Candidate active sets for the return with a tension cut-off: indices into the plane
+# list [main, edge_23, edge_12, T1, T2, T3], tried one, two, then three at a time.
+_MC_T_SETS = ([(i,) for i in range(6)]
+              + [(i, j) for i in range(6) for j in range(i + 1, 6)]
+              + [(i, j, k) for i in range(6) for j in range(i + 1, 6) for k in range(j + 1, 6)])
+
+
+def _mc_return_planes(w, Dp, planes, rhs):
+    """Return onto the active planes: A dg = b, A_ij = nf_i . Dp ng_j,
+    b_i = nf_i . w - rhs_i; s = w - Dp sum dg_j ng_j."""
+    A = np.array([[nf @ Dp @ ng for (_, ng) in planes] for (nf, _) in planes])
+    b = np.array([nf @ w - r for (nf, _), r in zip(planes, rhs)])
+    dg = np.linalg.solve(A, b)
+    return w - Dp @ sum(d * ng for d, (_, ng) in zip(dg, planes)), dg
+
+
 def mohr_coulomb(deps, sigma, history, params):
-    """params: E, nu, phi, c, psi (degrees, Pa).
+    """params: E, nu, phi, c, psi (degrees, Pa), optional sigma_t (Pa, tension cut-off).
 
     Return mapping in principal stress space (de Souza Neto et al., section 8.2.2):
     main plane, then the edge that the main-plane return crosses (triaxial compression
     or extension corner), then the apex. Because the surface is a set of planes and the
     material is perfectly plastic, each return is a small linear solve and is exact.
+
+    With sigma_t (WP 2.5c) three Rankine planes s_i <= sigma_t (associated flow) are
+    added. If the Mohr-Coulomb return above lands inside them it stands, so paths that
+    never reach the cut-off are unchanged bit for bit. Otherwise every active set of
+    one to three planes out of the three Mohr-Coulomb and three Rankine planes is
+    tried in a fixed order (_MC_T_SETS) and the first that is admissible is taken:
+    multipliers >= 0, principal order kept, and every yield function at or below zero.
+    This covers the tension plane, the tension edge (s1 = s2 = sigma_t), the tension
+    apex (hydrostatic sigma_t) and the mixed Mohr-Coulomb/tension corners.
     """
     K, G = bulk_shear(params)
     c = params["c"]
+    st = mc_tension_cutoff(params)
     sphi = math.sin(math.radians(params["phi"]))
     cphi = math.cos(math.radians(params["phi"]))
     spsi = math.sin(math.radians(params["psi"]))
@@ -222,42 +265,81 @@ def mohr_coulomb(deps, sigma, history, params):
     k = 2.0 * c * cphi
     scale = max(np.max(np.abs(w)), c, 1.0)
     f_trial = (w[0] - w[2]) + (w[0] + w[2]) * sphi - k
-    if f_trial <= YIELD_TOL * scale:
+    t_trial = -np.inf if st is None else w[0] - st
+    if f_trial <= YIELD_TOL * scale and t_trial <= YIELD_TOL * scale:
         return _elastic(trial, history)
 
     Dp = np.full((3, 3), K - 2.0 * G / 3.0) + np.eye(3) * 2.0 * G
     main, edge_12, edge_23 = _mc_principal_planes(sphi, spsi)
 
     def ret(planes):
-        A = np.array([[nf @ Dp @ ng for (_, ng) in planes] for (nf, _) in planes])
-        b = np.array([nf @ w - k for (nf, _) in planes])
-        dg = np.linalg.solve(A, b)
-        return w - Dp @ sum(d * ng for d, (_, ng) in zip(dg, planes)), dg
+        return _mc_return_planes(w, Dp, planes, [k] * len(planes))
 
     tol = 1e-12 * scale
     apex = False
-    s_new, dg = ret([main])
-    if not (s_new[0] >= s_new[1] - tol and s_new[1] >= s_new[2] - tol):
-        planes = [main, edge_23] if s_new[1] > s_new[0] else [main, edge_12]
-        s_new, dg = ret(planes)
-        ok = np.all(dg >= -tol) and s_new[0] >= s_new[1] - tol and s_new[1] >= s_new[2] - tol
-        if not ok:
-            if sphi == 0.0:
-                raise RuntimeError("Tresca corner return failed")
-            s_new = np.full(3, c * cphi / sphi)   # apex at c cot(phi)
+    s_new = None
+    if f_trial > YIELD_TOL * scale:
+        s_new, dg = ret([main])
+        if not (s_new[0] >= s_new[1] - tol and s_new[1] >= s_new[2] - tol):
+            planes = [main, edge_23] if s_new[1] > s_new[0] else [main, edge_12]
+            s_new, dg = ret(planes)
+            ok = np.all(dg >= -tol) and s_new[0] >= s_new[1] - tol and s_new[1] >= s_new[2] - tol
+            if not ok:
+                if sphi == 0.0:
+                    raise RuntimeError("Tresca corner return failed")
+                s_new = np.full(3, c * cphi / sphi)   # apex at c cot(phi)
+                apex = True
+        if not apex and sphi > 0.0 and (s_new[0] + s_new[2]) / 2.0 > c * cphi / sphi + tol:
+            s_new = np.full(3, c * cphi / sphi)
             apex = True
-    if not apex and sphi > 0.0 and (s_new[0] + s_new[2]) / 2.0 > c * cphi / sphi + tol:
-        s_new = np.full(3, c * cphi / sphi)
-        apex = True
+
+    if st is not None and (s_new is None or s_new[0] > st + tol):
+        s_new, apex = _mc_tension_return(w, Dp, sphi, k, st, scale,
+                                         [main, edge_23, edge_12])
 
     sig_new = tensor_to_stress(V @ np.diag(s_new) @ V.T)
     return _finish(trial, sig_new, history, K, G, apex=apex)
+
+
+def _mc_tension_return(w, Dp, sphi, k, st, scale, mc_planes):
+    """Active-set return onto Mohr-Coulomb plus Rankine planes (WP 2.5c).
+
+    Returns (s, apex): sorted principal stresses and whether s is the tension apex.
+    """
+    e = np.eye(3)
+    planes = list(mc_planes) + [(e[i], e[i]) for i in range(3)]
+    rhs = [k, k, k, st, st, st]
+    M = Dp[0, 0]                          # K + 4G/3: turns a multiplier into a stress
+    tol = 1e-10 * max(scale, st)
+    for act in _MC_T_SETS:
+        P = [planes[i] for i in act]
+        A = np.array([[nf @ Dp @ ng for (_, ng) in P] for (nf, _) in P])
+        if abs(np.linalg.det(A)) <= 1e-12 * np.prod(np.abs(np.diag(A))):
+            continue                      # dependent planes
+        s, dg = _mc_return_planes(w, Dp, P, [rhs[i] for i in act])
+        if np.any(dg * M < -tol):
+            continue
+        if not (s[0] >= s[1] - tol and s[1] >= s[2] - tol):
+            continue
+        f_mc = (s[0] - s[2]) + (s[0] + s[2]) * sphi - k
+        if f_mc > tol or s[0] - st > tol:
+            continue
+        return s, act == (3, 4, 5)
+    raise RuntimeError("Mohr-Coulomb tension cut-off return found no active set")
 
 
 def mc_yield(sigma, params, history=None):
     w = np.linalg.eigvalsh(stress_to_tensor(sigma))
     phi = math.radians(params["phi"])
     return (w[-1] - w[0]) + (w[-1] + w[0]) * math.sin(phi) - 2.0 * params["c"] * math.cos(phi)
+
+
+def rankine_yield(sigma, params, history=None):
+    """Tension cut-off yield function max(s_i) - sigma_t (-inf without a cut-off)."""
+    st = mc_tension_cutoff(params)
+    if st is None:
+        return -math.inf
+    return np.linalg.eigvalsh(stress_to_tensor(sigma))[-1] - st
 
 
 MODELS = {

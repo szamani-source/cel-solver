@@ -17,6 +17,11 @@ FoamFile
 //                   extension (inner cone) or plane_strain match to
 //                   Mohr-Coulomb. Perfectly plastic, non-associated (psi).
 //                   Example: phi 30; c 10e3; psi 5; fit compression;
+//   mohrCoulomb     needs E, nu, phi [deg], c [Pa], psi [deg] (WP 2.5b);
+//                   optional sigmaT [Pa]: tensile strength (Rankine tension
+//                   cut-off, WP 2.5c), 0 <= sigmaT <= c cot(phi); without it
+//                   cohesive material carries tension up to c cot(phi).
+//                   Example: phi 30; c 10e3; psi 5; sigmaT 5e3;
 // rho: density used where no 0/rho file is given (eulerianSolid, WP 2.1).
 // The stable time step uses the model's wave modulus K + 4G/3 and the cell
 // density.

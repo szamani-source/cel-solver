@@ -43,6 +43,10 @@ PY_MODELS = {
 }
 
 
+# Python parameter name -> C++ kernel parameter name, where they differ
+CPP_PARAM = {"sigma_t": "sigmaT"}
+
+
 def fmt(values):
     return " ".join("%.17g" % v for v in values)
 
@@ -54,7 +58,7 @@ def write_case(out, name, model_name, params, sigma0, deps_list):
     options = {k: v for k, v in params.items() if isinstance(v, str)}
     out.write("case %s %s %d %s\n" % (
         name, model_name, len(numbers),
-        " ".join("%s %.17g" % (k, v) for k, v in numbers.items())))
+        " ".join("%s %.17g" % (CPP_PARAM.get(k, k), v) for k, v in numbers.items())))
     for k, v in options.items():
         out.write("option %s %s\n" % (k, v))
     sigma = np.array(sigma0, dtype=float)
@@ -176,6 +180,57 @@ def main():
             # 1000 random increments (same fixed-seed increments as above)
             write_case(out, tag + "_random1000", "mohrCoulomb", p,
                        -pc * models.I_V, random_steps)
+
+        # WP 2.5c: Mohr-Coulomb with a tension cut-off, sigma_t = 0 and 0.5 c cot(phi)
+        base = dict(mc_sets[0][1])
+        ccot = base["c"] / np.tan(np.radians(base["phi"]))
+        trng = np.random.default_rng(2025)
+
+        def tension_path(n):
+            """Random increments biased to tension (as in check_models.py)."""
+            steps = []
+            for _ in range(n):
+                mag = 10 ** trng.uniform(-6, -2.5)
+                kind = trng.integers(5)
+                if kind == 0:
+                    steps.append(mag * models.I_V * trng.uniform(0.5, 2))
+                elif kind == 1:
+                    a, b = trng.uniform(0, 1), trng.uniform(-1, 1)
+                    steps.append(mag * np.array([a, a, b, 0, 0, 0]))
+                elif kind == 2:
+                    a, b = trng.uniform(0.5, 1), trng.uniform(-0.5, 0)
+                    steps.append(mag * np.array([a, b, b, 0, 0, 0]))
+                else:
+                    steps.append(mag * (trng.normal(size=6) + 0.5 * models.I_V))
+            return steps
+
+        tension_steps = tension_path(1000)
+        for tag, p in (("mcTension0", dict(base, sigma_t=0.0)),
+                       ("mcTensionHalf", dict(base, sigma_t=0.5 * ccot))):
+            d = np.zeros(6)
+            # Axial tension at 2 kPa confining stress (radial stresses held), up to
+            # the cut-off (from zero confinement the sigma_t = 0 path would be all
+            # round-off)
+            r = driver.triaxial(mc, p, 0.02 * pc, 0.01, 100, extension=True)
+            write_case(out, tag + "_triaxialTension", "mohrCoulomb", p,
+                       -0.02 * pc * models.I_V, increments(r))
+            # Hydrostatic stretch from 100 kPa compression to the tension apex
+            write_case(out, tag + "_hydrostaticTension", "mohrCoulomb", p,
+                       -pc * models.I_V, [d + 1e-4 * models.I_V] * 100)
+            # Tension to the cut-off, then shear in the x-y plane at fixed volume
+            stretch = [d + [2e-4, 1e-4, 0, 0, 0, 0]] * 60
+            shear = [d + [0, 0, 0, 2e-4, 0, 0]] * 100
+            write_case(out, tag + "_tensionShear", "mohrCoulomb", p,
+                       -0.1 * pc * models.I_V, stretch + shear)
+            # Uniaxial strain: compress, unload and pull through the cut-off
+            load = [d + [0, 0, -2e-2 / 100, 0, 0, 0]] * 100
+            unload = [d + [0, 0, 1e-2 / 50, 0, 0, 0]] * 50
+            pull = [d + [0, 0, 2e-2 / 100, 0, 0, 0]] * 100
+            write_case(out, tag + "_uniaxialStrain", "mohrCoulomb", p,
+                       -pc * models.I_V, load + unload + pull)
+            # 1000 random increments biased to tension
+            write_case(out, tag + "_random1000", "mohrCoulomb", p, -0.2 * pc * models.I_V,
+                       tension_steps)
 
 
 if __name__ == "__main__":

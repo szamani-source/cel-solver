@@ -5,7 +5,8 @@ Class
 Description
     Perfectly plastic Mohr-Coulomb with non-associated flow (WP 2.5b).
     Parameters: E [Pa], nu [-], phi [deg] friction angle, c [Pa] cohesion,
-    psi [deg] dilation angle.
+    psi [deg] dilation angle, and optional sigmaT [Pa] tensile strength
+    (Rankine tension cut-off, WP 2.5c; 0 <= sigmaT <= c cot(phi)).
 
     Yield function in sorted principal stresses s1 >= s2 >= s3 (tension
     positive):
@@ -19,7 +20,13 @@ Description
     1x1 or 2x2 linear solve with the active planes, exact for perfect
     plasticity. The principal directions come from symmetricEigen (celEigen.H).
 
-    No tension cut-off: the Python reference has none (decision 0004).
+    With sigmaT (WP 2.5c, decision 0015) three Rankine planes s_i <= sigmaT
+    with associated flow are added. The Mohr-Coulomb return above stands if
+    it lands inside them, so paths that never reach the cut-off are
+    unchanged. Otherwise every active set of one to three planes out of
+    {main, s1 = s2 edge, s2 = s3 edge, T1, T2, T3} is tried in a fixed order
+    and the first admissible one is taken (multipliers >= 0, order kept,
+    all yield functions <= 0), as _mc_tension_return in models.py.
     phi = 0 gives Tresca (no apex; a failed corner return throws).
 \*---------------------------------------------------------------------------*/
 
@@ -46,8 +53,15 @@ public:
         plane,
         compressionEdge,    // s1 = s2
         extensionEdge,      // s2 = s3
-        apex
+        apex,
+        tensionPlane,       // s1 = sigmaT
+        tensionEdge,        // s1 = s2 = sigmaT
+        tensionApex,        // s1 = s2 = s3 = sigmaT
+        tensionCorner       // Mohr-Coulomb and tension planes both active
     };
+
+    //- Number of Return values (for counting)
+    static constexpr int nReturns = 9;
 
 private:
 
@@ -56,6 +70,12 @@ private:
     double sinPhi_;
     double cosPhi_;
     double sinPsi_;
+    bool tension_;
+    double sigmaT_;
+
+    //- Active-set return onto Mohr-Coulomb plus Rankine planes, sorted
+    //  principal trial w -> s. Returns the kind of return taken.
+    Return tensionReturn(const double w[3], double scale, double s[3]) const;
 
 public:
 
@@ -92,6 +112,16 @@ public:
 
     //- Yield function at sigma (mc_yield in models.py), for tests
     double yield(const Voigt sigma) const;
+
+    //- True if a tension cut-off sigmaT was given
+    bool hasTensionCutOff() const
+    {
+        return tension_;
+    }
+
+    //- Tension cut-off yield function max(s_i) - sigmaT (rankine_yield in
+    //  models.py); -infinity without a cut-off
+    double tensionYield(const Voigt sigma) const;
 };
 
 } // End namespace constitutive
