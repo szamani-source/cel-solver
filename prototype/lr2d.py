@@ -544,16 +544,28 @@ def check_mirror():
     return ok
 
 
-def check_step(angle, n, criterion=True):
+def check_step(angle, n, startup_cells=0.0):
     """Square P pulse along angle, material streaming at 0.25 c_p along the
     diagonal. No new extrema above 1 % of each field's jump; conservation.
 
-    criterion=False only reports the extrema (the 45 degree pulse: the
-    direction-by-direction Riemann solver overshoots there, decision 0012)."""
+    Extrema in the first startup_cells cells of wave travel (along the
+    normal) are reported, not checked. Along x there is no start-up
+    overshoot (startup_cells 0). At 45 degrees a sharp step overshoots by
+    about 2.7 % in the first cell of travel and below 0.3 % after three
+    (decision 0013; the 13 % of decision 0012 came from a jagged initial
+    step, see below)."""
     box = Box2D(n, n, LENGTH, LENGTH, RHO, K_MOD, G_MOD)
     kx, ky = (1, 1) if angle == 45 else (1, 0)
-    X, Y = np.meshgrid(box.xc, box.yc)
-    s = (kx * X + ky * Y) % LENGTH
+    if angle == 45:
+        # s = x + y from integer indices. Computed from the cell centres in
+        # floating point, cells of one diagonal fall on both sides of the
+        # threshold, the front is jagged at the cell scale and radiates
+        # genuine 2D waves (most of the 13 % in decision 0012).
+        J, I = np.indices((n, n))
+        s = ((I + J + 1) % n) * box.dx
+    else:
+        X, Y = np.meshgrid(box.xc, box.yc)
+        s = (kx * X) % LENGTH
     eps = 1.0e-7 * np.where((s >= 0.2) & (s < 0.5), 1.0, 0.0)
     vd = 0.25 * box.cp / math.sqrt(2.0)
     set_plane_wave(box, "P", angle, eps, (vd, vd))
@@ -561,32 +573,41 @@ def check_step(angle, n, criterion=True):
     lo = {k: getattr(box, k).min() for k in keys}
     hi = {k: getattr(box, k).max() for k in keys}
     over = {k: 0.0 for k in keys}
+    over_start = {k: 0.0 for k in keys}
     m0 = box.total_mass()
     px0, py0 = box.total_momentum()
     pscale = (box.cell_mass() * np.hypot(box.vx, box.vy)).sum()
+    hn = box.dx / math.hypot(kx, ky)          # cell size along the normal
 
     def track(b, k):
+        w = over_start if box.cp * b.t < startup_cells * hn else over
         for q in keys:
             a = getattr(b, q)
-            over[q] = max(over[q], a.max() - hi[q], lo[q] - a.min())
+            w[q] = max(w[q], a.max() - hi[q], lo[q] - a.min())
 
     t_end = 0.4 * LENGTH / math.hypot(kx, ky) / (box.cp + 0.25 * box.cp)
     box.run(t_end, callback=track)
     worst = 0.0
+    worst_start = 0.0
     final = 0.0
     for q in keys:
         jump = hi[q] - lo[q]
         if jump > 0.0:
             worst = max(worst, over[q] / jump)
+            worst_start = max(worst_start, over_start[q] / jump)
             a = getattr(box, q)
             final = max(final, (a.max() - hi[q]) / jump, (lo[q] - a.min()) / jump)
-    ok_e = worst <= 0.01 or not criterion
+    ok_e = worst <= 0.01
     dm = abs(box.total_mass() - m0) / m0
     px, py = box.total_momentum()
     dpx, dpy = abs(px - px0) / pscale, abs(py - py0) / pscale
     ok_c = dm <= 1e-12 and dpx <= 1e-12 and dpy <= 1e-12
-    verdict = ("PASS" if ok_e else "FAIL") if criterion else "reported only"
-    print(f"  {angle} deg, {n} x {n}: largest new extremum over the run "
+    verdict = "PASS" if ok_e else "FAIL"
+    if startup_cells > 0.0:
+        print(f"  {angle} deg, {n} x {n}: start-up (first {startup_cells:g} cells of "
+              f"travel) {100 * worst_start:.3f} % of the jump (reported only)")
+    after = " after the start-up" if startup_cells > 0.0 else " over the run"
+    print(f"  {angle} deg, {n} x {n}: largest new extremum{after} "
           f"{100 * worst:.3f} % of the jump, at the end {100 * final:.3f} % "
           f"(<= 1 %: {verdict})")
     print(f"  mass change {dm:.1e}, momentum change x {dpx:.1e}, y {dpy:.1e} "
@@ -626,8 +647,9 @@ def verify(quick=False):
     ok &= check_mirror()
     print("\n[Step P-wave along x, material streaming 0.25 c_p diagonally]")
     ok &= check_step(0, 100 if quick else 200)
-    print("\n[Step P-wave at 45 degrees, same streaming: known issue, decision 0012]")
-    ok &= check_step(45, 100 if quick else 200, criterion=False)
+    print("\n[Step P-wave at 45 degrees, same streaming; start-up of 10 cells "
+          "reported (decision 0013)]")
+    ok &= check_step(45, 100 if quick else 200, startup_cells=10.0)
     print("\n[Fixed walls]")
     ok &= check_wall()
     print("\nFor the log: 45 degree vs axis-aligned L2 errors on the finest mesh")

@@ -3,6 +3,12 @@
 Date: 2026-11-14. Status: accepted for the prototype; the 45 degree overshoot goes to
 the formulation decision in WP 1.3b.
 
+**Correction (WP 1.3b, decision 0013):** item 4 below is mostly wrong. The 45 degree step
+was set from floating-point cell-centre sums, so the initial front was jagged at the
+cell scale. Set from integer indices, the step overshoots 2.7 percent during the first
+cell of travel and 0.12 to 0.22 percent after that. The scheme's Riemann solver is not
+the problem. `lr2d.check_step` now uses the clean step and checks it.
+
 Numbers 0009 to 0011 are taken by WP 2.5a, 2.1 and 2.5b.
 
 ## Context
