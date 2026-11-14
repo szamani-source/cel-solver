@@ -13,9 +13,10 @@ Constitutive models for bulk solids are tracked in `docs/constitutive-models.md`
 | 0.4 | Fast OpenFOAM setup for fresh cloud sessions | New session builds and tests in under 10 minutes |
 | 1.1 | 1D elastic Lagrange-plus-remap prototype | Converges at second order on a smooth wave |
 | 1.2 | 1D plasticity and history remap | Elastic-plastic wave matches analytic |
-| 1.3 | 2D prototype and formulation decision | Decision note written |
+| 1.3a | 2D plane-strain prototype, elastic waves | P and S waves at 0 and 45 degrees converge; reduces to 1D |
+| 1.3b | 2D rotation, plasticity and formulation decision | Rotating disc keeps its stress; decision note written |
 | 1.4 | Single-point constitutive driver: elastic, J2, Drucker-Prager, Mohr-Coulomb | Triaxial strengths match closed form |
-| 2.1 | OpenFOAM solver skeleton, explicit loop, CFL step | Runs empty steps on a hex mesh |
+| 2.1 | Eulerian library skeleton and solver fields | Runs empty cycles serial and on 2 processors, fields written |
 | 2.2 | Constitutive library interface, elastic and J2 | Single-point unit tests pass |
 | 2.3 | Stress update with objective rate | Rigid rotation produces no spurious stress |
 | 2.4 | Single-material remap of all fields | 1D wave reproduced in 3D mesh |
@@ -40,3 +41,5 @@ Constitutive models for bulk solids are tracked in `docs/constitutive-models.md`
 | 6.3 | Scaling tests and validation report | Report published |
 
 Note: the skeleton written in 0.1 already covers part of 2.1 (explicit loop and CFL step).
+
+Note (2026-11-14): 1.3 split into 1.3a and 1.3b to keep each within three sessions.
