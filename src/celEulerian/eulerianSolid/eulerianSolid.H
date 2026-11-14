@@ -40,6 +40,7 @@ SourceFiles
 
 #include "fvMesh.H"
 #include "volFields.H"
+#include "surfaceFields.H"
 #include "IOdictionary.H"
 #include "constitutiveModel.H"
 
@@ -77,6 +78,18 @@ class eulerianSolid
         //- Equivalent plastic strain [-]
         volScalarField epsPEq_;
 
+        //- Face volume flux of the last Lagrange step [m^3/s]: face velocity
+        //  dotted with the face area vector, positive out of the owner cell.
+        //  This is the contract between lagrangeStep() and remap():
+        //  after lagrangeStep(dt) the cell fields hold the values of the
+        //  moved (Lagrangian) cells, whose volume is
+        //      V_L = V + dt * (sum of phiL out of the cell),
+        //  with rho the Lagrangian density (cell mass unchanged). remap(dt)
+        //  moves the volume dt*phiL back across each face and returns all
+        //  fields to the fixed mesh. Not read or written. Zero until
+        //  WP 2.3 fills lagrangeStep().
+        surfaceScalarField phiL_;
+
 
 public:
 
@@ -107,6 +120,17 @@ public:
         const volSymmTensorField& sigma() const { return sigma_; }
         const volSymmTensorField& epsP() const { return epsP_; }
         const volScalarField& epsPEq() const { return epsPEq_; }
+        const surfaceScalarField& phiL() const { return phiL_; }
+
+    // Non-const access for test programs that set a state by hand
+    // (for example a prescribed phiL to test remap() alone)
+
+        volScalarField& rhoRef() { return rho_; }
+        volVectorField& URef() { return U_; }
+        volSymmTensorField& sigmaRef() { return sigma_; }
+        volSymmTensorField& epsPRef() { return epsP_; }
+        volScalarField& epsPEqRef() { return epsPEq_; }
+        surfaceScalarField& phiLRef() { return phiL_; }
 
 
     // Explicit cycle

@@ -6,7 +6,7 @@ Plan doc: https://claude.ai/artifact/DTT6kSikz9ZUTBkUxY6Grr
 
 ## Current phase
 
-Phase 1 (2D prototype) and Phase 2 (C++ material models, Eulerian library skeleton) in parallel.
+Phase 1 is complete (formulation fixed in decision 0013). Phase 2: the C++ Eulerian solver.
 
 ## Work packages
 
@@ -23,9 +23,12 @@ Phase 1 (2D prototype) and Phase 2 (C++ material models, Eulerian library skelet
 | 1.4 | Single-point constitutive driver: elastic, J2, Drucker-Prager, Mohr-Coulomb | Done | `prototype/constitutive/`; `tests/test_proto_constitutive.sh` passes in CI; PR #2 merged (2026-11-14) |
 | 2.1 | Eulerian library skeleton and solver fields | Done | `src/celEulerian` (class `eulerianSolid`), celFoam is a thin driver; `tests/test_eulerian_skeleton.sh` passes serial and on 2 processors (decision 0010). PR #8 |
 | 2.2 | Constitutive library interface in C++, elastic and J2 | Done | `src/celConstitutive/` (plain C++ kernel + OpenFOAM wrapper, decision 0006); `tests/test_constitutive_cpp.sh` passes in CI (kernel matches Python to 3e-15; wrapper and celFoam checks pass). PR #4 merged (2026-11-14) |
+| 2.3 | Lagrange step in C++ | Next | Brief: `docs/wp/WP-2.3.md` |
+| 2.4 | Remap in C++, single material | Next | Brief: `docs/wp/WP-2.4.md` |
+| 2.4b | Lagrange step plus remap, integration checks | Blocked on 2.3 and 2.4 | Brief: `docs/wp/WP-2.4b.md` |
 | 2.5a | Drucker-Prager in C++ | Done | `kernel/celDruckerPrager`, wrapper `druckerPrager` (`fit` word option, decision 0009); 14 new reference paths match Python to 2e-15 with apex returns; celFoam selects it. Merged on green CI (2026-11-14) |
 | 2.5b | Mohr-Coulomb in C++ | Done | `kernel/celMohrCoulomb`, Jacobi eigen-solver `kernel/celEigen` (decision 0011); `tests/test_constitutive_cpp.sh` matches Python on 10 MC paths to 1e-14, edge and apex returns required. Tension cut-off split to 2.5c |
-| 2.5c | Mohr-Coulomb tension cut-off | Not started | Needs a Python reference first; brief not written |
+| 2.5c | Mohr-Coulomb tension cut-off (Python, then C++) | Next | Brief: `docs/wp/WP-2.5c.md` |
 
 ## Standing instruction from Sia (2026-11-14)
 
@@ -46,17 +49,13 @@ anything that cannot be undone outside this repository.
 
 Started 2026-11-14, one thread each, independent of each other:
 
-1. WP 1.3a: 2D plane-strain prototype, elastic waves (`docs/wp/WP-1.3a.md`). Done.
-2. WP 2.5a: Drucker-Prager in C++ (`docs/wp/WP-2.5a.md`). Done.
-3. WP 2.5b: Mohr-Coulomb in C++ (`docs/wp/WP-2.5b.md`). Done.
-4. WP 2.1: Eulerian library skeleton and solver fields (`docs/wp/WP-2.1.md`): done.
+1. WP 2.3: Lagrange step in C++ (`docs/wp/WP-2.3.md`).
+2. WP 2.4: remap in C++ (`docs/wp/WP-2.4.md`).
+3. WP 2.5c: Mohr-Coulomb tension cut-off (`docs/wp/WP-2.5c.md`).
 
-5. WP 1.3b: rotation, plasticity, formulation decision (`docs/wp/WP-1.3b.md`). Done.
-
-Next: 2.3 (C++ stress update: unsplit face Riemann solver, Hughes-Winget rotation, one
-model call per cell per step) and 2.4 (remap, per-field limiters), as decision 0013
-fixes them; each fills one `eulerianSolid` method. Briefs not written yet. 2.5c is
-independent.
+2.3 and 2.4 are built in parallel against the contract in decision 0014 (`phiL` face
+flux, already in `eulerianSolid`). After both merge: WP 2.4b (`docs/wp/WP-2.4b.md`).
+After that, Phase 3 (materials and void): briefs not written yet.
 
 ## Known issues
 

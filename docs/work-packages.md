@@ -18,8 +18,9 @@ Constitutive models for bulk solids are tracked in `docs/constitutive-models.md`
 | 1.4 | Single-point constitutive driver: elastic, J2, Drucker-Prager, Mohr-Coulomb | Triaxial strengths match closed form |
 | 2.1 | Eulerian library skeleton and solver fields | Runs empty cycles serial and on 2 processors, fields written |
 | 2.2 | Constitutive library interface, elastic and J2 | Single-point unit tests pass |
-| 2.3 | Stress update with objective rate | Rigid rotation produces no spurious stress |
-| 2.4 | Single-material remap of all fields | 1D wave reproduced in 3D mesh |
+| 2.3 | Lagrange step in C++: face Riemann solver, objective stress update | Waves, rotation, shear, walls, parallel checks pass |
+| 2.4 | Remap in C++, single material | Reduces to 1D; conservative, monotone, second order |
+| 2.4b | Lagrange step plus remap, integration checks | 2D prototype checks reproduced by celFoam |
 | 2.5a | Drucker-Prager in C++ | Matches the 1.4 reference on all paths |
 | 2.5b | Mohr-Coulomb in C++ (corners, apex) | Matches the 1.4 reference on all paths |
 | 2.5c | Mohr-Coulomb tension cut-off (Python reference, then C++); split from 2.5b, decision 0011 | Cut-off returns match the reference; uniaxial tension stops at the cut-off |
