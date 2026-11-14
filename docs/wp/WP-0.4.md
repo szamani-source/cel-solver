@@ -1,6 +1,6 @@
 # WP 0.4: Fast OpenFOAM setup for fresh cloud sessions
 
-State: done, PR open
+State: done
 Branch: `claude/project-thread-mbzxdh` (thread sessions may only push to their assigned branch)
 
 ## Goal
