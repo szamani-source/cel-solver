@@ -1,7 +1,7 @@
 # 0008 Numerics for elastic-plastic waves and history remap (WP 1.2)
 
-Date: 2026-11-14. Status: proposed. Item 3 waits for Sia's choice (asked in the
-WP 1.2 project thread); the test is written for the recommended option.
+Date: 2026-11-14. Status: accepted. Sia chose option 1 of item 3 (check after the
+start-up) on 2026-11-14.
 
 Numbers 0006 and 0007 are taken by WP 2.2 and WP 0.4 branches running in parallel.
 

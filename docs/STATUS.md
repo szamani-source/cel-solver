@@ -17,14 +17,12 @@ Phase 1 prototypes, with Phase 0 tooling (0.4) and the first Phase 2 library (2.
 | 0.3 | Target problems, units, material data | Draft | `docs/spec/target-problems.md` waits for Sia's answers |
 | 0.4 | Fast OpenFOAM setup for fresh cloud sessions | Next | Brief: `docs/wp/WP-0.4.md` |
 | 1.1 | 1D elastic Lagrange-plus-remap prototype | Done | `prototype/lr1d.py`, `tests/test_proto_1d_elastic.sh` passes (order 1.88/1.83, monotone, conservative). Cell-centred instead of staggered: decision 0005. PR #3 merged (2026-11-14) |
-| 1.2 | 1D plasticity and history remap | Review | `prototype/lr1d_plastic.py`, `tests/test_proto_1d_plastic.sh` passes (wave speeds and HEL within 0.2 %, history edges 2 cells). Decision 0008; item 3 waits on Sia |
+| 1.2 | 1D plasticity and history remap | Review | `prototype/lr1d_plastic.py`, `tests/test_proto_1d_plastic.sh` passes (wave speeds and HEL within 0.2 %, history edges 2 cells). Decision 0008 accepted. PR #6, CI green |
 | 1.4 | Single-point constitutive driver: elastic, J2, Drucker-Prager, Mohr-Coulomb | Done | `prototype/constitutive/`; `tests/test_proto_constitutive.sh` passes in CI; PR #2 merged (2026-11-14) |
 | 2.2 | Constitutive library interface in C++, elastic and J2 | Next | Brief: `docs/wp/WP-2.2.md` |
 
 ## Waiting on Sia
 
-- WP 1.2: how the step-loading test treats the impact start-up overshoot (decision 0008
-  item 3). The test is written for the recommended option; the PR can merge either way.
 - Answers to the open questions in `docs/spec/target-problems.md` (closes 0.3). Not
   blocking 1.2, 0.4 or 2.2; needed before the Phase 2 benchmarks (2.6).
 - Confirm GPL-3.0 (decision 0003). Not blocking development; needed before the code is

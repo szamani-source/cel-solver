@@ -1,6 +1,6 @@
 # WP 1.2: 1D plasticity and history remap
 
-State: done, waiting for review (and Sia's choice on decision 0008 item 3)
+State: done, waiting for review
 Branch: `claude/project-thread-a7fstf` (the session's assigned branch; the planned name was `wp-1.2-1d-plasticity`)
 
 ## Goal
@@ -83,6 +83,6 @@ Learned:
 - `uniaxial_response` probes any model for its HEL and plastic wave speed; for von Mises
   it reproduces the closed forms to 1e-9.
 
-Next: Sia picks an option for decision 0008 item 3 (start-up overshoot) and reviews the
-PR. If Sia wants the strict check, add an elastic-plastic Riemann solver (probably a new
-package, WP 1.2b). Then WP 1.3.
+Update: Sia chose to check extrema after the start-up (decision 0008 item 3, accepted).
+
+Next: Sia reviews and merges PR #6. Then WP 1.3.
