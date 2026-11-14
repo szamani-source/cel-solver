@@ -1,6 +1,7 @@
 #include "celConstitutiveKernel.H"
 #include "celLinearElastic.H"
 #include "celVonMises.H"
+#include "celDruckerPrager.H"
 #include "celMohrCoulomb.H"
 
 #include <cmath>
@@ -87,6 +88,18 @@ double parameter(const Parameters& p, const std::string& key, double def)
 }
 
 
+std::string option
+(
+    const Options& opts,
+    const std::string& key,
+    const std::string& def
+)
+{
+    const auto it = opts.find(key);
+    return it == opts.end() ? def : it->second;
+}
+
+
 void plasticCorrector
 (
     const Elastic& el,
@@ -130,7 +143,12 @@ void plasticCorrector
 }
 
 
-std::unique_ptr<Model> makeModel(const std::string& name, const Parameters& p)
+std::unique_ptr<Model> makeModel
+(
+    const std::string& name,
+    const Parameters& p,
+    const Options& opts
+)
 {
     if (name == "linearElastic")
     {
@@ -140,6 +158,10 @@ std::unique_ptr<Model> makeModel(const std::string& name, const Parameters& p)
     {
         return std::unique_ptr<Model>(new VonMises(p));
     }
+    if (name == "druckerPrager")
+    {
+        return std::unique_ptr<Model>(new DruckerPrager(p, opts));
+    }
     if (name == "mohrCoulomb")
     {
         return std::unique_ptr<Model>(new MohrCoulomb(p));
@@ -147,7 +169,7 @@ std::unique_ptr<Model> makeModel(const std::string& name, const Parameters& p)
     throw std::invalid_argument
     (
         "unknown constitutive model '" + name
-      + "' (valid: linearElastic vonMises mohrCoulomb)"
+      + "' (valid: linearElastic vonMises druckerPrager mohrCoulomb)"
     );
 }
 

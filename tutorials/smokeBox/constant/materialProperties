@@ -12,6 +12,11 @@ FoamFile
 //   linearElastic   needs E, nu
 //   vonMises        needs E, nu, sigma_y [Pa]; optional H [Pa] (linear
 //                   isotropic hardening modulus, default 0)
+//   druckerPrager   needs E, nu, phi [deg], c [Pa], psi [deg] (WP 2.5a);
+//                   optional fit (word): compression (outer cone, default),
+//                   extension (inner cone) or plane_strain match to
+//                   Mohr-Coulomb. Perfectly plastic, non-associated (psi).
+//                   Example: phi 30; c 10e3; psi 5; fit compression;
 // The solver also reads rho, E and nu directly for the stable time step.
 
 type    linearElastic;

@@ -23,7 +23,7 @@ Phase 1 (2D prototype) and Phase 2 (C++ material models, Eulerian library skelet
 | 1.4 | Single-point constitutive driver: elastic, J2, Drucker-Prager, Mohr-Coulomb | Done | `prototype/constitutive/`; `tests/test_proto_constitutive.sh` passes in CI; PR #2 merged (2026-11-14) |
 | 2.1 | Eulerian library skeleton and solver fields | Next | Brief: `docs/wp/WP-2.1.md` |
 | 2.2 | Constitutive library interface in C++, elastic and J2 | Done | `src/celConstitutive/` (plain C++ kernel + OpenFOAM wrapper, decision 0006); `tests/test_constitutive_cpp.sh` passes in CI (kernel matches Python to 3e-15; wrapper and celFoam checks pass). PR #4 merged (2026-11-14) |
-| 2.5a | Drucker-Prager in C++ | Next | Brief: `docs/wp/WP-2.5a.md` |
+| 2.5a | Drucker-Prager in C++ | Done | `kernel/celDruckerPrager`, wrapper `druckerPrager` (`fit` word option, decision 0009); 14 new reference paths match Python to 2e-15 with apex returns; celFoam selects it. Merged on green CI (2026-11-14) |
 | 2.5b | Mohr-Coulomb in C++ | Done | `kernel/celMohrCoulomb`, Jacobi eigen-solver `kernel/celEigen` (decision 0011); `tests/test_constitutive_cpp.sh` matches Python on 10 MC paths to 1e-14, edge and apex returns required. Tension cut-off split to 2.5c |
 | 2.5c | Mohr-Coulomb tension cut-off | Not started | Needs a Python reference first; brief not written |
 
@@ -47,7 +47,7 @@ anything that cannot be undone outside this repository.
 Started 2026-11-14, one thread each, independent of each other:
 
 1. WP 1.3a: 2D plane-strain prototype, elastic waves (`docs/wp/WP-1.3a.md`).
-2. WP 2.5a: Drucker-Prager in C++ (`docs/wp/WP-2.5a.md`).
+2. WP 2.5a: Drucker-Prager in C++ (`docs/wp/WP-2.5a.md`). Done.
 3. WP 2.5b: Mohr-Coulomb in C++ (`docs/wp/WP-2.5b.md`). Done.
 4. WP 2.1: Eulerian library skeleton and solver fields (`docs/wp/WP-2.1.md`).
 

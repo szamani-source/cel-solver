@@ -57,6 +57,10 @@ constexpr double yieldTol = 1e-12;
 //- Material parameters by name (SI units, angles in degrees)
 typedef std::map<std::string, double> Parameters;
 
+//- Non-numeric model options by name (e.g. Drucker-Prager "fit"), kept apart
+//  from Parameters so parameters stay numbers only (WP 2.5a)
+typedef std::map<std::string, std::string> Options;
+
 
 //- Elastic constants from E and nu
 struct Elastic
@@ -99,7 +103,7 @@ public:
     virtual ~Model() = default;
 
     //- Model name as used in dictionaries ("linearElastic", "vonMises",
-    //  "mohrCoulomb")
+    //  "druckerPrager", "mohrCoulomb")
     virtual const char* name() const = 0;
 
     //- One increment: (deps, sigOld, hOld) -> (sigNew, hNew)
@@ -117,15 +121,28 @@ public:
 };
 
 
-//- Build a model by name. Throws std::invalid_argument for an unknown name or
-//  a missing parameter.
-std::unique_ptr<Model> makeModel(const std::string& name, const Parameters& p);
+//- Build a model by name. Throws std::invalid_argument for an unknown name,
+//  a missing parameter or an unknown option value.
+std::unique_ptr<Model> makeModel
+(
+    const std::string& name,
+    const Parameters& p,
+    const Options& opts = Options()
+);
 
 //- Read parameter key from p; throws std::invalid_argument if absent
 double parameter(const Parameters& p, const std::string& key);
 
 //- Read parameter key from p, or def if absent
 double parameter(const Parameters& p, const std::string& key, double def);
+
+//- Read option key from opts, or def if absent
+std::string option
+(
+    const Options& opts,
+    const std::string& key,
+    const std::string& def
+);
 
 //- Finish a plastic step from its corrector (_finish in models.py):
 //  hNew.epsP = hOld.epsP + C (trial - sigNew), hNew.epsPEq = hOld.epsPEq +

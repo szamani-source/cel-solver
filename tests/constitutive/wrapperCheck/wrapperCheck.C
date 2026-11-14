@@ -11,12 +11,15 @@ Description
       gives sigma_ij = 2 G eps_ij in the same component and nothing elsewhere;
       a normal strain gives lambda and lambda + 2G.
     - A large shear in xz takes vonMises to the yield surface: q = sigma_y.
+    - WP 2.5a: druckerPrager is selected with its word option fit; a large
+      xz shear returns to the cone, a large volumetric extension to the apex.
     - WP 2.5b: run-time selection of mohrCoulomb; an isochoric axial compression
       from an isotropic state returns to the triaxial compression edge
       (sxx = syy) on the yield surface f = 0.
 \*---------------------------------------------------------------------------*/
 
 #include "constitutiveModel.H"
+#include "celDruckerPrager.H"
 #include "IOstreams.H"
 #include "unitConversion.H"
 
@@ -105,6 +108,77 @@ int main()
             "plastic shear lands in xz (Voigt slot zx)",
             hNew.epsP[5] > 0 && hNew.epsP[3] == 0 && hNew.epsP[4] == 0
         );
+    }
+
+    // Drucker-Prager (WP 2.5a): phi 30, psi 5, c 10 kPa, plane-strain fit
+    {
+        dictionary dpDict(elDict);
+        dpDict.set("type", word("druckerPrager"));
+        dpDict.add("phi", 30.0);
+        dpDict.add("c", 10e3);
+        dpDict.add("psi", 5.0);
+        dpDict.add("fit", word("plane_strain"));
+
+        autoPtr<constitutiveModel> dp(constitutiveModel::New(dpDict));
+        check("selected druckerPrager", word(dp->kernel().name()) == "druckerPrager");
+
+        const auto* k =
+            dynamic_cast<const cel::constitutive::DruckerPrager*>(&dp->kernel());
+        check
+        (
+            "fit read as plane_strain",
+            k && k->fit() == cel::constitutive::DruckerPrager::Fit::planeStrain
+        );
+
+        dictionary defDict(dpDict);
+        defDict.remove("fit");
+        autoPtr<constitutiveModel> dpDef(constitutiveModel::New(defDict));
+        const auto* kDef =
+            dynamic_cast<const cel::constitutive::DruckerPrager*>(&dpDef->kernel());
+        check
+        (
+            "fit defaults to compression",
+            kDef && kDef->fit() == cel::constitutive::DruckerPrager::Fit::compression
+        );
+
+        if (k)
+        {
+            const symmTensor sig0(-1e5*symmTensor(I));
+            constitutiveModel::history h, hNew;
+            symmTensor sigNew;
+
+            // Large xz shear: cone return
+            symmTensor deps(Zero);
+            deps.xz() = 0.01;
+            dp->update(deps, sig0, h, sigNew, hNew);
+            double v[6];
+            constitutiveModel::toVoigt(sigNew, v);
+            Info<< "    druckerPrager xz shear: sigma = " << sigNew
+                << "  f = " << k->yield(v) << nl;
+            check("druckerPrager shear lands on the cone", mag(k->yield(v)) < 1e-9*1e5);
+            check("druckerPrager shear is not an apex return", !hNew.apex);
+            // psi > 0: plastic dilation; at fixed total volume that raises
+            // the confinement (mean stress more compressive)
+            check
+            (
+                "druckerPrager dilates (plastic volume grows)",
+                hNew.epsP[0] + hNew.epsP[1] + hNew.epsP[2] > 0
+            );
+            check("druckerPrager confinement grows", tr(sigNew)/3 < -1e5);
+
+            // Large volumetric extension: apex return
+            deps = symmTensor(0.01*symmTensor(I));
+            dp->update(deps, sig0, h, sigNew, hNew);
+            const scalar pApex = k->xi()*10e3/k->eta();
+            Info<< "    druckerPrager extension: sigma = " << sigNew
+                << "  apex p = " << pApex << nl;
+            check("druckerPrager extension returns to the apex", hNew.apex);
+            check
+            (
+                "druckerPrager apex stress is p = xi c/eta, zero deviator",
+                mag(sigNew - pApex*symmTensor(I)) < 1e-9*pApex
+            );
+        }
     }
 
     // Mohr-Coulomb (WP 2.5b): selection and a compression edge return

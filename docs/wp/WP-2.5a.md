@@ -1,7 +1,7 @@
 # WP 2.5a: Drucker-Prager in C++
 
-State: not started
-Branch: `wp-2.5a-drucker-prager`
+State: done (PR open, merge on green CI)
+Branch: `claude/project-thread-oviapd` (thread branch; the brief proposed `wp-2.5a-drucker-prager`)
 
 ## Goal
 
@@ -48,4 +48,34 @@ selectable at run time (`type druckerPrager;`).
 
 ## Log
 
-(none yet)
+### 2026-11-14
+
+Done:
+- Kernel `kernel/celDruckerPrager.{H,C}`: cone and apex return as in `drucker_prager`,
+  non-associated (psi), fits `compression`, `extension`, `plane_strain`; `yield()`,
+  `eta()`, `xi()`, `etaBar()`, `fit()` accessors for tests.
+- `fit` choice: new kernel `Options` map (string to string) beside `Parameters`,
+  `makeModel(name, params, options = {})`; wrapper reads optional word keys
+  (`fit compression;`). Shared `plasticCorrector` in the kernel (the C++ `_finish`),
+  for Mohr-Coulomb to reuse. Decision 0009.
+- Wrapper `constitutiveModels/druckerPrager/`, in `Make/files` and `makeModel`;
+  dictionary documented in `tutorials/smokeBox/constant/materialProperties`.
+- Generator: 14 new paths (cohesive phi 30 psi 5 c 10 kPa and sand phi 35 psi 0 c 0, five
+  paths each; extension and plane-strain fits on triaxial compression and 1000 random
+  increments). `compareReference` reads `option` lines and requires apex returns on
+  the Drucker-Prager random paths (5 to 21 apex steps per path).
+- `wrapperCheck`: selection with `fit plane_strain`, default fit, cone return on xz shear
+  (yield 7e-12 Pa, dilation raises confinement at fixed volume), apex return on
+  volumetric extension (p = xi c/eta). `test_constitutive_cpp.sh` also runs smokeBox with
+  `druckerPrager` selected.
+
+Results (local, OpenFOAM v2512 from `tools/setup_openfoam.sh`): all 29 paths match,
+worst Drucker-Prager error 7.0e-16 (stress) and 1.7e-15 (history), tolerance 1e-10; the
+15 existing paths give the same errors as before. Wrapper check and both celFoam runs
+pass; all five tests pass.
+
+Learned:
+- Uniaxial-strain compression from rest never yields Drucker-Prager for nu 0.3 and
+  phi 30 to 35 (sqrt(J2)/|p| = 0.53 < eta), so that path goes on into extension.
+
+Next: Mohr-Coulomb (2.5b) can reuse `plasticCorrector` and `Options`.

@@ -88,5 +88,9 @@ Learned:
 - Tension cut-off: still wanted for cohesive soils (cohesive MC carries tension up to
   c cot(phi)); split out as WP 2.5c, which needs a Python reference first.
 
-Next: CI green, then merge. WP 2.5a (Drucker-Prager) touches the same files; whoever
-merges second resolves `Make/files`, `makeModel`, the generator and `STATUS.md`.
+Merged main after WP 2.5a (PR #7) landed: kept both models in `Make/files`, `makeModel`,
+the generator, `compareReference.C` (DP apex check and MC return check) and
+`wrapperCheck.C`. `plasticCorrector` was already identical. After the merge all 39
+reference paths, the eigen check and the wrapper checks pass locally.
+
+Next: CI green, then merge.

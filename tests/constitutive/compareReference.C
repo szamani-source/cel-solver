@@ -11,7 +11,8 @@ Description
     Error measure for each case: max over steps of |C++ - Python|, divided by
     the largest reference value on the path (stress: max |sigma|; plastic
     strain: max of |epsP| and epsPEq). Passes if every case is below 1e-10,
-    the apex flags agree on every step, and every J2 case has plastic steps.
+    the apex flags agree on every step, every plastic case has plastic steps,
+    and every Drucker-Prager random path has apex returns (WP 2.5a).
 
     Mohr-Coulomb cases (WP 2.5b) also count which return each step took and
     require the returns the path is there to test: triaxial compression the
@@ -52,6 +53,7 @@ struct Case
     std::string name;
     std::string model;
     Parameters params;
+    Options options;
     double sigma0[6];
     std::vector<Step> steps;
 };
@@ -85,6 +87,12 @@ std::vector<Case> readCases(const char* file)
                 c.params[k] = v;
             }
             cases.push_back(c);
+        }
+        else if (key == "option")
+        {
+            std::string k, v;
+            is >> k >> v;
+            cases.back().options[k] = v;
         }
         else if (key == "init")
         {
@@ -126,14 +134,14 @@ int main(int argc, char* argv[])
 
     for (const Case& c : cases)
     {
-        const auto model = makeModel(c.model, c.params);
+        const auto model = makeModel(c.model, c.params, c.options);
 
         double sig[6];
         std::copy(c.sigma0, c.sigma0 + 6, sig);
         History h;
 
         double sigScale = 0, epsScale = 0, sigErr = 0, epsErr = 0;
-        int apexMismatch = 0, nPlastic = 0;
+        int apexMismatch = 0, nPlastic = 0, nApex = 0;
 
         const auto* mc = dynamic_cast<const MohrCoulomb*>(model.get());
         int nRet[5] = {0, 0, 0, 0, 0};
@@ -162,6 +170,7 @@ int main(int argc, char* argv[])
             epsErr = std::max(epsErr, std::abs(hNew.epsPEq - s.epsPEq));
             apexMismatch += (int(hNew.apex) != s.apex);
             nPlastic += (hNew.epsPEq != h.epsPEq);
+            nApex += hNew.apex;
 
             std::copy(sigNew, sigNew + 6, sig);
             h = hNew;
@@ -171,6 +180,10 @@ int main(int argc, char* argv[])
         // Elastic paths have no plastic strain: then require exact zeros
         const double relEps = epsScale > 0 ? epsErr/epsScale : epsErr;
         const bool needPlastic = (c.model != "linearElastic");
+        // Drucker-Prager random paths must exercise the apex return (WP 2.5a)
+        const bool needApex =
+            c.model == "druckerPrager"
+         && c.name.find("random") != std::string::npos;
 
         // Returns each Mohr-Coulomb path must exercise
         bool returnsOk = true;
@@ -207,16 +220,17 @@ int main(int argc, char* argv[])
          && (epsScale > 0 ? relEps < tol : epsErr == 0)
          && apexMismatch == 0
          && (!needPlastic || nPlastic > 0)
+         && (!needApex || nApex > 0)
          && returnsOk;
 
         char buf[256];
         std::snprintf
         (
             buf, sizeof(buf),
-            "%s  %-32s steps %4zu  plastic %4d  stress err %.2e  "
+            "%s  %-42s steps %4zu  plastic %4d  apex %3d  stress err %.2e  "
             "history err %.2e  apex mismatches %d\n",
             ok ? "PASS" : "FAIL", c.name.c_str(), c.steps.size(), nPlastic,
-            relSig, relEps, apexMismatch
+            nApex, relSig, relEps, apexMismatch
         );
         std::cout << buf << returns;
         failures += !ok;
