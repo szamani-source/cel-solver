@@ -1,6 +1,6 @@
 # WP 3.2r: Prototype column collapse deposit slope (split from WP 3.2q)
 
-State: not started
+State: done (staircase); toe split to WP 3.2s
 Branch: thread branch
 
 ## Goal
@@ -40,4 +40,19 @@ a = 0.5 keeps its top within 1 cell; run-out 0.30 to 0.90 (a = 0.5) and 1.2 to 3
 
 ## Log
 
-(none yet)
+### 2026-11-14
+
+- Rule 9 (decision 0024): in the x sweep, layers (al >= 0.1, al gradient larger across
+  x than along it) are spread instead of leaning on the fuller neighbour. The body of
+  the deposit is smooth: steepest per-cell slope without the toe 27.9 deg (a = 0.5) and
+  33.9 (a = 2), was 45 and 59. Run-outs 0.40 and 1.8 (20 cells: 0.45 and 2.45); top
+  kept. `tests/test_proto_void.sh` passes unchanged.
+- Why the 2D rule blew up in 3.2q: spreading in the y sweep (vertical films and pores),
+  with or without the shear cap. Thin films (al < 0.1) spread in x sprayed along the
+  floor at 20 cells (run-out 1.08), hence the 0.1 limit. Fixed a NaN path in the remap
+  slopes of near-empty cells.
+- Not passed: the toe. Per-cell slope at the front 62.3 deg (a = 0.5) and 48.0 (a = 2)
+  at 10 cells, 46.6 and 39.8 at 20. Cause: rule 4 (void first) leaves partly filled
+  cells without stress, so surface layers have no friction, creep downhill and pile up
+  behind the front. Two ways of straining them were unstable or sprayed (0024). Split
+  to WP 3.2s; the test stays in `tests/manual/`.
