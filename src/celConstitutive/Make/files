@@ -1,10 +1,13 @@
 kernel/celConstitutiveKernel.C
 kernel/celLinearElastic.C
 kernel/celVonMises.C
+kernel/celEigen.C
+kernel/celMohrCoulomb.C
 
 constitutiveModel/constitutiveModel.C
 constitutiveModel/constitutiveModelNew.C
 constitutiveModels/linearElastic/linearElasticModel.C
 constitutiveModels/vonMises/vonMisesModel.C
+constitutiveModels/mohrCoulomb/mohrCoulombModel.C
 
 LIB = $(FOAM_USER_LIBBIN)/libcelConstitutive

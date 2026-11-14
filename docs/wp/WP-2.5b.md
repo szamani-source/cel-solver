@@ -1,7 +1,7 @@
 # WP 2.5b: Mohr-Coulomb in C++
 
-State: not started
-Branch: `wp-2.5b-mohr-coulomb`
+State: done (PR open, merges when CI is green)
+Branch: `claude/project-thread-ie0bvq` (thread branch; the brief planned `wp-2.5b-mohr-coulomb`)
 
 ## Goal
 
@@ -51,4 +51,42 @@ bulk solids, so its corner and apex handling must be exact.
 
 ## Log
 
-(none yet)
+Newest first.
+
+### 2026-11-14 (session 1)
+
+Done:
+- `kernel/celEigen.{H,C}`: symmetric 3x3 eigen-solver by cyclic Jacobi, eigenvalues
+  sorted descending (decision 0011). `tests/constitutive/eigenCheck.C`: distinct,
+  hydrostatic, both triaxial repeats, gap 1e-9, zero, pure shear, wide range, tiny values
+  and 10000 random spectra (a quarter with two equal, a quarter with three equal); worst
+  error 5.9e-15 relative, tolerance 1e-13.
+- `kernel/celMohrCoulomb.{H,C}`: return mapping copied step for step from `mohr_coulomb`
+  in `models.py`. `updateReturn` also reports the return type (for the test).
+  `plasticCorrector` added to the kernel with the same signature and body as WP 2.5a's.
+- `constitutiveModels/mohrCoulomb/` wrapper (`type mohrCoulomb; E nu phi c psi`),
+  `Make/files`, `makeModel`.
+- Generator: model names in the reference file are now the C++ names (`PY_MODELS` maps
+  them to the Python functions, as in WP 2.5a). Ten new paths: uniaxial strain (load,
+  unload, pull into tension), triaxial compression, triaxial extension, simple shear and
+  the 1000 random increments, for phi 30 / psi 5 / c 10 kPa and phi 35 / psi 0 / c 0.
+  Existing paths unchanged (same numbers).
+- `compareReference.C` counts returns on Mohr-Coulomb paths and requires: compression
+  edge on triaxial compression, extension edge on triaxial extension, apex on uniaxial
+  strain, and an edge and an apex return on the random paths.
+- `wrapperCheck.C`: selects `mohrCoulomb` and checks an isochoric axial compression lands
+  on the compression edge (sxx = syy) with f = 0.
+
+Result: `tests/test_constitutive_cpp.sh` passes locally with OpenFOAM loaded. All 25
+paths match; Mohr-Coulomb worst errors 5.4e-15 (stress) and 1.1e-14 (history), tolerance
+1e-10; no path needed a looser tolerance. Returns seen: random cohesive 98 plane, 6
+compression edge, 2 extension edge, 7 apex; random sand 75 / 4 / 6 / 14.
+
+Learned:
+- Uniaxial strain from 100 kPa never yields in loading with nu = 0.3 (elastic K0 0.43 is
+  above the active ratio), so the uniaxial path pulls into tension to reach the apex.
+- Tension cut-off: still wanted for cohesive soils (cohesive MC carries tension up to
+  c cot(phi)); split out as WP 2.5c, which needs a Python reference first.
+
+Next: CI green, then merge. WP 2.5a (Drucker-Prager) touches the same files; whoever
+merges second resolves `Make/files`, `makeModel`, the generator and `STATUS.md`.

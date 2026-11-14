@@ -90,6 +90,7 @@ void deviator(const Voigt s, Voigt out);
 double J2(const Voigt s);
 
 
+
 //- Abstract material model. Parameters are fixed at construction.
 class Model
 {
@@ -97,7 +98,8 @@ public:
 
     virtual ~Model() = default;
 
-    //- Model name as used in dictionaries ("linearElastic", "vonMises")
+    //- Model name as used in dictionaries ("linearElastic", "vonMises",
+    //  "mohrCoulomb")
     virtual const char* name() const = 0;
 
     //- One increment: (deps, sigOld, hOld) -> (sigNew, hNew)
@@ -124,6 +126,19 @@ double parameter(const Parameters& p, const std::string& key);
 
 //- Read parameter key from p, or def if absent
 double parameter(const Parameters& p, const std::string& key, double def);
+
+//- Finish a plastic step from its corrector (_finish in models.py):
+//  hNew.epsP = hOld.epsP + C (trial - sigNew), hNew.epsPEq = hOld.epsPEq +
+//  sqrt(2/3 e:e) of the deviatoric plastic strain increment, hNew.apex = apex.
+void plasticCorrector
+(
+    const Elastic& el,
+    const Voigt trial,
+    const Voigt sigNew,
+    const History& hOld,
+    bool apex,
+    History& hNew
+);
 
 
 } // End namespace constitutive

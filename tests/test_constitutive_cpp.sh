@@ -1,11 +1,13 @@
 #!/bin/bash
-# WP 2.2: C++ constitutive library (src/celConstitutive).
+# WP 2.2 / 2.5b: C++ constitutive library (src/celConstitutive).
 #
-# 1. Kernel: builds the plain C++ kernel with g++ (no OpenFOAM needed), replays the
-#    WP 1.4 Python reference paths (uniaxial strain load-unload, triaxial compression
-#    and extension, simple shear, 1000 random increments) for linear elastic and
-#    von Mises (perfect and hardening) and requires stress and history to match to a
-#    relative 1e-10.
+# 1. Kernel: builds the plain C++ kernel with g++ (no OpenFOAM needed), unit-tests the
+#    symmetric 3x3 eigen-solver (repeated eigenvalues included), replays the WP 1.4
+#    Python reference paths (uniaxial strain load-unload, triaxial compression
+#    and extension, simple shear, 1000 random increments) for linear elastic,
+#    von Mises (perfect and hardening) and Mohr-Coulomb (cohesive and cohesionless;
+#    each path must hit its edge or apex return) and requires stress and history to
+#    match to a relative 1e-10.
 # 2. OpenFOAM wrapper: if OpenFOAM is loaded, checks libcelConstitutive.so was built by
 #    Allwmake, builds and runs tests/constitutive/wrapperCheck (run-time selection,
 #    symmTensor component order, a von Mises return) and checks that celFoam reports the model selected in the
@@ -22,6 +24,11 @@ echo "== Kernel test (g++)"
 g++ -std=c++17 -O2 -Wall -Wextra -Werror -I"$kernel" \
     "$root/tests/constitutive/compareReference.C" "$kernel"/*.C \
     -o "$work/compareReference"
+g++ -std=c++17 -O2 -Wall -Wextra -Werror -I"$kernel" \
+    "$root/tests/constitutive/eigenCheck.C" "$kernel/celEigen.C" \
+    -o "$work/eigenCheck"
+"$work/eigenCheck"
+echo
 python3 "$root/tests/gen_constitutive_reference.py" "$work/reference.txt"
 "$work/compareReference" "$work/reference.txt"
 

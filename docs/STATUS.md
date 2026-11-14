@@ -24,7 +24,8 @@ Phase 1 (2D prototype) and Phase 2 (C++ material models, Eulerian library skelet
 | 2.1 | Eulerian library skeleton and solver fields | Next | Brief: `docs/wp/WP-2.1.md` |
 | 2.2 | Constitutive library interface in C++, elastic and J2 | Done | `src/celConstitutive/` (plain C++ kernel + OpenFOAM wrapper, decision 0006); `tests/test_constitutive_cpp.sh` passes in CI (kernel matches Python to 3e-15; wrapper and celFoam checks pass). PR #4 merged (2026-11-14) |
 | 2.5a | Drucker-Prager in C++ | Next | Brief: `docs/wp/WP-2.5a.md` |
-| 2.5b | Mohr-Coulomb in C++ | Next | Brief: `docs/wp/WP-2.5b.md` |
+| 2.5b | Mohr-Coulomb in C++ | Done | `kernel/celMohrCoulomb`, Jacobi eigen-solver `kernel/celEigen` (decision 0011); `tests/test_constitutive_cpp.sh` matches Python on 10 MC paths to 1e-14, edge and apex returns required. Tension cut-off split to 2.5c |
+| 2.5c | Mohr-Coulomb tension cut-off | Not started | Needs a Python reference first; brief not written |
 
 ## Standing instruction from Sia (2026-11-14)
 
@@ -47,7 +48,7 @@ Started 2026-11-14, one thread each, independent of each other:
 
 1. WP 1.3a: 2D plane-strain prototype, elastic waves (`docs/wp/WP-1.3a.md`).
 2. WP 2.5a: Drucker-Prager in C++ (`docs/wp/WP-2.5a.md`).
-3. WP 2.5b: Mohr-Coulomb in C++ (`docs/wp/WP-2.5b.md`).
+3. WP 2.5b: Mohr-Coulomb in C++ (`docs/wp/WP-2.5b.md`). Done.
 4. WP 2.1: Eulerian library skeleton and solver fields (`docs/wp/WP-2.1.md`).
 
 After those: 1.3b follows 1.3a. 2.3 (stress update with objective rate) and 2.4 (remap)
@@ -62,4 +63,5 @@ follow 2.1 and the 1.3b formulation decision; briefs not written yet.
   percent of the jump at the impact plane for the first 5 to 10 cells of wave travel
   (1.7 percent elastic). Matters for contact (WP 4.x); revisit in WP 1.3 (decision 0008).
 - WP 1.2 prototype: history is remapped with superbee, stress with MC (decision 0008).
-- Mohr-Coulomb prototype has no separate tension cut-off below the apex (decision 0004).
+- Mohr-Coulomb (Python and C++) has no separate tension cut-off below the apex
+  (decisions 0004, 0011): cohesive material carries tension up to c cot(phi). WP 2.5c.

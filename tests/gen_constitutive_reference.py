@@ -14,6 +14,7 @@ File format, one record per line, numbers written with 17 significant digits:
     end
 
 Voigt order xx, yy, zz, xy, yz, zx; strain with engineering shear (decision 0004).
+<model> is the C++ model name (PY_MODELS maps it to the Python function).
 Mixed stress/strain paths are recorded as the strain increments the Python driver found,
 so the C++ side only needs a strain-driven replay.
 """
@@ -30,13 +31,21 @@ import driver  # noqa: E402
 import models  # noqa: E402
 
 
+# C++ model name -> Python reference model
+PY_MODELS = {
+    "linearElastic": models.linear_elastic,
+    "vonMises": models.von_mises,
+    "mohrCoulomb": models.mohr_coulomb,
+}
+
+
 def fmt(values):
     return " ".join("%.17g" % v for v in values)
 
 
 def write_case(out, name, model_name, params, sigma0, deps_list):
     """Run the Python model along deps_list from sigma0 and write the record."""
-    model = models.MODELS[model_name]
+    model = PY_MODELS[model_name]
     out.write("case %s %s %d %s\n" % (
         name, model_name, len(params),
         " ".join("%s %.17g" % (k, v) for k, v in params.items())))
@@ -79,7 +88,7 @@ def main():
         for tag, name, p in (("elastic", "linearElastic", elastic),
                              ("j2perfect", "vonMises", j2_perfect),
                              ("j2hard", "vonMises", j2_hard)):
-            m = models.MODELS[name]
+            m = PY_MODELS[name]
 
             # Uniaxial strain: load to 2 % compression, unload to 1 %, reload in tension
             d = np.zeros(6)
@@ -104,6 +113,37 @@ def main():
             # 1000 random increments from an isotropic compressive state
             write_case(out, tag + "_random1000", name, p, -pc * models.I_V,
                        random_steps)
+
+        # WP 2.5b: Mohr-Coulomb, frictional-cohesive and cohesionless sand
+        mc = PY_MODELS["mohrCoulomb"]
+        mc_sets = (("mcCohesive", dict(E=E, nu=nu, phi=30.0, c=10e3, psi=5.0)),
+                   ("mcSand", dict(E=E, nu=nu, phi=35.0, c=0.0, psi=0.0)))
+        for tag, p in mc_sets:
+            # Uniaxial strain from 100 kPa: load in compression, unload, then pull
+            # into tension until the apex is reached
+            d = np.zeros(6)
+            load = [d + [0, 0, -2e-2 / 100, 0, 0, 0]] * 100
+            unload = [d + [0, 0, 1e-2 / 50, 0, 0, 0]] * 50
+            pull = [d + [0, 0, 2e-2 / 100, 0, 0, 0]] * 100
+            write_case(out, tag + "_uniaxialStrain", "mohrCoulomb", p,
+                       -pc * models.I_V, load + unload + pull)
+
+            # Triaxial compression and extension: edge returns (s1 = s2, s2 = s3)
+            r = driver.triaxial(mc, p, pc, -0.02, 200)
+            write_case(out, tag + "_triaxialCompression", "mohrCoulomb", p,
+                       -pc * models.I_V, increments(r))
+            r = driver.triaxial(mc, p, pc, 0.02, 200, extension=True)
+            write_case(out, tag + "_triaxialExtension", "mohrCoulomb", p,
+                       -pc * models.I_V, increments(r))
+
+            # Simple shear at constant normal stress
+            r = driver.simple_shear(mc, p, pc, 0.05, 200)
+            write_case(out, tag + "_simpleShear", "mohrCoulomb", p,
+                       -pc * models.I_V, increments(r))
+
+            # 1000 random increments (same fixed-seed increments as above)
+            write_case(out, tag + "_random1000", "mohrCoulomb", p,
+                       -pc * models.I_V, random_steps)
 
 
 if __name__ == "__main__":
