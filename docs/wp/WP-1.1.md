@@ -1,7 +1,7 @@
 # WP 1.1: 1D elastic Lagrange-plus-remap prototype
 
-State: not started
-Branch: `wp-1.1-1d-elastic-remap`
+State: done (waiting for review)
+Branch: `claude/project-thread-as2tdz` (the session's assigned branch; the planned name was `wp-1.1-1d-elastic-remap`)
 
 ## Goal
 
@@ -15,8 +15,10 @@ fixed mesh using an explicit Lagrange step followed by a second-order monotone r
 
 ## Build
 
-- `prototype/lr1d.py`: staggered grid (velocity at nodes, stress and density at cells),
-  central-difference Lagrange step, MUSCL remap of mass, momentum and stress.
+- `prototype/lr1d.py`: all fields at cell centres, MUSCL-Hancock Godunov Lagrange step
+  with an acoustic Riemann solver, MUSCL remap of mass, momentum and stress.
+  (The brief first asked for a staggered grid with a central-difference step; decision
+  0004 explains why that was replaced.)
 - `tests/test_proto_1d_elastic.sh`
 
 ## Done when
@@ -31,4 +33,30 @@ fixed mesh using an explicit Lagrange step followed by a second-order monotone r
 
 ## Log
 
-(none yet)
+### 2026-11-14
+
+Done:
+- Wrote the checks first (`lr1d.py --verify`, run by `tests/test_proto_1d_elastic.sh`).
+  All three cases run on a periodic 1 m bar, rho 2000 kg/m^3, M 50 MPa, with the material
+  streaming at 0.25 c so the remap moves real amounts. Test runs in about 1 s.
+- Built the staggered version from the brief. Smooth order and conservation passed, but
+  no artificial viscosity made the step wave monotone without losing second order
+  (table in decision 0004). Kept in git history.
+- Replaced it with a cell-centred MUSCL-Hancock step plus Riemann solver. All checks pass:
+  orders 1.88 and 1.83 (200/400/800 cells), largest new extremum 1.8e-6 Pa on a 10 Pa
+  jump, front speed error 0.04 percent, mass and momentum change below 1e-15.
+
+Learned:
+- Characteristic slopes must be built from differences with the cell's own impedance.
+  Building them from s - z v mixed density noise times the streaming velocity into the
+  stress and dropped the order to 1.2.
+- A square pulse set up as sig = f, v = -f/(rho c) is not a discrete right-going wave on
+  a staggered grid. It launches a spurious left-going wave of about 1 percent.
+- The "new extrema" floor is physics plus round-off: the hypoelastic bar is nonlinear at
+  O(strain), and the strain update rounds at about M * 1e-16 per step. The test uses a
+  10 Pa pulse and a tolerance of 1e-6 of the jump. Its comments give the reasons.
+- Smooth order is limited by peak clipping. It is 1.78 at 0.5 c streaming
+  (`--v0 0.5` fails the 1.8 bar). An extremum-preserving limiter would fix it if needed.
+
+Next: Sia reviews the PR and decision 0004. WP 1.2 (plasticity and history remap) builds
+on this file.
