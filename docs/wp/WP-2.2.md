@@ -1,7 +1,7 @@
 # WP 2.2: Constitutive library interface in C++, elastic and J2
 
-State: not started
-Branch: `wp-2.2-constitutive-library`
+State: in progress (PR open, waiting on CI and review)
+Branch: `claude/project-thread-85watz` (thread sessions can only push their assigned branch)
 
 ## Goal
 
@@ -61,4 +61,30 @@ spending an hour compiling OpenFOAM.
 
 ## Log
 
-(none yet)
+### 2026-11-14
+
+Done:
+- Kernel `src/celConstitutive/kernel/` (plain C++17): `Model` interface, `History` struct,
+  `Elastic` helper, `LinearElastic`, `VonMises` (radial return, linear hardening),
+  `makeModel` factory. Design as proposed above; recorded in decision 0006.
+- OpenFOAM wrapper: `constitutiveModel` with run-time selection, derived
+  `constitutiveModels::linearElastic` and `vonMises`; `symmTensor` conversion in
+  `constitutiveModel::toVoigt/fromVoigt`. `Allwmake` builds `libcelConstitutive.so` first.
+- `celFoam` selects the model from `constant/materialProperties` (`type linearElastic;` added
+  to smokeBox, documented there) and prints `Constitutive model <type>`. It does not call
+  the model in the time loop yet (WP 2.3).
+- Test `tests/test_constitutive_cpp.sh`: kernel vs Python on 15 paths (5 paths x elastic,
+  J2 perfect, J2 hardening; 5340 increments). Locally all match with worst error
+  7.4e-16 (stress) and 3.0e-15 (history), tolerance 1e-10. With OpenFOAM it also builds and
+  runs `tests/constitutive/wrapperCheck` (selection, component order, shear factor, a J2
+  return) and the smokeBox check; in CI that part is required.
+
+Learned:
+- Recording the strain increments the Python mixed-control driver found lets the C++ side
+  replay every path strain-driven, so no C++ driver is needed.
+
+Not verified locally: the OpenFOAM wrapper, `wrapperCheck` and celFoam build (no OpenFOAM
+in the session). CI result to be recorded here.
+
+Next: confirm CI green, record it here and in STATUS.md, Sia reviews and merges. Then
+2.5a (Drucker-Prager in C++) adds a kernel class and its reference paths.

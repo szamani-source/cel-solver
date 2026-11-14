@@ -1,3 +1,5 @@
 #!/bin/sh
 cd "${0%/*}" || exit
+wclean src/celConstitutive
 wclean applications/solvers/celFoam
+wclean tests/constitutive/wrapperCheck

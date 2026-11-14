@@ -7,6 +7,15 @@ FoamFile
 }
 
 // Soft soil-like elastic material for the smoke test
+//
+// type: constitutive model (library celConstitutive, WP 2.2). Choices:
+//   linearElastic   needs E, nu
+//   vonMises        needs E, nu, sigma_y [Pa]; optional H [Pa] (linear
+//                   isotropic hardening modulus, default 0)
+// The solver also reads rho, E and nu directly for the stable time step.
+
+type    linearElastic;
+
 rho     1800;      // kg/m^3
 E       1e7;       // Pa
 nu      0.3;
