@@ -72,7 +72,7 @@ Done:
   (C) same case on 2 processors. Checks End, five fields written, start deltaT equals
   the hand value to 1e-12, mass 1800 / 1900 and momentum (1000 0 0) to 1e-12, and
   serial and parallel print identical time steps.
-- Decision 0009 records the choices (per-cell time step formula, `0.orig`, defaults
+- Decision 0010 records the choices (per-cell time step formula, `0.orig`, defaults
   with `zeroGradient` patches, `apex` not stored).
 
 Local result: all six tests pass (OpenFOAM from `tools/setup_openfoam.sh`). Mass errors
