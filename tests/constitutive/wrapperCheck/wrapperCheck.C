@@ -90,7 +90,7 @@ int main()
         constitutiveModel::history h, hNew;
         vm->update(deps, sig0, h, sigNew, hNew);
 
-        const scalar q = sqrt(1.5)*mag(dev(sigNew));
+        const scalar q = Foam::sqrt(scalar(1.5))*mag(dev(sigNew));
         Info<< "    vonMises xz shear: sigma = " << sigNew << "  q = " << q
             << "  epsPEq = " << hNew.epsPEq << nl;
         check("vonMises returns to q = sigma_y", mag(q - sigmaY) < 1e-9*sigmaY);

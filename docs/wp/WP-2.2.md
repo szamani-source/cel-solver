@@ -83,6 +83,10 @@ Learned:
 - Recording the strain increments the Python mixed-control driver found lets the C++ side
   replay every path strain-driven, so no C++ driver is needed.
 
+CI run 1: library and celFoam built; `wrapperCheck.C` failed to compile (`sqrt(1.5)`
+ambiguous between `::sqrt` and `Foam::sqrt` under `using namespace Foam`); fixed with
+`Foam::sqrt(scalar(1.5))`.
+
 Not verified locally: the OpenFOAM wrapper, `wrapperCheck` and celFoam build (no OpenFOAM
 in the session). CI result to be recorded here.
 
