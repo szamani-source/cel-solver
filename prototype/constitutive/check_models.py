@@ -156,6 +156,151 @@ ev = r["eps"][:, 1]
 check("MC simple shear with psi = 0 has no plastic volume change",
       abs(ev[-1] - ev[k]) < 1e-9, "delta eps_v = %.2e" % (ev[-1] - ev[k]))
 
+# 7. Mohr-Coulomb tension cut-off sigma_t (WP 2.5c)
+ccot = c * co / s                                   # apex c cot(phi), 17.3 kPa
+mc_t_strength = 2 * c * co / (1 + s)                # MC uniaxial tensile strength, 11.5 kPa
+for frac in (0.0, 0.5, 0.9):
+    st = frac * ccot
+    p = dict(mc, sigma_t=st)
+    # Uniaxial tension (radial stress zero): strength min(sigma_t, 2 c cos(phi)/(1 + sin(phi)))
+    r = driver.triaxial(models.mohr_coulomb, p, 0.0, 0.01, 200, extension=True)
+    target = min(st, mc_t_strength)
+    check("MC sigma_t = %.2f c cot(phi): uniaxial tensile strength" % frac,
+          abs(r["sigma"][-1, 2] - target) < 1e-9 * c,
+          "%.6g Pa, expected %.6g Pa" % (r["sigma"][-1, 2], target))
+    # Hydrostatic tension from 100 kPa compression is capped at sigma_t
+    sig, hist = -pc * models.I_V, models.init_history()
+    for _ in range(100):
+        sig, hist = models.mohr_coulomb(1e-4 * models.I_V, sig, hist, p)
+    check("MC sigma_t = %.2f c cot(phi): hydrostatic tension capped at sigma_t" % frac,
+          np.max(np.abs(sig - st * models.I_V)) < 1e-9 * c and hist["apex"],
+          "sigma = %s Pa, expected %.6g Pa, apex %s" % (np.array2string(sig[:3], precision=6),
+                                                       st, hist["apex"]))
+
+# Unloading from the cut-off is elastic
+p = dict(mc, sigma_t=0.5 * ccot)
+r = driver.triaxial(models.mohr_coulomb, p, 0.0, 0.01, 50, extension=True)
+sig, hist = r["sigma"][-1], r["history"][-1]
+back = np.array([0.0, 0.0, -1e-5, 0, 0, 0])
+sig2, hist2 = models.mohr_coulomb(back, sig, hist, p)
+K, G = models.bulk_shear(p)
+check("MC tension cut-off: unloading is elastic",
+      np.array_equal(hist2["eps_p"], hist["eps_p"])
+      and np.allclose(sig2, sig + models.elastic_matrix(K, G) @ back, rtol=0, atol=1e-9 * c),
+      "plastic strain unchanged, sigma_zz %.6g -> %.6g Pa" % (sig[2], sig2[2]))
+
+# Compression paths never reach the cut-off and are unchanged bit for bit
+same = True
+for fn in (lambda q: driver.triaxial(models.mohr_coulomb, q, pc, -0.05, 200),
+           lambda q: driver.triaxial(models.mohr_coulomb, q, pc, 0.05, 200, extension=True),
+           lambda q: driver.simple_shear(models.mohr_coulomb, q, pc, 0.2, 200)):
+    a, b = fn(mc), fn(dict(mc, sigma_t=0.0))
+    same = same and np.array_equal(a["sigma"], b["sigma"]) and np.array_equal(a["eps"], b["eps"])
+check("MC tension cut-off: compression paths unchanged (sigma_t = 0)", same,
+      "triaxial compression, extension and simple shear from 100 kPa")
+
+# Out-of-range sigma_t is rejected
+rejected = 0
+for bad in (-1.0, 1.01 * ccot):
+    try:
+        models.mohr_coulomb(np.zeros(6), np.zeros(6), models.init_history(),
+                            dict(mc, sigma_t=bad))
+    except ValueError:
+        rejected += 1
+check("MC sigma_t outside [0, c cot(phi)] rejected", rejected == 2, "%d of 2" % rejected)
+
+
+def tension_increment():
+    mag = 10 ** rng.uniform(-6, -2)
+    kind = rng.integers(4)
+    if kind == 0:   # volumetric stretch: tension apex
+        return mag * models.I_V * rng.uniform(0.5, 2)
+    if kind == 1:   # two equal principal stretches: tension edge s1 = s2
+        a, b = rng.uniform(0, 1), rng.uniform(-1, 1)
+        return mag * np.array([a, a, b, 0, 0, 0])
+    if kind == 2:   # uniaxial-like stretch: tension plane and mixed corners
+        a, b = rng.uniform(0.5, 1), rng.uniform(-0.5, 0)
+        return mag * np.array([a, b, b, 0, 0, 0])
+    return mag * (rng.normal(size=6) + 0.5 * models.I_V)
+
+
+for name, p in (("sigma_t = 0", dict(mc, sigma_t=0.0)),
+                ("sigma_t = 0.5 c cot(phi)", dict(mc, sigma_t=0.5 * ccot)),
+                ("sigma_t = 0.5 c cot(phi), associated", dict(mc, psi=phi, sigma_t=0.5 * ccot)),
+                ("sigma_t = 0.2 c cot(phi), psi = 0", dict(mc, psi=0.0, sigma_t=0.2 * ccot))):
+    worst, max_s1, n_cut, n_apex = -np.inf, -np.inf, 0, 0
+    sig, hist = -pc * models.I_V, models.init_history()
+    for i in range(n_per):
+        if i % 50 == 0:  # restart from a random compressive state
+            sig = -pc * rng.uniform(0.0, 1.0) * models.I_V
+        deps = tension_increment() if rng.random() < 0.7 else random_increment()
+        sig_new, hist_new = models.mohr_coulomb(deps, sig, hist, p)
+        scale = max(np.max(np.abs(sig_new)), p["c"], 1.0)
+        ft = models.rankine_yield(sig_new, p)
+        worst = max(worst, models.mc_yield(sig_new, p) / scale, ft / scale)
+        max_s1 = max(max_s1, ft + p["sigma_t"])
+        if np.any(hist_new["eps_p"] != hist["eps_p"]) and abs(ft) < 1e-9 * scale:
+            n_cut += 1
+        n_apex += hist_new["apex"]
+        sig, hist = sig_new, hist_new
+    check("MC %s: 10000 random increments inside MC and Rankine surfaces" % name,
+          worst < 1e-9 and n_cut > 1000 and n_apex > 100,
+          "max f/scale = %.2e, max s1 = %.4g Pa, cut-off returns %d, apex %d"
+          % (worst, max_s1, n_cut, n_apex))
+
+# Associated flow: the return is the closest point in the energy norm (independent check:
+# project onto every face of the full 9-plane surface in unsorted principal space and keep
+# the nearest admissible point)
+import itertools  # noqa: E402
+
+p = dict(mc, psi=phi, sigma_t=0.4 * ccot)
+K, G = models.bulk_shear(p)
+Dp = np.full((3, 3), K - 2 * G / 3) + np.eye(3) * 2 * G
+Cp = np.linalg.inv(Dp)
+N, rr = [], []
+for i, j in itertools.permutations(range(3), 2):
+    n = np.zeros(3)
+    n[i] += 1 + s
+    n[j] += -1 + s
+    N.append(n)
+    rr.append(2 * c * co)
+for i in range(3):
+    N.append(np.eye(3)[i])
+    rr.append(p["sigma_t"])
+N, rr = np.array(N), np.array(rr)
+
+
+def closest_point(w):
+    if np.all(N @ w - rr <= 0):
+        return w
+    best = None
+    for size in (1, 2, 3):
+        for act in itertools.combinations(range(9), size):
+            A, b = N[list(act)], rr[list(act)]
+            if np.linalg.matrix_rank(A) < size:
+                continue
+            x = w - Dp @ A.T @ np.linalg.solve(A @ Dp @ A.T, A @ w - b)
+            if np.all(N @ x - rr <= 1e-9 * c):
+                d = (x - w) @ Cp @ (x - w)
+                if best is None or d < best[0]:
+                    best = (d, x)
+    return best[1]
+
+
+worst = 0.0
+for _ in range(1000):
+    w = np.sort(rng.normal(size=3) * 3e4 + rng.uniform(-3e4, 4e4))[::-1]
+    if rng.random() < 0.2:
+        w[1] = w[0]
+    if rng.random() < 0.2:
+        w[2] = w[1]
+    sig, _ = models.mohr_coulomb(np.zeros(6), np.r_[w, 0, 0, 0], models.init_history(), p)
+    got = np.sort(sig[:3])[::-1]
+    want = np.sort(closest_point(w))[::-1]
+    worst = max(worst, np.max(np.abs(got - want)) / max(np.max(np.abs(w)), c))
+check("MC tension cut-off, associated: return = closest point (1000 trial states)",
+      worst < 1e-12, "max relative difference %.2e" % worst)
+
 print()
 if failures:
     print("%d check(s) failed: %s" % (len(failures), ", ".join(failures)))

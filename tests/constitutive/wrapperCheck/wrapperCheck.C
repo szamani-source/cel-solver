@@ -16,10 +16,13 @@ Description
     - WP 2.5b: run-time selection of mohrCoulomb; an isochoric axial compression
       from an isotropic state returns to the triaxial compression edge
       (sxx = syy) on the yield surface f = 0.
+    - WP 2.5c: mohrCoulomb reads the optional sigmaT; a hydrostatic stretch
+      ends at the tension apex sigma = sigmaT I.
 \*---------------------------------------------------------------------------*/
 
 #include "constitutiveModel.H"
 #include "celDruckerPrager.H"
+#include "celMohrCoulomb.H"
 #include "IOstreams.H"
 #include "unitConversion.H"
 
@@ -215,6 +218,35 @@ int main()
             mag(sigNew.xx() - sigNew.yy()) < 1e-9*mag(w.x())
         );
         check("mohrCoulomb plastic strain grows", hNew.epsPEq > 0);
+    }
+
+    // Mohr-Coulomb tension cut-off (WP 2.5c): optional sigmaT keyword;
+    // hydrostatic stretch from 100 kPa compression ends at the tension apex
+    {
+        const scalar phi = 30, c = 10e3, psi = 5, sigmaT = 5e3;
+        dictionary mcDict(elDict);
+        mcDict.set("type", word("mohrCoulomb"));
+        mcDict.add("phi", phi);
+        mcDict.add("c", c);
+        mcDict.add("psi", psi);
+        mcDict.add("sigmaT", sigmaT);
+        autoPtr<constitutiveModel> mc(constitutiveModel::New(mcDict));
+        const auto* k =
+            dynamic_cast<const cel::constitutive::MohrCoulomb*>(&mc->kernel());
+        check("mohrCoulomb reads sigmaT", k && k->hasTensionCutOff());
+
+        const symmTensor deps(0.01*symmTensor(I));
+        const symmTensor sig0(-1e5*symmTensor(I));
+        symmTensor sigNew;
+        constitutiveModel::history h, hNew;
+        mc->update(deps, sig0, h, sigNew, hNew);
+        Info<< "    mohrCoulomb hydrostatic tension: sigma = " << sigNew
+            << "  apex = " << hNew.apex << nl;
+        check
+        (
+            "mohrCoulomb hydrostatic tension capped at sigmaT",
+            mag(sigNew - sigmaT*symmTensor(I)) < 1e-9*sigmaT && hNew.apex
+        );
     }
 
     Info<< nl << (nFail ? "FAILED" : "All wrapper checks passed") << endl;

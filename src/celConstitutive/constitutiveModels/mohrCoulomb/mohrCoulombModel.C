@@ -22,7 +22,7 @@ Foam::constitutiveModels::mohrCoulomb::mohrCoulomb(const dictionary& dict)
         dict,
         typeName,
         wordList({"E", "nu", "phi", "c", "psi"}),
-        wordList()
+        wordList({"sigmaT"})
     )
 {}
 
