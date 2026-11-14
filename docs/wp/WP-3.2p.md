@@ -48,9 +48,10 @@ no stress. A decision note fixes the void treatment for the C++ code.
 - A block falling freely under gravity accelerates at g within 0.5 percent and lands on
   a rigid floor without losing mass or passing through.
 - 2D granular column collapse, aspect ratios 0.5 and 2, cohesionless Mohr-Coulomb,
-  friction 35 degrees: final run-out and height within the tolerance stated in
-  `docs/spec/silo-reference.md` (if absent: within 25 percent of the published
-  experimental fits, with the source cited in the log).
+  friction 35 degrees, tolerances from `docs/spec/silo-reference.md` section 6
+  (decision 0019): a = 0.5 keeps its top (H_f = H_i within 1 cell); run-out within 0.5
+  to 1.5 times the quasi-2D fit 1.2 a (0.30 to 0.90 at a = 0.5, 1.2 to 3.6 at a = 2);
+  no deposit slope steeper than 37 degrees.
 - Mass conserved to 1e-10 in all cases. Existing tests still pass unchanged.
 
 ## Out of scope
