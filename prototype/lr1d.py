@@ -13,7 +13,7 @@ A periodic 1D bar on a fixed uniform (Eulerian) mesh. Each cycle is
    MUSCL fluxes (MC limiter), integrated exactly over the swept region.
 
 All fields (density, velocity, stress) live at cell centres, as in the
-OpenFOAM solver this prototype prepares for. Decision 0004 records why the
+OpenFOAM solver this prototype prepares for. Decision 0005 records why the
 first, staggered-grid version was replaced. Cell j spans face j (left) to
 face j+1 (right). Area is 1 m^2.
 
@@ -49,7 +49,7 @@ def limiter(dl, dr):
     zero at extrema. A linear reconstruction with this slope stays inside the
     range of the neighbouring cell values, so the schemes below are TVD.
     MC clips smooth peaks less than the harmonic van Leer limiter, which kept
-    the smooth-wave order under 1.8 (decision 0004).
+    the smooth-wave order under 1.8 (decision 0005).
     """
     mag = np.minimum(np.minimum(2.0 * np.abs(dl), 2.0 * np.abs(dr)),
                      0.5 * np.abs(dl + dr))
@@ -315,7 +315,7 @@ def verify(v0_frac=0.25):
     # the cell lengths gives stress noise of order M * 1e-16 per step (about
     # 1e-6 Pa over this run). A 10 Pa pulse (strain 2e-7) keeps both near
     # 1e-7 of the jump; the tolerance is 1e-6 of the jump. For scale, the
-    # first, staggered version overshot by 5e-2 (decision 0004).
+    # first, staggered version overshot by 5e-2 (decision 0005).
     print("\n[2] Square stress pulse (10 Pa), monotonicity and wave speed")
     n = 800
     amp = 10.0

@@ -18,7 +18,7 @@ fixed mesh using an explicit Lagrange step followed by a second-order monotone r
 - `prototype/lr1d.py`: all fields at cell centres, MUSCL-Hancock Godunov Lagrange step
   with an acoustic Riemann solver, MUSCL remap of mass, momentum and stress.
   (The brief first asked for a staggered grid with a central-difference step; decision
-  0004 explains why that was replaced.)
+  0005 explains why that was replaced.)
 - `tests/test_proto_1d_elastic.sh`
 
 ## Done when
@@ -41,7 +41,7 @@ Done:
   streaming at 0.25 c so the remap moves real amounts. Test runs in about 1 s.
 - Built the staggered version from the brief. Smooth order and conservation passed, but
   no artificial viscosity made the step wave monotone without losing second order
-  (table in decision 0004). Kept in git history.
+  (table in decision 0005). Kept in git history.
 - Replaced it with a cell-centred MUSCL-Hancock step plus Riemann solver. All checks pass:
   orders 1.88 and 1.83 (200/400/800 cells), largest new extremum 1.8e-6 Pa on a 10 Pa
   jump, front speed error 0.04 percent, mass and momentum change below 1e-15.
@@ -58,5 +58,5 @@ Learned:
 - Smooth order is limited by peak clipping. It is 1.78 at 0.5 c streaming
   (`--v0 0.5` fails the 1.8 bar). An extremum-preserving limiter would fix it if needed.
 
-Next: Sia reviews the PR and decision 0004. WP 1.2 (plasticity and history remap) builds
+Next: Sia reviews the PR and decision 0005. WP 1.2 (plasticity and history remap) builds
 on this file.

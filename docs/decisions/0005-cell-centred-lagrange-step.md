@@ -1,4 +1,4 @@
-# 0004 Cell-centred Godunov Lagrange step in the 1D prototype
+# 0005 Cell-centred Godunov Lagrange step in the 1D prototype
 
 Date: 2026-11-14. Status: accepted for WP 1.1 (Sia to confirm in the PR review);
 revisit in WP 1.3.
