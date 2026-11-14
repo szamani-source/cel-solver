@@ -11,6 +11,9 @@ for t in "$root"/tests/test_*.sh; do
         echo "PASS  $name"
     else
         echo "FAIL  $name  (see tests/$name.log)"
+        echo "----- last 40 lines of $name.log -----"
+        tail -n 40 "$root/tests/$name.log"
+        echo "--------------------------------------"
         fail=1
     fi
 done
