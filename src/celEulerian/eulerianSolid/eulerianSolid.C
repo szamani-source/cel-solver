@@ -3,6 +3,7 @@
 \*---------------------------------------------------------------------------*/
 
 #include "eulerianSolid.H"
+#include "surfaceFields.H"
 #include "zeroGradientFvPatchFields.H"
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
@@ -76,6 +77,19 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
         mesh,
         dimensionedScalar(dimless, Zero),
         fvPatchFieldBase::zeroGradientType()
+    ),
+    phiL_
+    (
+        IOobject
+        (
+            "phiL",
+            mesh.time().timeName(),
+            mesh,
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        mesh,
+        dimensionedScalar(dimVolume/dimTime, Zero)
     )
 {
     if (maxCo_ <= 0)
