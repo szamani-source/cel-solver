@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <stdexcept>
 
 namespace cel
@@ -93,6 +94,69 @@ bool sorted(const double s[3], double tol)
     return s[0] >= s[1] - tol && s[1] >= s[2] - tol;
 }
 
+
+//- Solve the n x n system A x = b (n <= 3) by Gaussian elimination with
+//  partial pivoting. Returns false if A is singular to the test used by
+//  models.py: |det A| <= 1e-12 prod |A_ii|.
+bool solveSmall(int n, double A[3][3], double b[3], double x[3])
+{
+    double diag = 1;
+    for (int i = 0; i < n; ++i)
+    {
+        diag *= std::abs(A[i][i]);
+    }
+
+    double det = 1;
+    for (int k = 0; k < n; ++k)
+    {
+        int piv = k;
+        for (int i = k + 1; i < n; ++i)
+        {
+            if (std::abs(A[i][k]) > std::abs(A[piv][k]))
+            {
+                piv = i;
+            }
+        }
+        if (piv != k)
+        {
+            for (int j = 0; j < n; ++j)
+            {
+                std::swap(A[k][j], A[piv][j]);
+            }
+            std::swap(b[k], b[piv]);
+            det = -det;
+        }
+        det *= A[k][k];
+        if (A[k][k] == 0)
+        {
+            return false;
+        }
+        for (int i = k + 1; i < n; ++i)
+        {
+            const double f = A[i][k]/A[k][k];
+            for (int j = k; j < n; ++j)
+            {
+                A[i][j] -= f*A[k][j];
+            }
+            b[i] -= f*b[k];
+        }
+    }
+    if (std::abs(det) <= 1e-12*diag)
+    {
+        return false;
+    }
+    for (int i = n - 1; i >= 0; --i)
+    {
+        double r = b[i];
+        for (int j = i + 1; j < n; ++j)
+        {
+            r -= A[i][j]*x[j];
+        }
+        x[i] = r/A[i][i];
+    }
+    return true;
+}
+
 } // End anonymous namespace
 
 
@@ -102,7 +166,9 @@ MohrCoulomb::MohrCoulomb(const Parameters& p)
     c_(parameter(p, "c")),
     sinPhi_(std::sin(parameter(p, "phi")*pi/180.0)),
     cosPhi_(std::cos(parameter(p, "phi")*pi/180.0)),
-    sinPsi_(std::sin(parameter(p, "psi")*pi/180.0))
+    sinPsi_(std::sin(parameter(p, "psi")*pi/180.0)),
+    tension_(p.count("sigmaT") > 0),
+    sigmaT_(parameter(p, "sigmaT", 0))
 {
     const double phi = parameter(p, "phi");
     const double psi = parameter(p, "psi");
@@ -121,6 +187,21 @@ MohrCoulomb::MohrCoulomb(const Parameters& p)
     if (phi == 0 && c_ == 0)
     {
         throw std::invalid_argument("mohrCoulomb: phi = 0 needs c > 0");
+    }
+    if (tension_)
+    {
+        const double apex =
+            phi == 0
+          ? std::numeric_limits<double>::infinity()
+          : c_*cosPhi_/sinPhi_;
+        if (!(sigmaT_ >= 0 && sigmaT_ <= apex*(1 + 1e-12)))
+        {
+            throw std::invalid_argument
+            (
+                "mohrCoulomb: sigmaT must be in [0, c cot(phi)] = [0, "
+              + std::to_string(apex) + "] Pa"
+            );
+        }
     }
 }
 
@@ -163,8 +244,10 @@ MohrCoulomb::Return MohrCoulomb::updateReturn
     const double scale =
         std::max({std::abs(w[0]), std::abs(w[1]), std::abs(w[2]), c_, 1.0});
     const double fTrial = (w[0] - w[2]) + (w[0] + w[2])*sphi - k;
+    const double tTrial =
+        tension_ ? w[0] - sigmaT_ : -std::numeric_limits<double>::infinity();
 
-    if (fTrial <= yieldTol*scale)
+    if (fTrial <= yieldTol*scale && tTrial <= yieldTol*scale)
     {
         std::copy(trial, trial + 6, sigNew);
         return Return::elastic;
@@ -189,43 +272,57 @@ MohrCoulomb::Return MohrCoulomb::updateReturn
     const double tol = 1e-12*scale;
     Return ret = Return::plane;
     bool apex = false;
+    bool mcDone = false;
     double s[3], dg[2];
 
-    returnTo(el_, &main, 1, w, k, s, dg);
-    if (!sorted(s, tol))
+    if (fTrial > yieldTol*scale)
     {
-        Plane planes[2] = {main, edge12};
-        ret = Return::compressionEdge;
-        if (s[1] > s[0])
+        mcDone = true;
+        returnTo(el_, &main, 1, w, k, s, dg);
+        if (!sorted(s, tol))
         {
-            // s1 dropped below s2: triaxial compression corner s1 = s2,
-            // active planes (s1, s3) and (s2, s3)
-            planes[1] = edge23;
-        }
-        else
-        {
-            // s3 rose above s2: triaxial extension corner s2 = s3
-            ret = Return::extensionEdge;
-        }
-        returnTo(el_, planes, 2, w, k, s, dg);
-        const bool ok = dg[0] >= -tol && dg[1] >= -tol && sorted(s, tol);
-        if (!ok)
-        {
-            if (sphi == 0)
+            Plane planes[2] = {main, edge12};
+            ret = Return::compressionEdge;
+            if (s[1] > s[0])
             {
-                throw std::runtime_error("mohrCoulomb: Tresca corner return failed");
+                // s1 dropped below s2: triaxial compression corner s1 = s2,
+                // active planes (s1, s3) and (s2, s3)
+                planes[1] = edge23;
             }
+            else
+            {
+                // s3 rose above s2: triaxial extension corner s2 = s3
+                ret = Return::extensionEdge;
+            }
+            returnTo(el_, planes, 2, w, k, s, dg);
+            const bool ok = dg[0] >= -tol && dg[1] >= -tol && sorted(s, tol);
+            if (!ok)
+            {
+                if (sphi == 0)
+                {
+                    throw std::runtime_error
+                    (
+                        "mohrCoulomb: Tresca corner return failed"
+                    );
+                }
+                apex = true;
+            }
+        }
+        if (!apex && sphi > 0 && 0.5*(s[0] + s[2]) > c_*cosPhi_/sphi + tol)
+        {
             apex = true;
         }
+        if (apex)
+        {
+            s[0] = s[1] = s[2] = c_*cosPhi_/sphi;
+            ret = Return::apex;
+        }
     }
-    if (!apex && sphi > 0 && 0.5*(s[0] + s[2]) > c_*cosPhi_/sphi + tol)
+
+    if (tension_ && (!mcDone || s[0] > sigmaT_ + tol))
     {
-        apex = true;
-    }
-    if (apex)
-    {
-        s[0] = s[1] = s[2] = c_*cosPhi_/sphi;
-        ret = Return::apex;
+        ret = tensionReturn(w, scale, s);
+        apex = (ret == Return::tensionApex);
     }
 
     spectralToVoigt(s, V, sigNew);
@@ -234,6 +331,153 @@ MohrCoulomb::Return MohrCoulomb::updateReturn
     plasticCorrector(el_, trial, sigNew, hOld, apex, hNew);
 
     return ret;
+}
+
+
+MohrCoulomb::Return MohrCoulomb::tensionReturn
+(
+    const double w[3],
+    double scale,
+    double s[3]
+) const
+{
+    const double sphi = sinPhi_;
+    const double spsi = sinPsi_;
+    const double k = 2.0*c_*cosPhi_;
+
+    // Planes in the order of _MC_T_SETS in models.py: main, s1 = s2 edge
+    // (edge_23), s2 = s3 edge (edge_12), then the Rankine planes T1, T2, T3
+    const Plane planes[6] =
+    {
+        {{1 + sphi, 0, -1 + sphi}, {1 + spsi, 0, -1 + spsi}},
+        {{0, 1 + sphi, -1 + sphi}, {0, 1 + spsi, -1 + spsi}},
+        {{1 + sphi, -1 + sphi, 0}, {1 + spsi, -1 + spsi, 0}},
+        {{1, 0, 0}, {1, 0, 0}},
+        {{0, 1, 0}, {0, 1, 0}},
+        {{0, 0, 1}, {0, 0, 1}}
+    };
+    const double rhs[6] = {k, k, k, sigmaT_, sigmaT_, sigmaT_};
+
+    double Dng[6][3];
+    for (int j = 0; j < 6; ++j)
+    {
+        principalD(el_, planes[j].ng, Dng[j]);
+    }
+
+    const double M = el_.K + 4.0*el_.G/3.0;
+    const double tol = 1e-10*std::max(scale, sigmaT_);
+
+    // Active sets: one, two, then three planes, in lexicographic order
+    int sets[41][3];
+    int nSet[41];
+    int m = 0;
+    for (int i = 0; i < 6; ++i)
+    {
+        sets[m][0] = i; nSet[m++] = 1;
+    }
+    for (int i = 0; i < 6; ++i)
+    {
+        for (int j = i + 1; j < 6; ++j)
+        {
+            sets[m][0] = i; sets[m][1] = j; nSet[m++] = 2;
+        }
+    }
+    for (int i = 0; i < 6; ++i)
+    {
+        for (int j = i + 1; j < 6; ++j)
+        {
+            for (int l = j + 1; l < 6; ++l)
+            {
+                sets[m][0] = i; sets[m][1] = j; sets[m][2] = l; nSet[m++] = 3;
+            }
+        }
+    }
+
+    for (int a = 0; a < m; ++a)
+    {
+        const int n = nSet[a];
+        const int* act = sets[a];
+
+        double A[3][3], b[3], dg[3];
+        for (int i = 0; i < n; ++i)
+        {
+            for (int j = 0; j < n; ++j)
+            {
+                A[i][j] = dot3(planes[act[i]].nf, Dng[act[j]]);
+            }
+            b[i] = dot3(planes[act[i]].nf, w) - rhs[act[i]];
+        }
+        if (!solveSmall(n, A, b, dg))
+        {
+            continue;
+        }
+
+        bool ok = true;
+        for (int i = 0; i < n; ++i)
+        {
+            ok = ok && dg[i]*M >= -tol;
+        }
+        if (!ok)
+        {
+            continue;
+        }
+
+        double t[3];
+        for (int i = 0; i < 3; ++i)
+        {
+            t[i] = w[i];
+            for (int j = 0; j < n; ++j)
+            {
+                t[i] -= dg[j]*Dng[act[j]][i];
+            }
+        }
+        if (!sorted(t, tol))
+        {
+            continue;
+        }
+        const double fMC = (t[0] - t[2]) + (t[0] + t[2])*sphi - k;
+        if (fMC > tol || t[0] - sigmaT_ > tol)
+        {
+            continue;
+        }
+
+        std::copy(t, t + 3, s);
+
+        int nMC = 0, nT = 0;
+        bool compEdge = false, extEdge = false;
+        for (int i = 0; i < n; ++i)
+        {
+            (act[i] < 3 ? nMC : nT) += 1;
+            compEdge = compEdge || act[i] == 1;
+            extEdge = extEdge || act[i] == 2;
+        }
+        if (nMC && nT) return Return::tensionCorner;
+        if (nT == 1) return Return::tensionPlane;
+        if (nT == 2) return Return::tensionEdge;
+        if (nT == 3) return Return::tensionApex;
+        if (nMC == 3) return Return::apex;
+        if (compEdge) return Return::compressionEdge;
+        if (extEdge) return Return::extensionEdge;
+        return Return::plane;
+    }
+
+    throw std::runtime_error
+    (
+        "mohrCoulomb: tension cut-off return found no active set"
+    );
+}
+
+
+double MohrCoulomb::tensionYield(const Voigt sigma) const
+{
+    if (!tension_)
+    {
+        return -std::numeric_limits<double>::infinity();
+    }
+    double A[3][3], w[3], V[3][3];
+    voigtToMatrix(sigma, A);
+    symmetricEigen(A, w, V);
+    return w[0] - sigmaT_;
 }
 
 

@@ -28,7 +28,7 @@ Phase 1 is complete (formulation fixed in decision 0013). Phase 2: the C++ Euler
 | 2.4b | Lagrange step plus remap, integration checks | Blocked on 2.3 and 2.4 | Brief: `docs/wp/WP-2.4b.md` |
 | 2.5a | Drucker-Prager in C++ | Done | `kernel/celDruckerPrager`, wrapper `druckerPrager` (`fit` word option, decision 0009); 14 new reference paths match Python to 2e-15 with apex returns; celFoam selects it. Merged on green CI (2026-11-14) |
 | 2.5b | Mohr-Coulomb in C++ | Done | `kernel/celMohrCoulomb`, Jacobi eigen-solver `kernel/celEigen` (decision 0011); `tests/test_constitutive_cpp.sh` matches Python on 10 MC paths to 1e-14, edge and apex returns required. Tension cut-off split to 2.5c |
-| 2.5c | Mohr-Coulomb tension cut-off (Python, then C++) | Next | Brief: `docs/wp/WP-2.5c.md` |
+| 2.5c | Mohr-Coulomb tension cut-off (Python, then C++) | Done | Optional `sigma_t` / `sigmaT` (Rankine planes, active-set return, decision 0015). Python checks pass (strengths, caps, unloading, 4 x 10,000 tension-biased increments, associated return = independent closest point to 1e-15); C++ matches Python on 10 new paths to 2e-14 with every tension return exercised; celFoam reads `sigmaT`. Merged on green CI (2026-11-14) |
 
 ## Standing instruction from Sia (2026-11-14)
 
@@ -51,7 +51,7 @@ Started 2026-11-14, one thread each, independent of each other:
 
 1. WP 2.3: Lagrange step in C++: done (decision 0016).
 2. WP 2.4: remap in C++ (`docs/wp/WP-2.4.md`).
-3. WP 2.5c: Mohr-Coulomb tension cut-off (`docs/wp/WP-2.5c.md`).
+3. WP 2.5c: Mohr-Coulomb tension cut-off: done (2026-11-14).
 
 2.3 and 2.4 are built in parallel against the contract in decision 0014 (`phiL` face
 flux, already in `eulerianSolid`). After both merge: WP 2.4b (`docs/wp/WP-2.4b.md`).
@@ -66,8 +66,9 @@ After that, Phase 3 (materials and void): briefs not written yet.
   percent of the jump at the impact plane for the first 5 to 10 cells of wave travel
   (1.7 percent elastic). Matters for contact (WP 4.x); revisit in WP 1.3 (decision 0008).
 - WP 1.2 prototype: history is remapped with superbee, stress with MC (decision 0008).
-- Mohr-Coulomb (Python and C++) has no separate tension cut-off below the apex
-  (decisions 0004, 0011): cohesive material carries tension up to c cot(phi). WP 2.5c.
+- Mohr-Coulomb tension cut-off (WP 2.5c) is optional: without `sigmaT` cohesive
+  material still carries tension up to c cot(phi). The vectorised 2D prototype
+  (`prototype/constitutive/batch.py`) and Drucker-Prager have no cut-off.
 - 2D prototype: a step at 45 degrees overshoots 2.7 percent during its first cell of
   travel, then below 0.3 percent (decision 0013; the 13 percent in decision 0012 was a
   jagged test step). Like the 1D impact start-up, accepted; contact (WP 4.3) re-measures.

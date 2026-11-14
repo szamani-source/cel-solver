@@ -4,7 +4,8 @@ Class
 
 Description
     Perfectly plastic Mohr-Coulomb, non-associated: E, nu, phi [deg], c [Pa],
-    psi [deg]. No tension cut-off (decision 0004).
+    psi [deg], and the optional tensile strength sigmaT [Pa] (Rankine
+    tension cut-off, 0 <= sigmaT <= c cot(phi); absent = no cut-off, WP 2.5c).
     Wraps cel::constitutive kernel model "mohrCoulomb".
 
 SourceFiles

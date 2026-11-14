@@ -8,7 +8,7 @@ Description
     selection from a dictionary:
 
     \verbatim
-        type    vonMises;   // linearElastic | vonMises | druckerPrager
+        type    vonMises;   // linearElastic | vonMises | druckerPrager | mohrCoulomb
         E       2e7;        // Pa
         nu      0.3;
         sigma_y 2e5;        // Pa (vonMises)
@@ -17,6 +17,8 @@ Description
 
     druckerPrager reads E, nu, phi [deg], c [Pa], psi [deg] and the optional
     word fit (compression | extension | plane_strain, default compression).
+    mohrCoulomb reads E, nu, phi [deg], c [Pa], psi [deg] and the optional
+    tensile strength sigmaT [Pa] (tension cut-off; absent = none).
 
     update() takes OpenFOAM symmTensors. The strain increment is the tensor
     strain increment (e.g. symm(gradU)*dt), so its shear components are

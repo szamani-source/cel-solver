@@ -18,6 +18,10 @@ Description
     require the returns the path is there to test: triaxial compression the
     s1 = s2 edge, triaxial extension the s2 = s3 edge, uniaxial strain the
     apex, and the random paths at least one edge and one apex return.
+    Paths with a tension cut-off (WP 2.5c) must reach the cut-off and never
+    the Mohr-Coulomb apex; triaxial tension and uniaxial strain need the
+    tension plane, hydrostatic tension the tension apex, tension-then-shear a mixed Mohr-Coulomb/tension corner, and
+    the random paths every tension return (plane, edge, apex, corner).
 
     Build and run: tests/test_constitutive_cpp.sh
 \*---------------------------------------------------------------------------*/
@@ -144,7 +148,7 @@ int main(int argc, char* argv[])
         int apexMismatch = 0, nPlastic = 0, nApex = 0;
 
         const auto* mc = dynamic_cast<const MohrCoulomb*>(model.get());
-        int nRet[5] = {0, 0, 0, 0, 0};
+        int nRet[MohrCoulomb::nReturns] = {};
 
         for (const Step& s : c.steps)
         {
@@ -195,6 +199,11 @@ int main(int argc, char* argv[])
             const int comp = nRet[int(R::compressionEdge)];
             const int ext = nRet[int(R::extensionEdge)];
             const int apx = nRet[int(R::apex)];
+            const int tPlane = nRet[int(R::tensionPlane)];
+            const int tEdge = nRet[int(R::tensionEdge)];
+            const int tApex = nRet[int(R::tensionApex)];
+            const int tCorner = nRet[int(R::tensionCorner)];
+            const int tAll = tPlane + tEdge + tApex + tCorner;
             auto has = [&](const char* tag)
             {
                 return c.name.find(tag) != std::string::npos;
@@ -203,14 +212,31 @@ int main(int argc, char* argv[])
             if (has("triaxialExtension")) returnsOk = ext > 0;
             if (has("uniaxialStrain")) returnsOk = apx > 0;
             if (has("random")) returnsOk = (comp + ext) > 0 && apx > 0;
+            if (mc->hasTensionCutOff())
+            {
+                // WP 2.5c paths: each must reach the cut-off, and the
+                // apex flag must only come from the tension apex
+                returnsOk = tAll > 0 && apx == 0;
+                if (has("hydrostaticTension")) returnsOk = returnsOk && tApex > 0;
+                if (has("triaxialTension")) returnsOk = returnsOk && tPlane > 0;
+                if (has("uniaxialStrain")) returnsOk = returnsOk && tPlane > 0;
+                if (has("tensionShear")) returnsOk = returnsOk && tCorner > 0;
+                if (has("random"))
+                {
+                    returnsOk = returnsOk
+                     && tPlane > 0 && tEdge > 0 && tApex > 0 && tCorner > 0;
+                }
+            }
 
-            char rb[128];
+            char rb[256];
             std::snprintf
             (
                 rb, sizeof(rb),
                 "      returns: plane %d, compression edge %d, "
-                "extension edge %d, apex %d%s\n",
-                plane, comp, ext, apx, returnsOk ? "" : "  (MISSING)"
+                "extension edge %d, apex %d; tension plane %d, edge %d, "
+                "apex %d, corner %d%s\n",
+                plane, comp, ext, apx, tPlane, tEdge, tApex, tCorner,
+                returnsOk ? "" : "  (MISSING)"
             );
             returns = rb;
         }
