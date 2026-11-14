@@ -17,7 +17,9 @@ FoamFile
 //                   extension (inner cone) or plane_strain match to
 //                   Mohr-Coulomb. Perfectly plastic, non-associated (psi).
 //                   Example: phi 30; c 10e3; psi 5; fit compression;
-// The solver also reads rho, E and nu directly for the stable time step.
+// rho: density used where no 0/rho file is given (eulerianSolid, WP 2.1).
+// The stable time step uses the model's wave modulus K + 4G/3 and the cell
+// density.
 
 type    linearElastic;
 
