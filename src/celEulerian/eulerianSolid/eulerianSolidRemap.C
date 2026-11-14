@@ -443,12 +443,16 @@ static vectorField limitedGradient
     scalarField rMax(nCells, -GREAT);
     auto addFace = [&](const label celli, const vector& d)
     {
-        const scalar gd = g[celli] & d;
-        if (mag(gd) <= perpTol*mag(g[celli])*mag(d))
+        const scalar e = 0.5*(g[celli] & d);
+        if (mag(e) <= 0.5*perpTol*mag(g[celli])*mag(d) || mag(e) < ROOTVSMALL)
         {
-            return;     // face (nearly) normal to the gradient
+            // Face (nearly) normal to the gradient, or a vanishing gradient.
+            // The absolute test catches a subnormal g, whose relative
+            // tolerance underflows to 0 (WP 2.4b: 0.5 g.d rounded to -0 and
+            // the ratio divided by zero)
+            return;
         }
-        const scalar r = ratio(celli, 0.5*gd);
+        const scalar r = ratio(celli, e);
         rMin[celli] = min(rMin[celli], r);
         rMax[celli] = max(rMax[celli], r);
     };
@@ -459,7 +463,7 @@ static vectorField limitedGradient
     auto addSwept = [&](const label celli, const vector& x)
     {
         const scalar e = g[celli] & x;
-        if (mag(e) <= perpTol*mag(g[celli])*mag(x))
+        if (mag(e) <= perpTol*mag(g[celli])*mag(x) || mag(e) < ROOTVSMALL)
         {
             return;
         }

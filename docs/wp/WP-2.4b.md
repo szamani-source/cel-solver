@@ -1,7 +1,7 @@
 # WP 2.4b: Lagrange step plus remap, integration checks
 
-State: blocked on WP 2.3 and WP 2.4
-Branch: `wp-2.4b-integration-checks`
+State: done (2026-11-14)
+Branch: `claude/project-thread-504odx`
 
 ## Goal
 
@@ -40,4 +40,25 @@ prototyped").
 
 ## Log
 
-(none yet)
+### 2026-11-14: done in one session
+
+Built `tests/eulerian/cycleCheck` (`celCycleCheck`: initial U and sigma from `0/`,
+fixed dt, Lagrange step then remap per cycle, records totals and wave-frame ranges
+every step, optional prescribed rotation with U held), `tests/eulerian/cycle_checks.py`
+and `tests/test_eulerian_cycle.sh` (about 3 minutes). Every "done when" item passes;
+numbers and the stability study are in decision 0022.
+
+The checks exposed two bugs, both fixed:
+
+- Prescribed motion (`solveMomentum no`) used the acoustic face velocity, whose
+  stress-jump term blew up the rotating disc. Now the mean of the face states.
+- Remap limiter divided by -0 for a subnormal gradient (1D plastic wave on a 3D mesh,
+  floating-point exception). Now skips extrapolations below 1e-150.
+
+Learned: the WP 2.3 "second crossing not above the first" stability rule is noise
+(about 0.5 percent from crossing to crossing); the full cycle is stable to maxCo 0.8 in
+2D and at least 0.7 in 3D. Known issues recorded (S step at 45 degrees overshoots
+0.9 percent with streaming, 1.4 without; slow bounded creep of a 45 degree step's
+overshoot over many crossings).
+
+Next: WP 3.1 (C++ gravity and walls), after WP 3.1p.
