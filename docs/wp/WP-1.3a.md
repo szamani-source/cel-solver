@@ -1,7 +1,7 @@
 # WP 1.3a: 2D plane-strain prototype, elastic waves
 
-State: not started
-Branch: `wp-1.3a-2d-elastic`
+State: done (2026-11-14)
+Branch: `claude/project-thread-npbl39` (thread branches replace the `wp-` names)
 
 WP 1.3 is split in two (recorded in `docs/work-packages.md`): 1.3a builds the 2D scheme
 for elastic material; 1.3b adds rotation, plasticity and writes the formulation decision.
@@ -61,4 +61,38 @@ axis-aligned ones, and the run time per cell per step.
 
 ## Log
 
-(none yet)
+### 2026-11-14
+
+Done:
+- Wrote the checks first (`lr2d.py --verify`, run by `tests/test_proto_2d_elastic.sh`),
+  then `prototype/lr2d.py` as the brief suggested: per sweep a P system, an S system and
+  stationary s_tt, s_zz; MC characteristic slopes; acoustic Riemann solvers; 1D remap.
+  Material rho 2000, M 50 MPa (as WP 1.1), nu 0.3. Smooth runs stream the material at
+  0.25 c_p along the diagonal. All criteria pass; test takes about 5 minutes.
+- Smooth Gaussian (width 0.1 m along the normal), 100/200/400 cells per metre:
+  P 0 and 90 deg orders 1.85, 1.86; P 45 deg 1.84, 1.85; S 0 deg 1.78, 1.77;
+  S 45 deg 1.87, 1.87. Speeds within 0.002 percent.
+- Reduces to 1D bit-for-bit (difference 0.0). Mirror about the diagonal bit-for-bit.
+- Step P-wave along x with diagonal streaming: no new extrema (0.000 percent); mass and
+  momentum change below 4e-16. Fixed-wall box keeps its mass.
+
+Recorded (not pass criteria):
+- 45 deg vs axis-aligned L2 error at 400 cells: P 1.46e-4 vs 2.62e-4; S 1.43e-4 vs
+  3.93e-4. The diagonal is more accurate (more cells across the pulse along the normal).
+- Cost about 2.5 microseconds per cell per step on 400 x 400 (symmetric split, four
+  sweeps per step), 3 to 5 on the thin 400 x 4 strips (numpy overhead). A 200 x 200 step
+  case of 106 steps runs in about 10 s.
+- Step P-wave at 45 degrees: largest new extremum 13 percent of the jump (s_xy, start-up),
+  4.9 percent at the end of the run. Independent of CFL, limiter and streaming: the
+  direction-by-direction Riemann solver. The brief's step criterion is read as the wave
+  along x with diagonal streaming; the 45 degree number is printed only. Decision 0012.
+
+Learned:
+- Symmetric splitting (average of x-y and y-x) is needed for exact mirror symmetry.
+- Matching 1D to 1e-10 needs identical arithmetic: the strain `(h_new - h)/h` cancels
+  when the material streams, so one ulp grows to 1e-9. `lr1d.py` density and remap are
+  now written as increments (exact identity when nothing moves); 1D results unchanged
+  beyond round-off.
+
+Next: WP 1.3b (rotation, plasticity, formulation decision, now also item 6: oblique
+fronts).
