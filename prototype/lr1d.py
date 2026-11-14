@@ -148,7 +148,10 @@ class Bar1D:
         d = dt * v_star                           # face displacement
         h_new = h + right(d) - d
         sig_new = self.update_stress(h, h_new)
-        rho_new = m / h_new
+        # rho - rho dh/h_new (= m/h_new) leaves rho bit-for-bit unchanged when
+        # nothing moves, so a 2D sweep across a uniform direction is an exact
+        # identity and lr2d.py reduces to this code to round-off (WP 1.3a).
+        rho_new = rho - rho * (h_new - h) / h_new
         return d, h_new, rho_new, sig_new, v_new
 
     def update_stress(self, h, h_new):
@@ -192,13 +195,15 @@ class Bar1D:
         v_from_right = v - vslope_m * 0.5 * (m - am)
         mom_flux = mass_flux * np.where(d > 0.0, v_from_left, v_from_right)
 
-        m_new = m + mass_flux - right(mass_flux)
-        sigvol_new = sig * h + sigvol_flux - right(sigvol_flux)
-        p_new = m * v + mom_flux - right(mom_flux)
-
-        self.rho = m_new / self.dx
-        self.sig = sigvol_new / self.dx
-        self.v = p_new / m_new
+        # Written as increments of the Lagrangian values (algebraically
+        # (m + fluxes)/dx, (s h + fluxes)/dx and (m v + fluxes)/m_new), so the
+        # values are unchanged bit-for-bit when nothing moves (see above).
+        dh = h - self.dx
+        dmf = mass_flux - right(mass_flux)
+        self.rho = rho + (rho * dh + dmf) / self.dx
+        self.sig = sig + (sig * dh + sigvol_flux - right(sigvol_flux)) / self.dx
+        m_new = self.rho * self.dx
+        self.v = v + (mom_flux - right(mom_flux) - v * dmf) / m_new
 
     # --- driver ----------------------------------------------------------------
 

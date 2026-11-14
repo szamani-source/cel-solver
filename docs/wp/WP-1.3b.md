@@ -27,6 +27,9 @@ formulation the C++ solver will implement (WP 2.3, 2.4).
   4. Impulsive start-up overshoot (decision 0008): accept, elastic-plastic Riemann
      solver, or artificial viscosity at contact?
   5. Per-field limiter choice for the C++ remap.
+  6. Oblique fronts: the WP 1.3a scheme overshoots 3 to 14 percent on a step P-wave at
+     45 degrees (decision 0012). Accept, add a multidimensional (nodal) Riemann solver,
+     or go staggered?
 
 ## Done when
 
