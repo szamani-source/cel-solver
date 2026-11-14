@@ -6,6 +6,10 @@ FoamFile
     object      U;
 }
 
+// Velocity [m/s]. Optional: if this file is absent, celFoam creates U = 0
+// with zeroGradient patches. sigma, epsP and epsPEq are created the same way
+// (zero) unless a file is given.
+
 dimensions      [0 1 -1 0 0 0 0];
 internalField   uniform (0 0 0);
 

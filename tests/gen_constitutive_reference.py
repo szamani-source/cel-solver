@@ -8,12 +8,16 @@ Usage: python3 gen_constitutive_reference.py <output file>
 File format, one record per line, numbers written with 17 significant digits:
 
     case <name> <model> <n> <key> <value> ... (n parameter pairs)
+    option <key> <word>                      (zero or more, non-numeric options)
     init <sigma 6>
     step <deps 6> <sigma 6> <epsP 6> <epsPEq> <apex 0|1>
     ...
     end
 
 Voigt order xx, yy, zz, xy, yz, zx; strain with engineering shear (decision 0004).
+<model> is the C++ model name (PY_MODELS maps it to the Python function). String-valued
+parameters (Drucker-Prager "fit") are written as option lines, since the C++ kernel keeps
+numbers and options apart (WP 2.5a).
 Mixed stress/strain paths are recorded as the strain increments the Python driver found,
 so the C++ side only needs a strain-driven replay.
 """
@@ -30,16 +34,28 @@ import driver  # noqa: E402
 import models  # noqa: E402
 
 
+# C++ model name -> Python reference model
+PY_MODELS = {
+    "linearElastic": models.linear_elastic,
+    "vonMises": models.von_mises,
+    "druckerPrager": models.drucker_prager,
+}
+
+
 def fmt(values):
     return " ".join("%.17g" % v for v in values)
 
 
 def write_case(out, name, model_name, params, sigma0, deps_list):
     """Run the Python model along deps_list from sigma0 and write the record."""
-    model = models.MODELS[model_name]
+    model = PY_MODELS[model_name]
+    numbers = {k: v for k, v in params.items() if not isinstance(v, str)}
+    options = {k: v for k, v in params.items() if isinstance(v, str)}
     out.write("case %s %s %d %s\n" % (
-        name, model_name, len(params),
-        " ".join("%s %.17g" % (k, v) for k, v in params.items())))
+        name, model_name, len(numbers),
+        " ".join("%s %.17g" % (k, v) for k, v in numbers.items())))
+    for k, v in options.items():
+        out.write("option %s %s\n" % (k, v))
     sigma = np.array(sigma0, dtype=float)
     history = models.init_history()
     out.write("init %s\n" % fmt(sigma))
@@ -62,6 +78,9 @@ def main():
     elastic = dict(E=E, nu=nu)
     j2_perfect = dict(E=E, nu=nu, sigma_y=200e3, H=0.0)
     j2_hard = dict(E=E, nu=nu, sigma_y=200e3, H=2e6)
+    # WP 2.5a: frictional-cohesive and cohesionless Drucker-Prager
+    dp_cohesive = dict(E=E, nu=nu, phi=30.0, c=10e3, psi=5.0, fit="compression")
+    dp_sand = dict(E=E, nu=nu, phi=35.0, c=0.0, psi=0.0, fit="compression")
     pc = 100e3
 
     rng = np.random.default_rng(2022)
@@ -78,15 +97,25 @@ def main():
     with open(sys.argv[1], "w") as out:
         for tag, name, p in (("elastic", "linearElastic", elastic),
                              ("j2perfect", "vonMises", j2_perfect),
-                             ("j2hard", "vonMises", j2_hard)):
-            m = models.MODELS[name]
+                             ("j2hard", "vonMises", j2_hard),
+                             ("dpCohesive", "druckerPrager", dp_cohesive),
+                             ("dpSand", "druckerPrager", dp_sand)):
+            m = PY_MODELS[name]
 
             # Uniaxial strain: load to 2 % compression, unload to 1 %, reload in tension
             d = np.zeros(6)
             load = [d + [0, 0, -2e-2 / 100, 0, 0, 0]] * 100
             unload = [d + [0, 0, 1e-2 / 50, 0, 0, 0]] * 50
-            write_case(out, tag + "_uniaxialStrain", name, p, np.zeros(6),
-                       load + unload + load[:30])
+            if name == "druckerPrager":
+                # From the isotropic state: the uniaxial-strain compression path stays
+                # inside the cone (q/p too small for these phi), so unload on through
+                # zero strain into extension, where it yields, then reload
+                ext = [d + [0, 0, 2e-2 / 100, 0, 0, 0]] * 100
+                write_case(out, tag + "_uniaxialStrain", name, p, -pc * models.I_V,
+                           load[:50] + ext + load[:30])
+            else:
+                write_case(out, tag + "_uniaxialStrain", name, p, np.zeros(6),
+                           load + unload + load[:30])
 
             # Triaxial compression and extension from 100 kPa (mixed control)
             r = driver.triaxial(m, p, pc, -0.02, 200)
@@ -103,6 +132,17 @@ def main():
 
             # 1000 random increments from an isotropic compressive state
             write_case(out, tag + "_random1000", name, p, -pc * models.I_V,
+                       random_steps)
+
+        # WP 2.5a: the other two Drucker-Prager fits to Mohr-Coulomb
+        for fit in ("extension", "plane_strain"):
+            p = dict(dp_cohesive, fit=fit)
+            m = PY_MODELS["druckerPrager"]
+            tag = "dpCohesive_" + fit.replace("_", "")
+            r = driver.triaxial(m, p, pc, -0.02, 200)
+            write_case(out, tag + "_triaxialCompression", "druckerPrager", p,
+                       -pc * models.I_V, increments(r))
+            write_case(out, tag + "_random1000", "druckerPrager", p, -pc * models.I_V,
                        random_steps)
 
 

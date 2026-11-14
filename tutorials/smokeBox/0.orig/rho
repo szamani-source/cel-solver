@@ -1,0 +1,22 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    object      rho;
+}
+
+// Density [kg/m^3]. Optional: if this file is absent, celFoam creates rho
+// uniform from "rho" in constant/materialProperties. Allrun uses setFields
+// (system/setFieldsDict) to make it non-uniform.
+
+dimensions      [1 -3 0 0 0 0 0];
+internalField   uniform 1800;
+
+boundaryField
+{
+    walls
+    {
+        type    zeroGradient;
+    }
+}
