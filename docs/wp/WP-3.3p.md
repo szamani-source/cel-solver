@@ -40,7 +40,10 @@ open the outlet, discharge. This is the first end-to-end result to show Sia.
 - Rate independent of head: runs with H = 0.6 m and H = 0.9 m give the same steady rate
   within 10 percent.
 - Rate against outlet width D = 0.04, 0.06, 0.08 m: fitted exponent within 1.5 +/- 0.2,
-  and the constant within the range in `docs/spec/silo-reference.md`.
+  and the constant C (exponent fixed at 1.5, k = 0) within 1.0 to 1.9
+  (reference 1.45, `docs/spec/silo-reference.md` section 3, decision 0019). Measure the
+  steady rate between 95 and 70 percent of the initial mass: for D = 0.08 m the bed
+  passes one width after only about 0.8 s.
 - Flow pattern: stagnant zones in the bottom corners (velocity below 1 percent of the
   outlet velocity), a central channel, a crater in the free surface; figure in the
   results page.
