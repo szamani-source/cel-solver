@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-11-14
+Last updated: 2026-11-14 (WP 2.4)
 
 Plan doc: https://claude.ai/artifact/DTT6kSikz9ZUTBkUxY6Grr
 
@@ -24,7 +24,7 @@ Phase 2 (the C++ Eulerian solver: 2.3 done, 2.4 running) and Phase 3 (silo disch
 | 2.1 | Eulerian library skeleton and solver fields | Done | `src/celEulerian` (class `eulerianSolid`), celFoam is a thin driver; `tests/test_eulerian_skeleton.sh` passes serial and on 2 processors (decision 0010). PR #8 |
 | 2.2 | Constitutive library interface in C++, elastic and J2 | Done | `src/celConstitutive/` (plain C++ kernel + OpenFOAM wrapper, decision 0006); `tests/test_constitutive_cpp.sh` passes in CI (kernel matches Python to 3e-15; wrapper and celFoam checks pass). PR #4 merged (2026-11-14) |
 | 2.3 | Lagrange step in C++ | Done | `eulerianSolidLagrange.C`: MUSCL-Hancock face states, acoustic face Riemann solver, Hughes-Winget, boundaries from the U patch type, default maxCo 0.4 (decision 0018). `tests/test_lagrange_step.sh` passes: wave orders 1.9 to 2.3, rotation 3e-13, shear 3e-7, reflections 1e-4, 2/4 processors 3e-15 (2026-11-14) |
-| 2.4 | Remap in C++, single material | Next | Brief: `docs/wp/WP-2.4.md` |
+| 2.4 | Remap in C++, single material | Done | `eulerianSolidRemap.C`: unsplit face-based remap, geometry from `phiL` only, Barth-Jespersen form of MC/superbee per field (`remapLimiters` in materialProperties), decision 0017. `tests/test_remap.sh` passes: 1D prototype match 7e-14, order 2.7 (2D) / 2.3 (3D), no new extrema, history edge 2 cells, slotted disc, 2 and 4 processors match serial to 3e-14, conservation 1e-13. Stable to summed Courant about 0.9. Merged on green CI (2026-11-14) |
 | 2.4b | Lagrange step plus remap, integration checks | Blocked on 2.3 and 2.4 | Brief: `docs/wp/WP-2.4b.md` |
 | 2.5a | Drucker-Prager in C++ | Done | `kernel/celDruckerPrager`, wrapper `druckerPrager` (`fit` word option, decision 0009); 14 new reference paths match Python to 2e-15 with apex returns; celFoam selects it. Merged on green CI (2026-11-14) |
 | 2.5b | Mohr-Coulomb in C++ | Done | `kernel/celMohrCoulomb`, Jacobi eigen-solver `kernel/celEigen` (decision 0011); `tests/test_constitutive_cpp.sh` matches Python on 10 MC paths to 1e-14, edge and apex returns required. Tension cut-off split to 2.5c |
@@ -52,8 +52,8 @@ anything that cannot be undone outside this repository.
 
 ## Next
 
-WP 2.3 (Lagrange step in C++) is done (decision 0018). Running: WP 2.4 (remap in C++).
-After it merges: WP 2.4b (`docs/wp/WP-2.4b.md`).
+WP 2.3 (Lagrange step in C++, decision 0018) and WP 2.4 (remap in C++, decision 0017)
+are done. Next: WP 2.4b (`docs/wp/WP-2.4b.md`).
 
 Silo track (decision 0016), one thread each:
 
@@ -100,12 +100,15 @@ Then the C++ counterparts 3.1 to 3.4 (after 2.4b; briefs not written yet) and 3.
 - 2D prototype: a step at 45 degrees overshoots 2.7 percent during its first cell of
   travel, then below 0.3 percent (decision 0013; the 13 percent in decision 0012 was a
   jagged test step). Like the 1D impact start-up, accepted; contact (WP 4.3) re-measures.
+- C++ remap (WP 2.4) has no corner transport: stable up to a summed outflow material
+  Courant number of about 0.9 (2D 0.45 and 3D 0.30 per direction on a diagonal), far
+  above what the acoustic step gives except for near-sonic material speeds. Density
+  is not returned to uniform exactly by a compress-then-reverse flux (1e-3 at Courant
+  0.2); velocity, stress and history are (decision 0017).
 - C++ Lagrange step (WP 2.3): stable Courant number 0.65 in 2D, 0.45 to 0.50 in 3D
   on uniform meshes (default maxCo 0.4); not measured on graded or distorted meshes. The
   rotating-disc check needs the remap and moves to WP 2.4b (decision 0018).
 - `stableDeltaT` uses cbrt(V): 2D one-cell-thick meshes must be as thick as their
   in-plane cells (decision 0018, consequences).
-- Until the remap (WP 2.4) is merged, celFoam runs the Lagrange step with no remap:
-  the printed mass drifts with the Lagrangian density.
 - WP 1.3a test takes about 5 minutes (400 x 400 meshes for the 45 degree convergence runs);
   WP 1.3b test about 1.5 minutes.

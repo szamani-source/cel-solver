@@ -98,7 +98,8 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
         ),
         mesh,
         dimensionedScalar(dimVolume/dimTime, Zero)
-    )
+    ),
+    remapLimiter_(readRemapLimiters(materialProperties_))
 {
     if (maxCo_ <= 0)
     {
@@ -134,11 +135,7 @@ Foam::scalar Foam::eulerianSolid::stableDeltaT() const
 }
 
 
-void Foam::eulerianSolid::remap(const scalar)
-{
-    // WP 2.4: remap mass, momentum, stress and history onto the fixed mesh.
-    // Nothing happens yet.
-}
+// remap(dt): eulerianSolidRemap.C (WP 2.4)
 
 
 Foam::scalar Foam::eulerianSolid::totalMass() const
