@@ -2,6 +2,7 @@
 #include "celLinearElastic.H"
 #include "celVonMises.H"
 #include "celDruckerPrager.H"
+#include "celMohrCoulomb.H"
 
 #include <cmath>
 #include <stdexcept>
@@ -161,10 +162,14 @@ std::unique_ptr<Model> makeModel
     {
         return std::unique_ptr<Model>(new DruckerPrager(p, opts));
     }
+    if (name == "mohrCoulomb")
+    {
+        return std::unique_ptr<Model>(new MohrCoulomb(p));
+    }
     throw std::invalid_argument
     (
         "unknown constitutive model '" + name
-      + "' (valid: linearElastic vonMises druckerPrager)"
+      + "' (valid: linearElastic vonMises druckerPrager mohrCoulomb)"
     );
 }
 

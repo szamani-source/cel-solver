@@ -94,6 +94,7 @@ void deviator(const Voigt s, Voigt out);
 double J2(const Voigt s);
 
 
+
 //- Abstract material model. Parameters are fixed at construction.
 class Model
 {
@@ -102,7 +103,7 @@ public:
     virtual ~Model() = default;
 
     //- Model name as used in dictionaries ("linearElastic", "vonMises",
-    //  "druckerPrager")
+    //  "druckerPrager", "mohrCoulomb")
     virtual const char* name() const = 0;
 
     //- One increment: (deps, sigOld, hOld) -> (sigNew, hNew)

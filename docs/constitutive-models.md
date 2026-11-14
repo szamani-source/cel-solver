@@ -14,7 +14,7 @@ then ported to C++ with the same tests (WP 2.2, 2.5a, 2.5b).
 | Linear elastic | Baseline | E, nu | Uniaxial strain against closed form | 1.4, 2.2 |
 | von Mises / Tresca (J2) | Undrained clay, metals | E, nu, yield stress or su | Uniaxial yield, radial return exactness | 1.4, 2.2 |
 | Drucker-Prager | Sand and granular bulk, smooth cone | E, nu, friction angle, cohesion, dilation angle | Triaxial compression peak strength, non-associated flow volume change | 1.4, 2.5a |
-| Mohr-Coulomb | Sand and granular bulk, standard soil parameters | E, nu, phi, c, psi, tension cut-off | Triaxial compression and extension strengths, corner and apex return | 1.4, 2.5b |
+| Mohr-Coulomb | Sand and granular bulk, standard soil parameters | E, nu, phi, c, psi, tension cut-off | Triaxial compression and extension strengths, corner and apex return | 1.4, 2.5b (C++ done); tension cut-off 2.5c |
 
 ## Points that matter for granular material
 

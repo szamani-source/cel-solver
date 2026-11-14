@@ -14,10 +14,16 @@ Description
     the apex flags agree on every step, every plastic case has plastic steps,
     and every Drucker-Prager random path has apex returns (WP 2.5a).
 
+    Mohr-Coulomb cases (WP 2.5b) also count which return each step took and
+    require the returns the path is there to test: triaxial compression the
+    s1 = s2 edge, triaxial extension the s2 = s3 edge, uniaxial strain the
+    apex, and the random paths at least one edge and one apex return.
+
     Build and run: tests/test_constitutive_cpp.sh
 \*---------------------------------------------------------------------------*/
 
 #include "celConstitutiveKernel.H"
+#include "celMohrCoulomb.H"
 
 #include <algorithm>
 #include <cmath>
@@ -137,11 +143,21 @@ int main(int argc, char* argv[])
         double sigScale = 0, epsScale = 0, sigErr = 0, epsErr = 0;
         int apexMismatch = 0, nPlastic = 0, nApex = 0;
 
+        const auto* mc = dynamic_cast<const MohrCoulomb*>(model.get());
+        int nRet[5] = {0, 0, 0, 0, 0};
+
         for (const Step& s : c.steps)
         {
             double sigNew[6];
             History hNew;
-            model->update(s.deps, sig, h, sigNew, hNew);
+            if (mc)
+            {
+                ++nRet[int(mc->updateReturn(s.deps, sig, h, sigNew, hNew))];
+            }
+            else
+            {
+                model->update(s.deps, sig, h, sigNew, hNew);
+            }
 
             for (int i = 0; i < 6; ++i)
             {
@@ -169,12 +185,43 @@ int main(int argc, char* argv[])
             c.model == "druckerPrager"
          && c.name.find("random") != std::string::npos;
 
+        // Returns each Mohr-Coulomb path must exercise
+        bool returnsOk = true;
+        std::string returns;
+        if (mc)
+        {
+            typedef MohrCoulomb::Return R;
+            const int plane = nRet[int(R::plane)];
+            const int comp = nRet[int(R::compressionEdge)];
+            const int ext = nRet[int(R::extensionEdge)];
+            const int apx = nRet[int(R::apex)];
+            auto has = [&](const char* tag)
+            {
+                return c.name.find(tag) != std::string::npos;
+            };
+            if (has("triaxialCompression")) returnsOk = comp > 0;
+            if (has("triaxialExtension")) returnsOk = ext > 0;
+            if (has("uniaxialStrain")) returnsOk = apx > 0;
+            if (has("random")) returnsOk = (comp + ext) > 0 && apx > 0;
+
+            char rb[128];
+            std::snprintf
+            (
+                rb, sizeof(rb),
+                "      returns: plane %d, compression edge %d, "
+                "extension edge %d, apex %d%s\n",
+                plane, comp, ext, apx, returnsOk ? "" : "  (MISSING)"
+            );
+            returns = rb;
+        }
+
         const bool ok =
             relSig < tol
          && (epsScale > 0 ? relEps < tol : epsErr == 0)
          && apexMismatch == 0
          && (!needPlastic || nPlastic > 0)
-         && (!needApex || nApex > 0);
+         && (!needApex || nApex > 0)
+         && returnsOk;
 
         char buf[256];
         std::snprintf
@@ -185,7 +232,7 @@ int main(int argc, char* argv[])
             ok ? "PASS" : "FAIL", c.name.c_str(), c.steps.size(), nPlastic,
             nApex, relSig, relEps, apexMismatch
         );
-        std::cout << buf;
+        std::cout << buf << returns;
         failures += !ok;
     }
 
