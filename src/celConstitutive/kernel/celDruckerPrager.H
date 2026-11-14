@@ -85,6 +85,11 @@ public:
         return el_.waveModulus();
     }
 
+    double shearModulus() const override
+    {
+        return el_.G;
+    }
+
     Fit fit() const
     {
         return fit_;

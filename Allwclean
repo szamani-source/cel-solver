@@ -4,3 +4,4 @@ wclean src/celConstitutive
 wclean src/celEulerian
 wclean applications/solvers/celFoam
 wclean tests/constitutive/wrapperCheck
+wclean tests/lagrange/lagrangeStepCheck

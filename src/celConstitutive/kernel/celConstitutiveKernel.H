@@ -118,6 +118,9 @@ public:
 
     //- Elastic P-wave modulus K + 4G/3 (stable time step)
     virtual double waveModulus() const = 0;
+
+    //- Elastic shear modulus G (shear impedance of the Lagrange step)
+    virtual double shearModulus() const = 0;
 };
 
 
