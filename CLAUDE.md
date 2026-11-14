@@ -29,12 +29,24 @@ velocity and position update, remap onto the fixed Eulerian mesh, write.
 ## How to build and test
 
 ```bash
-source /path/to/OpenFOAM-v2512/etc/bashrc   # in the cloud container: /opt/of/OpenFOAM-v2512
+source /usr/lib/openfoam/openfoam2512/etc/bashrc
 ./Allwmake
 tests/run_tests.sh
 ```
 
 CI (`.github/workflows/ci.yml`) runs the same in the `opencfd/openfoam-dev:2512` image.
+
+### Setting up OpenFOAM in a new session
+
+A fresh cloud container has no OpenFOAM. One command installs the same build CI uses,
+at the same path, in about a minute (decision 0007):
+
+```bash
+tools/setup_openfoam.sh    # safe to re-run; exits at once if already installed
+```
+
+`tests/manual/test_setup_time.sh --remove` times the whole setup, build and test run
+from scratch (66 s on 2026-11-14; limit 10 minutes).
 
 ## How we work (Sia's priority: small, findable pieces)
 
