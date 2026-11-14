@@ -46,7 +46,7 @@ Built `tests/eulerian/cycleCheck` (`celCycleCheck`: initial U and sigma from `0/
 fixed dt, Lagrange step then remap per cycle, records totals and wave-frame ranges
 every step, optional prescribed rotation with U held), `tests/eulerian/cycle_checks.py`
 and `tests/test_eulerian_cycle.sh` (about 3 minutes). Every "done when" item passes;
-numbers and the stability study are in decision 0021.
+numbers and the stability study are in decision 0022.
 
 The checks exposed two bugs, both fixed:
 

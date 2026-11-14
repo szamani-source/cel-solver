@@ -36,7 +36,7 @@ Description
         maxCo (default 0.4, decision 0018), the fraction of the CFL
         limit (stableDeltaT);
         solveMomentum (default yes): no holds U fixed (prescribed motion;
-        face velocities are then the mean of the face states, decision 0021);
+        face velocities are then the mean of the face states, decision 0022);
         secondOrder (default yes): no uses first-order (piecewise constant)
         face states in the Lagrange step.
 

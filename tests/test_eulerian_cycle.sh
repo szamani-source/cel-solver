@@ -1,6 +1,6 @@
 #!/bin/bash
 # WP 2.4b: the full C++ cycle (eulerianSolid::lagrangeStep then remap, as celFoam
-# runs them) reproduces the 2D prototype checks (decisions 0013, 0017, 0018, 0021).
+# runs them) reproduces the 2D prototype checks (decisions 0013, 0017, 0018, 0022).
 #
 # Builds the test driver tests/eulerian/cycleCheck (celCycleCheck: initial U and
 # sigma from 0/, fixed dt, records totals and wave-frame ranges every step) and runs
@@ -17,7 +17,7 @@
 #   by at most 1 % after the start-up; 2 processors match serial to 1e-12.
 # - Stable at the default maxCo (read from eulerianSolid.C), 2D and 3D, 4 crossings.
 #
-# Takes about 3 minutes. `cycle_checks.py WORKDIR --study` scans maxCo (decision 0021).
+# Takes about 3 minutes. `cycle_checks.py WORKDIR --study` scans maxCo (decision 0022).
 set -eu
 root="$(cd "$(dirname "$0")/.." && pwd)"
 work="$(mktemp -d)"

@@ -1,8 +1,8 @@
-# 0021 Lagrange step plus remap: integration results and two fixes (WP 2.4b)
+# 0022 Lagrange step plus remap: integration results and two fixes (WP 2.4b)
 
 Date: 2026-11-14. Status: accepted (Sia's standing rule: proceed and merge on green CI).
 
-Numbers 0019 and 0020 are taken by WP 3.0 and WP 3.1p. This note updates decision 0013
+Numbers 0019 to 0021 are taken by WP 3.0, WP 3.1p and WP 3.2p (void). This note updates decision 0013
 item 2 ("unsplit in C++") with what the C++ cycle does, and closes the risk recorded
 there ("the unsplit C++ scheme is not the scheme prototyped").
 

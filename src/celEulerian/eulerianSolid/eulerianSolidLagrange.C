@@ -19,7 +19,7 @@
        velocity vStar and the traction tStar = sigma* & n on the owner side.
        Boundary faces from the patch type of U (decision 0018). With
        solveMomentum no (prescribed motion) the face velocity is the mean of
-       the two face states, without the stress-jump term (decision 0021).
+       the two face states, without the stress-jump term (decision 0022).
     3. phiL = vStar & Sf (decision 0014); face force F = tStar |Sf|.
        Coupled faces (cyclic, processor, processorCyclic) are solved on the
        owner side only; the other side receives vStar and -F, -phiL, so both
@@ -725,7 +725,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
         if (!solveMomentum_)
         {
             // Prescribed motion: the face moves with the material on both
-            // sides, no acoustic correction from stress jumps (decision 0021)
+            // sides, no acoustic correction from stress jumps (decision 0022)
             vS[facei] = 0.5*(UO()[facei] + UN()[facei]);
         }
         F[facei] = t*magSf[facei];

@@ -25,7 +25,7 @@ WP 1.2 and 1.3b (prototype/lr1d_plastic.py, prototype/lr2d_plastic.py):
 5. Stability at the default maxCo: 45 degree (2D) and body-diagonal (3D)
    step waves with streaming, no growth over 4 crossings.
 
---study also scans maxCo for the stable Courant number (decision 0021).
+--study also scans maxCo for the stable Courant number (decision 0022).
 Prints one PASS/FAIL line per check, exits non-zero on any failure.
 """
 

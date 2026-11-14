@@ -25,14 +25,15 @@ Phase 2 (the C++ Eulerian solver: 2.1 to 2.5c and 2.4b done; 2.6 waits for Phase
 | 2.2 | Constitutive library interface in C++, elastic and J2 | Done | `src/celConstitutive/` (plain C++ kernel + OpenFOAM wrapper, decision 0006); `tests/test_constitutive_cpp.sh` passes in CI (kernel matches Python to 3e-15; wrapper and celFoam checks pass). PR #4 merged (2026-11-14) |
 | 2.3 | Lagrange step in C++ | Done | `eulerianSolidLagrange.C`: MUSCL-Hancock face states, acoustic face Riemann solver, Hughes-Winget, boundaries from the U patch type, default maxCo 0.4 (decision 0018). `tests/test_lagrange_step.sh` passes: wave orders 1.9 to 2.3, rotation 3e-13, shear 3e-7, reflections 1e-4, 2/4 processors 3e-15 (2026-11-14) |
 | 2.4 | Remap in C++, single material | Done | `eulerianSolidRemap.C`: unsplit face-based remap, geometry from `phiL` only, Barth-Jespersen form of MC/superbee per field (`remapLimiters` in materialProperties), decision 0017. `tests/test_remap.sh` passes: 1D prototype match 7e-14, order 2.7 (2D) / 2.3 (3D), no new extrema, history edge 2 cells, slotted disc, 2 and 4 processors match serial to 3e-14, conservation 1e-13. Stable to summed Courant about 0.9. Merged on green CI (2026-11-14) |
-| 2.4b | Lagrange step plus remap, integration checks | Done | `tests/test_eulerian_cycle.sh` passes (about 3 min): streaming P/S waves along x and at 45 deg, speeds within 0.2 %, orders 1.80 to 2.11; disc one turn 0.11 % (prototype 0.03 %); plastic step on a 3D mesh, speeds and HEL within 0.12 %; 45 deg impact 0.022 % over along x; 2 processors 1e-13. Fixed: prescribed-motion face velocity, remap divide by -0 (decision 0021). Stable to maxCo 0.8 (2D), at least 0.7 (3D); 2.3e-6 s per cell per step |
+| 2.4b | Lagrange step plus remap, integration checks | Done | `tests/test_eulerian_cycle.sh` passes (about 3 min): streaming P/S waves along x and at 45 deg, speeds within 0.2 %, orders 1.80 to 2.11; disc one turn 0.11 % (prototype 0.03 %); plastic step on a 3D mesh, speeds and HEL within 0.12 %; 45 deg impact 0.022 % over along x; 2 processors 1e-13. Fixed: prescribed-motion face velocity, remap divide by -0 (decision 0022). Stable to maxCo 0.8 (2D), at least 0.7 (3D); 2.3e-6 s per cell per step |
 | 2.5a | Drucker-Prager in C++ | Done | `kernel/celDruckerPrager`, wrapper `druckerPrager` (`fit` word option, decision 0009); 14 new reference paths match Python to 2e-15 with apex returns; celFoam selects it. Merged on green CI (2026-11-14) |
 | 2.5b | Mohr-Coulomb in C++ | Done | `kernel/celMohrCoulomb`, Jacobi eigen-solver `kernel/celEigen` (decision 0011); `tests/test_constitutive_cpp.sh` matches Python on 10 MC paths to 1e-14, edge and apex returns required. Tension cut-off split to 2.5c |
 | 2.5c | Mohr-Coulomb tension cut-off (Python, then C++) | Done | Optional `sigma_t` / `sigmaT` (Rankine planes, active-set return, decision 0015). Python checks pass (strengths, caps, unloading, 4 x 10,000 tension-biased increments, associated return = independent closest point to 1e-15); C++ matches Python on 10 new paths to 2e-14 with every tension return exercised; celFoam reads `sigmaT`. Merged on green CI (2026-11-14) |
 | 3.0 | Silo benchmark definition and reference values | Done | `docs/spec/silo-reference.md` (10 sources opened 2026-11-14; unread values marked not verified), `tools/silo_reference.py`, `tests/test_silo_reference.sh` passes. T0: Janssen K 0.29 to 0.43, bottom stress 80 to 86 percent of hydrostatic; Beverloo C = 1.45 (continuum mu(I) 1.40 to 1.55) gives 65, 120, 185 kg/s/m for D = 0.04, 0.06, 0.08 m. Tolerances: decision 0019 |
 | 3.1p | Prototype gravity, walls and settling | Done | `prototype/silo2d.py`; `tests/test_proto_silo_settle.sh` passes (about 3 min): lake at rest 3e-18 m/s, smooth walls 0.13 % from rho g H with K0 = 0.4286 exact, frictional tank (H = 3 W, 10 mm cells) within 1.7 % of Janssen with K = 0.425 measured at the walls, wall ratio within 1.8 % of tan 20 deg, force balance 0.08 %. Gravity by subtracting the discrete weight, walls as one-sided Riemann solutions, ramp 0.1 s plus damping 250 1/s (decision 0020). Mohr-Coulomb vectorised in `constitutive/batch.py` |
-| 3.2p | Prototype free surface (material plus void) | Next | Brief: `docs/wp/WP-3.2p.md` |
-| 3.3p | Prototype silo discharge (target T0) | Blocked on 3.2p | Brief: `docs/wp/WP-3.3p.md` |
+| 3.2p | Prototype free surface (material plus void) | Done | `prototype/void2d.py` (`VoidBox`); `tests/test_proto_void.sh` passes (about 70 s): lake at rest with a half-full top cell 2.5e-16 m/s, block translating 50 cells with exact edges and 3.5e-9 Pa stress, free fall at g to 1e-13 and landing, cohesionless block cracks with void = 2 v t. Slab-per-sweep remap, homogenised partly filled cells, void-first strain, separation at pulling faces (decision 0021). Column collapse split to 3.2q |
+| 3.2q | Prototype column collapse (split from 3.2p) | Next | Brief: `docs/wp/WP-3.2q.md`. Not passing yet: a = 0.5 run-out 0.25 (band 0.30 to 0.90), toes 50 to 60 deg; depends on E, so Riemann dissipation is part of it (decision 0021). Test `tests/manual/test_proto_collapse.sh` |
+| 3.3p | Prototype silo discharge (target T0) | Next | Brief: `docs/wp/WP-3.3p.md`; build on `void2d.VoidBox`; measure the rate's dependence on E first (decision 0021) |
 
 ## Standing instruction from Sia (2026-11-14)
 
@@ -53,16 +54,17 @@ anything that cannot be undone outside this repository.
 
 The C++ Eulerian cycle is done and checked against the prototypes: WP 2.3 (Lagrange
 step, decision 0018), WP 2.4 (remap, decision 0017), WP 2.4b (both together, decision
-0021). The C++ silo packages 3.1 to 3.4 can start once their prototype counterparts
+0022). The C++ silo packages 3.1 to 3.4 can start once their prototype counterparts
 are done (briefs not written yet).
 
 Silo track (decision 0016), one thread each:
 
 1. WP 3.0: reference values. Done (`docs/spec/silo-reference.md`).
 2. WP 3.1p: prototype gravity, walls, settling. Done (decision 0020).
-3. WP 3.2p: prototype free surface (`docs/wp/WP-3.2p.md`). Start now; build on `prototype/silo2d.py`.
+3. WP 3.2p: prototype free surface. Done (decision 0021); column collapse split to
+   WP 3.2q (`docs/wp/WP-3.2q.md`), which can run beside 3.3p.
 4. WP 3.3p: prototype silo discharge, the first end-to-end result for Sia
-   (`docs/wp/WP-3.3p.md`). After 3.2p.
+   (`docs/wp/WP-3.3p.md`). Start now, on `prototype/void2d.py`.
 
 Then the C++ counterparts 3.1 to 3.4 (2.4b is done; briefs not written yet) and 3.5
 (cohesion).
@@ -75,8 +77,13 @@ Then the C++ counterparts 3.1 to 3.4 (2.4b is done; briefs not written yet) and 
   0018 item 1); characteristic limiting would fix it if contact or the silo needs it.
 - C++ cycle (WP 2.4b): over many crossings a 45 degree P step's overshoot creeps up and
   levels off (0.5 percent first crossing, 2.7 percent after 16, 5.7 percent after 40;
-  2D, maxCo 0.4), with or without streaming (decision 0021).
+  2D, maxCo 0.4), with or without streaming (decision 0022).
 - C++ remap costs about 1.4e-6 s per cell per step, the Lagrange step 8e-7 (2D, serial).
+- Void prototype (WP 3.2p, decision 0021): slow granular flow is slowed by the acoustic
+  Riemann solver's dissipation (column collapse run-out grows as E falls: 0.25 at 1 MPa,
+  0.35 at 0.1 MPa, a = 0.5). Fronts are blunt (2 to 4 cells, 50 to 60 deg). Affects
+  3.3p's discharge rate; WP 3.2q works on it. The slab rule is 1D per sweep (tilted
+  surfaces are staircases); not tested at an angle.
 
 - WP 3.1p prototype: the free top of a full tank is a zero-traction face with no mass
   flux, so top cells lose density as the column settles (7 % in the top cell for 1.2 m).
@@ -84,6 +91,7 @@ Then the C++ counterparts 3.1 to 3.4 (2.4b is done; briefs not written yet) and 
   of rho g H over a further 10 % of the run undamped) because the walls sit at the limit.
   A fast ramp (0.05 s) with light damping lets the column rebound and unload the upper
   wall (ratio 10 to 25 % below tan delta_w): use the 0.1 s ramp (decision 0020).
+
 - Silo reference (WP 3.0): every published continuum discharge constant used mu(I)
   with friction 0.32 to 0.38; T0 is Mohr-Coulomb with tan 35 = 0.70. The test band for C
   is therefore wide (1.0 to 1.9); the exponent is the real check. Lube et al. 2005 and
@@ -111,7 +119,7 @@ Then the C++ counterparts 3.1 to 3.4 (2.4b is done; briefs not written yet) and 
   on uniform meshes (default maxCo 0.4); not measured on graded or distorted meshes.
   WP 2.4b found that measure too strict: the full cycle is stable to 0.8 (2D) and at
   least 0.7 (3D); above about 0.6 in 3D the start-up overshoot grows past 5 percent
-  (decision 0021). The disc check passed in WP 2.4b.
+  (decision 0022). The disc check passed in WP 2.4b.
 - `stableDeltaT` uses cbrt(V): 2D one-cell-thick meshes must be as thick as their
   in-plane cells (decision 0018, consequences).
 - WP 1.3a test takes about 5 minutes (400 x 400 meshes for the 45 degree convergence runs);
