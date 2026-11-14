@@ -1,4 +1,4 @@
-# 0009 Eulerian solid: one class owns the state, fields default when absent (WP 2.1)
+# 0010 Eulerian solid: one class owns the state, fields default when absent (WP 2.1)
 
 Date: 2026-11-14. Status: proposed (WP 2.1), confirm by merging the PR.
 
