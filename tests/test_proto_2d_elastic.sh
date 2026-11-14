@@ -6,7 +6,8 @@
 #   2. a P-wave along x matches prototype/lr1d.py at 200 cells to 1e-10
 #   3. a problem mirrored about the diagonal gives mirrored fields to 1e-12
 #   4. step P-wave along x: no new extrema above 1 % of the jump; mass and both momentum
-#      components conserved to 1e-12. The 45 degree step is run and reported (decision 0012).
+#      components conserved to 1e-12. Step P-wave at 45 degrees: the same after a start-up
+#      of 10 cells of travel, which is reported (decision 0013; added in WP 1.3b).
 #   5. fixed-wall box keeps its mass
 set -eu
 root="$(cd "$(dirname "$0")/.." && pwd)"

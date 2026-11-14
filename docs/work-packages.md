@@ -44,3 +44,9 @@ Constitutive models for bulk solids are tracked in `docs/constitutive-models.md`
 Note: the skeleton written in 0.1 already covers part of 2.1 (explicit loop and CFL step).
 
 Note (2026-11-14): 1.3 split into 1.3a and 1.3b to keep each within three sessions.
+
+Note (2026-11-14, WP 1.3b): decision 0013 fixes the C++ formulation for 2.3 and 2.4:
+cell-centred, unsplit face Riemann solver, Jaumann rate by Hughes-Winget, one
+constitutive call per cell per step, per-field remap limiters (MC; superbee for
+history). 2.3's rigid-rotation test is the WP 1.3b disc check; 2.3 also re-runs the
+simple-shear and 45 degree impact checks and measures its stable Courant number.

@@ -18,8 +18,8 @@ Phase 1 (2D prototype) and Phase 2 (C++ material models, Eulerian library skelet
 | 0.4 | Fast OpenFOAM setup for fresh cloud sessions | Done | `tools/setup_openfoam.sh` installs the CI image's OpenFOAM from registry layers; setup + build + tests in 66 s (decision 0007). PR #5 merged (2026-11-14) |
 | 1.1 | 1D elastic Lagrange-plus-remap prototype | Done | `prototype/lr1d.py`, `tests/test_proto_1d_elastic.sh` passes (order 1.88/1.83, monotone, conservative). Cell-centred instead of staggered: decision 0005. PR #3 merged (2026-11-14) |
 | 1.2 | 1D plasticity and history remap | Done | `prototype/lr1d_plastic.py`, `tests/test_proto_1d_plastic.sh` passes (wave speeds and HEL within 0.2 %, history edges 2 cells). Decision 0008 accepted. PR #6 merged (2026-11-14) |
-| 1.3a | 2D plane-strain prototype, elastic waves | Done | `prototype/lr2d.py` (symmetric dimensional splitting), `tests/test_proto_2d_elastic.sh` passes: P and S waves at 0 and 45 degrees, orders 1.77 to 1.87, speeds within 0.002 %; matches `lr1d.py` bit-for-bit; mirror-exact. 45 degree step overshoots (known issue, decision 0012). PR for WP 1.3a |
-| 1.3b | 2D rotation, plasticity and formulation decision | Next | Brief: `docs/wp/WP-1.3b.md` |
+| 1.3a | 2D plane-strain prototype, elastic waves | Done | `prototype/lr2d.py` (symmetric dimensional splitting), `tests/test_proto_2d_elastic.sh` passes: P and S waves at 0 and 45 degrees, orders 1.77 to 1.87, speeds within 0.002 %; matches `lr1d.py` bit-for-bit; mirror-exact. PR #10 merged (2026-11-14). The 45 degree overshoot was a jagged test step (decision 0013) |
+| 1.3b | 2D rotation, plasticity and formulation decision | Done | `prototype/lr2d_plastic.py` (Jaumann via Hughes-Winget, WP 1.4 models vectorised in `constitutive/batch.py`); `tests/test_proto_2d_rotation.sh` passes (disc 0.03 %, simple shear 3e-7, 1D match 1e-11). **Formulation: `docs/decisions/0013-eulerian-formulation.md`**: cell-centred, unsplit in C++, Jaumann/Hughes-Winget, accept start-up overshoot, MC + superbee for history, no nodal solver |
 | 1.4 | Single-point constitutive driver: elastic, J2, Drucker-Prager, Mohr-Coulomb | Done | `prototype/constitutive/`; `tests/test_proto_constitutive.sh` passes in CI; PR #2 merged (2026-11-14) |
 | 2.1 | Eulerian library skeleton and solver fields | Done | `src/celEulerian` (class `eulerianSolid`), celFoam is a thin driver; `tests/test_eulerian_skeleton.sh` passes serial and on 2 processors (decision 0010). PR #8 |
 | 2.2 | Constitutive library interface in C++, elastic and J2 | Done | `src/celConstitutive/` (plain C++ kernel + OpenFOAM wrapper, decision 0006); `tests/test_constitutive_cpp.sh` passes in CI (kernel matches Python to 3e-15; wrapper and celFoam checks pass). PR #4 merged (2026-11-14) |
@@ -51,8 +51,12 @@ Started 2026-11-14, one thread each, independent of each other:
 3. WP 2.5b: Mohr-Coulomb in C++ (`docs/wp/WP-2.5b.md`). Done.
 4. WP 2.1: Eulerian library skeleton and solver fields (`docs/wp/WP-2.1.md`): done.
 
-After those: 1.3b (brief `docs/wp/WP-1.3b.md`) is next now that 1.3a is done. 2.3 (stress update with objective rate) and 2.4 (remap)
-follow the 1.3b formulation decision (2.1 is done; each fills one `eulerianSolid` method); briefs not written yet.
+5. WP 1.3b: rotation, plasticity, formulation decision (`docs/wp/WP-1.3b.md`). Done.
+
+Next: 2.3 (C++ stress update: unsplit face Riemann solver, Hughes-Winget rotation, one
+model call per cell per step) and 2.4 (remap, per-field limiters), as decision 0013
+fixes them; each fills one `eulerianSolid` method. Briefs not written yet. 2.5c is
+independent.
 
 ## Known issues
 
@@ -65,8 +69,11 @@ follow the 1.3b formulation decision (2.1 is done; each fills one `eulerianSolid
 - WP 1.2 prototype: history is remapped with superbee, stress with MC (decision 0008).
 - Mohr-Coulomb (Python and C++) has no separate tension cut-off below the apex
   (decisions 0004, 0011): cohesive material carries tension up to c cot(phi). WP 2.5c.
-- WP 1.3a prototype: a step P-wave at 45 degrees to the mesh overshoots by up to 13 percent
-  of the jump at start-up, settling to about 5 percent; along an axis there is none. Cause:
-  the direction-by-direction Riemann solver, not the splitting or the time step. To be
-  settled in the WP 1.3b formulation decision (decision 0012, item 6 of the 1.3b brief).
-- WP 1.3a test takes about 5 minutes (400 x 400 meshes for the 45 degree convergence runs).
+- 2D prototype: a step at 45 degrees overshoots 2.7 percent during its first cell of
+  travel, then below 0.3 percent (decision 0013; the 13 percent in decision 0012 was a
+  jagged test step). Like the 1D impact start-up, accepted; contact (WP 4.3) re-measures.
+- The C++ solver will be unsplit, which the prototype is not; an unsplit proxy needs
+  CFL about 0.3 in 2D. WP 2.3 must re-run the disc, shear and 45 degree checks on the
+  C++ scheme and measure its stable Courant number (decision 0013, item 2).
+- WP 1.3a test takes about 5 minutes (400 x 400 meshes for the 45 degree convergence runs);
+  WP 1.3b test about 1.5 minutes.
