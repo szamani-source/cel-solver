@@ -118,6 +118,12 @@ public:
             return kernel_->waveModulus();
         }
 
+        //- Elastic shear modulus G [Pa]
+        scalar shearModulus() const
+        {
+            return kernel_->shearModulus();
+        }
+
         //- One increment at one point. deps is the tensor strain increment.
         void update
         (

@@ -1,3 +1,4 @@
 eulerianSolid/eulerianSolid.C
+eulerianSolid/eulerianSolidLagrange.C
 
 LIB = $(FOAM_USER_LIBBIN)/libcelEulerian

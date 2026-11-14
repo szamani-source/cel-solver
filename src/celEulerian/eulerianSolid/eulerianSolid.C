@@ -42,7 +42,15 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
         )
     ),
     material_(constitutiveModel::New(materialProperties_)),
-    maxCo_(mesh.time().controlDict().getOrDefault<scalar>("maxCo", 0.5)),
+    maxCo_(mesh.time().controlDict().getOrDefault<scalar>("maxCo", 0.4)),
+    solveMomentum_
+    (
+        mesh.time().controlDict().getOrDefault<Switch>("solveMomentum", true)
+    ),
+    secondOrder_
+    (
+        mesh.time().controlDict().getOrDefault<Switch>("secondOrder", true)
+    ),
     rho_
     (
         fieldIO("rho", mesh),
@@ -109,7 +117,8 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
 
     Info<< "Eulerian solid: rho in [" << minRho << ", "
         << gMax(rho_.primitiveField()) << "] kg/m^3, maxCo = " << maxCo_
-        << nl << endl;
+        << ", solveMomentum " << solveMomentum_
+        << ", secondOrder " << secondOrder_ << nl << endl;
 }
 
 
@@ -122,13 +131,6 @@ Foam::scalar Foam::eulerianSolid::stableDeltaT() const
     const scalarField c(sqrt(material_->waveModulus()/rho_.primitiveField()));
 
     return maxCo_*gMin(delta/c);
-}
-
-
-void Foam::eulerianSolid::lagrangeStep(const scalar)
-{
-    // WP 2.3: stress update with the constitutive model, momentum update.
-    // The discretisation is chosen in WP 1.3b. Nothing happens yet.
 }
 
 

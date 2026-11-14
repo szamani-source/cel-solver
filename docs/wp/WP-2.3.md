@@ -1,7 +1,7 @@
 # WP 2.3: Lagrange step in C++ (face Riemann solver, objective stress update)
 
-State: not started
-Branch: `wp-2.3-lagrange-step`
+State: done (2026-11-14)
+Branch: `claude/project-thread-kvby91` (thread branch; the brief named `wp-2.3-lagrange-step`)
 
 ## Goal
 
@@ -81,4 +81,52 @@ and parallel.
 
 ## Log
 
-(none yet)
+### 2026-11-14 (session 1): done in one session
+
+Built:
+
+- `src/celEulerian/eulerianSolid/eulerianSolidLagrange.C`: the whole step (stub moved
+  out of `eulerianSolid.C`). Choices in decision 0016: per-face MC slopes along the
+  cell-centre line from Gauss gradients, Hancock predictor, mirror ghost cells at
+  boundaries, boundary kinds from the U patch type, owner-side solve plus exchange on
+  coupled faces, default `maxCo` 0.4, `solveMomentum` and `secondOrder` switches.
+- Kernel `Model::shearModulus()` (all four models) and `constitutiveModel::shearModulus()`.
+- Test driver `tests/lagrange/lagrangeStepCheck` (`celLagrangeStepCheck`: sets a
+  wave, rotation or shear state by hand, Lagrange steps only, keeps cell mass fixed
+  after each step), case builder `tests/lagrange/cases.py`, checks
+  `tests/lagrange/run_checks.py`, run by `tests/test_lagrange_step.sh` (38 s).
+
+Results (`tests/test_lagrange_step.sh`, all pass):
+
+| Check | Result | Criterion |
+| --- | --- | --- |
+| P along x: speed / orders (25-50-100) | +0.036 % / 2.06, 2.12 | 1 % / 1.7 |
+| S along x | +0.123 % / 1.88, 2.05 | |
+| P at 45 deg | -0.019 % / 2.10, 2.12 | |
+| S at 45 deg | -0.035 % / 2.26, 2.22 | |
+| Momentum, periodic waves | 1.4e-16 | 1e-12 |
+| rho V_L = m | 0 | 1e-13 |
+| First-order switch, order | 0.92 | 0.7 to 1.3 |
+| Stable at maxCo 0.4, 2D 45 deg step / 3D diagonal step | no growth | no growth over 2 crossings |
+| Rigid rotation 1 turn: principal stresses / direction | 2.6e-13 / 3.0e-4 deg | 0.1 % / 0.1 deg |
+| Simple shear von Mises: s_xy vs Y/sqrt(3) after yield / largest drop | 2.8e-7 / 2.5e-7 | 0.1 % / 0.1 % |
+| Simple shear Drucker-Prager: sqrt(J2) vs cone / s_xy drop | 2.3e-15 / 1.1e-5 | 0.1 % |
+| Reflection, P from fixed wall, free surface, symmetry; S from symmetry | within 1e-4 | 2 % |
+| 2 and 4 processors vs serial | 2.2e-15 (U), 3.0e-15 (sigma) | 1e-12 |
+
+Measured for the record:
+
+- Stable Courant number (decision 0016 item 4): 2D 0.65, 3D 0.50 over 2 crossings;
+  over 8 crossings 3D grows at 0.50 and stays bounded at 0.45. Default 0.4.
+- Overshoot of a 45 degree step at maxCo 0.4: 0.46 % (first crossing), 0.44 % in the
+  second (decision 0013 prototype: 2.7 % at start-up, below 0.3 % after). 3D
+  body-diagonal step: 2.4 %.
+- Run time 1.2e-6 s per cell per step (serial, 2D 100 x 100, linear elastic,
+  second order), on the cloud container.
+- smokeBox (moving half against fixed walls) now really moves: `test_eulerian_skeleton.sh`
+  case B adjusted (decision 0016 item 6).
+
+Not verified: graded or distorted meshes, non-Cartesian cells, plastic waves (need
+the remap: WP 2.4b).
+
+Next: WP 2.4b once WP 2.4 (remap) is merged.
