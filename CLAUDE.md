@@ -38,6 +38,10 @@ CI (`.github/workflows/ci.yml`) runs the same in the `opencfd/openfoam-dev:2512`
 
 ## How we work (Sia's priority: small, findable pieces)
 
+The full routine is in `docs/MANAGEMENT.md`. Follow its session start and end steps.
+Bulk-solid material models (Mohr-Coulomb, Drucker-Prager) are core scope: see
+`docs/constitutive-models.md`.
+
 1. One work package per session or project thread. Pick the next one from `docs/STATUS.md`.
 2. Each package has one "done when" test in `docs/work-packages.md`. Write that test first,
    as `tests/test_<name>.sh`, then make it pass. Never weaken an existing test to get green.

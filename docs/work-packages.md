@@ -2,20 +2,25 @@
 
 Each package fits in one to three working sessions and is done when its test passes.
 Phases and gates are explained in the plan doc (link in `STATUS.md`).
+Each package gets a brief in `docs/wp/` before work starts (see `docs/MANAGEMENT.md`).
+Constitutive models for bulk solids are tracked in `docs/constitutive-models.md`.
 
 | ID | Work package | Done when |
 | --- | --- | --- |
 | 0.1 | Repository, build against pinned OpenFOAM, CI | Empty solver builds and runs in CI |
 | 0.2 | CLAUDE.md, STATUS.md, decisions folder | Files exist and describe the plan |
 | 0.3 | Target problems, units, material data | Spec file agreed with Sia |
+| 0.4 | Fast OpenFOAM setup for fresh cloud sessions | New session builds and tests in under 10 minutes |
 | 1.1 | 1D elastic Lagrange-plus-remap prototype | Converges at second order on a smooth wave |
 | 1.2 | 1D plasticity and history remap | Elastic-plastic wave matches analytic |
 | 1.3 | 2D prototype and formulation decision | Decision note written |
+| 1.4 | Single-point constitutive driver: elastic, J2, Drucker-Prager, Mohr-Coulomb | Triaxial strengths match closed form |
 | 2.1 | OpenFOAM solver skeleton, explicit loop, CFL step | Runs empty steps on a hex mesh |
 | 2.2 | Constitutive library interface, elastic and J2 | Single-point unit tests pass |
 | 2.3 | Stress update with objective rate | Rigid rotation produces no spurious stress |
 | 2.4 | Single-material remap of all fields | 1D wave reproduced in 3D mesh |
-| 2.5 | Drucker-Prager and Mohr-Coulomb | Single-point triaxial tests pass |
+| 2.5a | Drucker-Prager in C++ | Matches the 1.4 reference on all paths |
+| 2.5b | Mohr-Coulomb in C++ (corners, apex, tension cut-off) | Matches the 1.4 reference on all paths |
 | 2.6 | Phase 2 benchmarks | Taylor bar within tolerance |
 | 3.1 | N-material volume fractions with isoAdvector | Pure advection keeps interfaces sharp |
 | 3.2 | Void cells | Free surface holds with zero stress |
