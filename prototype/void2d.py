@@ -44,9 +44,15 @@ settling) and adds a material volume fraction ``al`` per cell. The rules
 Rules 6 (round-off dust) and 7 (gravity in first-order cells) and the
 reasons for all of them are in docs/decisions/0021-void-treatment.md.
 
+8. **Shear cap (WP 3.2q, decision 0023).** The jump term of the shear Riemann
+   solution may not push the face stress outside the Mohr-Coulomb surface;
+   a capped face slips (each side keeps its own characteristic velocity).
+   Without it the jump term acts as a mesh-independent viscosity in one-cell
+   shear bands and slow granular flow depends on E.
+
 ``python3 void2d.py --verify`` runs the WP 3.2p checks
-(tests/test_proto_void.sh); ``--collapse`` the column collapse checks moved to
-WP 3.2q (tests/manual/test_proto_collapse.sh). SI units, stress positive in tension, thickness
+(tests/test_proto_void.sh); ``--collapse`` the column collapse checks (WP 3.2q,
+slope open in WP 3.2r) (tests/manual/test_proto_collapse.sh). SI units, stress positive in tension, thickness
 1 m, arrays (ny, nx).
 """
 
@@ -71,7 +77,8 @@ from silo2d import mirror, pad_ends, parity, weight_profile, boundary_face  # no
 
 EPS = 1e-12          # al at or below: empty
 FULL = 1.0 - 1e-12   # al at or above: full
-DISS = 1.0
+DISS = 1.0           # study knob: scale of the Riemann jump terms
+SHEAR_CAP = True     # rule 8 (decision 0023): face shear traction capped at yield
 DUST = 1e-9          # al below which a cell with mass is round-off dust
 
 
@@ -116,6 +123,50 @@ def out_overlap(A, H, d, lean, side):
     toward = lean > 0 if side == "right" else lean < 0
     away = lean < 0 if side == "right" else lean > 0
     return np.where(toward, near, np.where(away, far, spread))
+
+
+def shear_cap(fn, ft, seff, zs, vt_star, snt_star, Gf, params):
+    """Rule 8 (decision 0023): the jump term of the shear Riemann solution
+    (z_s (vR - vL) / 2, a numerical viscosity) may not push the face stress
+    outside the Mohr-Coulomb surface. The face stress is the Riemann normal
+    and shear tractions with the mean of the two cells' tt and zz stresses;
+    the shear jump is scaled back (bisection) until the yield function is
+    no larger than without it (or zero). A capped face slips: each side
+    takes the velocity of its own characteristic at the capped traction, as
+    at a frictional wall. Returns the new (vt_star, snt_star) and the
+    (left side, right side) tangential face velocities, all per face."""
+    sphi = math.sin(math.radians(params["phi"]))
+    ccos = params.get("c", 0.0) * math.cos(math.radians(params["phi"]))
+    stt = mirror(seff[..., 1])
+    szz = mirror(seff[..., 2])
+    ftt = 0.5 * (stt[:, 1:-2] + stt[:, 2:-1])
+    fzz = 0.5 * (szz[:, 1:-2] + szz[:, 2:-1])
+    snn_face = fn[4] + fn[5] + Gf                  # actual normal face stress
+    tb, tj = ft[4], ft[5]
+
+    def yf(snt):
+        cen = 0.5 * (snn_face + ftt)
+        rad = np.sqrt((0.5 * (snn_face - ftt)) ** 2 + snt ** 2)
+        s1 = np.maximum(cen + rad, fzz)
+        s3 = np.minimum(cen - rad, fzz)
+        return 0.5 * (s1 - s3) + 0.5 * (s1 + s3) * sphi - ccos
+
+    lim = np.maximum(yf(tb), 0.0)
+    bad = yf(tb + tj) > lim
+    if not bad.any():
+        return vt_star, snt_star, None
+    lo = np.zeros_like(tb)
+    hi = np.ones_like(tb)
+    for _ in range(20):
+        mid = 0.5 * (lo + hi)
+        ok = yf(tb + mid * tj) <= lim
+        lo = np.where(ok, mid, lo)
+        hi = np.where(ok, hi, mid)
+    t_new = np.where(bad, tb + lo * tj, snt_star)
+    zl, zr = zs[:, 1:-2], zs[:, 2:-1]
+    va = ft[1] + (t_new - ft[0]) / np.where(zl > 0.0, zl, 1.0)
+    vb = ft[3] - (t_new - ft[2]) / np.where(zr > 0.0, zr, 1.0)
+    return vt_star, t_new, (np.where(bad, va, vt_star), np.where(bad, vb, vt_star))
 
 
 # ----------------------------------------------------------------------------
@@ -191,8 +242,9 @@ def void_sweep(f, h0, dt, mat, ends, model, params, grav=0.0, mu=0.0,
         zsum = zL + zR
         zsum = np.where(zsum > 0.0, zsum, 1.0)
         v_star = (zL * vL + zR * vR + DISS * (sR - sL)) / zsum
-        s_star = (zR * sL + zL * sR + DISS * zL * zR * (vR - vL)) / zsum
-        return v_star, s_star, (sL, vL, sR, vR)
+        s_base = (zR * sL + zL * sR) / zsum
+        s_jump = DISS * zL * zR * (vR - vL) / zsum
+        return v_star, s_base + s_jump, (sL, vL, sR, vR, s_base, s_jump)
 
     ds_n, dv_n = characteristic(snn, vn, zp)
     if grav > 0.0:
@@ -210,6 +262,9 @@ def void_sweep(f, h0, dt, mat, ends, model, params, grav=0.0, mu=0.0,
     vn_star, snn_star, fn = riemann(snn, vn, zp, ds_n, dv_n, M)
     ds_t, dv_t = characteristic(snt, vt, zs)
     vt_star, snt_star, ft = riemann(snt, vt, zs, ds_t, dv_t, G)
+    slip = None
+    if SHEAR_CAP and "phi" in params:
+        vt_star, snt_star, slip = shear_cap(fn, ft, seff, zs, vt_star, snt_star, Gf, params)
 
     # --- free-surface faces (interior faces 1 .. n-1) -------------------------
     pL = touch_r[:, :-1]                     # left cell touches the face
@@ -225,7 +280,7 @@ def void_sweep(f, h0, dt, mat, ends, model, params, grav=0.0, mu=0.0,
         sfree = -Gf[:, 1:-1]
 
         def one_sided(sstar, F, zl, zr):
-            sL, vL, sR, vR = (a[:, 1:-1] for a in F)
+            sL, vL, sR, vR = (a[:, 1:-1] for a in F[:4])
             vl = vL + (sstar - sL) / np.where(zl > 0.0, zl, 1.0)
             vr = vR - (sstar - sR) / np.where(zr > 0.0, zr, 1.0)
             hL, hR = has[:, :-1], has[:, 1:]
@@ -239,6 +294,14 @@ def void_sweep(f, h0, dt, mat, ends, model, params, grav=0.0, mu=0.0,
         vn_star[inner] = np.where(free, vfn, vn_star[inner])
         snt_star[inner] = np.where(free, 0.0, snt_star[inner])
         vt_star[inner] = np.where(free, vft, vt_star[inner])
+
+    # capped faces slip: the cell on each side sees its own tangential velocity
+    vtA = vt_star.copy()          # seen by the cell on the left of the face
+    vtB = vt_star.copy()          # seen by the cell on the right
+    if slip is not None:
+        inner = (slice(None), slice(1, -1))
+        vtA[inner] = np.where(free, vtA[inner], slip[0][:, 1:-1])
+        vtB[inner] = np.where(free, vtB[inner], slip[1][:, 1:-1])
 
     # --- boundary faces --------------------------------------------------------
     rec = {}
@@ -258,6 +321,7 @@ def void_sweep(f, h0, dt, mat, ends, model, params, grav=0.0, mu=0.0,
         t_b = np.where(pres, t_b, 0.0)
         w_b = np.where(pres, w_b, 0.0)
         snt_star[:, j], vt_star[:, j] = t_b, w_b
+        vtA[:, j], vtB[:, j] = w_b, w_b
         rec[side] = (normal, t_b.copy(), v_b.copy(), w_b.copy())
 
     # --- Lagrange update ----------------------------------------------------
@@ -278,7 +342,7 @@ def void_sweep(f, h0, dt, mat, ends, model, params, grav=0.0, mu=0.0,
     A_new = A0 + dmat
     amid = A0 + 0.5 * dmat
     hmid = 0.5 * (h0 + h_new)
-    gam = np.where(has, dt * (vt_star[:, 1:] - vt_star[:, :-1]) / hmid, 0.0)
+    gam = np.where(has, dt * (vtA[:, 1:] - vtB[:, :-1]) / hmid, 0.0)
     deps = np.zeros((rows, n, 6))
     deps[..., 0] = np.where(has, dmat / np.where(amid > 0.0, amid, 1.0), 0.0)
     deps[..., 3] = gam

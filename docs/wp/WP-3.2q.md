@@ -1,6 +1,6 @@
 # WP 3.2q: Prototype column collapse (split from WP 3.2p)
 
-State: not started
+State: partly done (run-out passes; slope split to WP 3.2r), 2026-11-14
 Branch: thread branch
 
 ## Goal
@@ -44,4 +44,22 @@ a = 0.5 keeps its top within 1 cell; run-out 0.30 to 0.90 (a = 0.5) and 1.2 to 3
 
 ## Log
 
-(none yet)
+### 2026-11-14
+
+- E series (a = 0.5, 10 cells): 0.50, 0.40, 0.35, 0.25, 0.25, 0.20 for E = 0.01, 0.03,
+  0.1, 1, 3, 10 MPa. Not the time step (smaller CFL gives longer run-out), not the
+  reconstruction order next to the surface, mesh independent (10 and 20 cells agree).
+  Scaling the Riemann jump terms by 0.3 gives 0.40: the jump term z dv / 2 in a
+  one-cell shear band is a mesh-independent viscosity growing with sqrt(E).
+- Fix (decision 0023, rule 8, `shear_cap`): the shear jump term is cut back so the face
+  stress stays inside Mohr-Coulomb; capped faces slip like a frictional wall. a = 0.5
+  0.40 (10 and 20 cells), top 0.06 cell lower; a = 2 1.6. Both run-out bands pass;
+  `tests/test_proto_void.sh` unchanged and passing.
+- Rejected: Coulomb limit on the face plane only (no effect); capping the normal jump
+  term (any form) or the whole shear traction (unstable or the top sinks).
+- Not passed: deposit slope 45 deg (a = 0.5) and 59 deg (a = 2) per cell, two-cell 35
+  and 53. Cause: the 1D slab rule (0021 rule 2) keeps thin top layers from moving
+  sideways, so column heights snap to whole cells. A 2D-normal slab rule smooths it
+  without the cap (0.35) but blew up with the cap. Split to WP 3.2r; the test stays in
+  `tests/manual/`. Residual E dependence (0.45, 0.40, 0.25 at 0.1, 1, 10 MPa) from the
+  uncapped normal jump term is recorded in 0023 for 3.3p.

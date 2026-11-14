@@ -13,7 +13,8 @@ open the outlet, discharge. This is the first end-to-end result to show Sia.
 - `docs/spec/target-problems.md` (T0), `docs/spec/silo-reference.md`
 - `prototype/silo2d.py`, `prototype/void2d.py` (`VoidBox`, start from it); logs of `docs/wp/WP-3.1p.md` and `docs/wp/WP-3.2p.md`;
   `docs/decisions/0021-void-treatment.md` (the discharge rate may depend on E through
-  the Riemann solver's dissipation: measure that first)
+  the Riemann solver's dissipation: measure that first; decision 0023 capped the shear
+  part in WP 3.2q, the normal part still depends on E)
 
 ## Build
 
