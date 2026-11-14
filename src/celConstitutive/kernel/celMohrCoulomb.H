@@ -110,6 +110,11 @@ public:
         return el_.waveModulus();
     }
 
+    double shearModulus() const override
+    {
+        return el_.G;
+    }
+
     //- Yield function at sigma (mc_yield in models.py), for tests
     double yield(const Voigt sigma) const;
 

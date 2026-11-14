@@ -9,7 +9,7 @@ Description
     method rather than reshape the solver:
 
     - stableDeltaT()   implemented (WP 2.1)
-    - lagrangeStep(dt) empty, WP 2.3 (stress update, momentum)
+    - lagrangeStep(dt) implemented (WP 2.3, eulerianSolidLagrange.C)
     - remap(dt)        implemented (WP 2.4, eulerianSolidRemap.C)
 
     Fields (cell-centred, read from the time directory if present, otherwise
@@ -32,10 +32,16 @@ Description
       Optional subdictionary remapLimiters (WP 2.4), for example
       remapLimiters { rho MC; U MC; sigma MC; epsP superbee; epsPEq superbee; }
       (these are the defaults; also minmod and upwind).
-    - system/controlDict: maxCo (default 0.5), the fraction of the CFL limit.
+    - system/controlDict:
+        maxCo (default 0.4, decision 0018), the fraction of the CFL
+        limit (stableDeltaT);
+        solveMomentum (default yes): no holds U fixed (prescribed motion);
+        secondOrder (default yes): no uses first-order (piecewise constant)
+        face states in the Lagrange step.
 
 SourceFiles
     eulerianSolid.C
+    eulerianSolidLagrange.C
     eulerianSolidRemap.C
 \*---------------------------------------------------------------------------*/
 
@@ -46,6 +52,7 @@ SourceFiles
 #include "volFields.H"
 #include "surfaceFields.H"
 #include "IOdictionary.H"
+#include "Switch.H"
 #include "constitutiveModel.H"
 
 namespace Foam
@@ -66,6 +73,14 @@ class eulerianSolid
 
         //- Fraction of the CFL limit used for the time step
         scalar maxCo_;
+
+        //- Update U in the Lagrange step (no: U held fixed, prescribed
+        //  motion for kinematic tests)
+        Switch solveMomentum_;
+
+        //- Limited linear face states plus the half-step predictor
+        //  (no: first order)
+        Switch secondOrder_;
 
         //- Density [kg/m^3]
         volScalarField rho_;
@@ -130,6 +145,8 @@ public:
         const fvMesh& mesh() const { return mesh_; }
         const constitutiveModel& material() const { return *material_; }
         scalar maxCo() const { return maxCo_; }
+        bool solveMomentum() const { return solveMomentum_; }
+        bool secondOrder() const { return secondOrder_; }
 
         const volScalarField& rho() const { return rho_; }
         const volVectorField& U() const { return U_; }
@@ -158,13 +175,18 @@ public:
         //  Parallel-safe.
         scalar stableDeltaT() const;
 
-        //- Lagrange step over dt: stress update and momentum (WP 2.3).
-        //  Empty in WP 2.1.
+        //- Lagrange step over dt (WP 2.3, decision 0013, boundary
+        //  conditions decision 0018): MUSCL-Hancock face states, acoustic
+        //  Riemann solver per face, momentum, Hughes-Winget rotation and one
+        //  constitutive call per cell. Fills phiL and leaves the Lagrangian
+        //  state (decision 0014). Parallel-safe; coupled faces are solved on
+        //  the owner side only, so both sides hold identical face values.
         void lagrangeStep(const scalar dt);
 
         //- Remap the Lagrange-step state back onto the fixed mesh (WP 2.4,
         //  eulerianSolidRemap.C): moves the volume dt*phiL back across each
-        //  face (internal and coupled; other boundary faces carry no flux).
+        //  face (internal and coupled; across other boundary faces material
+        //  leaves or enters with the boundary cell's own values).
         //  Density by volume flux, U, sigma, epsP and epsPEq mass-weighted,
         //  limited linear reconstruction at the swept-region centroid.
         //  Conserves mass and sum(m q) for every field; a cell with no flux

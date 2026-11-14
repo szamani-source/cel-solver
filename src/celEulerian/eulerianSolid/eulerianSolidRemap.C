@@ -30,8 +30,12 @@
     5. New state written as increments of the Lagrangian state, so a cell
        with no flux through any face keeps every value bit for bit.
 
-    Non-coupled boundary faces (wall, symmetry, empty, ...) carry no flux:
-    their phiL is not used. Coupled faces (processor, cyclic) are handled
+    Non-coupled boundary faces (wall, symmetry, free surface, prescribed
+    velocity): the Lagrange step's V_L includes their phiL, and the remap
+    leaves that volume outside the fixed mesh, so material crosses them with
+    the boundary cell's own (Lagrangian) values: outflow removes rho_L dt phiL
+    of mass, inflow brings in the cell's own state (first order, zero
+    gradient). Walls and symmetry planes have phiL = 0. Coupled faces (processor, cyclic) are handled
     like internal faces with neighbour data exchanged through temporary
     volFields, so both sides compute the same flux (to round-off).
 \*---------------------------------------------------------------------------*/
@@ -194,10 +198,7 @@ static remapGeometry makeGeometry
         forAll(fc, i)
         {
             M[fc[i]] += sqr(pSf[i]);
-            if (p.coupled())
-            {
-                b[fc[i]] += pSf[i]*pPhi[i];
-            }
+            b[fc[i]] += pSf[i]*pPhi[i];
         }
     }
     vectorField uC(nCells);

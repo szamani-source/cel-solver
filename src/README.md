@@ -8,5 +8,6 @@ Libraries are added here by later work packages, one folder per library:
 - `celEulerian/` (WP 2.1, then 2.x, 3.x): Eulerian fields, Lagrange step, remap, volume fractions.
   `eulerianSolid/` (WP 2.1) owns the fields `rho`, `U`, `sigma`, `epsP`, `epsPEq` and the
   constitutive model, with one method per step of the explicit cycle (decision 0010).
+  The Lagrange step (WP 2.3) is in `eulerianSolidLagrange.C` (decision 0018).
 - `celLagrangian/` (WP 4.x, 5.x): rigid bodies and explicit hex8 FE.
 - `celCoupling/` (WP 4.x): Eulerian-Lagrangian contact search and penalty forces.

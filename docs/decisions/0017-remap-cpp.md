@@ -48,8 +48,12 @@ item 5 per field. Brief: `docs/wp/WP-2.4.md`. Numbers below come from
    `remapLimiters { rho MC; U MC; sigma MC; epsP superbee; epsPEq superbee; }` (these
    are the defaults). `system/fvSchemes` was not used: these are not OpenFOAM schemes,
    and the material file is where the other remap-relevant choices live.
-5. **Only internal and coupled faces carry flux.** `phiL` on wall, symmetry and empty
-   faces is ignored. Processor and cyclic faces get neighbour values, gradients and
+5. **Boundaries.** Internal and coupled faces are remapped as above. On other boundary
+   faces (free surface, prescribed velocity; walls and symmetry planes have
+   `phiL = 0`) the volume `dt phiL` that the Lagrange step added to `V_L` is left
+   outside the fixed mesh: outflow takes `rho_L dt phiL` of mass out of the domain with
+   the cell's own values, inflow brings in the cell's own state (first order, zero
+   gradient). Real free surfaces need void (Phase 3). Processor and cyclic faces get neighbour values, gradients and
    cell velocities through temporary volFields, so each side computes the same flux to
    round-off.
 6. **Update written as increments of the Lagrangian state**,

@@ -45,6 +45,11 @@ public:
     {
         return el_.waveModulus();
     }
+
+    double shearModulus() const override
+    {
+        return el_.G;
+    }
 };
 
 } // End namespace constitutive

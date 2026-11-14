@@ -50,6 +50,11 @@ public:
         return el_.waveModulus();
     }
 
+    double shearModulus() const override
+    {
+        return el_.G;
+    }
+
     //- Yield function q - (sigma_y + H epsPEq), for tests
     double yield(const Voigt sigma, const History& h) const;
 };
