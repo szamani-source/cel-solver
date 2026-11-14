@@ -147,10 +147,15 @@ class Bar1D:
         v_new = v + dt * (right(s_star) - s_star) / m
         d = dt * v_star                           # face displacement
         h_new = h + right(d) - d
-        h_mid = 0.5 * (h + h_new)
-        sig_new = sig + self.M * (h_new - h) / h_mid   # hypoelastic
+        sig_new = self.update_stress(h, h_new)
         rho_new = m / h_new
         return d, h_new, rho_new, sig_new, v_new
+
+    def update_stress(self, h, h_new):
+        """Stress at the end of the Lagrange step from the cell lengths before
+        and after it. Hypoelastic here; lr1d_plastic.py overrides it to call a
+        constitutive model."""
+        return self.sig + self.M * (h_new - h) / (0.5 * (h + h_new))
 
     # --- remap ---------------------------------------------------------------
 
