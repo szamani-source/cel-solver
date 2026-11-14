@@ -19,7 +19,8 @@ Foam::constitutiveModel::constitutiveModel
     const dictionary& dict,
     const word& modelType,
     const wordList& required,
-    const wordList& optional
+    const wordList& optional,
+    const wordList& wordOptions
 )
 {
     cel::constitutive::Parameters p;
@@ -37,9 +38,19 @@ Foam::constitutiveModel::constitutiveModel
         }
     }
 
+    cel::constitutive::Options opts;
+    for (const word& key : wordOptions)
+    {
+        word value;
+        if (dict.readIfPresent(key, value))
+        {
+            opts[key] = value;
+        }
+    }
+
     try
     {
-        kernel_ = cel::constitutive::makeModel(modelType, p);
+        kernel_ = cel::constitutive::makeModel(modelType, p, opts);
     }
     catch (const std::exception& e)
     {

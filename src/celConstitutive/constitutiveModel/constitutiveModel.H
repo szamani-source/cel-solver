@@ -8,12 +8,15 @@ Description
     selection from a dictionary:
 
     \verbatim
-        type    vonMises;   // linearElastic | vonMises
+        type    vonMises;   // linearElastic | vonMises | druckerPrager
         E       2e7;        // Pa
         nu      0.3;
         sigma_y 2e5;        // Pa (vonMises)
         H       0;          // Pa, optional hardening modulus (vonMises)
     \endverbatim
+
+    druckerPrager reads E, nu, phi [deg], c [Pa], psi [deg] and the optional
+    word fit (compression | extension | plane_strain, default compression).
 
     update() takes OpenFOAM symmTensors. The strain increment is the tensor
     strain increment (e.g. symm(gradU)*dt), so its shear components are
@@ -74,14 +77,16 @@ public:
 
     // Constructors
 
-        //- Read the required and optional scalar parameters from dict and
-        //  build the kernel model of the given type
+        //- Read the required and optional scalar parameters and the
+        //  optional word options from dict and build the kernel model of the
+        //  given type
         constitutiveModel
         (
             const dictionary& dict,
             const word& modelType,
             const wordList& required,
-            const wordList& optional
+            const wordList& optional,
+            const wordList& wordOptions = wordList()
         );
 
         //- No copy construct

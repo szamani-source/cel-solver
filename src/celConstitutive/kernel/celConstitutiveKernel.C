@@ -1,7 +1,9 @@
 #include "celConstitutiveKernel.H"
 #include "celLinearElastic.H"
 #include "celVonMises.H"
+#include "celDruckerPrager.H"
 
+#include <cmath>
 #include <stdexcept>
 
 namespace cel
@@ -85,7 +87,67 @@ double parameter(const Parameters& p, const std::string& key, double def)
 }
 
 
-std::unique_ptr<Model> makeModel(const std::string& name, const Parameters& p)
+std::string option
+(
+    const Options& opts,
+    const std::string& key,
+    const std::string& def
+)
+{
+    const auto it = opts.find(key);
+    return it == opts.end() ? def : it->second;
+}
+
+
+void plasticCorrector
+(
+    const Elastic& el,
+    const Voigt trial,
+    const Voigt sigNew,
+    const History& hOld,
+    bool apex,
+    History& hNew
+)
+{
+    Voigt dsig, depsP;
+    for (int i = 0; i < 6; ++i)
+    {
+        dsig[i] = trial[i] - sigNew[i];
+    }
+    el.strain(dsig, depsP);
+
+    // Tensor shear strains, then the deviator
+    double e[6];
+    for (int i = 0; i < 6; ++i)
+    {
+        e[i] = i < 3 ? depsP[i] : 0.5*depsP[i];
+    }
+    const double ev = (e[0] + e[1] + e[2])/3.0;
+    double dev[6];
+    for (int i = 0; i < 6; ++i)
+    {
+        dev[i] = i < 3 ? e[i] - ev : e[i];
+    }
+    const double devNorm2 =
+        (dev[0]*dev[0] + dev[1]*dev[1] + dev[2]*dev[2])
+      + 2.0*(dev[3]*dev[3] + dev[4]*dev[4] + dev[5]*dev[5]);
+
+    hNew = hOld;
+    for (int i = 0; i < 6; ++i)
+    {
+        hNew.epsP[i] = hOld.epsP[i] + depsP[i];
+    }
+    hNew.epsPEq = hOld.epsPEq + std::sqrt(2.0/3.0*devNorm2);
+    hNew.apex = apex;
+}
+
+
+std::unique_ptr<Model> makeModel
+(
+    const std::string& name,
+    const Parameters& p,
+    const Options& opts
+)
 {
     if (name == "linearElastic")
     {
@@ -95,10 +157,14 @@ std::unique_ptr<Model> makeModel(const std::string& name, const Parameters& p)
     {
         return std::unique_ptr<Model>(new VonMises(p));
     }
+    if (name == "druckerPrager")
+    {
+        return std::unique_ptr<Model>(new DruckerPrager(p, opts));
+    }
     throw std::invalid_argument
     (
         "unknown constitutive model '" + name
-      + "' (valid: linearElastic vonMises)"
+      + "' (valid: linearElastic vonMises druckerPrager)"
     );
 }
 
