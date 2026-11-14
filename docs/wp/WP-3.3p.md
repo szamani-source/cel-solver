@@ -1,6 +1,6 @@
 # WP 3.3p: Prototype silo discharge (target T0)
 
-State: blocked on WP 3.2p
+State: not started (3.2p done 2026-11-14)
 Branch: `wp-3.3p-silo-discharge`
 
 ## Goal
@@ -11,8 +11,9 @@ open the outlet, discharge. This is the first end-to-end result to show Sia.
 ## Read first
 
 - `docs/spec/target-problems.md` (T0), `docs/spec/silo-reference.md`
-- `prototype/silo2d.py`; logs of `docs/wp/WP-3.1p.md` and `docs/wp/WP-3.2p.md`;
-  the void decision note
+- `prototype/silo2d.py`, `prototype/void2d.py` (`VoidBox`, start from it); logs of `docs/wp/WP-3.1p.md` and `docs/wp/WP-3.2p.md`;
+  `docs/decisions/0021-void-treatment.md` (the discharge rate may depend on E through
+  the Riemann solver's dissipation: measure that first)
 
 ## Build
 
