@@ -7,3 +7,4 @@ tutorials/**/log.*
 tutorials/**/constant/polyMesh/
 tutorials/**/[1-9]*/
 tutorials/**/0.[0-9]*/
+__pycache__/
