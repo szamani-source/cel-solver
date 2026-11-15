@@ -36,9 +36,9 @@ Constitutive models for bulk solids are tracked in `docs/constitutive-models.md`
 | 3.3r | Prototype discharge rate at T0 stiffness (split from 3.3q, decision 0027) | Rate at E = 0.1, 1, 10 MPa within 10 percent, no noise in the dead zones |
 | 3.2t | One rule set for collapse and discharge (split from 3.3r, decision 0028) | Collapse test passes with rules 12 and 13 on, run-out at 1 and 10 MPa within 0.1 |
 | 3.1 | C++ gravity and wall boundaries (smooth, frictional) | celFoam settles a tank, matches the prototype |
-| 3.2 | C++ void and free surface | celFoam passes the 3.2p checks |
+| 3.2 | C++ void and free surface (shear cap, neither rule 12 nor 13; decision 0029) | celFoam passes the 3.2p checks; column collapse run-out at E = 0.1, 1, 10 MPa recorded against decision 0019 |
 | 3.3 | C++ outlet boundary that opens | Material leaves only after the opening time, mass balance exact |
-| 3.4 | Silo discharge in celFoam (target T0), serial and parallel | Matches the prototype and the reference values |
+| 3.4 | Silo discharge in celFoam (target T0), serial and parallel | Matches the prototype and the reference values; rate at E = 0.1, 1, 10 MPa within 10 % with the same code as the collapse (settles rules 12 and 13, decision 0029) |
 | 3.5 | Cohesion in the silo (arching, flow or no flow) | Flow stops below a critical outlet width |
 | 3B.1 | N-material volume fractions with isoAdvector | Pure advection keeps interfaces sharp |
 | 3B.2 | Mixed-cell closure | Two-material impact conserves mass and momentum |

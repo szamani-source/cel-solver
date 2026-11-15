@@ -38,7 +38,18 @@ Description
         solveMomentum (default yes): no holds U fixed (prescribed motion;
         face velocities are then the mean of the face states, decision 0022);
         secondOrder (default yes): no uses first-order (piecewise constant)
-        face states in the Lagrange step.
+        face states in the Lagrange step;
+        gravityRamp (default 0) [s]: gravity grows from 0 as (1 - cos) over
+        this time (WP 3.1, decision 0030);
+        damping (default 0) [1/s]: U <- U/(1 + damping dt) after each
+        momentum update, for settling (setDamping() changes it).
+    - constant/g (optional, standard OpenFOAM uniformDimensionedVectorField):
+      gravity [m/s^2], default zero. Balanced in the face states by the
+      hydrostatic stress jump of each cell (decision 0030).
+    - constant/materialProperties, optional subdictionary walls (WP 3.1):
+      patch name -> { friction <deg>; } makes that patch a rigid wall: no
+      normal velocity, no tension (material separates), Coulomb shear
+      traction at most tan(friction) times the wall pressure (0: smooth).
 
 SourceFiles
     eulerianSolid.C
@@ -55,6 +66,7 @@ SourceFiles
 #include "IOdictionary.H"
 #include "Switch.H"
 #include "constitutiveModel.H"
+#include "HashTable.H"
 
 namespace Foam
 {
@@ -116,6 +128,26 @@ class eulerianSolid
         //  sigma, superbee for epsP and epsPEq (decision 0013 item 5).
         HashTable<word> remapLimiter_;
 
+        //- Gravity [m/s^2] (constant/g, zero if absent)
+        vector g_;
+
+        //- Gravity ramp time [s] (controlDict gravityRamp)
+        scalar gravityRamp_;
+
+        //- Velocity damping [1/s] (controlDict damping)
+        scalar damping_;
+
+        //- Wall patches: name -> tan(friction angle) (materialProperties walls)
+        HashTable<scalar> wallFriction_;
+
+        //- Face velocity of the last Lagrange step [m/s] (diagnostics)
+        surfaceVectorField vStar_;
+
+        //- Face force of the last Lagrange step [N]: traction times area on
+        //  the owner side; on boundary faces the force of the boundary on
+        //  the cell (diagnostics: wall and bottom forces)
+        surfaceVectorField Fstar_;
+
 
     // Private Member Functions
 
@@ -155,6 +187,17 @@ public:
         const volSymmTensorField& epsP() const { return epsP_; }
         const volScalarField& epsPEq() const { return epsPEq_; }
         const surfaceScalarField& phiL() const { return phiL_; }
+        const surfaceVectorField& vStar() const { return vStar_; }
+        const surfaceVectorField& Fstar() const { return Fstar_; }
+        const vector& g() const { return g_; }
+        scalar damping() const { return damping_; }
+        const HashTable<scalar>& wallFriction() const { return wallFriction_; }
+
+        //- Gravity at time t, with the ramp
+        vector gravityAt(const scalar t) const;
+
+        //- Change the velocity damping (for example off once settled)
+        void setDamping(const scalar alpha) { damping_ = alpha; }
 
     // Non-const access for test programs that set a state by hand
     // (for example a prescribed phiL to test remap() alone)
