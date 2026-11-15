@@ -62,8 +62,10 @@ def frame_image(ax, r, k, kind):
     return im
 
 
-def fig_fields(r, out, times=(0.0, 2.0, 4.0, 6.0, 8.0)):
+def fig_fields(r, out, times=None):
     ft = r["f_t"]
+    if times is None:
+        times = np.linspace(0.0, ft[-1], 5)
     ks = [int(np.argmin(np.abs(ft - t))) for t in times if t <= ft[-1] + 1e-9]
     for kind, label, fname in (("speed", "speed (m/s)", "speed"),
                                ("epq", "log10 equivalent plastic strain", "plastic_strain")):
@@ -78,8 +80,10 @@ def fig_fields(r, out, times=(0.0, 2.0, 4.0, 6.0, 8.0)):
         print("wrote", p)
 
 
-def fig_surface(r, out, times=(0.0, 1.0, 2.0, 4.0, 6.0, 8.0)):
+def fig_surface(r, out, times=None):
     ft = r["f_t"]
+    if times is None:
+        times = np.linspace(0.0, ft[-1], 6)
     fig, ax = plt.subplots(figsize=(5, 3.5), constrained_layout=True)
     cmap = plt.get_cmap("viridis")
     ts = [t for t in times if t <= ft[-1] + 1e-9]
