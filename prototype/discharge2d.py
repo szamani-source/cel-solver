@@ -13,7 +13,7 @@ from ``void2d.VoidBox`` (WP 3.2p, 3.2q; decisions 0021, 0023).
 
 ``python3 discharge2d.py --check`` runs the CI checks (outlet mechanics,
 tests/test_proto_silo_discharge.sh); ``--rate-check`` the full WP 3.3p rate
-checks (tests/manual/test_proto_silo_rate.sh; they fail: decision 0024, WP
+checks (tests/manual/test_proto_silo_rate.sh; they fail: decision 0026, WP
 3.3q). Coarse: 10 mm cells, E = 0.1 MPa.
 ``--run`` runs one case and saves its history (``--save`` .npz) for
 ``tools/plot_discharge.py``. SI units, thickness 1 m.
@@ -225,7 +225,7 @@ CHECK_WINDOW = (0.97, 0.88)
 
 def check(full=False):
     """WP 3.3p checks, coarse: 10 mm cells, E = 0.1 MPa (the stiffest E at which
-    a 10-cell test runs in minutes; the rate depends on E, decision 0024),
+    a 10-cell test runs in minutes; the rate depends on E, decision 0026),
     rate measured from 97 to 88 percent of the mass.
 
     Default (CI, tests/test_proto_silo_discharge.sh): the outlet mechanics,

@@ -49,11 +49,11 @@ reasons for all of them are in docs/decisions/0021-void-treatment.md.
    a capped face slips (each side keeps its own characteristic velocity).
    Without it the jump term acts as a mesh-independent viscosity in one-cell
    shear bands and slow granular flow depends on E.
-9. **Outlet (WP 3.3p, decision 0024).** ``outlet`` marks rows whose lo end is
+9. **Outlet (WP 3.3p, decision 0026).** ``outlet`` marks rows whose lo end is
    an outflow face: zero traction, empty ghosts with free-end parities, and
    the material swept across the face leaves the domain (counted in
    ``VoidBox.discharged``).
-10. **Low-Mach jump terms (WP 3.3p, decision 0024; off by default).** Both
+10. **Low-Mach jump terms (WP 3.3p, decision 0026; off by default).** Both
    Riemann jump terms z (vR - vL) / 2 are multiplied by min(1, |v| / c), so
    the numerical viscosity is rho |v| dv rather than rho c dv.
 
@@ -274,7 +274,7 @@ def void_sweep(f, h0, dt, mat, ends, model, params, grav=0.0, mu=0.0,
         s_base = (zR * sL + zL * sR) / zsum
         s_jump = DISS * zL * zR * (vR - vL) / zsum
         if low_mach:
-            # rule 10 (WP 3.3p, decision 0024): jump term scaled by the face
+            # rule 10 (WP 3.3p, decision 0026): jump term scaled by the face
             # Mach number of the material speed, so its stress is of order
             # rho |v| dv instead of rho c dv (Thornber et al. 2008)
             ma = np.maximum(np.abs(vL), np.abs(vR)) / c_mat
@@ -501,7 +501,7 @@ class VoidBox(sd.SiloBox):
         # no tensile strength: cohesionless, or a tension cut-off at zero
         p = self.params
         self.no_tension = p.get("c", None) == 0.0 or p.get("sigma_t", None) == 0.0
-        self.low_mach = False     # rule 10 (decision 0024)
+        self.low_mach = False     # rule 10 (decision 0026)
         self.outlet = None        # bool per column: bottom face is an outflow (rule 9)
         self.discharged = 0.0     # mass that left through the outlet (kg per m depth)
         self._out = []

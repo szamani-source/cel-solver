@@ -62,7 +62,7 @@ def frame_image(ax, r, k, kind):
     return im
 
 
-def fig_fields(r, out, times=(0.0, 0.25, 0.5, 1.0, 1.5)):
+def fig_fields(r, out, times=(0.0, 1.0, 2.0, 3.5, 5.0)):
     ft = r["f_t"]
     ks = [int(np.argmin(np.abs(ft - t))) for t in times if t <= ft[-1] + 1e-9]
     for kind, label, fname in (("speed", "speed (m/s)", "speed"),
@@ -78,7 +78,7 @@ def fig_fields(r, out, times=(0.0, 0.25, 0.5, 1.0, 1.5)):
         print("wrote", p)
 
 
-def fig_surface(r, out, times=(0.0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5)):
+def fig_surface(r, out, times=(0.0, 1.0, 2.0, 3.0, 4.0, 5.0)):
     ft = r["f_t"]
     fig, ax = plt.subplots(figsize=(5, 3.5), constrained_layout=True)
     cmap = plt.get_cmap("viridis")
@@ -124,7 +124,7 @@ def gif(r, out, fps=12):
 
     anim = animation.FuncAnimation(fig, update, frames=len(ft), blit=False)
     p = os.path.join(out, "discharge.gif")
-    anim.save(p, writer=animation.PillowWriter(fps=fps), dpi=80)
+    anim.save(p, writer=animation.PillowWriter(fps=fps), dpi=60)
     plt.close(fig)
     print("wrote", p)
 

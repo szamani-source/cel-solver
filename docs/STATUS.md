@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-11-14 (WP 3.2q)
+Last updated: 2026-11-15 (WP 3.3p)
 
 Plan doc: https://claude.ai/artifact/DTT6kSikz9ZUTBkUxY6Grr
 
@@ -34,7 +34,8 @@ Phase 2 (the C++ Eulerian solver: 2.1 to 2.5c and 2.4b done; 2.6 waits for Phase
 | 3.2p | Prototype free surface (material plus void) | Done | `prototype/void2d.py` (`VoidBox`); `tests/test_proto_void.sh` passes (about 70 s): lake at rest with a half-full top cell 2.5e-16 m/s, block translating 50 cells with exact edges and 3.5e-9 Pa stress, free fall at g to 1e-13 and landing, cohesionless block cracks with void = 2 v t. Slab-per-sweep remap, homogenised partly filled cells, void-first strain, separation at pulling faces (decision 0021). Column collapse split to 3.2q |
 | 3.2q | Prototype column collapse (split from 3.2p) | Done (run-out); slope split to 3.2r | Cause of the short run-out: the Riemann solver's shear jump term acts as a mesh-independent viscosity in one-cell shear bands (grows with sqrt(E)). Fix: face shear capped at yield, capped faces slip (`shear_cap`, decision 0023). a = 0.5 run-out 0.25 -> 0.40 (10 and 20 cells; band 0.30 to 0.90), top kept; a = 2 1.2 -> 1.6 (band 1.2 to 3.6). `tests/test_proto_void.sh` unchanged and passing |
 | 3.2r | Prototype column collapse deposit slope | Next | Brief: `docs/wp/WP-3.2r.md`. Slopes 45 deg (a = 0.5) and 59 deg (a = 2) per cell against 37: the 1D slab rule snaps column heights to whole cells. Test `tests/manual/test_proto_collapse.sh` (run-outs pass, slope fails) |
-| 3.3p | Prototype silo discharge (target T0) | Next | Brief: `docs/wp/WP-3.3p.md`; build on `void2d.VoidBox` (shear cap on since 3.2q); measure the rate's dependence on E first (decisions 0021, 0023) |
+| 3.3p | Prototype silo discharge (target T0) | Done (outlet, end-to-end run); rate law split to 3.3q | `prototype/discharge2d.py`, outlet = rule 9 of `void2d.py` (decision 0026). `tests/test_proto_silo_discharge.sh` passes (about 3 to 5 min): nothing leaks, mass 1e-14, head independence 0.94. Results, figures and animation: `docs/results/silo-prototype.md`. Steady rate, stagnant corners and crater are right, but the rate is about half of Beverloo (5 mm, E = 0.1 MPa: C 0.52 to 0.67, exponent 1.87) and depends on E (6 / 17 / 38 kg/s/m at 10 / 1 / 0.1 MPa): Riemann dissipation |
+| 3.3q | Prototype silo discharge rate (split from 3.3p) | Next | Brief: `docs/wp/WP-3.3q.md`. Damping that does not resist plastic flow, and/or mu(I) friction. Test `tests/manual/test_proto_silo_rate.sh` (fails now) |
 
 ## Standing instruction from Sia (2026-11-14)
 
@@ -65,8 +66,10 @@ Silo track (decision 0016), one thread each:
 3. WP 3.2p: prototype free surface. Done (decision 0021). WP 3.2q fixed the collapse
    run-out (decision 0023); the deposit slope is WP 3.2r (`docs/wp/WP-3.2r.md`), which
    can run beside 3.3p.
-4. WP 3.3p: prototype silo discharge, the first end-to-end result for Sia
-   (`docs/wp/WP-3.3p.md`). Start now, on `prototype/void2d.py`.
+4. WP 3.3p: prototype silo discharge. Done (decision 0026): the tank fills, settles,
+   opens and empties (`docs/results/silo-prototype.md`), but the rate is set by the
+   Riemann solver's dissipation.
+5. WP 3.3q: discharge rate (`docs/wp/WP-3.3q.md`). Start now; can run beside 3.2r.
 
 Then the C++ counterparts 3.1 to 3.4 (2.4b is done; briefs not written yet) and 3.5
 (cohesion).
@@ -84,8 +87,10 @@ Then the C++ counterparts 3.1 to 3.4 (2.4b is done; briefs not written yet) and 
 - Void prototype (decisions 0021, 0023): the face shear cap (WP 3.2q) removed most of
   the over-damping of slow granular flow, but the normal jump term of the Riemann
   solver is not capped (capping it was unstable), so run-out still falls with E: 0.45,
-  0.40, 0.25 at 0.1, 1, 10 MPa (a = 0.5). Stiff material under-predicts flow; 3.3p must
-  measure its rate against E. Surfaces are staircases of whole cells and fronts are
+  0.40, 0.25 at 0.1, 1, 10 MPa (a = 0.5). Stiff material under-predicts flow. The silo
+  discharge rate shows it strongly (WP 3.3p, decision 0026): 6 / 17 / 38 kg/s/m at
+  E = 10 / 1 / 0.1 MPa against Beverloo's 120, and 13 percent mesh dependence (5 against
+  2.5 mm). Reducing the jump terms makes the flow noisy; WP 3.3q. Surfaces are staircases of whole cells and fronts are
   blunt (1D slab rule; WP 3.2r). The C++ Lagrange step has the same face solver and
   needs the shear cap before the silo runs in celFoam.
 

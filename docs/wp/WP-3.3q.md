@@ -1,6 +1,6 @@
 # WP 3.3q: Prototype silo discharge rate (split from WP 3.3p)
 
-State: not started (split 2026-11-15, decision 0024)
+State: not started (split 2026-11-15, decision 0026)
 Branch: thread branch
 
 ## Goal
@@ -11,7 +11,7 @@ mesh, with no spurious noise in the stagnant zones.
 
 ## Read first
 
-- `docs/decisions/0024-silo-outlet-and-discharge-rate.md` (all measurements so far),
+- `docs/decisions/0026-silo-outlet-and-discharge-rate.md` (all measurements so far),
   `0023` (shear cap), `0021` (void rules)
 - `docs/spec/silo-reference.md` section 3 (C, mu(I) caveat), section 6 (tolerances)
 - `docs/results/silo-prototype.md`; `prototype/discharge2d.py`, `prototype/void2d.py`
@@ -25,7 +25,7 @@ mesh, with no spurious noise in the stagnant zones.
   artificial viscosity on the velocity divergence; something from the literature on
   low-dissipation Godunov schemes for solids. Measure each with
   `discharge2d.py --run --cell 0.01 --E 1e6 --t-end 0.3` and record rate, kinetic over
-  strain energy, largest speed and corner speed (as in the decision 0024 table).
+  strain energy, largest speed and corner speed (as in the decision 0026 table).
 - If the rate still depends on the numerics once the noise is gone, add mu(I) friction
   (Jop et al. 2006; parameters from S2 or S4 in `silo-reference.md`) as an option of the
   Mohr-Coulomb model in `constitutive/batch.py`, and report both.
