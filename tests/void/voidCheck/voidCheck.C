@@ -19,11 +19,15 @@ Description
                                     //   above (g along -y, top at y1)
         tEnd        0.1;            // run to tEnd with dt = tEnd/ceil(...)
         nSteps      1000;           // or this many steps of the stable dt
+        maxCo       0.4;            // optional (WP 3.2b): run to tEnd at
+                                    //   the stable dt of each step instead
+        writeTimes  (0.5 1);        // optional (WP 3.2b): also write
+                                    //   cells_<t>.dat at these times
     \endverbatim
 
     Output (master unless noted):
         history.dat  step t mass px py cx cy max|s| max|s|_empty max|U|
-                     Fy_bottom max(s_xx, s_yy)
+                     Fy_bottom max(s_xx, s_yy) KE nCapped
                      (s: material stress; Fy_bottom: force of the patch
                      bottom on the material)
         cells.dat    (cells.dat.procN in parallel) at the end:
@@ -135,7 +139,7 @@ int main(int argc, char *argv[])
         hist.reset(new OFstream("history.dat"));
         hist().precision(17);
         hist() << "# step t mass px py cx cy smax smaxEmpty Umax FyBottom snMax"
-            << nl;
+            << " KE nCapped" << nl;
     }
 
     auto record = [&](const label step)
@@ -148,6 +152,8 @@ int main(int argc, char *argv[])
         const scalar mass = gSum(m);
         const vector p = gSum(m*u);
         const vector mc = gSum(m*C);
+        const scalar ke = 0.5*gSum(m*magSqr(u));
+        const label nCap = returnReduce(solid.nCapped(), sumOp<label>());
         scalar smax = 0, sEmpty = 0, umax = 0, snMax = -GREAT;
         forAll(m, celli)
         {
@@ -175,26 +181,17 @@ int main(int argc, char *argv[])
             hist() << step << ' ' << runTime.value() << ' ' << mass << ' '
                 << p.x() << ' ' << p.y() << ' ' << mc.x()/mass << ' '
                 << mc.y()/mass << ' ' << smax << ' ' << sEmpty << ' ' << umax
-                << ' ' << fy << ' ' << snMax << nl;
+                << ' ' << fy << ' ' << snMax << ' ' << ke << ' ' << nCap << nl;
         }
     };
 
-    record(0);
-    for (label step = 1; step <= nSteps; ++step)
-    {
-        runTime.setDeltaT(dt);
-        ++runTime;
-        solid.lagrangeStep(dt);
-        solid.remap(dt);
-        record(step);
-    }
-
+    auto writeCells = [&](const word& stem)
     {
         const fileName name
         (
             Pstream::parRun()
-          ? fileName("cells.dat.proc" + Foam::name(Pstream::myProcNo()))
-          : fileName("cells.dat")
+          ? fileName(stem + ".dat.proc" + Foam::name(Pstream::myProcNo()))
+          : fileName(stem + ".dat")
         );
         OFstream os(runTime.globalPath()/name);
         os.precision(17);
@@ -210,8 +207,52 @@ int main(int argc, char *argv[])
                 << ' ' << sg[celli].xx() << ' ' << sg[celli].yy() << ' '
                 << sg[celli].xy() << nl;
         }
-    }
+    };
 
+    record(0);
+    if (dict.found("maxCo"))
+    {
+        // Variable step (WP 3.2b): the stable dt of each step at maxCo,
+        // shortened to land on tEnd and on each of writeTimes
+        const scalar tEnd = dict.get<scalar>("tEnd");
+        const scalar co = dict.get<scalar>("maxCo");
+        const scalarList wt(dict.getOrDefault<scalarList>("writeTimes", scalarList()));
+        label next = 0;
+        label step = 0;
+        while (runTime.value() < tEnd - 1e-12)
+        {
+            scalar dtk = co/solid.maxCo()*solid.stableDeltaT();
+            scalar target = tEnd;
+            if (next < wt.size())
+            {
+                target = min(target, wt[next]);
+            }
+            dtk = min(dtk, target - runTime.value());
+            runTime.setDeltaT(dtk);
+            ++runTime;
+            solid.lagrangeStep(dtk);
+            solid.remap(dtk);
+            record(++step);
+            if (next < wt.size() && runTime.value() >= wt[next] - 1e-12)
+            {
+                writeCells("cells_" + Foam::name(wt[next]));
+                ++next;
+            }
+        }
+        Info<< step << " steps to t = " << runTime.value() << " s" << nl;
+    }
+    else
+    {
+        for (label step = 1; step <= nSteps; ++step)
+        {
+            runTime.setDeltaT(dt);
+            ++runTime;
+            solid.lagrangeStep(dt);
+            solid.remap(dt);
+            record(step);
+        }
+    }
+    writeCells("cells");
     Info<< "End" << nl << endl;
     return 0;
 }
