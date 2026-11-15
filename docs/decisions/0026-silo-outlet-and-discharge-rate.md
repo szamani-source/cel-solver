@@ -41,8 +41,10 @@ opening (Beverloo with C = 1.45 gives 120 kg/s/m):
 The jump terms z (vR - vL) / 2 act as a viscosity of order rho c h |grad v| in the
 converging flow above the outlet; it grows with sqrt(E) and, unlike the one-cell shear
 bands of decision 0023, it does fall with the cell size (E = 0.1 MPa, rate over 0.2 to
-0.5 s: 51 kg/s/m at 5 mm and 58 at 2.5 mm, 13 percent apart; 10 mm gave 42 over a later
-window; see `docs/results/silo-prototype.md`).
+0.5 s: 36.8 kg/s/m at 5 mm and 45.2 at 2.5 mm, 23 percent apart; see
+`docs/results/silo-prototype.md`). The free-surface rule matters too: WP 3.2r's rule 9
+(merged during this package) lowered every rate by 20 to 40 percent. The E table above
+was measured before that merge.
 
 Tried and rejected (E = 1 MPa, 10 mm, unless stated):
 
@@ -73,13 +75,14 @@ it). So even a dissipation-free scheme may leave the rate set by the numerics.
 ## Consequences
 
 - `tests/test_proto_silo_discharge.sh` (CI) checks what is done: the outlet mechanics
-  (no leak, mass balance 1e-8, outflow, head independence within 10 percent: 0.94).
+  (no leak, mass balance 1e-8, outflow, head independence within 10 percent: 0.975).
 - The WP 3.3p rate checks (steady rate, exponent, C, corners, crater) are in
   `tests/manual/test_proto_silo_rate.sh` and fail: at E = 0.1 MPa, 10 mm, exponent 2.2
-  (band 1.3 to 1.7), C 0.38 / 0.51 / 0.61 for D = 0.04 / 0.06 / 0.08 m (band 1.0 to 1.9);
-  at 5 mm, exponent 1.87 and C 0.52 / 0.63 / 0.67. The rate is steady (within 5 percent
-  at 5 mm), the corners are stagnant and a crater forms: the flow pattern is right, the
-  magnitude is about half of Beverloo's.
+  (band 1.3 to 1.7), C 0.38 / 0.51 / 0.61 for D = 0.04 / 0.06 / 0.08 m (band 1.0 to 1.9;
+  before the WP 3.2r merge); at 5 mm with rule 9, exponent 2.26 and C 0.32 / 0.44 /
+  0.54. The rate is steady (within 7 percent at 5 mm), the corners are stagnant and a
+  crater forms: the flow pattern is right, the magnitude is a third to a half of
+  Beverloo's.
   They are the done-when of WP 3.3q (`docs/wp/WP-3.3q.md`).
 - WP 3.3q options, in order: (1) a damping that acts on elastic and odd-even modes but
   not on the plastic flow (for example jump terms scaled only where both cells are at

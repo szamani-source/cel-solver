@@ -35,7 +35,7 @@ Phase 2 (the C++ Eulerian solver: 2.1 to 2.5c and 2.4b done; 2.6 waits for Phase
 | 3.2q | Prototype column collapse (split from 3.2p) | Done (run-out); slope split to 3.2r | Cause of the short run-out: the Riemann solver's shear jump term acts as a mesh-independent viscosity in one-cell shear bands (grows with sqrt(E)). Fix: face shear capped at yield, capped faces slip (`shear_cap`, decision 0023). a = 0.5 run-out 0.25 -> 0.40 (10 and 20 cells; band 0.30 to 0.90), top kept; a = 2 1.2 -> 1.6 (band 1.2 to 3.6). `tests/test_proto_void.sh` unchanged and passing |
 | 3.2r | Prototype column collapse deposit slope | Done (staircase); toe split to 3.2s | Rule 9 (decision 0024): top layers (al >= 0.1) spread sideways in the x sweep. Deposit body smooth: steepest slope without the toe 27.9 deg (a = 0.5) and 33.9 (a = 2), was 45 and 59; run-outs 0.40 and 1.8 (20 cells 0.45 and 2.45), top kept. The 3.2q blow-up came from spreading in the y sweep, not the cap. Toe still 62.3 / 48.0 deg per cell (10 cells), 46.6 / 39.8 (20 cells); test stays in `tests/manual/` |
 | 3.2s | Prototype collapse toe: stress in partly filled cells | Next | Brief: `docs/wp/WP-3.2s.md`. Rule 4 (void first) leaves partly filled cells stress-free, so surface layers have no friction, creep and pile up at the front. Two closures tried in 3.2r failed (0024) |
-| 3.3p | Prototype silo discharge (target T0) | Done (outlet, end-to-end run); rate law split to 3.3q | `prototype/discharge2d.py`, outlet = rule 10 of `void2d.py` (decision 0026). `tests/test_proto_silo_discharge.sh` passes (about 3 to 5 min): nothing leaks, mass 1e-14, head independence 0.94. Results, figures and animation: `docs/results/silo-prototype.md`. Steady rate, stagnant corners and crater are right, but the rate is about half of Beverloo (5 mm, E = 0.1 MPa: C 0.52 to 0.67, exponent 1.87) and depends on E (6 / 17 / 38 kg/s/m at 10 / 1 / 0.1 MPa): Riemann dissipation |
+| 3.3p | Prototype silo discharge (target T0) | Done (outlet, end-to-end run); rate law split to 3.3q | `prototype/discharge2d.py`, outlet = rule 10 of `void2d.py` (decision 0026). `tests/test_proto_silo_discharge.sh` passes (about 3 to 5 min): nothing leaks, mass 1e-14, head independence 0.975. Results, figures and animation: `docs/results/silo-prototype.md`. Steady rate, stagnant corners and crater are right, but the rate is a third to a half of Beverloo (5 mm, E = 0.1 MPa: C 0.32 to 0.54, exponent 2.26; 5 against 2.5 mm 23 percent apart) and depends on E (6 / 17 / 38 kg/s/m at 10 / 1 / 0.1 MPa): Riemann dissipation |
 | 3.3q | Prototype silo discharge rate (split from 3.3p) | Next | Brief: `docs/wp/WP-3.3q.md`. Damping that does not resist plastic flow, and/or mu(I) friction. Test `tests/manual/test_proto_silo_rate.sh` (fails now) |
 
 ## Standing instruction from Sia (2026-11-14)
@@ -90,8 +90,8 @@ Then the C++ counterparts 3.1 to 3.4 (2.4b is done; briefs not written yet) and 
   solver is not capped (capping it was unstable), so run-out still falls with E: 0.45,
   0.40, 0.25 at 0.1, 1, 10 MPa (a = 0.5). Stiff material under-predicts flow. The silo
   discharge rate shows it strongly (WP 3.3p, decision 0026): 6 / 17 / 38 kg/s/m at
-  E = 10 / 1 / 0.1 MPa against Beverloo's 120, and 13 percent mesh dependence (5 against
-  2.5 mm). Reducing the jump terms makes the flow noisy; WP 3.3q. Surfaces were staircases of whole cells (fixed in
+  E = 10 / 1 / 0.1 MPa against Beverloo's 120, 23 percent mesh dependence (5 against
+  2.5 mm), and a 20 to 40 percent drop from WP 3.2r's free-surface rule. Reducing the jump terms makes the flow noisy; WP 3.3q. Surfaces were staircases of whole cells (fixed in
   WP 3.2r); fronts are still blunt (WP 3.2s). The C++ Lagrange step has the same face solver and
   needs the shear cap before the silo runs in celFoam.
 - Void prototype (decision 0024): partly filled cells carry no stress (void-first

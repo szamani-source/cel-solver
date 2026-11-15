@@ -62,7 +62,7 @@ def frame_image(ax, r, k, kind):
     return im
 
 
-def fig_fields(r, out, times=(0.0, 1.0, 2.0, 3.5, 5.0)):
+def fig_fields(r, out, times=(0.0, 2.0, 4.0, 6.0, 8.0)):
     ft = r["f_t"]
     ks = [int(np.argmin(np.abs(ft - t))) for t in times if t <= ft[-1] + 1e-9]
     for kind, label, fname in (("speed", "speed (m/s)", "speed"),
@@ -78,7 +78,7 @@ def fig_fields(r, out, times=(0.0, 1.0, 2.0, 3.5, 5.0)):
         print("wrote", p)
 
 
-def fig_surface(r, out, times=(0.0, 1.0, 2.0, 3.0, 4.0, 5.0)):
+def fig_surface(r, out, times=(0.0, 1.0, 2.0, 4.0, 6.0, 8.0)):
     ft = r["f_t"]
     fig, ax = plt.subplots(figsize=(5, 3.5), constrained_layout=True)
     cmap = plt.get_cmap("viridis")
