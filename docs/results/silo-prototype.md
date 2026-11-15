@@ -13,9 +13,11 @@ Tank 0.40 m wide, material to 0.60 m, void above; walls and floor with Coulomb f
 phi 35 deg, psi 0, rho 1800 kg/m3, nu 0.3. Stage 1: gravity ramped over 0.1 s, damping
 250 1/s, 0.3 s in all, outlet closed. Stage 2: outlet opens instantly, damping off.
 
-**Stiffness.** These runs use E = 0.1 MPa, not T0's 10 MPa: the rate still depends on E
-(below, WP 3.3r), and stiffer runs cost more (the time step scales with 1 / sqrt(E)).
-This is a numerical limitation, not a material choice.
+**Stiffness.** The figures and the first rate table below are WP 3.3q runs at
+E = 0.1 MPa without rules 12 and 13. Since WP 3.3r (decision 0028, section "Stiffness
+and fine mesh" below) the rate no longer depends on E, so T0's own 10 MPa can be used;
+it costs 10 times more steps than 0.1 MPa. The checks still run at 0.1 MPa to keep CI
+time down.
 
 Reproduce (each writes an .npz for the plots):
 
@@ -79,8 +81,8 @@ percent), which give the same rates within 3 percent.
 | Exponent | 1.59 | 1.3 to 1.7 | Pass |
 | C | 1.035 | 1.0 to 1.9 | Pass |
 | Mesh, 10 against 5 mm (D = 0.06 m) | 81.4 against 82.2 kg/s/m, 1 % | 10 % | Pass |
-| Mesh, 5 against 2.5 mm (D = 0.06 m, 0.2 to 0.5 s) | 81.5 against 93.3 kg/s/m, 14 % (C 0.98 against 1.13) | 10 % | **Fail** |
-| Stiffness (10 mm, D = 0.06 m) | 81 / 73 / 54 kg/s/m at E = 0.1 / 1 / 10 MPa | within 10 % | **Fail** (WP 3.3r) |
+| Mesh, 5 against 2.5 mm (D = 0.06 m, 0.2 to 0.5 s) | 81.5 against 93.3 kg/s/m, 14 % (C 0.98 against 1.13); with rules 12 and 13 96.2 against 93.4 (3 %) | 10 % | Pass since WP 3.3r |
+| Stiffness (10 mm, D = 0.06 m) | 81 / 73 / 54 kg/s/m at E = 0.1 / 1 / 10 MPa; with rules 12 and 13 (WP 3.3r) 91.2 / 87.1 / 84.0 (8.7 %) | within 10 % | Pass since WP 3.3r |
 
 At 10 mm the 0.04 m outlet is only 4 cells wide and gives C 0.75 (the 0.06, 0.08 and
 0.10 m outlets give 0.98), which is why the rate-law test runs at 5 mm.
@@ -95,18 +97,34 @@ row rang between 0 and 9 kPa and held the column up. With rule 10b (an outlet fa
 takes the free velocity even when the material leans away) the outlet row carries 0 to
 0.2 kPa and the rate roughly doubles to triples.
 
-## Still open: stiffness and fine mesh (WP 3.3r)
+## Stiffness and fine mesh (WP 3.3r, decision 0028)
 
-The rate still falls with E: 81 / 73 / 54 kg/s/m at E = 0.1 / 1 / 10 MPa (10 mm,
-D = 0.06 m). At E = 1 MPa it also falls with refinement (73 at 10 mm, 61 at 5 mm),
-while at 0.1 MPa it rises between 5 and 2.5 mm (82 to 93). So it is not simply a
-dissipation of order rho c h that refinement removes. Reducing the Riemann jump terms
-(rule 11, `DISS_N`, `DISS_T`) still makes the flow noisy (decision 0027).
+The rate fell with E (81 / 73 / 54 kg/s/m at E = 0.1 / 1 / 10 MPa, 10 mm) for two
+reasons. The normal jump term of the Riemann solver, left uncapped by the shear cap,
+is a numerical viscosity of order rho c h on the deviatoric extension of plastic flow,
+growing with sqrt(E). And one sweep's stretch opened small voids in the flowing bulk
+(about 8 times the elastic strain there at 10 MPa), which made interior faces free
+surfaces; stiff runs carried 4 to 11 percent void near the outlet. Rule 12 caps the
+normal jump term at yield; rule 13 treats void inside the bulk as porosity. Both are on
+in the discharge (`discharge2d.py --old-rules` turns them off).
+
+`tests/test_proto_silo_stiffness.sh` (10 mm, D = 0.06 m, rate 97 to 88 percent):
+
+| E (MPa) | Before | Rate (kg/s/m) | C | 0.1 s windows | Mean corner / outlet speed |
+| --- | --- | --- | --- | --- | --- |
+| 0.1 | 81 | 91.2 | 1.10 | 5.1 % | 0.63 % |
+| 1 | 73 | 87.1 | 1.05 | 4.2 % | 0.10 % |
+| 10 (T0) | 54 | 84.0 | 1.01 | 4.0 % | 0.09 % |
+
+With the rules on, the 5 mm rate-law test gives C 1.14 / 1.16 / 1.12 (D = 0.04 / 0.06 /
+0.08 m), exponent 1.48, fitted C 1.133, head 0.992; 5 against 2.5 mm 96.2 against 93.4
+kg/s/m (3 percent; 14 before). The rules make the column collapse run too far, so they
+are not yet used there (WP 3.2t).
 
 ## Cost
 
 Python prototype, one core (four runs sharing four cores): 5 mm cells and E = 0.1 MPa
 run about 400 s of wall time per second of discharge (80 x 124 cells); 2.5 mm about 7
 times that. `tests/test_proto_silo_rate.sh` runs its four 5 mm cases in parallel
-(1407 s on four shared cores). At T0's E = 10 MPa the
+(1407 s on four shared cores; 1736 s with rules 12 and 13). `tests/test_proto_silo_stiffness.sh` takes about 16 minutes, set by the 10 MPa case (23,700 steps). At T0's E = 10 MPa the
 time step is 10 times smaller.

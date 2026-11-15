@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-11-15 (WP 3.3q)
+Last updated: 2026-11-15 (WP 3.3r)
 
 Plan doc: https://claude.ai/artifact/DTT6kSikz9ZUTBkUxY6Grr
 
@@ -37,7 +37,8 @@ Phase 2 (the C++ Eulerian solver: 2.1 to 2.5c and 2.4b done; 2.6 waits for Phase
 | 3.2s | Prototype collapse toe | Done | Decision 0025 (Sia chose the fitted flank angle, 2026-11-15). `tests/test_proto_collapse.sh` now in CI and passing: fitted slope 22.2 / 22.3 deg, run-outs 0.40 / 1.8. Partly filled cells are frictionless, but giving them strength (`FLOOR`) made the toe worse (a = 2: 59.9 deg, run-out 1.5). The a = 0.5 creep is full cells sliding along faces held at yield by the shear cap; making slow faces stick (`VSTICK`) stops it but the toe then reads 30 to 54 deg depending on whether the last column is just over one cell. With creep stopped the toe is still 39.7 deg: the nose of a 1 to 2 cell flowing layer (resolution). Both knobs off, defaults unchanged. Single-cell slopes printed for information only |
 | 3.3p | Prototype silo discharge (target T0) | Done (outlet, end-to-end run); rate law split to 3.3q | `prototype/discharge2d.py`, outlet = rule 10 of `void2d.py` (decision 0026). `tests/test_proto_silo_discharge.sh` passes (about 3 to 5 min): nothing leaks, mass 1e-14, head independence 0.975. Results, figures and animation: `docs/results/silo-prototype.md`. Steady rate, stagnant corners and crater are right, but the rate is a third to a half of Beverloo (5 mm, E = 0.1 MPa: C 0.32 to 0.54, exponent 2.26; 5 against 2.5 mm 23 percent apart) and depends on E (6 / 17 / 38 kg/s/m at 10 / 1 / 0.1 MPa): Riemann dissipation |
 | 3.3q | Prototype silo discharge rate (split from 3.3p) | Done (rate law at E = 0.1 MPa); stiffness split to 3.3r | The low rate was an outlet bug, not dissipation: a partly filled outlet cell leaned away from the face, which then got the wall velocity 0 and shut (rule 10b, decision 0027). `tests/test_proto_silo_rate.sh` now in CI and passing (5 mm, four processes, about 20 to 25 min): C 0.99 / 0.99 / 1.06 for D = 0.04 / 0.06 / 0.08 m, exponent 1.59, fitted C 1.035, steady within 6 %, averaged corner speed 0.8 %, head 0.992. Outlet test gained C >= 0.8 (now 0.98). Not met: E (81 / 73 / 54 kg/s/m at 0.1 / 1 / 10 MPa, 10 mm), and 2.5 against 5 mm (93 against 82 kg/s/m, 14 %) |
-| 3.3r | Prototype discharge rate at T0 stiffness (split from 3.3q) | Next | Brief: `docs/wp/WP-3.3r.md`. Rate falls with E; at 1 MPa it also falls with refinement (73 at 10 mm, 61 at 5 mm), so not a coarse-mesh dissipation. Cause unknown |
+| 3.3r | Prototype discharge rate at T0 stiffness (split from 3.3q) | Done; collapse with the new rules split to 3.2t | Decision 0028. Causes: the uncapped normal Riemann jump term (numerical viscosity ~ rho c h on plastic flow) and voids opened by one sweep that made interior faces free surfaces. Rule 12 caps the normal jump at yield (per-side strain, volume kept), rule 13 spreads void inside the bulk; both on in the discharge only. `tests/test_proto_silo_stiffness.sh` in CI and passing (about 16 min): 91.2 / 87.1 / 84.0 kg/s/m at E = 0.1 / 1 / 10 MPa (8.7 %, band 10, thin), windows 4 to 5 %, corners 0.1 to 0.6 %. Rate test still passes (exponent 1.48, C 1.133); 5 against 2.5 mm 3 % (was 14). Collapse with the rules runs too far (0.8 / 1.05 / 1.2): WP 3.2t |
+| 3.2t | One rule set for collapse and discharge (split from 3.3r) | Next | Brief: `docs/wp/WP-3.2t.md` |
 
 ## Standing instruction from Sia (2026-11-14)
 
@@ -72,8 +73,12 @@ Silo track (decision 0016), one thread each:
    opens and empties (`docs/results/silo-prototype.md`).
 5. WP 3.3q: discharge rate. Done (decision 0027): an outlet bug held the rate at a third
    of Beverloo; fixed, the rate follows D^1.5 with C about 1.0 at E = 0.1 MPa.
-6. WP 3.3r: the rate at T0's stiffness (`docs/wp/WP-3.3r.md`). Start now. The C++
-   silo packages can start in parallel; WP 3.3 must copy rule 10b.
+6. WP 3.3r: the rate at T0's stiffness. Done (decision 0028): rules 12 and 13 make the
+   rate independent of E (within 9 percent from 0.1 to 10 MPa) and of the mesh (3
+   percent between 5 and 2.5 mm).
+7. WP 3.2t: one rule set for the collapse and the discharge (`docs/wp/WP-3.2t.md`).
+   Start now. The C++ silo packages can start in parallel; WP 3.3 must copy rule 10b,
+   and the C++ Lagrange step should wait for 3.2t before copying rules 12 and 13.
 
 Then the C++ counterparts 3.1 to 3.4 (2.4b is done; briefs not written yet) and 3.5
 (cohesion).
@@ -99,8 +104,10 @@ is built. Silo walls are mesh boundaries with friction, not contact.
   solver is not capped (capping it was unstable), so run-out still falls with E: 0.45,
   0.40, 0.25 at 0.1, 1, 10 MPa (a = 0.5). Stiff material under-predicts flow. The silo
   discharge numbers of WP 3.3p (decision 0026) were mostly an outlet bug (decision
-  0027); with it fixed the rate still falls with E (81 / 73 / 54 kg/s/m at 0.1 / 1 /
-  10 MPa, 10 mm), WP 3.3r. Reducing the jump terms still makes the flow noisy. Surfaces were staircases of whole cells (fixed in
+  0027); with it fixed the rate still fell with E, fixed for the discharge in WP 3.3r by
+  capping the normal jump term too (rule 12, with per-side strain; decision 0028) and
+  dispersing interior void (rule 13). With both rules the collapse runs too far (a = 0.5
+  run-out 0.8 / 1.05 / 1.2 at 0.1 / 1 / 10 MPa), so they are off there (WP 3.2t). Surfaces were staircases of whole cells (fixed in
   WP 3.2r); fronts are still blunt (WP 3.2s). The C++ Lagrange step has the same face solver and
   needs the shear cap before the silo runs in celFoam.
 - Void prototype (decisions 0024, 0025): partly filled cells carry no stress (void-first
