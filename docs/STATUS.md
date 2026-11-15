@@ -72,6 +72,12 @@ Silo track (decision 0016), one thread each:
 Then the C++ counterparts 3.1 to 3.4 (2.4b is done; briefs not written yet) and 3.5
 (cohesion).
 
+After the silo (Phase 4, Lagrangian bodies): WP 4.0 comes first, a thorough
+investigation of body-to-material contact schemes (LS-DYNA constraint and penalty
+coupling, Abaqus CEL contact, cut-cell, immersed boundary), requested by Sia on
+2026-11-15 (`docs/wp/WP-4.0.md`). Its recommendation is shown to Sia before the coupling
+is built. Silo walls are mesh boundaries with friction, not contact.
+
 ## Known issues
 
 - C++ cycle (WP 2.4b): a 45 degree S step overshoots 0.9 percent after start-up in
