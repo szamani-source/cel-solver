@@ -30,6 +30,18 @@
        with Hughes-Winget, one model call per cell (none if the strain
        increment is exactly zero).
     6. rho = m / V_L, V_L = V + dt sum(phiL out of the cell).
+
+    Gravity and walls (WP 3.1, decision 0030). Gravity g(t) is balanced in
+    the face states: across a face the stress reconstruction works on the
+    deviation from each cell's own hydrostatic jump
+    e = -rho (g . d) gHat gHat (d the vector between the cells), so a
+    column in discrete equilibrium (cell stresses differing by the mean of
+    the two cells' e) has equal face states on both sides and stays at
+    rest to round-off; the momentum and Hancock predictor add g. Wall
+    patches (materialProperties walls): v_n = 0 unless that gives tension
+    (then zero traction); sticking shear kept if at most mu times the wall
+    pressure, else clipped to it with v_t from the interior characteristic.
+    Damping U <- U/(1 + damping dt) after the momentum update.
 \*---------------------------------------------------------------------------*/
 
 #include "eulerianSolid.H"
@@ -78,6 +90,32 @@ inline scalar minmod3(const scalar a, const scalar b, const scalar c)
 inline scalar mcSlope(const scalar a, const scalar c)
 {
     return minmod3(2*a, c, 2*(2*c - a));
+}
+
+
+//- Hydrostatic stress jump over the vector d in a cell of density rho
+//  under gravity g: -rho (g . d) gHat gHat for the stress, zero for other
+//  types (decision 0030)
+template<class Type>
+inline Type equilibriumJump(const scalar, const vector&, const vector&)
+{
+    return Zero;
+}
+
+template<>
+inline symmTensor equilibriumJump<symmTensor>
+(
+    const scalar rho,
+    const vector& d,
+    const vector& g
+)
+{
+    const scalar gg = magSqr(g);
+    if (gg <= 0)
+    {
+        return Zero;
+    }
+    return (-rho*(g & d)/gg)*sqr(g);
 }
 
 
@@ -189,15 +227,23 @@ void componentGradients
 //  so a linear field with exact patch values is reconstructed exactly and a
 //  zeroGradient patch gives the cell value; qN = qO. With secondOrder false
 //  all states are the cell values.
+//  With gravity g nonzero and rho given, the reconstruction works on the
+//  deviation from each side's hydrostatic jump (equilibriumJump): the
+//  jump a and the gradient increments lose the equilibrium part, which
+//  is added back when extrapolating to the face (decision 0030).
 template<class Type>
 void faceStates
 (
     const GeometricField<Type, fvPatchField, volMesh>& q,
     const bool secondOrder,
     GeometricField<Type, fvsPatchField, surfaceMesh>& qO,
-    GeometricField<Type, fvsPatchField, surfaceMesh>& qN
+    GeometricField<Type, fvsPatchField, surfaceMesh>& qN,
+    const volScalarField* rho = nullptr,
+    const vector& gravity = Zero
 )
 {
+    const bool grav = rho && magSqr(gravity) > 0;
+    const Type zeroT(Zero);
     const fvMesh& mesh = q.mesh();
     const labelUList& own = mesh.owner();
     const labelUList& nei = mesh.neighbour();
@@ -213,28 +259,56 @@ void faceStates
 
     // Owner and neighbour side states from cell values qP, qQ, gradients
     // and the vector dPQ from owner to neighbour centre
+    // eP, eQ: hydrostatic jumps of the two cells over dPQ (zero without
+    // gravity, which leaves the original scheme unchanged)
     auto states = [&]
     (
         const Type& qP, const Type& qQ,
         const UList<vector>* gP, const UList<vector>* gQ,
         const vector& dPQ,
-        Type& outP, Type& outQ
+        Type& outP, Type& outQ,
+        const Type& eP, const Type& eQ
     )
     {
         outP = qP;
         outQ = qQ;
         if (!secondOrder)
         {
+            if (grav)
+            {
+                outP += 0.5*eP;
+                outQ -= 0.5*eQ;
+            }
+            return;
+        }
+        if (!grav)
+        {
+            for (direction d = 0; d < nCmpt; ++d)
+            {
+                const scalar a = component(qQ, d) - component(qP, d);
+                const scalar sP = mcSlope(a, dPQ & (*gP)[d]);
+                const scalar sQ = mcSlope(a, dPQ & (*gQ)[d]);
+                setComponent(outP, d) = component(qP, d) + 0.5*sP;
+                setComponent(outQ, d) = component(qQ, d) - 0.5*sQ;
+            }
             return;
         }
         for (direction d = 0; d < nCmpt; ++d)
         {
-            const scalar a = component(qQ, d) - component(qP, d);
-            const scalar sP = mcSlope(a, dPQ & (*gP)[d]);
-            const scalar sQ = mcSlope(a, dPQ & (*gQ)[d]);
-            setComponent(outP, d) = component(qP, d) + 0.5*sP;
-            setComponent(outQ, d) = component(qQ, d) - 0.5*sQ;
+            const scalar ep = component(eP, d);
+            const scalar eq = component(eQ, d);
+            const scalar a =
+                component(qQ, d) - component(qP, d) - 0.5*(ep + eq);
+            const scalar sP = mcSlope(a, (dPQ & (*gP)[d]) - ep);
+            const scalar sQ = mcSlope(a, (dPQ & (*gQ)[d]) - eq);
+            setComponent(outP, d) = component(qP, d) + 0.5*(sP + ep);
+            setComponent(outQ, d) = component(qQ, d) - 0.5*(sQ + eq);
         }
+    };
+
+    auto eqJump = [&](const scalar r, const vector& d) -> Type
+    {
+        return grav ? equilibriumJump<Type>(r, d, gravity) : zeroT;
     };
 
     List<vector> gP(nCmpt), gQ(nCmpt);
@@ -253,7 +327,9 @@ void faceStates
         }
         states
         (
-            q[P], q[N], &gP, &gQ, delta[facei], qO[facei], qN[facei]
+            q[P], q[N], &gP, &gQ, delta[facei], qO[facei], qN[facei],
+            eqJump(grav ? (*rho)[P] : 0, delta[facei]),
+            eqJump(grav ? (*rho)[N] : 0, delta[facei])
         );
     }
 
@@ -268,6 +344,12 @@ void faceStates
         {
             const Field<Type> qn(q.boundaryField()[patchi].patchNeighbourField());
             const vectorField& pd = delta.boundaryField()[patchi];
+            const scalarField rn
+            (
+                grav
+              ? rho->boundaryField()[patchi].patchNeighbourField()
+              : tmp<scalarField>::New(p.size(), Zero)
+            );
 
             PtrList<vectorField> gn(secondOrder ? nCmpt : 0);
             if (secondOrder)
@@ -292,7 +374,12 @@ void faceStates
                         gQ[d] = gn[d][i];
                     }
                 }
-                states(q[fc[i]], qn[i], &gP, &gQ, pd[i], pO[i], pN[i]);
+                states
+                (
+                    q[fc[i]], qn[i], &gP, &gQ, pd[i], pO[i], pN[i],
+                    eqJump(grav ? (*rho)[fc[i]] : 0, pd[i]),
+                    eqJump(rn[i], pd[i])
+                );
             }
         }
         else
@@ -309,11 +396,15 @@ void faceStates
                         gP[d] = g[d][fc[i]];
                     }
                 }
+                // The mirror ghost carries the cell's own hydrostatic
+                // jump, so the deviation is mirrored (decision 0030)
                 Type ghost;
+                const vector dG(2*(Cf[i] - C[fc[i]]));
+                const Type e(eqJump(grav ? (*rho)[fc[i]] : 0, dG));
                 states
                 (
-                    q[fc[i]], 2*qb[i] - q[fc[i]], &gP, &gP,
-                    2*(Cf[i] - C[fc[i]]), pO[i], ghost
+                    q[fc[i]], 2*qb[i] - q[fc[i]] + e, &gP, &gP,
+                    dG, pO[i], ghost, e, e
                 );
                 pN[i] = pO[i];
             }
@@ -359,11 +450,29 @@ inline void riemann
 
 
 //- Boundary kinds (decision 0018)
-enum class boundaryKind { coupled, empty, velocity, symmetry, traction };
-
-
-boundaryKind kindOf(const fvPatch& p, const fvPatchVectorField& pU)
+enum class boundaryKind
 {
+    coupled, empty, velocity, symmetry, traction, wall
+};
+
+
+boundaryKind kindOf
+(
+    const fvPatch& p,
+    const fvPatchVectorField& pU,
+    const HashTable<scalar>& walls
+)
+{
+    if (walls.found(p.name()))
+    {
+        if (p.coupled() || isA<emptyFvPatch>(p))
+        {
+            FatalErrorInFunction
+                << "Patch " << p.name() << " of type " << p.type()
+                << " cannot be a wall" << exit(FatalError);
+        }
+        return boundaryKind::wall;
+    }
     if (p.coupled())
     {
         if (isA<processorFvPatch>(p) || isA<cyclicFvPatch>(p))
@@ -394,6 +503,44 @@ boundaryKind kindOf(const fvPatch& p, const fvPatchVectorField& pU)
         return boundaryKind::velocity;
     }
     return boundaryKind::traction;
+}
+
+
+//- Riemann solution at a rigid wall at rest with unit normal n out of the
+//  cell, from the cell-side state (vL, sL): v_n = 0 unless that pulls on
+//  the wall (then zero traction); sticking shear clipped to mu |t_n|
+//  (decision 0030). Returns face velocity v and traction t = sigma* & n.
+inline void wallFace
+(
+    const vector& n,
+    const vector& vL, const symmTensor& sL,
+    const scalar zp, const scalar zs, const scalar mu,
+    vector& v, vector& t
+)
+{
+    const vector tL(sL & n);
+    const scalar vnL = vL & n;
+    const scalar tnL = tL & n;
+    const vector vtL(vL - vnL*n);
+    const vector ttL(tL - tnL*n);
+
+    const scalar tn = tnL - zp*vnL;
+    if (tn >= 0)
+    {
+        v = (vnL - tnL/zp)*n + vtL - ttL/zs;
+        t = Zero;
+        return;
+    }
+    vector tt(ttL - zs*vtL);
+    const scalar limit = -tn*mu;
+    const scalar magTt = mag(tt);
+    v = Zero;
+    if (magTt > limit)
+    {
+        tt *= limit/magTt;
+        v = vtL + (tt - ttL)/zs;
+    }
+    t = tn*n + tt;
 }
 
 
@@ -574,6 +721,9 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
     // Cell mass, constant in the step
     const scalarField m(rho_.primitiveField()*V);
 
+    // Gravity at mid-step (the driver advances the time before the step)
+    const vector g(gravityAt(mesh.time().value() - 0.5*dt));
+
     // Impedances, with neighbour values on coupled patches
     tmp<volScalarField> tzp = workField<scalar>(mesh, "zp", dimless);
     tmp<volScalarField> tzs = workField<scalar>(mesh, "zs", dimless);
@@ -605,7 +755,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
     );
 
     faceStates(U_, secondOrder_, UO.ref(), UN.ref());
-    faceStates(sigma_, secondOrder_, sO.ref(), sN.ref());
+    faceStates(sigma_, secondOrder_, sO.ref(), sN.ref(), &rho_, g);
 
     if (secondOrder_)
     {
@@ -635,6 +785,23 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
             const vectorField& pS = Sf.boundaryField()[patchi];
             const symmTensorField& ps = sO().boundaryField()[patchi];
             const vectorField& pu = UO().boundaryField()[patchi];
+            if (kindOf(p, U_.boundaryField()[patchi], wallFriction_)
+             == boundaryKind::wall)
+            {
+                // The predictor sees the wall's reaction: wall Riemann
+                // solution from the face states (decision 0030)
+                const scalar mu = wallFriction_[p.name()];
+                const scalarField& pmS = magSf.boundaryField()[patchi];
+                forAll(fc, i)
+                {
+                    const label P = fc[i];
+                    vector v, t;
+                    wallFace(pS[i]/pmS[i], pu[i], ps[i], zp[P], zs[P], mu, v, t);
+                    divS[P] += t*pmS[i] - (sigma_[P] & pS[i]);
+                    gradU[P] += pS[i]*(v - U_[P]);
+                }
+                continue;
+            }
             forAll(fc, i)
             {
                 divS[fc[i]] += (ps[i] - sigma_[fc[i]]) & pS[i];
@@ -646,7 +813,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
         {
             if (solveMomentum_)
             {
-                dU[celli] = 0.5*dt*divS[celli]/m[celli];
+                dU[celli] = 0.5*dt*(divS[celli]/m[celli] + g);
             }
             const symmTensor D(symm(gradU[celli])/V[celli]);
             dS[celli] = 0.5*dt*(K*tr(D)*symmTensor::I + 2*G*dev(D));
@@ -736,7 +903,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
     {
         const fvPatch& p = mesh.boundary()[patchi];
         const fvPatchVectorField& pU = U_.boundaryField()[patchi];
-        const boundaryKind kind = kindOf(p, pU);
+        const boundaryKind kind = kindOf(p, pU, wallFriction_);
         if (kind == boundaryKind::empty)
         {
             continue;
@@ -808,6 +975,14 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                 const vector vt(v - vn*n);
                 t = (tnL + zp[P]*(vn - vnL))*n + ttL + zs[P]*(vt - vtL);
             }
+            else if (kind == boundaryKind::wall)
+            {
+                wallFace
+                (
+                    n, vL, pso[i], zp[P], zs[P], wallFriction_[p.name()],
+                    v, t
+                );
+            }
             else if (kind == boundaryKind::symmetry)
             {
                 // No normal velocity, no shear traction
@@ -827,6 +1002,8 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
     }
 
     syncCoupled(mesh, vS, F, phiL_);
+    vStar_ = vS;
+    Fstar_ = F;
 
 
     // 4. Momentum, velocity gradient and Lagrangian volume ----------------------
@@ -868,7 +1045,11 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
         vectorField& U = U_.primitiveFieldRef();
         forAll(U, celli)
         {
-            U[celli] += dt*force[celli]/m[celli];
+            U[celli] += dt*(force[celli]/m[celli] + g);
+            if (damping_ > 0)
+            {
+                U[celli] /= 1 + damping_*dt;
+            }
         }
     }
 
