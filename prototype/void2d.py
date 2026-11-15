@@ -278,7 +278,8 @@ def void_sweep(f, h0, dt, mat, ends, model, params, grav=0.0, mu=0.0,
             # Mach number of the material speed, so its stress is of order
             # rho |v| dv instead of rho c dv (Thornber et al. 2008)
             ma = np.maximum(np.abs(vL), np.abs(vR)) / c_mat
-            s_jump = s_jump * np.minimum(ma, 1.0)
+            floor = 0.0 if low_mach is True else float(low_mach)
+            s_jump = s_jump * np.clip(ma, floor, 1.0)
         return v_star, s_base + s_jump, (sL, vL, sR, vR, s_base, s_jump)
 
     ds_n, dv_n = characteristic(snn, vn, zp)
