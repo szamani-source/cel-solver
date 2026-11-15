@@ -42,15 +42,18 @@ ALPHA = 250.0
 T_SETTLE = 0.3           # ramp 0.1 s plus 0.2 s damped (decision 0020)
 HEADROOM = 0.02          # void above the fill (m); the material never rises
 WINDOW = (0.95, 0.70)    # steady-rate window, fractions of the initial mass
+NORMAL_CAP = True        # rule 12 of void2d (WP 3.3r, decision 0028)
+DISPERSE = 0.5           # rule 13 of void2d (WP 3.3r, decision 0028)
 T_AVG = 0.3              # flow pattern: velocities averaged over this much more discharge,
                          # at least one period of the bed's first elastic mode (4 H / c_p)
 
 
 def make_tank(cell=0.005, W=W_TANK, H=H_FILL, D=D_OUT, E=None, delta_w=DELTA_W,
-              low_mach=False):
+              low_mach=False, new_rules=True):
     """Tank of width W with material to height H, void above, frictional
     walls and floor (delta_w), outlet of width D centred in the floor
-    (closed until opened)."""
+    (closed until opened). new_rules: rules 12 and 13 of void2d (WP 3.3r,
+    decision 0028); False reproduces WP 3.3q."""
     nx = int(round(W / cell))
     ny = int(math.ceil((H + HEADROOM) / cell))
     params = dict(sd.T0_MC)
@@ -62,6 +65,8 @@ def make_tank(cell=0.005, W=W_TANK, H=H_FILL, D=D_OUT, E=None, delta_w=DELTA_W,
     box.fill(vd.rect(-1.0, 2.0 * W, -1.0, H, cell, cell))     # stress free
     box.t_ramp = T_RAMP
     box.low_mach = False          # settling keeps the full jump terms (rule 11 off)
+    box.normal_cap = NORMAL_CAP and new_rules
+    box.disperse = DISPERSE if new_rules else None
     box.low_mach_open = low_mach  # switched on with the outlet
     box.damping = ALPHA
     n_out = int(round(D / cell))
@@ -209,9 +214,9 @@ def averaged_pattern(box, t_avg=T_AVG, cfl=0.5):
 
 def run_case(cell=0.005, W=W_TANK, H=H_FILL, D=D_OUT, E=None, window=WINDOW, frames=None,
              frame_dt=0.02, m_stop=None, t_end=None, log=None, quiet=False, low_mach=False,
-             average=True):
+             average=True, new_rules=True):
     """Settle, open, discharge to the end of the rate window. Returns a dict."""
-    box = make_tank(cell, W, H, D, E, low_mach=low_mach)
+    box = make_tank(cell, W, H, D, E, low_mach=low_mach, new_rules=new_rules)
     m_fill = box.total_mass()
     ok, sec_settle, ke_ratio = settle(box)
     t_settle = box.t
@@ -348,11 +353,69 @@ def check(full=False, procs=None):
     return ok
 
 
+STIFF_E = (1.0e5, 1.0e6, 1.0e7)   # WP 3.3r: 0.1, 1 and 10 MPa (T0)
+
+
+def _stiff_case(args):
+    cell, E, new_rules = args
+    t0 = time.perf_counter()
+    r = run_case(cell=cell, D=D_OUT, E=E, window=CHECK_WINDOW, quiet=True, new_rules=new_rules)
+    r.pop("box")
+    r.pop("hist")
+    r["wall"] = time.perf_counter() - t0
+    return r
+
+
+def stiffness_check(cell=CHECK_CELL, new_rules=True, procs=None):
+    """WP 3.3r done-when (tests/test_proto_silo_stiffness.sh): D = 0.06 m,
+    H = 0.6 m, 10 mm cells, E = 0.1, 1 and 10 MPa in parallel processes, rate
+    from 97 to 88 percent of the mass (as the outlet checks). Rates within
+    10 percent of each other, 0.1 s windows within 10 percent, averaged
+    corner speed below 1 percent of the outlet speed at each E."""
+    import multiprocessing as mp
+    t_all = time.perf_counter()
+    P = lambda good: "PASS" if good else "FAIL"            # noqa: E731
+    print(f"T0 tank W = {W_TANK} m, H = {H_FILL} m, D = {D_OUT} m, frictional walls and floor "
+          f"({DELTA_W:g} deg), Mohr-Coulomb c = 0, phi 35, {1000 * cell:g} mm cells, rules 12 "
+          f"and 13 {'on' if new_rules else 'off'}")
+    n = procs or min(3, os.cpu_count() or 1)
+    with mp.get_context("fork").Pool(n) as pool:
+        out = pool.map(_stiff_case, [(cell, E, new_rules) for E in STIFF_E[::-1]], chunksize=1)
+    res = dict(zip(STIFF_E[::-1], out))
+    ok = True
+    for E in STIFF_E:
+        r = res[E]
+        pat = r["pattern"]
+        g = (r["var"] <= 0.10 and pat["corner_ratio"] <= 0.01 and r["leaked"] == 0.0
+             and r["cons"] <= 1e-8)
+        ok &= g
+        print(f"  E = {E / 1e6:g} MPa: rate {r['rate']:.1f} kg/s/m (C = {r['C']:.3f}) over t = "
+              f"{r['win'][0]:.3f} to {r['win'][1]:.3f} s; 0.1 s windows within "
+              f"{100 * r['var']:.1f} % (<= 10 %); corner speed (mean over {T_AVG:g} s) "
+              f"{pat['corner_ratio']:.1e} of the outlet speed {pat['v_out']:.2f} m/s (<= 1e-2; "
+              f"instantaneous {pat['corner_ratio_now']:.1e}); mass {r['cons']:.0e}; "
+              f"{r['steps']} steps, {r['wall']:.0f} s: {P(g)}")
+    rates = [res[E]["rate"] for E in STIFF_E]
+    spread = max(rates) / min(rates) - 1.0
+    g = spread <= 0.10
+    ok &= g
+    print(f"[stiffness] rates {', '.join(f'{x:.1f}' for x in rates)} kg/s/m at E = "
+          f"{', '.join(f'{E / 1e6:g}' for E in STIFF_E)} MPa: largest / smallest - 1 = "
+          f"{100 * spread:.1f} % (<= 10 %): {P(g)}")
+    print(f"\nWP 3.3r stiffness checks: {'ALL PASS' if ok else 'FAILED'} "
+          f"({time.perf_counter() - t_all:.0f} s)")
+    return ok
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     p.add_argument("--check", action="store_true", help="run the CI checks (outlet)")
     p.add_argument("--rate-check", action="store_true",
                    help="run the rate-law checks (tests/test_proto_silo_rate.sh, WP 3.3q)")
+    p.add_argument("--stiffness-check", action="store_true",
+                   help="run the stiffness checks (tests/test_proto_silo_stiffness.sh, WP 3.3r)")
+    p.add_argument("--old-rules", action="store_true",
+                   help="rules 12 and 13 off (reproduces WP 3.3q)")
     p.add_argument("--run", action="store_true", help="run one case")
     p.add_argument("--cell", type=float, default=0.005)
     p.add_argument("--H", type=float, default=H_FILL)
@@ -367,6 +430,8 @@ def main(argv=None):
     p.add_argument("--t-end", type=float, default=None, help="stop this long after opening")
     p.add_argument("--save", default=None, help=".npz file for the history and frames")
     args = p.parse_args(argv)
+    if args.stiffness_check:
+        return 0 if stiffness_check(new_rules=not args.old_rules) else 1
     if args.check or args.rate_check:
         return 0 if check(full=args.rate_check) else 1
     if args.run:
@@ -379,7 +444,8 @@ def main(argv=None):
                       f"({time.perf_counter() - t0:.0f} s)", flush=True)
         r = run_case(cell=args.cell, H=args.H, D=args.D, E=args.E, frames=frames,
                      frame_dt=args.frame_dt, m_stop=args.m_stop, log=log, t_end=args.t_end,
-                     low_mach=False if args.low_mach is None else (args.low_mach or True))
+                     low_mach=False if args.low_mach is None else (args.low_mach or True),
+                     new_rules=not args.old_rules)
         print(f"rate {r['rate']:.2f} kg/s/m, C = {r['C']:.4f}, variation {100 * r['var']:.1f} %, "
               f"window {r['win'][0]:.3f} to {r['win'][1]:.3f} s, conservation {r['cons']:.0e}, "
               f"leak {r['leaked']:.0e}, pattern {r['pattern']}, {r['steps']} steps, "

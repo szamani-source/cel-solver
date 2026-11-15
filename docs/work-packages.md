@@ -34,6 +34,7 @@ Constitutive models for bulk solids are tracked in `docs/constitutive-models.md`
 | 3.3p | Prototype silo discharge (target T0) | Outlet opens, no leak before, mass balance exact, rate independent of head (rate law split to 3.3q, decision 0026) |
 | 3.3q | Prototype silo discharge rate (split from 3.3p, decision 0026) | Steady rate, D^1.5 law with C 1.0 to 1.9, independent of E and mesh |
 | 3.3r | Prototype discharge rate at T0 stiffness (split from 3.3q, decision 0027) | Rate at E = 0.1, 1, 10 MPa within 10 percent, no noise in the dead zones |
+| 3.2t | One rule set for collapse and discharge (split from 3.3r, decision 0028) | Collapse test passes with rules 12 and 13 on, run-out at 1 and 10 MPa within 0.1 |
 | 3.1 | C++ gravity and wall boundaries (smooth, frictional) | celFoam settles a tank, matches the prototype |
 | 3.2 | C++ void and free surface | celFoam passes the 3.2p checks |
 | 3.3 | C++ outlet boundary that opens | Material leaves only after the opening time, mass balance exact |
@@ -81,6 +82,9 @@ dissipation, so the rate law is split to 3.3q (2026-11-15, decision 0026).
 decision 0027); with it fixed the rate law holds at 5 mm and E = 0.1 MPa, but the rate
 still falls with E (81 / 73 / 54 kg/s/m at 0.1 / 1 / 10 MPa, 10 mm), split to 3.3r
 (2026-11-15).
+3.3r made the rate independent of E (normal jump cap and dispersed void, rules 12 and
+13, decision 0028), but the rules make the column collapse run too far, so they are on
+only in the discharge; reconciling them is split to 3.2t (2026-11-15).
 Phases 4 to 6 (Lagrangian bodies, contact, FE, parallel scaling) are unchanged but come
 after T0. 2.6 (Taylor bar) waits for Phase 5.
 

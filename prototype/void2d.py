@@ -69,6 +69,23 @@ reasons for all of them are in docs/decisions/0021-void-treatment.md.
    Riemann jump terms z (vR - vL) / 2 are multiplied by min(1, |v| / c), so
    the numerical viscosity is rho |v| dv rather than rho c dv.
 
+12. **Normal jump cap (WP 3.3r, decision 0028; on in the discharge).** As
+   rule 8 for the normal Riemann solution: its jump term z (vR - vL) / 2 may
+   not push the face stress outside the Mohr-Coulomb surface. A capped face
+   keeps one normal velocity for the geometry and the remap (mass exact),
+   but each cell takes the strain of its own characteristic at the capped
+   traction (as a capped shear face slips, rule 8), with the volume change
+   restored as an in-plane isotropic strain, so only the deviatoric part of
+   the excess is dropped (plastic flow at psi = 0 keeps volume). Without it
+   the jump term is a numerical viscosity of order rho c h on the
+   deviatoric extension of plastic flow, and the discharge slows as E grows.
+13. **Dispersed interior void (WP 3.3r, decision 0028; on in the discharge).**
+   A partly filled cell whose two neighbours in the sweep both hold at least
+   ``disperse`` of material is spread (lean 0), touching both faces. Small
+   voids opened by one sweep inside the flowing bulk (rule 4) are then
+   porosity, not a slab with a free surface on one side, so they no longer
+   cut the material into blocks with zero-traction faces between them.
+
 10, 11. **Study knobs, off (WP 3.2s, decision 0025).** ``FLOOR``: supported
    partly filled cells are returned to the yield surface with their
    overburden pressure added, so they have friction. ``VSTICK``: capped faces
@@ -216,12 +233,55 @@ def shear_cap(fn, ft, seff, zs, vt_star, snt_star, Gf, params):
     return vt_star, t_new, (np.where(bad, va, vt_star), np.where(bad, vb, vt_star))
 
 
+def normal_cap(fn, seff, snt_face, zp, Gf, params):
+    """Rule 12 (decision 0028): the normal jump term of the Riemann solution
+    is scaled back (bisection, as in shear_cap) until the face stress, built
+    as in shear_cap with the face shear traction snt_face, is no further
+    outside the Mohr-Coulomb surface than without the jump (or inside it).
+    Returns None if no face is capped, else (traction s_hat per face, normal
+    face velocity seen by the left cell, by the right cell, capped mask); the
+    velocities follow each side's own characteristic at the capped
+    traction."""
+    sphi = math.sin(math.radians(params["phi"]))
+    ccos = params.get("c", 0.0) * math.cos(math.radians(params["phi"]))
+    stt = mirror(seff[..., 1])
+    szz = mirror(seff[..., 2])
+    ftt = 0.5 * (stt[:, 1:-2] + stt[:, 2:-1])
+    fzz = 0.5 * (szz[:, 1:-2] + szz[:, 2:-1])
+    nb, nj = fn[4] + Gf, fn[5]                     # actual normal face stress, jump
+
+    def yf(snn):
+        cen = 0.5 * (snn + ftt)
+        rad = np.sqrt((0.5 * (snn - ftt)) ** 2 + snt_face ** 2)
+        s1 = np.maximum(cen + rad, fzz)
+        s3 = np.minimum(cen - rad, fzz)
+        return 0.5 * (s1 - s3) + 0.5 * (s1 + s3) * sphi - ccos
+
+    lim = np.maximum(yf(nb), 0.0)
+    bad = yf(nb + nj) > lim
+    if not bad.any():
+        return None
+    lo = np.zeros_like(nb)
+    hi = np.ones_like(nb)
+    for _ in range(20):
+        mid = 0.5 * (lo + hi)
+        ok = yf(nb + mid * nj) <= lim
+        lo = np.where(ok, mid, lo)
+        hi = np.where(ok, hi, mid)
+    t_new = fn[4] + np.where(bad, lo, 1.0) * nj
+    zl, zr = zp[:, 1:-2], zp[:, 2:-1]
+    va = fn[1] + (t_new - fn[0]) / np.where(zl > 0.0, zl, 1.0)
+    vb = fn[3] - (t_new - fn[2]) / np.where(zr > 0.0, zr, 1.0)
+    return t_new, va, vb, bad
+
+
 # ----------------------------------------------------------------------------
 # One sweep with void
 # ----------------------------------------------------------------------------
 
 def void_sweep(f, h0, dt, mat, ends, model, params, grav=0.0, mu=0.0,
-               rotation="jaumann", no_tension=True, axis=0, outlet=None, low_mach=False):
+               rotation="jaumann", no_tension=True, axis=0, outlet=None, low_mach=False,
+               normal_cap_on=False, disperse=None):
     """silo2d.silo_sweep with a material volume fraction f["al"] (rules 1 to 5
     in the module docstring). Returns (new state, eps_p_eq made, boundary
     record).
@@ -231,7 +291,10 @@ def void_sweep(f, h0, dt, mat, ends, model, params, grav=0.0, mu=0.0,
     and material swept across it leaves the domain. The mass that left (per
     unit face area) is returned in the record as rec["out"].
     low_mach: rule 11 (WP 3.3p), the Riemann jump terms scaled by the face
-    Mach number."""
+    Mach number.
+    normal_cap_on: rule 12 (WP 3.3r), the normal jump term capped at yield.
+    disperse: rule 13 (WP 3.3r), None (off) or the neighbour fill above which
+    a partly filled cell is spread (dispersed void)."""
     M, G, rho0 = mat
     c_mat = math.sqrt(M / rho0)
     rows, n = f["rho"].shape
@@ -266,6 +329,10 @@ def void_sweep(f, h0, dt, mat, ends, model, params, grav=0.0, mu=0.0,
         # for layers thinner than SLAB2D_MIN (they sprayed along the floor).
         lay = layer_across(al) & (al >= SLAB2D_MIN)
         lean = np.where(lay, 0.0, lean)
+    if disperse is not None:
+        # rule 13 (decision 0028): void inside the bulk is porosity
+        nb_min = np.minimum(alp[:, NG - 1:NG - 1 + n], alp[:, NG + 1:NG + 1 + n])
+        lean = np.where(nb_min >= disperse, 0.0, lean)
     lean = np.where(full, 0.0, lean)
     mask = smooth_mask(alp)                          # (rows, n + 2)
 
@@ -349,6 +416,11 @@ def void_sweep(f, h0, dt, mat, ends, model, params, grav=0.0, mu=0.0,
     slip = None
     if SHEAR_CAP and "phi" in params:
         vt_star, snt_star, slip = shear_cap(fn, ft, seff, zs, vt_star, snt_star, Gf, params)
+    ncap = None
+    if normal_cap_on and "phi" in params:
+        ncap = normal_cap(fn, seff, snt_star, zp, Gf, params)
+        if ncap is not None:
+            snn_star = np.where(ncap[3], ncap[0], snn_star)
 
     # --- free-surface faces (interior faces 1 .. n-1) -------------------------
     pL = touch_r[:, :-1]                     # left cell touches the face
@@ -416,6 +488,19 @@ def void_sweep(f, h0, dt, mat, ends, model, params, grav=0.0, mu=0.0,
         vtA[:, j], vtB[:, j] = w_b, w_b
         rec[side] = (normal, t_b.copy(), v_b.copy(), w_b.copy())
 
+    # rule 12: at capped interior contact faces each cell strains with its own
+    # characteristic velocity; dstr is the change of its length strain
+    dstr = None
+    if ncap is not None:
+        capm = ncap[3].copy()
+        capm[:, 0] = False
+        capm[:, -1] = False
+        capm[:, 1:-1] &= ~free
+        if capm.any():
+            vA = np.where(capm, ncap[1], vn_star)    # seen by the cell on the left
+            vB = np.where(capm, ncap[2], vn_star)    # seen by the cell on the right
+            dstr = dt * ((vA[:, 1:] - vn_star[:, 1:]) - (vB[:, :-1] - vn_star[:, :-1])) / h0
+
     # --- Lagrange update ----------------------------------------------------
     vn_new = np.where(has, f["vn"] + dt * (snn_star[:, 1:] - snn_star[:, :-1]) / msafe, 0.0)
     vt_new = np.where(has, f["vt"] + dt * (snt_star[:, 1:] - snt_star[:, :-1]) / msafe, 0.0)
@@ -437,13 +522,19 @@ def void_sweep(f, h0, dt, mat, ends, model, params, grav=0.0, mu=0.0,
     gam = np.where(has, dt * (vtA[:, 1:] - vtB[:, :-1]) / hmid, 0.0)
     deps = np.zeros((rows, n, 6))
     deps[..., 0] = np.where(has, dmat / np.where(amid > 0.0, amid, 1.0), 0.0)
+    if dstr is not None:
+        # rule 12: only the deviatoric part of the dropped strain is dropped;
+        # its volume change is kept as an in-plane isotropic strain, so the
+        # pressure stays tied to the density (full cells only)
+        deps[..., 0] = np.where(full, deps[..., 0] + 0.5 * dstr, deps[..., 0])
+        deps[..., 1] = np.where(full, -0.5 * dstr, 0.0)
     deps[..., 3] = gam
     s_old, ep_old = f["s"], f["ep"]
     if rotation == "jaumann":
         a = 0.5 * gam
         s_old = rotate_inplane(s_old, a)
         ep_old = rotate_inplane(ep_old, a, 0.5)
-    act = has & ((deps[..., 0] != 0.0) | (gam != 0.0))
+    act = has & ((deps[..., 0] != 0.0) | (deps[..., 1] != 0.0) | (gam != 0.0))
     s_new, ep_new, epq_new = s_old.copy(), ep_old.copy(), f["epq"].copy()
     # rule 10 (decision 0025): a supported partly filled cell is returned to
     # the yield surface with its overburden pressure added (in-plane and out
@@ -563,6 +654,8 @@ class VoidBox(sd.SiloBox):
         p = self.params
         self.no_tension = p.get("c", None) == 0.0 or p.get("sigma_t", None) == 0.0
         self.low_mach = False     # rule 11 (decision 0026)
+        self.normal_cap = False   # rule 12 (decision 0028)
+        self.disperse = None      # rule 13 (decision 0028)
         self.outlet = None        # bool per column: bottom face is an outflow (rule 10)
         self.discharged = 0.0     # mass that left through the outlet (kg per m depth)
         self._out = []
@@ -596,7 +689,8 @@ class VoidBox(sd.SiloBox):
             g, made, rec = void_sweep(fl, self.dx, dt, mat,
                                       (self.walls["left"], self.walls["right"]),
                                       self.model, self.params, 0.0, self.mu, self.rotation,
-                                      self.no_tension, axis=0, low_mach=self.low_mach)
+                                      self.no_tension, axis=0, low_mach=self.low_mach,
+                                      normal_cap_on=self.normal_cap, disperse=self.disperse)
             self._rec.append(("left", rec["lo"]))
             self._rec.append(("right", rec["hi"]))
             return {"rho": g["rho"], "al": g["al"], "vx": g["vn"], "vy": g["vt"],
@@ -612,7 +706,8 @@ class VoidBox(sd.SiloBox):
                                   (self.walls["bottom"], self.walls["top"]),
                                   self.model, self.params, self._g_now, self.mu,
                                   self.rotation, self.no_tension, axis=1, outlet=self.outlet,
-                                  low_mach=self.low_mach)
+                                  low_mach=self.low_mach, normal_cap_on=self.normal_cap,
+                                  disperse=self.disperse)
         self._out.append(rec["out"].sum() * self.dx)
         self._rec.append(("bottom", rec["lo"]))
         self._rec.append(("top", rec["hi"]))
