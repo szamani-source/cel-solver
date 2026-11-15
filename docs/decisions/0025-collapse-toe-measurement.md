@@ -1,7 +1,7 @@
 # 0025 Column collapse toe: why it stays steep, and how to measure it
 
-Date: 2026-11-15. Status: proposed (WP 3.2s). The measurement choice is Sia's; nothing in
-the test was changed. The prototype's behaviour is unchanged (two study knobs added,
+Date: 2026-11-15. Status: accepted. Sia chose option 1, the fitted flank angle
+(2026-11-15); the collapse test uses it and runs in CI. The prototype's behaviour is unchanged (two study knobs added,
 both off).
 
 ## Context
@@ -80,11 +80,17 @@ card recommending option 2 was withdrawn when the 20-cell numbers came in.
 
 ## Consequences
 
-- Until Sia chooses, `tests/manual/test_proto_collapse.sh` stays manual and fails on the
-  toe only.
 - The a = 0.5 deposit still creeps at about 1 cm/s at t = 2 s (KE 2e-3 of peak). 3.3p
   (discharge) has the same capped faces at yield next to its free surface; a creeping
   free surface over the outlet is expected. A rate-dependent friction (mu(I)) is the
   physical cure and would also replace `VSTICK`.
 - `FLOOR` and `VSTICK` stay in `prototype/void2d.py` as study knobs, off by default,
   so the runs above can be repeated; default results are unchanged bit for bit.
+
+## Decision (Sia, 2026-11-15)
+
+The collapse test judges the deposit by a line fitted to the surface from 10 to 90 % of
+the final height, at most 37 deg. Single-cell slopes (all columns, without the toe, over
+two cells) are printed for information only. `tests/test_proto_collapse.sh` is in
+`tests/` and runs in CI: 22.2 and 22.3 deg at 10 cells, run-outs 0.40 and 1.8, top kept,
+mass 5e-14. Revisit if a later package needs a local check on single steep steps.

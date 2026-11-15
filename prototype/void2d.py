@@ -63,7 +63,7 @@ reasons for all of them are in docs/decisions/0021-void-treatment.md.
 
 ``python3 void2d.py --verify`` runs the WP 3.2p checks
 (tests/test_proto_void.sh); ``--collapse`` the column collapse checks (WP 3.2q,
-toe slope measurement waits on Sia, decision 0025) (tests/manual/test_proto_collapse.sh). SI units, stress positive in tension, thickness
+slope as a fitted line, decision 0025) (tests/test_proto_collapse.sh). SI units, stress positive in tension, thickness
 1 m, arrays (ny, nx).
 """
 
@@ -916,7 +916,9 @@ def collapse_check(cells_short=10):
         fit = 1.2 * a
         g_run = lo_hi[0] <= r["runout"] <= lo_hi[1]
         g_top = abs(r["H_f"] - r["H_i"]) <= r["cell"] if a < 1.0 else True
-        g_slope = r["slope_max"] <= 37.0
+        # decision 0025 (Sia, 2026-11-15): the flank as a line fitted from 10 to
+        # 90 % of H_f, at most 37 deg; single-cell slopes are printed only
+        g_slope = r["slope_fit"] <= 37.0
         good = g_run and g_top and g_slope and r["dm"] <= 1e-10
         ok &= good
         print(f"  a = {a}: L_i {r['L_i']:.3f} m, H_i {r['H_i']:.3f} m, {r['nx']} x {r['ny']} "
@@ -924,10 +926,10 @@ def collapse_check(cells_short=10):
               f"({r['seconds']:.0f} s), KE {r['ke_end']:.0e} of peak")
         print(f"    run-out (L_f - L_i)/L_i = {r['runout']:.3f} (fit 1.2 a = {fit:.2f}, band "
               f"{lo_hi[0]} to {lo_hi[1]}); H_f = {r['H_f']:.4f} m against H_i {r['H_i']:.3f} "
-              f"m{' (within 1 cell required)' if a < 1.0 else ''}; steepest deposit slope "
-              f"{r['slope_max']:.1f} deg (<= 37; over two cells {r['slope2_max']:.1f}, "
-              f"without the toe {r['slope_body']:.1f}, fitted from 10 to 90 % of "
-              f"H_f {r['slope_fit']:.1f}); "
+              f"m{' (within 1 cell required)' if a < 1.0 else ''}; deposit slope fitted from "
+              f"10 to 90 % of H_f {r['slope_fit']:.1f} deg (<= 37; for information, "
+              f"steepest per cell {r['slope_max']:.1f}, without the toe "
+              f"{r['slope_body']:.1f}, over two cells {r['slope2_max']:.1f}); "
               f"mass change {r['dm']:.0e}: {P(good)}")
 
     print(f"\nColumn collapse checks: {'ALL PASS' if ok else 'FAILED'} "
@@ -939,7 +941,7 @@ def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     p.add_argument("--verify", action="store_true", help="run the WP 3.2p checks")
     p.add_argument("--collapse", action="store_true",
-                   help="run the column collapse checks (WP 3.2q, tests/manual)")
+                   help="run the column collapse checks (tests/test_proto_collapse.sh)")
     p.add_argument("--case", choices=("lake", "block", "fall", "sep", "c05", "c2"))
     args = p.parse_args(argv)
     if args.verify:

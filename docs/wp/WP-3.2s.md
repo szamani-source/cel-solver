@@ -1,6 +1,6 @@
 # WP 3.2s: Prototype collapse toe: stress in partly filled cells (split from WP 3.2r)
 
-State: waiting on Sia (measurement, decision 0025)
+State: done (decision 0025)
 Branch: thread branch
 
 ## Goal
@@ -65,3 +65,7 @@ a = 0.5 keeps its top within 1 cell; run-out 0.30 to 0.90 (a = 0.5) and 1.2 to 3
   judged; recommended the fitted flank angle (first card, recommending excluding the
   last pair, withdrawn). Next step: apply Sia's choice to `collapse_check`, and if the
   test passes move it from `tests/manual/` to `tests/`.
+- Sia chose the fitted flank angle (decision 0025). `collapse_check` now checks it
+  (single-cell slopes printed only); the test moved to `tests/test_proto_collapse.sh`
+  and passes (22.2 / 22.3 deg, run-outs 0.40 / 1.8, 237 s). The creep of the a = 0.5
+  deposit is left as a known issue (mu(I) is the physical cure).
