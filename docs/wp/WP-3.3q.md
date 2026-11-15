@@ -15,13 +15,13 @@ mesh, with no spurious noise in the stagnant zones.
   `0023` (shear cap), `0021` (void rules)
 - `docs/spec/silo-reference.md` section 3 (C, mu(I) caveat), section 6 (tolerances)
 - `docs/results/silo-prototype.md`; `prototype/discharge2d.py`, `prototype/void2d.py`
-  (rules 8 to 10)
+  (rules 8 to 11)
 
 ## Build
 
 - Find a damping for the elastic and odd-even modes that does not act as a viscosity on
   the plastic flow. Candidates: jump terms scaled by the Mach number only at faces where
-  both cells are at yield (rule 10 is the all-faces version, which turned noisy); an
+  both cells are at yield (rule 11 is the all-faces version, which turned noisy); an
   artificial viscosity on the velocity divergence; something from the literature on
   low-dissipation Godunov schemes for solids. Measure each with
   `discharge2d.py --run --cell 0.01 --E 1e6 --t-end 0.3` and record rate, kinetic over

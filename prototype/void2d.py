@@ -49,17 +49,22 @@ reasons for all of them are in docs/decisions/0021-void-treatment.md.
    a capped face slips (each side keeps its own characteristic velocity).
    Without it the jump term acts as a mesh-independent viscosity in one-cell
    shear bands and slow granular flow depends on E.
-9. **Outlet (WP 3.3p, decision 0026).** ``outlet`` marks rows whose lo end is
+9. **Top layers spread sideways (WP 3.2r, decision 0024).** In the x sweep a
+   partly filled cell (al >= 0.1) whose al gradient is larger across x than
+   along it is a layer parallel to the sweep and is spread (lean 0) instead of
+   leaning against its fuller neighbour, so column heights no longer snap to
+   whole cells.
+10. **Outlet (WP 3.3p, decision 0026).** ``outlet`` marks rows whose lo end is
    an outflow face: zero traction, empty ghosts with free-end parities, and
    the material swept across the face leaves the domain (counted in
    ``VoidBox.discharged``).
-10. **Low-Mach jump terms (WP 3.3p, decision 0026; off by default).** Both
+11. **Low-Mach jump terms (WP 3.3p, decision 0026; off by default).** Both
    Riemann jump terms z (vR - vL) / 2 are multiplied by min(1, |v| / c), so
    the numerical viscosity is rho |v| dv rather than rho c dv.
 
 ``python3 void2d.py --verify`` runs the WP 3.2p checks
 (tests/test_proto_void.sh); ``--collapse`` the column collapse checks (WP 3.2q,
-slope open in WP 3.2r) (tests/manual/test_proto_collapse.sh). SI units, stress positive in tension, thickness
+toe slope open in WP 3.2s) (tests/manual/test_proto_collapse.sh). SI units, stress positive in tension, thickness
 1 m, arrays (ny, nx).
 """
 
@@ -87,6 +92,8 @@ FULL = 1.0 - 1e-12   # al at or above: full
 DISS = 1.0           # study knob: scale of the Riemann jump terms
 SHEAR_CAP = True     # rule 8 (decision 0023): face shear traction capped at yield
 DUST = 1e-9          # al below which a cell with mass is round-off dust
+SLAB2D = True        # rule 9 (WP 3.2r, decision 0024): layers spread in the x sweep
+SLAB2D_MIN = 0.1     # rule 9: thinner layers keep the 1D slab rule (no thin-film spray)
 
 
 # ----------------------------------------------------------------------------
@@ -111,6 +118,19 @@ def lean_of(alp, n):
     right = alp[:, NG + 1:NG + 1 + n]
     dif = right - left
     return np.where(np.abs(dif) > 1e-9, np.sign(dif), 0.0)
+
+
+def layer_across(al):
+    """True where the interface of a cell lies along the sweep: the 2D
+    (Youngs, 1-2-1 weighted) gradient of al is larger across the sweep
+    (axis 0) than along it (axis 1). Such a cell is a layer parallel to the
+    sweep and is spread evenly in it (lean 0) instead of leaning against its
+    fuller neighbour. Edges are padded by copying (walls)."""
+    p = np.pad(al, 1, mode="edge")
+    w = np.array([1.0, 2.0, 1.0])
+    gx = sum(w[i] * (p[i:i + al.shape[0], 2:] - p[i:i + al.shape[0], :-2]) for i in range(3))
+    gy = sum(w[j] * (p[2:, j:j + al.shape[1]] - p[:-2, j:j + al.shape[1]]) for j in range(3))
+    return np.abs(gy) > np.abs(gx)
 
 
 def smooth_mask(alp):
@@ -181,16 +201,16 @@ def shear_cap(fn, ft, seff, zs, vt_star, snt_star, Gf, params):
 # ----------------------------------------------------------------------------
 
 def void_sweep(f, h0, dt, mat, ends, model, params, grav=0.0, mu=0.0,
-               rotation="jaumann", no_tension=True, outlet=None, low_mach=False):
+               rotation="jaumann", no_tension=True, axis=0, outlet=None, low_mach=False):
     """silo2d.silo_sweep with a material volume fraction f["al"] (rules 1 to 5
     in the module docstring). Returns (new state, eps_p_eq made, boundary
     record).
 
-    outlet: optional bool array per row (WP 3.3p, rule 9): those rows' lo end
+    outlet: optional bool array per row (WP 3.3p, rule 10): those rows' lo end
     is an outflow face instead of the lo wall: zero traction, empty ghosts,
     and material swept across it leaves the domain. The mass that left (per
     unit face area) is returned in the record as rec["out"].
-    low_mach: rule 10 (WP 3.3p), the Riemann jump terms scaled by the face
+    low_mach: rule 11 (WP 3.3p), the Riemann jump terms scaled by the face
     Mach number."""
     M, G, rho0 = mat
     c_mat = math.sqrt(M / rho0)
@@ -218,6 +238,14 @@ def void_sweep(f, h0, dt, mat, ends, model, params, grav=0.0, mu=0.0,
     if outlet is not None:
         alp[outlet, :NG] = 0.0                       # beyond an outlet: empty
     lean = lean_of(alp, n)
+    if SLAB2D and axis == 0:
+        # rule 9 (decision 0024): in the x sweep a partly filled cell whose
+        # interface lies along x (a top layer) is spread, so a thin top layer
+        # can slide sideways instead of standing as a vertical slab. Not in
+        # the y sweep (spreading vertical films there was unstable), and not
+        # for layers thinner than SLAB2D_MIN (they sprayed along the floor).
+        lay = layer_across(al) & (al >= SLAB2D_MIN)
+        lean = np.where(lay, 0.0, lean)
     lean = np.where(full, 0.0, lean)
     mask = smooth_mask(alp)                          # (rows, n + 2)
 
@@ -235,7 +263,7 @@ def void_sweep(f, h0, dt, mat, ends, model, params, grav=0.0, mu=0.0,
     snt = pad_ends(seff[..., 3], pst_lo, pst_hi)
     vt = pad_ends(f["vt"], pvt_lo, pvt_hi)
     if outlet is not None:
-        # outlet rows: ghosts of a free end (rule 9)
+        # outlet rows: ghosts of a free end (rule 10)
         o_rows = outlet[:, None]
         fsn, fvn = parity("free", "n")
         fst, fvt = parity("free", "t")
@@ -274,7 +302,7 @@ def void_sweep(f, h0, dt, mat, ends, model, params, grav=0.0, mu=0.0,
         s_base = (zR * sL + zL * sR) / zsum
         s_jump = DISS * zL * zR * (vR - vL) / zsum
         if low_mach:
-            # rule 10 (WP 3.3p, decision 0026): jump term scaled by the face
+            # rule 11 (WP 3.3p, decision 0026): jump term scaled by the face
             # Mach number of the material speed, so its stress is of order
             # rho |v| dv instead of rho c dv (Thornber et al. 2008)
             ma = np.maximum(np.abs(vL), np.abs(vR)) / c_mat
@@ -417,7 +445,7 @@ def void_sweep(f, h0, dt, mat, ends, model, params, grav=0.0, mu=0.0,
     dI = d[:, 1:-1]
     vf[:, 1:-1] = np.where(dI > 0.0, outR[:, :-1], -outL[:, 1:])
     if outlet is not None:
-        # rule 9: material swept across an outlet face leaves the domain
+        # rule 10: material swept across an outlet face leaves the domain
         vf[:, 0] = np.where(outlet & (d[:, 0] < 0.0), -outL[:, 0], 0.0)
     # round-off face motion (for example 1e-19 m from a 1e-17 m/s velocity)
     # must not seed dust in empty cells: no flux below 1e-9 of a cell
@@ -466,8 +494,12 @@ def void_sweep(f, h0, dt, mat, ends, model, params, grav=0.0, mu=0.0,
             pv = pad_ends(val, *par)
             mk, mpp, mff = mask, mp, mf
         mps = np.where(mpp > 0.0, mpp, 1.0)
-        gl, gr = gradients(pv, mps[..., 0] if val.ndim == 3 else mps)
-        sl = lim(gl, gr) * mk
+        # slopes only where the cell and both neighbours are full; elsewhere
+        # the masses can be round-off small and the gradients overflow, and
+        # inf * 0 would leave NaN in the flux (WP 3.2r)
+        with np.errstate(over="ignore", invalid="ignore", divide="ignore"):
+            gl, gr = gradients(pv, mps[..., 0] if val.ndim == 3 else mps)
+            sl = np.where(mk > 0.0, lim(gl, gr), 0.0)
         qc, mc = pv[:, 1:-1], mpp[:, 1:-1]
         am = np.abs(mff)
         from_left = qc[:, :-1] + sl[:, :-1] * 0.5 * (mc[:, :-1] - am)
@@ -501,8 +533,8 @@ class VoidBox(sd.SiloBox):
         # no tensile strength: cohesionless, or a tension cut-off at zero
         p = self.params
         self.no_tension = p.get("c", None) == 0.0 or p.get("sigma_t", None) == 0.0
-        self.low_mach = False     # rule 10 (decision 0026)
-        self.outlet = None        # bool per column: bottom face is an outflow (rule 9)
+        self.low_mach = False     # rule 11 (decision 0026)
+        self.outlet = None        # bool per column: bottom face is an outflow (rule 10)
         self.discharged = 0.0     # mass that left through the outlet (kg per m depth)
         self._out = []
 
@@ -535,7 +567,7 @@ class VoidBox(sd.SiloBox):
             g, made, rec = void_sweep(fl, self.dx, dt, mat,
                                       (self.walls["left"], self.walls["right"]),
                                       self.model, self.params, 0.0, self.mu, self.rotation,
-                                      self.no_tension, low_mach=self.low_mach)
+                                      self.no_tension, axis=0, low_mach=self.low_mach)
             self._rec.append(("left", rec["lo"]))
             self._rec.append(("right", rec["hi"]))
             return {"rho": g["rho"], "al": g["al"], "vx": g["vn"], "vy": g["vt"],
@@ -547,7 +579,7 @@ class VoidBox(sd.SiloBox):
         g, made, rec = void_sweep(fl, self.dy, dt, mat,
                                   (self.walls["bottom"], self.walls["top"]),
                                   self.model, self.params, self._g_now, self.mu,
-                                  self.rotation, self.no_tension, outlet=self.outlet,
+                                  self.rotation, self.no_tension, axis=1, outlet=self.outlet,
                                   low_mach=self.low_mach)
         self._out.append(rec["out"].sum() * self.dx)
         self._rec.append(("bottom", rec["lo"]))
@@ -807,10 +839,16 @@ def column_collapse(a, cells_short=20, cell=None, delta_b=COLLAPSE_DELTA_B,
     # the same over two-cell baselines
     slopes2 = np.degrees(np.arctan(np.abs(hc[2:] - hc[:-2]) / (2 * cell)))
     sl2_mask = dep[:-2] & dep[2:]
+    # for information (not a check): the same per-cell slope without the last
+    # pair of columns at the front (the toe), WP 3.2r
+    body = sl_mask.copy()
+    if body.any():
+        body[np.where(body)[0].max()] = False
     return dict(a=a, L_i=L_i, H_i=H_i, cell=cell, nx=nx, ny=ny, L_f=L_f, H_f=H_f,
                 runout=(L_f - L_i) / L_i, dm=abs(box.total_mass() - m0) / m0,
                 slope_max=slopes[sl_mask].max() if sl_mask.any() else 0.0,
                 slope2_max=slopes2[sl2_mask].max() if sl2_mask.any() else 0.0,
+                slope_body=slopes[body].max() if body.any() else 0.0,
                 steps=box.nstep, t=box.t, seconds=sec, hc=hc,
                 ke_end=hist[-1][1] / max(ke_peak, 1e-300), box=box,
                 void_stress=box.void_stress())
@@ -899,7 +937,8 @@ def collapse_check(cells_short=10):
         print(f"    run-out (L_f - L_i)/L_i = {r['runout']:.3f} (fit 1.2 a = {fit:.2f}, band "
               f"{lo_hi[0]} to {lo_hi[1]}); H_f = {r['H_f']:.4f} m against H_i {r['H_i']:.3f} "
               f"m{' (within 1 cell required)' if a < 1.0 else ''}; steepest deposit slope "
-              f"{r['slope_max']:.1f} deg (<= 37; over two cells {r['slope2_max']:.1f}); "
+              f"{r['slope_max']:.1f} deg (<= 37; over two cells {r['slope2_max']:.1f}, "
+              f"without the toe {r['slope_body']:.1f}); "
               f"mass change {r['dm']:.0e}: {P(good)}")
 
     print(f"\nColumn collapse checks: {'ALL PASS' if ok else 'FAILED'} "

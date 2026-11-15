@@ -63,7 +63,7 @@ the source, and what constitutive change would address it.
 
 ## Log
 
-- 2026-11-15: Outlet built (rule 9 in `void2d.py`, `prototype/discharge2d.py`); settle
+- 2026-11-15: Outlet built (rule 10 in `void2d.py`, `prototype/discharge2d.py`); settle
   0.3 s with the outlet closed, open instantly, damping off. CI test
   `tests/test_proto_silo_discharge.sh` passes (10 mm, E = 0.1 MPa, about 3 to 5 min):
   nothing leaks, mass balance 1e-14, head independence 0.94. Rate against E first, as
@@ -71,7 +71,7 @@ the source, and what constitutive change would address it.
   never steadies. Cause: the Riemann jump terms act as a viscosity of order rho c h
   grad v. Reducing them (scaled, Mach-scaled, with floors) raises the rate but makes the
   flow noisy (speeds 4 to 10 m/s, kinetic above strain energy), so nothing was adopted;
-  `low_mach` (rule 10) stays as an off-by-default study option. Full runs at 5 mm, E = 0.1
+  `low_mach` (rule 11) stays as an off-by-default study option. Full runs at 5 mm, E = 0.1
   MPa: rates 23.3 / 52.6 / 85.4 kg/s/m for D = 0.04 / 0.06 / 0.08 m (C 0.52 / 0.63 /
   0.67, exponent 1.87), steady within 5 percent, stagnant corners (0.3 percent of the
   outlet speed at D = 0.06 m), crater. Mesh: 51 (5 mm) against 58 (2.5 mm) kg/s/m over

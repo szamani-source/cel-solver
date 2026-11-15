@@ -33,8 +33,9 @@ Phase 2 (the C++ Eulerian solver: 2.1 to 2.5c and 2.4b done; 2.6 waits for Phase
 | 3.1p | Prototype gravity, walls and settling | Done | `prototype/silo2d.py`; `tests/test_proto_silo_settle.sh` passes (about 3 min): lake at rest 3e-18 m/s, smooth walls 0.13 % from rho g H with K0 = 0.4286 exact, frictional tank (H = 3 W, 10 mm cells) within 1.7 % of Janssen with K = 0.425 measured at the walls, wall ratio within 1.8 % of tan 20 deg, force balance 0.08 %. Gravity by subtracting the discrete weight, walls as one-sided Riemann solutions, ramp 0.1 s plus damping 250 1/s (decision 0020). Mohr-Coulomb vectorised in `constitutive/batch.py` |
 | 3.2p | Prototype free surface (material plus void) | Done | `prototype/void2d.py` (`VoidBox`); `tests/test_proto_void.sh` passes (about 70 s): lake at rest with a half-full top cell 2.5e-16 m/s, block translating 50 cells with exact edges and 3.5e-9 Pa stress, free fall at g to 1e-13 and landing, cohesionless block cracks with void = 2 v t. Slab-per-sweep remap, homogenised partly filled cells, void-first strain, separation at pulling faces (decision 0021). Column collapse split to 3.2q |
 | 3.2q | Prototype column collapse (split from 3.2p) | Done (run-out); slope split to 3.2r | Cause of the short run-out: the Riemann solver's shear jump term acts as a mesh-independent viscosity in one-cell shear bands (grows with sqrt(E)). Fix: face shear capped at yield, capped faces slip (`shear_cap`, decision 0023). a = 0.5 run-out 0.25 -> 0.40 (10 and 20 cells; band 0.30 to 0.90), top kept; a = 2 1.2 -> 1.6 (band 1.2 to 3.6). `tests/test_proto_void.sh` unchanged and passing |
-| 3.2r | Prototype column collapse deposit slope | Next | Brief: `docs/wp/WP-3.2r.md`. Slopes 45 deg (a = 0.5) and 59 deg (a = 2) per cell against 37: the 1D slab rule snaps column heights to whole cells. Test `tests/manual/test_proto_collapse.sh` (run-outs pass, slope fails) |
-| 3.3p | Prototype silo discharge (target T0) | Done (outlet, end-to-end run); rate law split to 3.3q | `prototype/discharge2d.py`, outlet = rule 9 of `void2d.py` (decision 0026). `tests/test_proto_silo_discharge.sh` passes (about 3 to 5 min): nothing leaks, mass 1e-14, head independence 0.94. Results, figures and animation: `docs/results/silo-prototype.md`. Steady rate, stagnant corners and crater are right, but the rate is about half of Beverloo (5 mm, E = 0.1 MPa: C 0.52 to 0.67, exponent 1.87) and depends on E (6 / 17 / 38 kg/s/m at 10 / 1 / 0.1 MPa): Riemann dissipation |
+| 3.2r | Prototype column collapse deposit slope | Done (staircase); toe split to 3.2s | Rule 9 (decision 0024): top layers (al >= 0.1) spread sideways in the x sweep. Deposit body smooth: steepest slope without the toe 27.9 deg (a = 0.5) and 33.9 (a = 2), was 45 and 59; run-outs 0.40 and 1.8 (20 cells 0.45 and 2.45), top kept. The 3.2q blow-up came from spreading in the y sweep, not the cap. Toe still 62.3 / 48.0 deg per cell (10 cells), 46.6 / 39.8 (20 cells); test stays in `tests/manual/` |
+| 3.2s | Prototype collapse toe: stress in partly filled cells | Next | Brief: `docs/wp/WP-3.2s.md`. Rule 4 (void first) leaves partly filled cells stress-free, so surface layers have no friction, creep and pile up at the front. Two closures tried in 3.2r failed (0024) |
+| 3.3p | Prototype silo discharge (target T0) | Done (outlet, end-to-end run); rate law split to 3.3q | `prototype/discharge2d.py`, outlet = rule 10 of `void2d.py` (decision 0026). `tests/test_proto_silo_discharge.sh` passes (about 3 to 5 min): nothing leaks, mass 1e-14, head independence 0.94. Results, figures and animation: `docs/results/silo-prototype.md`. Steady rate, stagnant corners and crater are right, but the rate is about half of Beverloo (5 mm, E = 0.1 MPa: C 0.52 to 0.67, exponent 1.87) and depends on E (6 / 17 / 38 kg/s/m at 10 / 1 / 0.1 MPa): Riemann dissipation |
 | 3.3q | Prototype silo discharge rate (split from 3.3p) | Next | Brief: `docs/wp/WP-3.3q.md`. Damping that does not resist plastic flow, and/or mu(I) friction. Test `tests/manual/test_proto_silo_rate.sh` (fails now) |
 
 ## Standing instruction from Sia (2026-11-14)
@@ -64,12 +65,12 @@ Silo track (decision 0016), one thread each:
 1. WP 3.0: reference values. Done (`docs/spec/silo-reference.md`).
 2. WP 3.1p: prototype gravity, walls, settling. Done (decision 0020).
 3. WP 3.2p: prototype free surface. Done (decision 0021). WP 3.2q fixed the collapse
-   run-out (decision 0023); the deposit slope is WP 3.2r (`docs/wp/WP-3.2r.md`), which
-   can run beside 3.3p.
+   run-out (decision 0023), WP 3.2r the deposit staircase (decision 0024); the toe is
+   WP 3.2s (`docs/wp/WP-3.2s.md`), which can run beside 3.3p.
 4. WP 3.3p: prototype silo discharge. Done (decision 0026): the tank fills, settles,
    opens and empties (`docs/results/silo-prototype.md`), but the rate is set by the
    Riemann solver's dissipation.
-5. WP 3.3q: discharge rate (`docs/wp/WP-3.3q.md`). Start now; can run beside 3.2r.
+5. WP 3.3q: discharge rate (`docs/wp/WP-3.3q.md`). Start now; can run beside 3.2s.
 
 Then the C++ counterparts 3.1 to 3.4 (2.4b is done; briefs not written yet) and 3.5
 (cohesion).
@@ -90,9 +91,14 @@ Then the C++ counterparts 3.1 to 3.4 (2.4b is done; briefs not written yet) and 
   0.40, 0.25 at 0.1, 1, 10 MPa (a = 0.5). Stiff material under-predicts flow. The silo
   discharge rate shows it strongly (WP 3.3p, decision 0026): 6 / 17 / 38 kg/s/m at
   E = 10 / 1 / 0.1 MPa against Beverloo's 120, and 13 percent mesh dependence (5 against
-  2.5 mm). Reducing the jump terms makes the flow noisy; WP 3.3q. Surfaces are staircases of whole cells and fronts are
-  blunt (1D slab rule; WP 3.2r). The C++ Lagrange step has the same face solver and
+  2.5 mm). Reducing the jump terms makes the flow noisy; WP 3.3q. Surfaces were staircases of whole cells (fixed in
+  WP 3.2r); fronts are still blunt (WP 3.2s). The C++ Lagrange step has the same face solver and
   needs the shear cap before the silo runs in celFoam.
+- Void prototype (decision 0024): partly filled cells carry no stress (void-first
+  closure), so free-surface layers have no friction and creep; the a = 0.5 collapse
+  still moves at t = 2 s with 10 cells (stops at 0.5 s with 20). The toe is 1 to 2
+  cells steeper than the body. WP 3.2s. Expect the same creep of the free surface in
+  3.3p.
 
 - WP 3.1p prototype: the free top of a full tank is a zero-traction face with no mass
   flux, so top cells lose density as the column settles (7 % in the top cell for 1.2 m).

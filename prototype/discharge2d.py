@@ -5,7 +5,7 @@ A rectangular tank (docs/spec/target-problems.md, T0) is filled with
 cohesionless Mohr-Coulomb material, settles under gravity with the outlet
 closed (WP 3.1p controls: gravity ramp 0.1 s, damping 250 1/s, decision 0020),
 then the outlet, a centred segment of the bottom wall, becomes an outflow face
-(rule 9 of ``void2d.py``: zero traction, empty ghosts, material swept across
+(rule 10 of ``void2d.py``: zero traction, empty ghosts, material swept across
 it leaves the domain and is counted). Damping is off during the discharge.
 
 The free surface, the void above the material and the face shear cap come
@@ -59,7 +59,7 @@ def make_tank(cell=0.005, W=W_TANK, H=H_FILL, D=D_OUT, E=None, delta_w=DELTA_W,
                       delta_w=delta_w)
     box.fill(vd.rect(-1.0, 2.0 * W, -1.0, H, cell, cell))     # stress free
     box.t_ramp = T_RAMP
-    box.low_mach = False          # settling keeps the full jump terms (rule 10 off)
+    box.low_mach = False          # settling keeps the full jump terms (rule 11 off)
     box.low_mach_open = low_mach  # switched on with the outlet
     box.damping = ALPHA
     n_out = int(round(D / cell))
@@ -298,7 +298,7 @@ def main(argv=None):
     p.add_argument("--D", type=float, default=D_OUT)
     p.add_argument("--E", type=float, default=None)
     p.add_argument("--low-mach", type=float, default=None,
-                   help="rule 10 on after opening, with this floor (study; noisy)")
+                   help="rule 11 on after opening, with this floor (study; noisy)")
     p.add_argument("--frames", action="store_true", help="store snapshots for the animation")
     p.add_argument("--frame-dt", type=float, default=0.02)
     p.add_argument("--m-stop", type=float, default=None,

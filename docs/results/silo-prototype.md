@@ -1,6 +1,6 @@
 # T0 silo discharge in the 2D prototype (WP 3.3p)
 
-Date: 2026-11-15. Code: `prototype/discharge2d.py` on `prototype/void2d.py` (rules 1 to 9).
+Date: 2026-11-15. Code: `prototype/discharge2d.py` on `prototype/void2d.py` (rules 1 to 10).
 Decision: `docs/decisions/0026-silo-outlet-and-discharge-rate.md`.
 
 ## Set-up

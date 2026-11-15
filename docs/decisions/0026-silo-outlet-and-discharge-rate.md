@@ -10,7 +10,7 @@ phi 35 deg, psi 0. Settling as WP 3.1p (gravity ramp 0.1 s, damping 250 1/s, dec
 0020), for a fixed 0.3 s; then the outlet opens and damping is switched off. The brief
 asked to measure the rate's dependence on E first (decisions 0021, 0023).
 
-## Decision 1: the outlet (rule 9 of `void2d.py`)
+## Decision 1: the outlet (rule 10 of `void2d.py`)
 
 `void_sweep(..., outlet=mask)` marks rows (columns of the tank) whose bottom face is an
 outflow face. Those rows get, in the gravity sweep only:
@@ -63,7 +63,7 @@ Mach scaling during settling the column rang (kinetic energy 10 times the strain
 energy at 0.3 s). The Mach-scaled rate also did not converge in E (40, 48, 58, 105, 165
 kg/s/m for E = 0.1, 1, 3, 10, 30 MPa). The jump terms are the only damping of the
 elastic and odd-even modes (decision 0023), so they cannot simply be removed. The Mach
-scaling is kept in the code as `low_mach` (rule 10, off by default) for WP 3.3q.
+scaling is kept in the code as `low_mach` (rule 11, off by default) for WP 3.3q.
 
 A second, physical reason is recorded, not tuned: rate-independent Coulomb friction
 does not select a unique steady flow (`docs/spec/silo-reference.md` section 3, S4; the
@@ -87,4 +87,4 @@ it). So even a dissipation-free scheme may leave the rate set by the numerics.
   friction (Jop et al. 2006) in `constitutive/batch.py`, which gives the flow a rate
   dependence that selects the steady rate and is what every continuum reference used;
   (3) both. Use E = 0.1 MPa while developing: it is 10 times cheaper than T0's E.
-- The C++ outlet (WP 3.3) can copy rule 9 as it is.
+- The C++ outlet (WP 3.3) can copy rule 10 as it is.
