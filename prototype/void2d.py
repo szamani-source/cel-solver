@@ -56,9 +56,14 @@ reasons for all of them are in docs/decisions/0021-void-treatment.md.
    leaning against its fuller neighbour, so column heights no longer snap to
    whole cells.
 
+10, 11. **Study knobs, off (WP 3.2s, decision 0025).** ``FLOOR``: supported
+   partly filled cells are returned to the yield surface with their
+   overburden pressure added, so they have friction. ``VSTICK``: capped faces
+   slipping slower than VSTICK stick. Neither fixed the collapse toe.
+
 ``python3 void2d.py --verify`` runs the WP 3.2p checks
 (tests/test_proto_void.sh); ``--collapse`` the column collapse checks (WP 3.2q,
-toe slope open in WP 3.2s) (tests/manual/test_proto_collapse.sh). SI units, stress positive in tension, thickness
+toe slope measurement waits on Sia, decision 0025) (tests/manual/test_proto_collapse.sh). SI units, stress positive in tension, thickness
 1 m, arrays (ny, nx).
 """
 
@@ -84,10 +89,13 @@ from silo2d import mirror, pad_ends, parity, weight_profile, boundary_face  # no
 EPS = 1e-12          # al at or below: empty
 FULL = 1.0 - 1e-12   # al at or above: full
 DISS = 1.0           # study knob: scale of the Riemann jump terms
+VSTICK = 0.0         # rule 11 study knob: faces slipping slower than this stick
 SHEAR_CAP = True     # rule 8 (decision 0023): face shear traction capped at yield
 DUST = 1e-9          # al below which a cell with mass is round-off dust
 SLAB2D = True        # rule 9 (WP 3.2r, decision 0024): layers spread in the x sweep
 SLAB2D_MIN = 0.1     # rule 9: thinner layers keep the 1D slab rule (no thin-film spray)
+FLOOR = False        # rule 10 (WP 3.2s, decision 0025): overburden pressure floor in the
+                     # yield check of supported partly filled cells
 
 
 # ----------------------------------------------------------------------------
@@ -174,6 +182,8 @@ def shear_cap(fn, ft, seff, zs, vt_star, snt_star, Gf, params):
 
     lim = np.maximum(yf(tb), 0.0)
     bad = yf(tb + tj) > lim
+    if VSTICK > 0.0:
+        bad &= np.abs(ft[3] - ft[1]) > VSTICK
     if not bad.any():
         return vt_star, snt_star, None
     lo = np.zeros_like(tb)
@@ -382,9 +392,18 @@ def void_sweep(f, h0, dt, mat, ends, model, params, grav=0.0, mu=0.0,
         ep_old = rotate_inplane(ep_old, a, 0.5)
     act = has & ((deps[..., 0] != 0.0) | (gam != 0.0))
     s_new, ep_new, epq_new = s_old.copy(), ep_old.copy(), f["epq"].copy()
+    # rule 10 (decision 0025): a supported partly filled cell is returned to
+    # the yield surface with its overburden pressure added (in-plane and out
+    # of plane), so it has frictional strength although rule 4 leaves its
+    # normal stress at zero. The floor is not stored and exerts no force.
+    pf = f.get("pf")
+    flo = np.zeros((rows, n, 6))
+    if pf is not None:
+        flo[..., 0] = flo[..., 1] = flo[..., 2] = -pf
     if act.any():
         s_new[act], ep_new[act], epq_new[act], _ = model(
-            deps[act], s_old[act], ep_old[act], f["epq"][act], params)
+            deps[act], s_old[act] + flo[act], ep_old[act], f["epq"][act], params)
+        s_new[act] -= flo[act]
     made = (m * (epq_new - f["epq"])).sum()
 
     # --- remap: slab volume fluxes, no flux through the boundary faces --------
@@ -508,7 +527,7 @@ class VoidBox(sd.SiloBox):
         mat = (self.M, self.G, self.rho0)
         if axis == 0:
             fl = {"rho": st["rho"], "al": st["al"], "vn": st["vx"], "vt": st["vy"],
-                  "s": st["s"], "ep": st["ep"], "epq": st["epq"]}
+                  "s": st["s"], "ep": st["ep"], "epq": st["epq"], "pf": self.pressure_floor(st)}
             g, made, rec = void_sweep(fl, self.dx, dt, mat,
                                       (self.walls["left"], self.walls["right"]),
                                       self.model, self.params, 0.0, self.mu, self.rotation,
@@ -520,7 +539,10 @@ class VoidBox(sd.SiloBox):
         tr = lambda a: np.swapaxes(a, 0, 1)                      # noqa: E731
         fl = {"rho": tr(st["rho"]), "al": tr(st["al"]), "vn": tr(st["vy"]),
               "vt": tr(st["vx"]), "s": tr(st["s"][..., PERM_Y]),
-              "ep": tr(st["ep"][..., PERM_Y]), "epq": tr(st["epq"])}
+              "ep": tr(st["ep"][..., PERM_Y]), "epq": tr(st["epq"]),
+              "pf": self.pressure_floor(st)}
+        if fl["pf"] is not None:
+            fl["pf"] = tr(fl["pf"])
         g, made, rec = void_sweep(fl, self.dy, dt, mat,
                                   (self.walls["bottom"], self.walls["top"]),
                                   self.model, self.params, self._g_now, self.mu,
@@ -530,6 +552,23 @@ class VoidBox(sd.SiloBox):
         return {"rho": tr(g["rho"]), "al": tr(g["al"]), "vx": tr(g["vt"]),
                 "vy": tr(g["vn"]), "s": tr(g["s"])[..., PERM_Y],
                 "ep": tr(g["ep"])[..., PERM_Y], "epq": tr(g["epq"])}, made * self.dx
+
+    def pressure_floor(self, st):
+        """Rule 10 (decision 0025): material pressure of the overburden at the
+        centre of each partly filled cell that stands on material (or on the
+        floor), zero elsewhere. Overburden = weight of the column above the
+        cell centre (its own upper half included) over al."""
+        if not FLOOR or "phi" not in self.params:
+            return None
+        al = st["al"]
+        w = self._g_now * st["rho"] * self.dy             # (ny, nx), row 0 at the bottom
+        above = np.cumsum(w[::-1], axis=0)[::-1] - 0.5 * w
+        part = (al > EPS) & (al < FULL)
+        below = np.zeros_like(part)
+        below[1:] = al[:-1] > EPS
+        below[0] = self.walls["bottom"] != "free"
+        ok = part & below
+        return np.where(ok, above / np.where(ok, al, 1.0), 0.0)
 
     def step(self, dt):
         """Symmetric split (x-y and y-x averaged, mass-weighted as
@@ -785,11 +824,19 @@ def column_collapse(a, cells_short=20, cell=None, delta_b=COLLAPSE_DELTA_B,
     body = sl_mask.copy()
     if body.any():
         body[np.where(body)[0].max()] = False
+    # for information (WP 3.2s): least-squares line through the surface where
+    # it is between 10 and 90 percent of the final height, as deposit angles
+    # are read from experiments (one number for the whole flank)
+    H_top = hc.max()
+    band = (hc >= 0.1 * H_top) & (hc <= 0.9 * H_top)
+    slope_fit = (np.degrees(np.arctan(-np.polyfit(box.xc[band], hc[band], 1)[0]))
+                 if band.sum() >= 3 else 0.0)
     return dict(a=a, L_i=L_i, H_i=H_i, cell=cell, nx=nx, ny=ny, L_f=L_f, H_f=H_f,
                 runout=(L_f - L_i) / L_i, dm=abs(box.total_mass() - m0) / m0,
                 slope_max=slopes[sl_mask].max() if sl_mask.any() else 0.0,
                 slope2_max=slopes2[sl2_mask].max() if sl2_mask.any() else 0.0,
                 slope_body=slopes[body].max() if body.any() else 0.0,
+                slope_fit=slope_fit,
                 steps=box.nstep, t=box.t, seconds=sec, hc=hc,
                 ke_end=hist[-1][1] / max(ke_peak, 1e-300), box=box,
                 void_stress=box.void_stress())
@@ -879,7 +926,8 @@ def collapse_check(cells_short=10):
               f"{lo_hi[0]} to {lo_hi[1]}); H_f = {r['H_f']:.4f} m against H_i {r['H_i']:.3f} "
               f"m{' (within 1 cell required)' if a < 1.0 else ''}; steepest deposit slope "
               f"{r['slope_max']:.1f} deg (<= 37; over two cells {r['slope2_max']:.1f}, "
-              f"without the toe {r['slope_body']:.1f}); "
+              f"without the toe {r['slope_body']:.1f}, fitted from 10 to 90 % of "
+              f"H_f {r['slope_fit']:.1f}); "
               f"mass change {r['dm']:.0e}: {P(good)}")
 
     print(f"\nColumn collapse checks: {'ALL PASS' if ok else 'FAILED'} "
