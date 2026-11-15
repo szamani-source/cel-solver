@@ -49,12 +49,18 @@ reasons for all of them are in docs/decisions/0021-void-treatment.md.
    a capped face slips (each side keeps its own characteristic velocity).
    Without it the jump term acts as a mesh-independent viscosity in one-cell
    shear bands and slow granular flow depends on E.
-
 9. **Top layers spread sideways (WP 3.2r, decision 0024).** In the x sweep a
    partly filled cell (al >= 0.1) whose al gradient is larger across x than
    along it is a layer parallel to the sweep and is spread (lean 0) instead of
    leaning against its fuller neighbour, so column heights no longer snap to
    whole cells.
+10. **Outlet (WP 3.3p, decision 0026).** ``outlet`` marks rows whose lo end is
+   an outflow face: zero traction, empty ghosts with free-end parities, and
+   the material swept across the face leaves the domain (counted in
+   ``VoidBox.discharged``).
+11. **Low-Mach jump terms (WP 3.3p, decision 0026; off by default).** Both
+   Riemann jump terms z (vR - vL) / 2 are multiplied by min(1, |v| / c), so
+   the numerical viscosity is rho |v| dv rather than rho c dv.
 
 10, 11. **Study knobs, off (WP 3.2s, decision 0025).** ``FLOOR``: supported
    partly filled cells are returned to the yield surface with their
@@ -205,11 +211,19 @@ def shear_cap(fn, ft, seff, zs, vt_star, snt_star, Gf, params):
 # ----------------------------------------------------------------------------
 
 def void_sweep(f, h0, dt, mat, ends, model, params, grav=0.0, mu=0.0,
-               rotation="jaumann", no_tension=True, axis=0):
+               rotation="jaumann", no_tension=True, axis=0, outlet=None, low_mach=False):
     """silo2d.silo_sweep with a material volume fraction f["al"] (rules 1 to 5
     in the module docstring). Returns (new state, eps_p_eq made, boundary
-    record)."""
+    record).
+
+    outlet: optional bool array per row (WP 3.3p, rule 10): those rows' lo end
+    is an outflow face instead of the lo wall: zero traction, empty ghosts,
+    and material swept across it leaves the domain. The mass that left (per
+    unit face area) is returned in the record as rec["out"].
+    low_mach: rule 11 (WP 3.3p), the Riemann jump terms scaled by the face
+    Mach number."""
     M, G, rho0 = mat
+    c_mat = math.sqrt(M / rho0)
     rows, n = f["rho"].shape
     lo, hi = ends
     rho, al = f["rho"], f["al"]
@@ -228,7 +242,11 @@ def void_sweep(f, h0, dt, mat, ends, model, params, grav=0.0, mu=0.0,
     seff = f["s"] * al[..., None]
     Gf, Gc = weight_profile(rho, h0, grav)
 
+    if outlet is not None and not outlet.any():
+        outlet = None
     alp = pad_alpha(al, lo, hi)
+    if outlet is not None:
+        alp[outlet, :NG] = 0.0                       # beyond an outlet: empty
     lean = lean_of(alp, n)
     if SLAB2D and axis == 0:
         # rule 9 (decision 0024): in the x sweep a partly filled cell whose
@@ -254,6 +272,16 @@ def void_sweep(f, h0, dt, mat, ends, model, params, grav=0.0, mu=0.0,
     vn = pad_ends(f["vn"], pvn_lo, pvn_hi)
     snt = pad_ends(seff[..., 3], pst_lo, pst_hi)
     vt = pad_ends(f["vt"], pvt_lo, pvt_hi)
+    if outlet is not None:
+        # outlet rows: ghosts of a free end (rule 10)
+        o_rows = outlet[:, None]
+        fsn, fvn = parity("free", "n")
+        fst, fvt = parity("free", "t")
+        for arr, q, par, c in ((snn, seff[..., 0] - Gc, fsn, -Gf[:, 0]),
+                               (vn, f["vn"], fvn, 0.0), (snt, seff[..., 3], fst, 0.0),
+                               (vt, f["vt"], fvt, 0.0)):
+            g = pad_ends(q, par, 1, c)
+            arr[:, :NG] = np.where(o_rows, g[:, :NG], arr[:, :NG])
     zp = mirror(zeff)
     zs = mirror(zseff)
     mp = mirror(m)
@@ -283,6 +311,13 @@ def void_sweep(f, h0, dt, mat, ends, model, params, grav=0.0, mu=0.0,
         v_star = (zL * vL + zR * vR + DISS * (sR - sL)) / zsum
         s_base = (zR * sL + zL * sR) / zsum
         s_jump = DISS * zL * zR * (vR - vL) / zsum
+        if low_mach:
+            # rule 11 (WP 3.3p, decision 0026): jump term scaled by the face
+            # Mach number of the material speed, so its stress is of order
+            # rho |v| dv instead of rho c dv (Thornber et al. 2008)
+            ma = np.maximum(np.abs(vL), np.abs(vR)) / c_mat
+            floor = 0.0 if low_mach is True else float(low_mach)
+            s_jump = s_jump * np.clip(ma, floor, 1.0)
         return v_star, s_base + s_jump, (sL, vL, sR, vR, s_base, s_jump)
 
     ds_n, dv_n = characteristic(snn, vn, zp)
@@ -351,12 +386,20 @@ def void_sweep(f, h0, dt, mat, ends, model, params, grav=0.0, mu=0.0,
         zI = np.where(pres, zeff[:, cell], 1.0)
         zIs = np.where(pres, zseff[:, cell], 1.0)
         s_b, v_b = boundary_face(kind, sgn, fn[o][:, k], fn[o + 1][:, k], zI, Gf[:, j])
+        o_here = outlet is not None and side == "lo"
+        if o_here:
+            s_o, v_o = boundary_face("free", sgn, fn[o][:, k], fn[o + 1][:, k], zI, Gf[:, j])
+            s_b, v_b = np.where(outlet, s_o, s_b), np.where(outlet, v_o, v_b)
         s_b = np.where(pres, s_b, -Gf[:, j])
         v_b = np.where(pres, v_b, 0.0)
         snn_star[:, j], vn_star[:, j] = s_b, v_b
         normal = s_b + Gf[:, j]
         t_b, w_b = boundary_face(kind, sgn, ft[o][:, k], ft[o + 1][:, k], zIs,
                                  None, normal=normal, mu=mu)
+        if o_here:
+            t_o, w_o = boundary_face("free", sgn, ft[o][:, k], ft[o + 1][:, k], zIs,
+                                     None, normal=normal, mu=mu)
+            t_b, w_b = np.where(outlet, t_o, t_b), np.where(outlet, w_o, w_b)
         t_b = np.where(pres, t_b, 0.0)
         w_b = np.where(pres, w_b, 0.0)
         snt_star[:, j], vt_star[:, j] = t_b, w_b
@@ -420,6 +463,9 @@ def void_sweep(f, h0, dt, mat, ends, model, params, grav=0.0, mu=0.0,
     vf = np.zeros((rows, n + 1))
     dI = d[:, 1:-1]
     vf[:, 1:-1] = np.where(dI > 0.0, outR[:, :-1], -outL[:, 1:])
+    if outlet is not None:
+        # rule 10: material swept across an outlet face leaves the domain
+        vf[:, 0] = np.where(outlet & (d[:, 0] < 0.0), -outL[:, 0], 0.0)
     # round-off face motion (for example 1e-19 m from a 1e-17 m/s velocity)
     # must not seed dust in empty cells: no flux below 1e-9 of a cell
     vf = np.where(np.abs(vf) > 1e-9 * h0, vf, 0.0)
@@ -433,9 +479,14 @@ def void_sweep(f, h0, dt, mat, ends, model, params, grav=0.0, mu=0.0,
     donor_smooth[:, 1:-1] = np.where(dI > 0.0, ms[:, :-1], ms[:, 1:])
     rho_donor = np.zeros((rows, n + 1))
     rho_donor[:, 1:-1] = np.where(dI > 0.0, rhoL[:, :-1], rhoL[:, 1:])
+    rho_donor[:, 0] = rhoL[:, 0]
     mf = vf * np.where(donor_smooth, rho_muscl, rho_donor)
-    mf[:, 0] = 0.0
+    if outlet is None:
+        mf[:, 0] = 0.0
+    else:
+        mf[:, 0] = np.where(outlet, mf[:, 0], 0.0)
     mf[:, -1] = 0.0
+    rec["out"] = -mf[:, 0]
 
     dmf = mf[:, :-1] - mf[:, 1:]
     m_new = m + dmf
@@ -501,6 +552,10 @@ class VoidBox(sd.SiloBox):
         # no tensile strength: cohesionless, or a tension cut-off at zero
         p = self.params
         self.no_tension = p.get("c", None) == 0.0 or p.get("sigma_t", None) == 0.0
+        self.low_mach = False     # rule 11 (decision 0026)
+        self.outlet = None        # bool per column: bottom face is an outflow (rule 10)
+        self.discharged = 0.0     # mass that left through the outlet (kg per m depth)
+        self._out = []
 
     def fill(self, inside, K0=None):
         """Material where inside(X, Y, h) gives the filled fraction per cell
@@ -531,7 +586,7 @@ class VoidBox(sd.SiloBox):
             g, made, rec = void_sweep(fl, self.dx, dt, mat,
                                       (self.walls["left"], self.walls["right"]),
                                       self.model, self.params, 0.0, self.mu, self.rotation,
-                                      self.no_tension, axis=0)
+                                      self.no_tension, axis=0, low_mach=self.low_mach)
             self._rec.append(("left", rec["lo"]))
             self._rec.append(("right", rec["hi"]))
             return {"rho": g["rho"], "al": g["al"], "vx": g["vn"], "vy": g["vt"],
@@ -546,7 +601,9 @@ class VoidBox(sd.SiloBox):
         g, made, rec = void_sweep(fl, self.dy, dt, mat,
                                   (self.walls["bottom"], self.walls["top"]),
                                   self.model, self.params, self._g_now, self.mu,
-                                  self.rotation, self.no_tension, axis=1)
+                                  self.rotation, self.no_tension, axis=1, outlet=self.outlet,
+                                  low_mach=self.low_mach)
+        self._out.append(rec["out"].sum() * self.dx)
         self._rec.append(("bottom", rec["lo"]))
         self._rec.append(("top", rec["hi"]))
         return {"rho": tr(g["rho"]), "al": tr(g["al"]), "vx": tr(g["vt"]),
@@ -576,6 +633,7 @@ class VoidBox(sd.SiloBox):
         boundary record as SiloBox.step."""
         self._g_now = self.g_at(self.t + 0.5 * dt)
         self._rec = []
+        self._out = []
         st = self.state()
         a, ma = self.sweep(st, dt, 0)
         a, mb = self.sweep(a, dt, 1)
@@ -593,6 +651,7 @@ class VoidBox(sd.SiloBox):
             new[k] = (wa * a[k] + wb * b[k]) / t2
         self.set_state(new)
         self.plastic_made += 0.5 * (ma + mb + mc + md)
+        self.discharged += 0.5 * sum(self._out)    # the two orderings are averaged
         self.t += dt
         self.nstep += 1
         if self.damping > 0.0:

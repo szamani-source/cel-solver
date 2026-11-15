@@ -31,7 +31,8 @@ Constitutive models for bulk solids are tracked in `docs/constitutive-models.md`
 | 3.2q | Prototype column collapse (split from 3.2p, decision 0021) | Column collapse run-out, top and deposit slope within decision 0019 |
 | 3.2r | Prototype column collapse deposit slope (split from 3.2q, decision 0023) | Deposit body without whole-cell steps (done, decision 0024); toe split to 3.2s |
 | 3.2s | Prototype collapse toe: stress in partly filled cells (split from 3.2r, decision 0024) | Same test as 3.2q: run-out, top and deposit slope within decision 0019 (slope as a fitted line, decision 0025; done) |
-| 3.3p | Prototype silo discharge (target T0) | Steady rate, D^1.5 law, rate independent of head |
+| 3.3p | Prototype silo discharge (target T0) | Outlet opens, no leak before, mass balance exact, rate independent of head (rate law split to 3.3q, decision 0026) |
+| 3.3q | Prototype silo discharge rate (split from 3.3p, decision 0026) | Steady rate, D^1.5 law with C 1.0 to 1.9, independent of E and mesh |
 | 3.1 | C++ gravity and wall boundaries (smooth, frictional) | celFoam settles a tank, matches the prototype |
 | 3.2 | C++ void and free surface | celFoam passes the 3.2p checks |
 | 3.3 | C++ outlet boundary that opens | Material leaves only after the opening time, mass balance exact |
@@ -73,6 +74,8 @@ decision 0021). 3.2q fixed the run-out (face shear cap, decision 0023); the depo
 slope is split to 3.2r (2026-11-14). 3.2r removed the whole-cell staircase (decision
 0024); the toe, which needs partly filled cells to carry stress, is split to 3.2s
 (2026-11-14).
+3.3p ran T0 end to end with an outlet; its rate is set by the Riemann solver's
+dissipation, so the rate law is split to 3.3q (2026-11-15, decision 0026).
 Phases 4 to 6 (Lagrangian bodies, contact, FE, parallel scaling) are unchanged but come
 after T0. 2.6 (Taylor bar) waits for Phase 5.
 
