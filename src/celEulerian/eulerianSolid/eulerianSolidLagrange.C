@@ -610,17 +610,22 @@ inline void wallFace
 
 //- Copy the owner-side coupled face values to the other side:
 //  vStar as is, F and phi negated. Cyclic locally, processor by message.
+//  With the shear cap (dO, dN not null): the slip velocities seen by the
+//  owner and the neighbour cell swap sides.
 void syncCoupled
 (
     const fvMesh& mesh,
     surfaceVectorField& vS,
     surfaceVectorField& F,
-    surfaceScalarField& phi
+    surfaceScalarField& phi,
+    surfaceVectorField* dO = nullptr,
+    surfaceVectorField* dN = nullptr
 )
 {
     auto& bv = vS.boundaryFieldRef();
     auto& bF = F.boundaryFieldRef();
     auto& bp = phi.boundaryFieldRef();
+    const bool slip = dO && dN;
 
     forAll(mesh.boundary(), patchi)
     {
@@ -637,6 +642,13 @@ void syncCoupled
                 bv[patchi] = v;
                 bF[patchi] = f;
                 bp[patchi] = ph;
+                if (slip)
+                {
+                    const vectorField so(dN->boundaryField()[nbr]);
+                    const vectorField sn(dO->boundaryField()[nbr]);
+                    dO->boundaryFieldRef()[patchi] = so;
+                    dN->boundaryFieldRef()[patchi] = sn;
+                }
             }
         }
     }
@@ -696,6 +708,11 @@ void syncCoupled
                         << vectorField(bv[patchi])
                         << vectorField(bF[patchi])
                         << scalarField(bp[patchi]);
+                    if (slip)
+                    {
+                        os  << vectorField(dO->boundaryField()[patchi])
+                            << vectorField(dN->boundaryField()[patchi]);
+                    }
                 }
             }
         }
@@ -709,14 +726,22 @@ void syncCoupled
         label n;
         is >> n;
 
-        std::map<label, std::tuple<vectorField, vectorField, scalarField>> got;
+        std::map
+        <
+            label,
+            std::tuple<vectorField, vectorField, scalarField, vectorField, vectorField>
+        > got;
         for (label k = 0; k < n; ++k)
         {
             label tag;
-            vectorField v, f;
+            vectorField v, f, so, sn;
             scalarField ph;
             is >> tag >> v >> f >> ph;
-            got[tag] = std::make_tuple(v, f, ph);
+            if (slip)
+            {
+                is >> so >> sn;
+            }
+            got[tag] = std::make_tuple(v, f, ph, so, sn);
         }
 
         forAll(mesh.boundary(), patchi)
@@ -745,6 +770,12 @@ void syncCoupled
             bv[patchi] = std::get<0>(iter->second);
             bF[patchi] = f;
             bp[patchi] = ph;
+            if (slip)
+            {
+                // the sender's owner cell is this side's neighbour
+                dO->boundaryFieldRef()[patchi] = std::get<4>(iter->second);
+                dN->boundaryFieldRef()[patchi] = std::get<3>(iter->second);
+            }
         }
     }
 }
@@ -779,13 +810,18 @@ inline direction faceAxis(const vector& S)
 //  neighbours along each axis; walls, symmetry planes and prescribed
 //  velocity patches mirror the cell, traction-free patches count as empty.
 //  alpha must have its coupled patches evaluated.
+//  Rule 9 (decision 0024, C++ in decision 0032) when gAxis >= 0 (the axis
+//  of gravity): a partly filled cell with alpha >= 0.1 is spread (lean 0)
+//  along each other axis d where its Youngs (1-2-1) alpha gradient is
+//  larger along gAxis than along d.
 void slabSides
 (
     const fvMesh& mesh,
     const volScalarField& alpha,
     const UList<boundaryKind>& kinds,
     vectorField& lean,
-    scalarField& smooth
+    scalarField& smooth,
+    const label gAxis = -1
 )
 {
     const labelUList& own = mesh.owner();
@@ -861,6 +897,78 @@ void slabSides
             )
           ? 1 : 0;
     }
+
+    if (gAxis < 0)
+    {
+        return;
+    }
+
+    // Rule 9: centred alpha differences D per axis (aPlus - aMinus), then
+    // the 1-2-1 sum of D_d over the neighbours along e (e != d); the
+    // neighbour beyond a non-coupled boundary is the cell itself (copy)
+    tmp<volVectorField> tD = workField<vector>(mesh, "alphaDif", dimless);
+    volVectorField& D = tD.ref();
+    D.primitiveFieldRef() = aPlus - aMinus;
+    D.correctBoundaryConditions();
+    const vectorField& Dc = D.primitiveField();
+
+    // Neighbour D along each axis and side: index 2 e + (0 for +, 1 for -)
+    List<FixedList<vector, 6>> Dn(mesh.nCells());
+    forAll(Dn, celli)
+    {
+        Dn[celli] = Dc[celli];
+    }
+    auto setN = [&](const label c, const vector& Sout, const vector& Db)
+    {
+        const direction e = faceAxis(Sout);
+        Dn[c][2*e + (Sout[e] > 0 ? 0 : 1)] = Db;
+    };
+    forAll(own, facei)
+    {
+        setN(own[facei], Sf[facei], Dc[nei[facei]]);
+        setN(nei[facei], -Sf[facei], Dc[own[facei]]);
+    }
+    forAll(mesh.boundary(), patchi)
+    {
+        if (kinds[patchi] != boundaryKind::coupled)
+        {
+            continue;
+        }
+        const fvPatch& p = mesh.boundary()[patchi];
+        const labelUList& fc = p.faceCells();
+        const vectorField& pS = p.Sf();
+        const vectorField dn(D.boundaryField()[patchi].patchNeighbourField());
+        forAll(fc, i)
+        {
+            setN(fc[i], pS[i], dn[i]);
+        }
+    }
+
+    const direction g = direction(gAxis);
+    const Vector<label>& geomD = mesh.geometricD();
+    forAll(a, celli)
+    {
+        if (a[celli] < 0.1 || a[celli] >= alphaFull)
+        {
+            continue;
+        }
+        for (direction d = 0; d < vector::nComponents; ++d)
+        {
+            if (d == g || geomD[d] < 0 || lean[celli][d] == 0)
+            {
+                continue;
+            }
+            // gradient along d, smoothed along g; along g, smoothed along d
+            const scalar Gd =
+                2*Dc[celli][d] + Dn[celli][2*g][d] + Dn[celli][2*g + 1][d];
+            const scalar Gg =
+                2*Dc[celli][g] + Dn[celli][2*d][g] + Dn[celli][2*d + 1][g];
+            if (mag(Gg) > mag(Gd))
+            {
+                lean[celli][d] = 0;
+            }
+        }
+    }
 }
 
 
@@ -904,7 +1012,8 @@ inline vector oneSided
 //  tensile strength and the solution pulls; every other face is
 //  traction-free with the one-sided velocity of the side that touches it
 //  (owner first), else of the side(s) holding material, else zero.
-inline void voidFace
+//  Returns true for a contact face (Riemann solution kept).
+inline bool voidFace
 (
     const vector& n,
     const vector& vL, const symmTensor& sL, const scalar zpL, const scalar zsL,
@@ -921,7 +1030,7 @@ inline void voidFace
         riemann(n, vL, sL, zpL, zsL, vR, sR, zpR, zsR, vS, tS);
         if (!noTension || (tS & n) <= 0)
         {
-            return;
+            return true;
         }
     }
     tS = Zero;
@@ -954,6 +1063,94 @@ inline void voidFace
     {
         vS = Zero;
     }
+    return false;
+}
+
+
+//- Mohr-Coulomb yield function (s1 - s3)/2 + (s1 + s3)/2 sin(phi)
+//  - c cos(phi) of a stress (tension positive)
+inline scalar mcYield(const symmTensor& s, const scalar sinPhi, const scalar cCos)
+{
+    const vector ev(eigenValues(s));
+    const scalar s1 = cmptMax(ev);
+    const scalar s3 = cmptMin(ev);
+    return 0.5*(s1 - s3) + 0.5*(s1 + s3)*sinPhi - cCos;
+}
+
+
+//- Rule 8 (decision 0023; C++ decision 0032): shear cap at a contact face
+//  with unit normal n (L to R). The face stress is the mean of the two
+//  cells' stresses sMean with its n row replaced by the Riemann traction
+//  tS. The shear jump term zsL zsR (vtR - vtL)/(zsL + zsR) is scaled back
+//  (20 bisection steps) until the yield function is no larger than
+//  without it (or zero). A capped face slips: L sees vtL + (tt - ttL)/zsL,
+//  R sees vtR - (tt - ttR)/zsR. Returns true if capped, with tS changed
+//  and the tangential velocities dL, dR that L and R see, relative to vS.
+inline bool capShear
+(
+    const vector& n,
+    const vector& vL, const symmTensor& sL, const scalar zsL,
+    const vector& vR, const symmTensor& sR, const scalar zsR,
+    const symmTensor& sMean,
+    const scalar sinPhi, const scalar cCos,
+    const vector& vS,
+    vector& tS,
+    vector& dL,
+    vector& dR
+)
+{
+    if (zsL <= 0 || zsR <= 0)
+    {
+        return false;
+    }
+    const vector tL(sL & n);
+    const vector tR(sR & n);
+    const vector ttL(tL - (tL & n)*n);
+    const vector ttR(tR - (tR & n)*n);
+    const vector vtL(vL - (vL & n)*n);
+    const vector vtR(vR - (vR & n)*n);
+    const scalar zs = zsL + zsR;
+    const vector tb((zsR*ttL + zsL*ttR)/zs);
+    const vector tj(zsL*zsR*(vtR - vtL)/zs);
+    const scalar tn = tS & n;
+
+    // face stress: tangential block of sMean, n row from the traction
+    const tensor P(I - sqr(n));
+    const tensor A(P & tensor(sMean) & P);
+    auto faceYield = [&](const vector& tt)
+    {
+        return mcYield
+        (
+            symm(A + tn*sqr(n) + (n*tt) + (tt*n)),
+            sinPhi,
+            cCos
+        );
+    };
+
+    const scalar lim = max(faceYield(tb), scalar(0));
+    if (faceYield(tb + tj) <= lim)
+    {
+        return false;
+    }
+    scalar lo = 0, hi = 1;
+    for (label k = 0; k < 20; ++k)
+    {
+        const scalar mid = 0.5*(lo + hi);
+        if (faceYield(tb + mid*tj) <= lim)
+        {
+            lo = mid;
+        }
+        else
+        {
+            hi = mid;
+        }
+    }
+    const vector tt(tb + lo*tj);
+    tS = tn*n + tt;
+    const vector vtS(vS - (vS & n)*n);
+    dL = vtL + (tt - ttL)/zsL - vtS;
+    dR = vtR - (tt - ttR)/zsR - vtS;
+    return true;
 }
 
 } // End namespace lagrangeStepDetail
@@ -1029,7 +1226,12 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
             }
         }
 
-        slabSides(mesh, alpha_, kinds, lean_, smooth_);
+        label gAxis = -1;
+        if (spreadLayers_ && mag(g_) > 0)
+        {
+            gAxis = label(faceAxis(g_));
+        }
+        slabSides(mesh, alpha_, kinds, lean_, smooth_, gAxis);
 
         tsmooth = workField<scalar>(mesh, "smooth", dimless);
         tsmooth.ref().primitiveFieldRef() = smooth_;
@@ -1268,6 +1470,24 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
     );
     surfaceVectorField& vS = tvS.ref();
     surfaceVectorField& F = tF.ref();
+    nCapped_ = 0;
+
+    // Shear cap (rule 8): tangential velocity seen by the owner and the
+    // neighbour cell of a capped face, relative to vStar (zero elsewhere)
+    tmp<surfaceVectorField> tdO, tdN;
+    if (shearCap_)
+    {
+        tdO = surfaceVectorField::New
+        (
+            "slipO", IOobject::NO_REGISTER, mesh,
+            dimensionedVector(dimVelocity, Zero)
+        );
+        tdN = surfaceVectorField::New
+        (
+            "slipN", IOobject::NO_REGISTER, mesh,
+            dimensionedVector(dimVelocity, Zero)
+        );
+    }
 
     forAll(own, facei)
     {
@@ -1275,10 +1495,11 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
         const label N = nei[facei];
         const vector n(Sf[facei]/magSf[facei]);
         vector t;
+        bool contact = true;
         if (fs)
         {
             const scalar aP = alpha_[P], aN = alpha_[N];
-            voidFace
+            contact = voidFace
             (
                 n,
                 UO()[facei], sO()[facei], zp[P], zs[P], aP > alphaEmpty,
@@ -1296,6 +1517,18 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                 UO()[facei], sO()[facei], zp[P], zs[P],
                 UN()[facei], sN()[facei], zp[N], zs[N],
                 vS[facei], t
+            );
+        }
+        if (shearCap_ && contact && solveMomentum_)
+        {
+            nCapped_ += capShear
+            (
+                n,
+                UO()[facei], sO()[facei], zs[P],
+                UN()[facei], sN()[facei], zs[N],
+                0.5*(sref[P] + sref[N]),
+                capSinPhi_, capCCos_, vS[facei], t,
+                tdO.ref()[facei], tdN.ref()[facei]
             );
         }
         if (!solveMomentum_)
@@ -1342,15 +1575,21 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
             const symmTensorField& psn = sN().boundaryField()[patchi];
             const scalarField zpn(zp.boundaryField()[patchi].patchNeighbourField());
             const scalarField zsn(zs.boundaryField()[patchi].patchNeighbourField());
+            symmTensorField srn;
+            if (shearCap_)
+            {
+                srn = sref.boundaryField()[patchi].patchNeighbourField();
+            }
             forAll(fc, i)
             {
                 const vector n(pS[i]/pmS[i]);
                 vector t;
+                bool contact = true;
                 if (fs)
                 {
                     const scalar aP = alpha_[fc[i]];
                     const scalar aN = aNbr[patchi][i];
-                    voidFace
+                    contact = voidFace
                     (
                         n,
                         puo[i], pso[i], zp[fc[i]], zs[fc[i]], aP > alphaEmpty,
@@ -1368,6 +1607,19 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                         puo[i], pso[i], zp[fc[i]], zs[fc[i]],
                         pun[i], psn[i], zpn[i], zsn[i],
                         pvS[i], t
+                    );
+                }
+                if (shearCap_ && contact && solveMomentum_)
+                {
+                    nCapped_ += capShear
+                    (
+                        n,
+                        puo[i], pso[i], zs[fc[i]],
+                        pun[i], psn[i], zsn[i],
+                        0.5*(sref[fc[i]] + srn[i]),
+                        capSinPhi_, capCCos_, pvS[i], t,
+                        tdO.ref().boundaryFieldRef()[patchi][i],
+                        tdN.ref().boundaryFieldRef()[patchi][i]
                     );
                 }
                 if (!solveMomentum_)
@@ -1433,7 +1685,14 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
         }
     }
 
-    syncCoupled(mesh, vS, F, phiL_);
+    if (shearCap_)
+    {
+        syncCoupled(mesh, vS, F, phiL_, &tdO.ref(), &tdN.ref());
+    }
+    else
+    {
+        syncCoupled(mesh, vS, F, phiL_);
+    }
     vStar_ = vS;
     Fstar_ = F;
 
@@ -1472,9 +1731,18 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
         const label N = nei[facei];
         force[P] += F[facei];
         force[N] -= F[facei];
-        const tensor t(Sf[facei]*vS[facei]);
-        T[P] += t;
-        T[N] -= t;
+        if (shearCap_)
+        {
+            // a capped face slips: each side sees its own velocity
+            T[P] += Sf[facei]*(vS[facei] + tdO()[facei]);
+            T[N] -= Sf[facei]*(vS[facei] + tdN()[facei]);
+        }
+        else
+        {
+            const tensor t(Sf[facei]*vS[facei]);
+            T[P] += t;
+            T[N] -= t;
+        }
         dV[P] += phiL_[facei];
         dV[N] -= phiL_[facei];
     }
@@ -1491,6 +1759,14 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
             force[fc[i]] += pF[i];
             T[fc[i]] += pS[i]*pvS[i];
             dV[fc[i]] += pphi[i];
+        }
+        if (shearCap_)
+        {
+            const vectorField& pdO = tdO().boundaryField()[patchi];
+            forAll(fc, i)
+            {
+                T[fc[i]] += pS[i]*pdO[i];
+            }
         }
     }
 

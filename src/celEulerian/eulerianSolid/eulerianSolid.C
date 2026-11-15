@@ -3,6 +3,7 @@
 \*---------------------------------------------------------------------------*/
 
 #include "eulerianSolid.H"
+#include "unitConversion.H"
 #include "surfaceFields.H"
 #include "zeroGradientFvPatchFields.H"
 #include "uniformDimensionedFields.H"
@@ -200,8 +201,42 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
             materialProperties_.found("sigmaT")
          && materialProperties_.get<scalar>("sigmaT") == 0
         )
-    )
+    ),
+    shearCap_(materialProperties_.getOrDefault<Switch>("shearCap", false)),
+    capSinPhi_
+    (
+        shearCap_
+      ? Foam::sin(degToRad(materialProperties_.get<scalar>("phi")))
+      : 0
+    ),
+    capCCos_
+    (
+        shearCap_
+      ? materialProperties_.getOrDefault<scalar>("c", 0)
+       *Foam::cos(degToRad(materialProperties_.get<scalar>("phi")))
+      : 0
+    ),
+    spreadLayers_
+    (
+        materialProperties_.getOrDefault<Switch>("spreadLayers", false)
+    ),
+    nCapped_(0)
 {
+    if (spreadLayers_ && !freeSurface_)
+    {
+        FatalIOErrorInFunction(materialProperties_)
+            << "spreadLayers needs freeSurface yes" << exit(FatalIOError);
+    }
+    if (shearCap_)
+    {
+        Info<< "Shear cap at Mohr-Coulomb yield (rule 8): sin(phi) "
+            << capSinPhi_ << ", c cos(phi) " << capCCos_ << " Pa" << nl;
+    }
+    if (spreadLayers_)
+    {
+        Info<< "Top layers spread sideways (rule 9)" << nl;
+    }
+
     if (maxCo_ <= 0)
     {
         FatalIOErrorInFunction(mesh.time().controlDict())

@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-11-15 (WP 3.2a)
+Last updated: 2026-11-15 (WP 3.2b)
 
 Plan doc: https://claude.ai/artifact/DTT6kSikz9ZUTBkUxY6Grr
 
@@ -41,6 +41,7 @@ Phase 2 (the C++ Eulerian solver: 2.1 to 2.5c and 2.4b done; 2.6 waits for Phase
 | 3.2t | One rule set for collapse and discharge (split from 3.3r) | Closed, done-when not met | Decision 0029: no rule set found in the split prototype. Rule 13 makes stress-free porosity diffuse through the collapsing bulk (cured by keeping isochoric stretch in the material, which slows the discharge, 76 against 87 kg/s/m at 1 MPa). Rule 12 turns the column hydrostatic; capped only at yield the 1 MPa collapse is fine (0.35) but the 10 MPa column never stops (time-step dependent) and the discharge falls to 48 to 52 kg/s/m. Nine more variants tabled. The 0028 E independence leans on capping faces of still-elastic cells. Defaults unchanged, knobs kept off. Stiffness margin not improved |
 | 3.1 | C++ gravity and wall boundaries (smooth, frictional) | Done | Decision 0030. `tests/test_silo_settle.sh` passes (57 s): lake at rest 3e-17 m/s; smooth column 0.12 % from rho g H, K0 exact; frictional tank (0.4 x 1.2 m, 10 mm) Janssen within 1.7 % with K 0.424 at the walls (prototype 0.425), wall ratio 0.4 % where it slips, force balance 0.05 %; 2 processors match serial to 7e-18. Gravity by hydrostatic reconstruction per face; walls named in `materialProperties` `walls`; the Hancock predictor uses the wall Riemann solution (without it a one-cell shear layer formed at frictional walls). First step of the C++ rule 12/13 question (decision 0029): needs 3.2 and 3.3 before collapse and discharge run on one code |
 | 3.2a | C++ void and free surface (split from 3.2) | Done | Decision 0031: `freeSurface yes` and field `alpha` in eulerianSolid; prototype rules 1 to 7 face by face on Cartesian hex meshes (slab side per axis, no isoAdvector). `tests/test_void.sh` passes in 17 s: lake at rest 2.5e-17 m/s, block translating 50 cells with exact edges, free fall at g, cohesionless block cracks with void 2.000 = 2 v t, 2 processors match serial to 2e-15. Old code paths unchanged bit for bit. Shear cap and collapse are 3.2b |
+| 3.2b | C++ column collapse: shear cap and rule 9 | Done (recorded; creep and E dependence remain) | Decision 0032: `shearCap yes` (rule 8, face by face, capped faces slip) and `spreadLayers yes` (rule 9) in materialProperties, both default off. `tests/test_collapse.sh` passes (about 2.5 min, 10 mm): a = 0.5 run-out 0.55 / 0.35 / 0.20 at E = 0.1 / 1 / 10 MPa (prototype 0.55 / 0.40 / 0.25), top kept, fitted slope 17 to 24 deg; a = 2 at 1 MPa 1.40 (prototype 1.8), stops at 1.5 s. The a = 0.5 columns still creep at 2 s (as the prototype at 10 cells). 10 MPa run-out below the 0019 band (normal jump term uncapped, the rule 12 question for WP 3.4). Without the cap 0.25 at 1 MPa. 2 processors match serial to 8e-13 at 0.1 s; later round-off flips cap/rule 9 switches and the runs part |
 
 ## Standing instruction from Sia (2026-11-14)
 
@@ -83,9 +84,10 @@ Silo track (decision 0016), one thread each:
    also slows the discharge.
 8. WP 3.1: C++ gravity and walls. Done (decision 0030).
 9. WP 3.2a: C++ void and free surface. Done (decision 0031).
-10. Next: WP 3.2b, the C++ column collapse: face shear cap (decision 0023, rule 8) and
-   rule 9 (decision 0024) on top of 3.2a, neither rule 12 nor 13; run-outs at E = 0.1,
-   1, 10 MPa recorded against decision 0019. Then WP 3.3 (outlet, copy rule 10b) and
+10. WP 3.2b: C++ column collapse. Done (decision 0032): shear cap and rule 9 behind
+   `shearCap` / `spreadLayers`; run-outs 0.55 / 0.35 / 0.20 at 0.1 / 1 / 10 MPa, close to
+   the prototype.
+11. Next: WP 3.3 (outlet, copy rule 10b; turn on `shearCap` and `spreadLayers`) and
    WP 3.4 (discharge), whose test measures the rate at E = 0.1, 1, 10 MPa with the same
    code that runs the collapse. A cap (rule 12) or void spreading (rule 13) is added
    only if the rate depends on E, with the collapse as its check (decision 0029). Keep

@@ -167,6 +167,27 @@ class eulerianSolid
         //- Material without tensile strength (c 0 or sigmaT 0): separates
         bool noTension_;
 
+        //- Rule 8 (decision 0023; C++ WP 3.2b, decision 0032):
+        //  materialProperties shearCap yes; at contact faces the shear jump
+        //  term of the Riemann solution is scaled back so the face stress
+        //  stays inside the Mohr-Coulomb surface (phi, c of the material);
+        //  a capped face slips (each side sees its own tangential velocity)
+        Switch shearCap_;
+
+        //- sin(phi) and c cos(phi) of the shear cap
+        scalar capSinPhi_;
+        scalar capCCos_;
+
+        //- Rule 9 (decision 0024; decision 0032): materialProperties
+        //  spreadLayers yes (freeSurface only); a partly filled cell
+        //  (alpha >= 0.1) whose alpha gradient points more along gravity
+        //  than along a horizontal axis is spread along that axis
+        Switch spreadLayers_;
+
+        //- Number of faces capped by rule 8 in the last Lagrange step
+        //  (this processor, owner side of coupled faces)
+        label nCapped_;
+
         //- Cell lengths along x, y, z (Cartesian hex cells, freeSurface)
         vectorField hCell_;
 
@@ -232,6 +253,9 @@ public:
         const volScalarField& alpha() const { return alpha_; }
         scalar rho0() const { return rho0_; }
         bool noTension() const { return noTension_; }
+        bool shearCap() const { return shearCap_; }
+        bool spreadLayers() const { return spreadLayers_; }
+        label nCapped() const { return nCapped_; }
 
         //- Gravity at time t, with the ramp
         vector gravityAt(const scalar t) const;
