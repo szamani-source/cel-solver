@@ -72,3 +72,7 @@ within 10 percent, and 5 mm against 2.5 mm within 10 percent.
   of the bed's first elastic mode, 0.28 s); 0.1 s still read 1.5 percent at 5 mm.
 - Outlet test (CI) gained a guard C >= 0.8 at D = 0.06 m. Passes (185 s).
 - mu(I) not built: not needed to reach the band.
+- 2.5 mm, D = 0.06 m, rate 0.2 to 0.5 s: 93.3 kg/s/m against 81.5 at 5 mm (14 percent;
+  done-when asks 10). Carried to WP 3.3r with the stiffness dependence.
+- Done-when status: rate test passes at 5 mm and is in CI; E and 2.5 mm bands not met,
+  split to WP 3.3r. Next: WP 3.3r.

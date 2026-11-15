@@ -90,6 +90,9 @@ about flow, so it now uses velocities averaged over a further 0.3 s of discharge
   percent and left it as noisy. The E dependence is also not a coarse-mesh dissipation
   of order rho c h: at E = 1 MPa the rate falls with refinement (73 kg/s/m at 10 mm,
   61 at 5 mm) while at 0.1 MPa it does not move (81, 82). Cause unknown.
+- Fine mesh: D = 0.06 m, rate over 0.2 to 0.5 s after opening: 81.5 kg/s/m at 5 mm,
+  93.3 at 2.5 mm (14 percent, C 0.98 against 1.13; 10 against 5 mm agreed to 1
+  percent). The done-when's 10 percent between 5 and 2.5 mm is not met; C stays in band.
 - mu(I) was not needed to reach the band and was not built.
 
 ## Consequences

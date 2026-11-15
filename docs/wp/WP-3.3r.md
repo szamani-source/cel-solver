@@ -34,11 +34,15 @@ checked, at the real stiffness.
   `constitutive/batch.py` as an option, and report both.
 - Keep the void, collapse, settle, discharge and rate tests passing unchanged.
 
+- Also explain the fine-mesh rise at E = 0.1 MPa (D = 0.06 m: 81.4 / 82.2 / 93.3
+  kg/s/m at 10 / 5 / 2.5 mm).
+
 ## Done when
 
 A new `tests/test_proto_silo_stiffness.sh` (10 mm, D = 0.06 m) passes: rate at
 E = 0.1, 1 and 10 MPa within 10 percent of each other, 0.1 s windows within 10 percent,
-averaged corner speed below 1 percent of the outlet speed at each E.
+averaged corner speed below 1 percent of the outlet speed at each E. Reported: 5 against
+2.5 mm at E = 0.1 MPa within 10 percent.
 
 ## Out of scope
 
