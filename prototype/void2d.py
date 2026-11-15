@@ -58,6 +58,13 @@ reasons for all of them are in docs/decisions/0021-void-treatment.md.
    an outflow face: zero traction, empty ghosts with free-end parities, and
    the material swept across the face leaves the domain (counted in
    ``VoidBox.discharged``).
+   10b. (WP 3.3q, decision 0027) An outlet face takes the free one-sided
+   velocity even when the cell's slab leans away from it (void at the bottom
+   of a partly filled outlet cell), so that void passes out first and the
+   slab follows. Before, such a face got the closed-wall velocity 0, the cell
+   was squeezed between it and the material arriving from above, and the
+   outlet row rang between 0 and about 9 kPa: that, not the Riemann
+   dissipation, held the rate at a third of Beverloo.
 11. **Low-Mach jump terms (WP 3.3p, decision 0026; off by default).** Both
    Riemann jump terms z (vR - vL) / 2 are multiplied by min(1, |v| / c), so
    the numerical viscosity is rho |v| dv rather than rho c dv.
@@ -95,11 +102,14 @@ from silo2d import mirror, pad_ends, parity, weight_profile, boundary_face  # no
 EPS = 1e-12          # al at or below: empty
 FULL = 1.0 - 1e-12   # al at or above: full
 DISS = 1.0           # study knob: scale of the Riemann jump terms
+DISS_N = 1.0         # study knob (WP 3.3q): scale of the normal jump term only
+DISS_T = 1.0         # study knob (WP 3.3q): scale of the shear jump term only
 VSTICK = 0.0         # rule 11 study knob: faces slipping slower than this stick
 SHEAR_CAP = True     # rule 8 (decision 0023): face shear traction capped at yield
 DUST = 1e-9          # al below which a cell with mass is round-off dust
 SLAB2D = True        # rule 9 (WP 3.2r, decision 0024): layers spread in the x sweep
 SLAB2D_MIN = 0.1     # rule 9: thinner layers keep the 1D slab rule (no thin-film spray)
+OUTLET_VOID = True   # rule 10b (WP 3.3q, decision 0027): void under a slab passes out
 FLOOR = False        # rule 10 (WP 3.2s, decision 0025): overburden pressure floor in the
                      # yield check of supported partly filled cells
 
@@ -295,7 +305,7 @@ def void_sweep(f, h0, dt, mat, ends, model, params, grav=0.0, mu=0.0,
         wl = limiter(gs_l + zc * gv_l, gs_r + zc * gv_r)
         return 0.5 * (wr + wl) * hc * mask, 0.5 * (wl - wr) / zsafe * hc * mask
 
-    def riemann(s, v, z, ds, dv, mod):
+    def riemann(s, v, z, ds, dv, mod, kscale=1.0):
         mc, hc, zc = mp[:, 1:-1], h[:, 1:-1], z[:, 1:-1]
         mcs = np.where(mc > 0.0, mc, 1.0)
         s_p = s[:, 1:-1] + 0.5 * dt * mod * dv / hc
@@ -310,7 +320,7 @@ def void_sweep(f, h0, dt, mat, ends, model, params, grav=0.0, mu=0.0,
         zsum = np.where(zsum > 0.0, zsum, 1.0)
         v_star = (zL * vL + zR * vR + DISS * (sR - sL)) / zsum
         s_base = (zR * sL + zL * sR) / zsum
-        s_jump = DISS * zL * zR * (vR - vL) / zsum
+        s_jump = kscale * DISS * zL * zR * (vR - vL) / zsum
         if low_mach:
             # rule 11 (WP 3.3p, decision 0026): jump term scaled by the face
             # Mach number of the material speed, so its stress is of order
@@ -333,9 +343,9 @@ def void_sweep(f, h0, dt, mat, ends, model, params, grav=0.0, mu=0.0,
         phi = np.where(wp > 0.0, np.clip(1.0 - np.abs(sp) / np.where(wp > 0.0, 0.5 * wp, 1.0),
                                          0.0, 1.0), 0.0)
         ds_n = ds_n + (1.0 - mask) * (-wp * phi)
-    vn_star, snn_star, fn = riemann(snn, vn, zp, ds_n, dv_n, M)
+    vn_star, snn_star, fn = riemann(snn, vn, zp, ds_n, dv_n, M, DISS_N)
     ds_t, dv_t = characteristic(snt, vt, zs)
-    vt_star, snt_star, ft = riemann(snt, vt, zs, ds_t, dv_t, G)
+    vt_star, snt_star, ft = riemann(snt, vt, zs, ds_t, dv_t, G, DISS_T)
     slip = None
     if SHEAR_CAP and "phi" in params:
         vt_star, snt_star, slip = shear_cap(fn, ft, seff, zs, vt_star, snt_star, Gf, params)
@@ -391,7 +401,7 @@ def void_sweep(f, h0, dt, mat, ends, model, params, grav=0.0, mu=0.0,
             s_o, v_o = boundary_face("free", sgn, fn[o][:, k], fn[o + 1][:, k], zI, Gf[:, j])
             s_b, v_b = np.where(outlet, s_o, s_b), np.where(outlet, v_o, v_b)
         s_b = np.where(pres, s_b, -Gf[:, j])
-        v_b = np.where(pres, v_b, 0.0)
+        v_b = np.where(pres, v_b, v_o if o_here and OUTLET_VOID else 0.0)
         snn_star[:, j], vn_star[:, j] = s_b, v_b
         normal = s_b + Gf[:, j]
         t_b, w_b = boundary_face(kind, sgn, ft[o][:, k], ft[o + 1][:, k], zIs,
@@ -401,7 +411,7 @@ def void_sweep(f, h0, dt, mat, ends, model, params, grav=0.0, mu=0.0,
                                      None, normal=normal, mu=mu)
             t_b, w_b = np.where(outlet, t_o, t_b), np.where(outlet, w_o, w_b)
         t_b = np.where(pres, t_b, 0.0)
-        w_b = np.where(pres, w_b, 0.0)
+        w_b = np.where(pres, w_b, w_o if o_here and OUTLET_VOID else 0.0)
         snt_star[:, j], vt_star[:, j] = t_b, w_b
         vtA[:, j], vtB[:, j] = w_b, w_b
         rec[side] = (normal, t_b.copy(), v_b.copy(), w_b.copy())
