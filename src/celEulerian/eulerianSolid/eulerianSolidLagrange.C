@@ -1174,6 +1174,24 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
     const scalar G = material_->shearModulus();
     const scalar K = M - 4.0*G/3.0;
 
+    // Outlets open at the start of the first step at or after their
+    // opening time (WP 3.3, decision 0033)
+    {
+        const scalar t0 = mesh.time().value() - dt;
+        forAllConstIters(outletOpenTime_, iter)
+        {
+            if
+            (
+                wallFriction_.found(iter.key())
+             && t0 >= iter.val() - 1e-9*dt
+            )
+            {
+                openOutlets();
+                break;
+            }
+        }
+    }
+
     rho_.correctBoundaryConditions();
     U_.correctBoundaryConditions();
     sigma_.correctBoundaryConditions();
@@ -1646,9 +1664,21 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
             vector v, t;
             if (fs && !touches(alpha_[P], lean_[P], pS[i]))
             {
-                // Material not at the face (decision 0021 rule 3)
-                v = Zero;
+                // Material not at the face (decision 0021 rule 3). An open
+                // outlet takes the free one-sided velocity anyway, so the
+                // void under the slab passes out first (rule 10b, decisions
+                // 0027 and 0033); other faces stay still.
                 t = Zero;
+                v = Zero;
+                if
+                (
+                    alpha_[P] > alphaEmpty
+                 && kind == boundaryKind::traction
+                 && outletOpenTime_.found(p.name())
+                )
+                {
+                    v = (vnL - tnL/zp[P])*n + vtL - ttL/zs[P];
+                }
             }
             else if (kind == boundaryKind::velocity)
             {

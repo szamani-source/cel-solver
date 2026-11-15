@@ -8,6 +8,7 @@
 #include "zeroGradientFvPatchFields.H"
 #include "uniformDimensionedFields.H"
 #include "mathematicalConstants.H"
+#include "emptyFvPatch.H"
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -74,6 +75,54 @@ static HashTable<scalar> readWalls(const fvMesh& mesh, const dictionary& dict)
         walls.set(e.keyword(), Foam::tan(deg*constant::mathematical::pi/180));
     }
     return walls;
+}
+
+
+//- Outlet patches from materialProperties outlets (WP 3.3): opening time,
+//  and their closed-wall friction added to walls
+static HashTable<scalar> readOutlets
+(
+    const fvMesh& mesh,
+    const dictionary& dict,
+    HashTable<scalar>& walls
+)
+{
+    HashTable<scalar> outlets;
+    const dictionary* od = dict.findDict("outlets");
+    if (!od)
+    {
+        return outlets;
+    }
+    for (const entry& e : *od)
+    {
+        const label patchi = mesh.boundaryMesh().findPatchID(e.keyword());
+        if (patchi < 0)
+        {
+            FatalIOErrorInFunction(*od)
+                << "outlets: no patch " << e.keyword() << exit(FatalIOError);
+        }
+        if (walls.found(e.keyword()))
+        {
+            FatalIOErrorInFunction(*od)
+                << "outlets: " << e.keyword() << " is also in walls"
+                << exit(FatalIOError);
+        }
+        const scalar deg = e.dict().get<scalar>("friction");
+        if (deg < 0 || deg >= 90)
+        {
+            FatalIOErrorInFunction(*od)
+                << "outlets: friction of " << e.keyword()
+                << " must be in [0, 90) degrees, got " << deg
+                << exit(FatalIOError);
+        }
+        walls.set(e.keyword(), Foam::tan(deg*constant::mathematical::pi/180));
+        outlets.set
+        (
+            e.keyword(),
+            e.dict().getOrDefault<scalar>("openTime", VGREAT)
+        );
+    }
+    return outlets;
 }
 
 } // End namespace Foam
@@ -220,8 +269,33 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
     (
         materialProperties_.getOrDefault<Switch>("spreadLayers", false)
     ),
-    nCapped_(0)
+    nCapped_(0),
+    outletOpenTime_(readOutlets(mesh, materialProperties_, wallFriction_)),
+    discharged_(0)
 {
+    if (outletOpenTime_.size() && !freeSurface_)
+    {
+        FatalIOErrorInFunction(materialProperties_)
+            << "outlets need freeSurface yes" << exit(FatalIOError);
+    }
+    forAllConstIters(outletOpenTime_, iter)
+    {
+        const label patchi = mesh.boundaryMesh().findPatchID(iter.key());
+        const fvPatch& p = mesh.boundary()[patchi];
+        if
+        (
+            p.coupled() || isA<emptyFvPatch>(p)
+         || U_.boundaryField()[patchi].fixesValue()
+        )
+        {
+            FatalErrorInFunction
+                << "Outlet " << iter.key() << " must be a plain patch "
+                << "without a fixed velocity" << exit(FatalError);
+        }
+        Info<< "Outlet " << iter.key() << ": closed (friction coefficient "
+            << wallFriction_[iter.key()] << "), opens at t = "
+            << iter.val() << " s" << nl;
+    }
     if (spreadLayers_ && !freeSurface_)
     {
         FatalIOErrorInFunction(materialProperties_)
@@ -288,6 +362,26 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
             << iter.val() << nl;
     }
     Info<< endl;
+}
+
+
+void Foam::eulerianSolid::openOutlets()
+{
+    forAllConstIters(outletOpenTime_, iter)
+    {
+        if (wallFriction_.erase(iter.key()))
+        {
+            Info<< "Outlet " << iter.key() << " opened at t = "
+                << mesh_.time().value() << " s; damping off" << endl;
+            damping_ = 0;
+        }
+    }
+}
+
+
+Foam::scalar Foam::eulerianSolid::discharged() const
+{
+    return returnReduce(discharged_, sumOp<scalar>());
 }
 
 
