@@ -183,6 +183,23 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
         ),
         mesh,
         dimensionedVector(dimForce, Zero)
+    ),
+    freeSurface_(materialProperties_.getOrDefault<Switch>("freeSurface", false)),
+    alpha_
+    (
+        fieldIO("alpha", mesh),
+        mesh,
+        dimensionedScalar(dimless, 1),
+        fvPatchFieldBase::zeroGradientType()
+    ),
+    rho0_(materialProperties_.get<scalar>("rho")),
+    noTension_
+    (
+        (materialProperties_.found("c") && materialProperties_.get<scalar>("c") == 0)
+     || (
+            materialProperties_.found("sigmaT")
+         && materialProperties_.get<scalar>("sigmaT") == 0
+        )
     )
 {
     if (maxCo_ <= 0)
@@ -192,8 +209,25 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
             << exit(FatalIOError);
     }
 
+    if (freeSurface_)
+    {
+        setCartesianGeometry();
+        lean_.setSize(mesh.nCells(), Zero);
+        alphaL_ = alpha_.primitiveField();
+        smooth_.setSize(mesh.nCells(), Zero);
+        Info<< "Free surface: material plus void, alpha in ["
+            << gMin(alpha_.primitiveField()) << ", "
+            << gMax(alpha_.primitiveField()) << "], "
+            << (noTension_ ? "no tensile strength" : "tensile strength")
+            << nl;
+    }
+    else
+    {
+        alpha_.writeOpt(IOobject::NO_WRITE);
+    }
+
     const scalar minRho = gMin(rho_.primitiveField());
-    if (minRho <= 0)
+    if (minRho < 0 || (minRho == 0 && !freeSurface_))
     {
         FatalErrorInFunction
             << "rho must be positive in every cell, smallest is " << minRho
@@ -236,8 +270,76 @@ Foam::vector Foam::eulerianSolid::gravityAt(const scalar t) const
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
+void Foam::eulerianSolid::setCartesianGeometry()
+{
+    // h_a = V / A_a with A_a half the summed |S_a| of the cell's faces;
+    // every face must be normal to an axis (decision 0031)
+    const vectorField& Sf = mesh_.Sf().primitiveField();
+    const scalarField& magSf = mesh_.magSf().primitiveField();
+    const labelUList& own = mesh_.owner();
+    const labelUList& nei = mesh_.neighbour();
+    vectorField A(mesh_.nCells(), Zero);
+
+    auto check = [&](const vector& S, const scalar mS)
+    {
+        if (cmptMax(cmptMag(S)) < (1 - 1e-6)*mS)
+        {
+            FatalErrorInFunction
+                << "freeSurface needs a Cartesian hex mesh: face normal "
+                << S/mS << " is not along an axis" << exit(FatalError);
+        }
+    };
+    forAll(own, facei)
+    {
+        check(Sf[facei], magSf[facei]);
+        A[own[facei]] += 0.5*cmptMag(Sf[facei]);
+        A[nei[facei]] += 0.5*cmptMag(Sf[facei]);
+    }
+    // Poly patches: empty patches (2D front and back) count here too
+    forAll(mesh_.boundaryMesh(), patchi)
+    {
+        const polyPatch& p = mesh_.boundaryMesh()[patchi];
+        const labelUList& fc = p.faceCells();
+        const vectorField pS(p.faceAreas());
+        forAll(fc, i)
+        {
+            check(pS[i], mag(pS[i]));
+            A[fc[i]] += 0.5*cmptMag(pS[i]);
+        }
+    }
+    const scalarField& V = mesh_.V().field();
+    hCell_.setSize(mesh_.nCells());
+    forAll(hCell_, celli)
+    {
+        for (direction a = 0; a < vector::nComponents; ++a)
+        {
+            hCell_[celli][a] = V[celli]/A[celli][a];
+        }
+    }
+}
+
+
 Foam::scalar Foam::eulerianSolid::stableDeltaT() const
 {
+    if (freeSurface_)
+    {
+        // Wave speed of the material (density rho/alpha, bounded as in the
+        // Lagrange step); empty cells take the reference density
+        const scalarField& r = rho_.primitiveField();
+        const scalarField& a = alpha_.primitiveField();
+        const scalarField delta(cbrt(mesh_.V().field()));
+        scalar dt = GREAT;
+        forAll(r, celli)
+        {
+            const scalar rm =
+                a[celli] > 1e-12
+              ? min(max(r[celli]/a[celli], 0.5*rho0_), 2*rho0_)
+              : rho0_;
+            dt = min(dt, delta[celli]/sqrt(material_->waveModulus()/rm));
+        }
+        return maxCo_*returnReduce(dt, minOp<scalar>());
+    }
+
     // Cell size cbrt(V) over P-wave speed sqrt(M/rho), smallest over the mesh
     const scalarField delta(cbrt(mesh_.V().field()));
     const scalarField c(sqrt(material_->waveModulus()/rho_.primitiveField()));

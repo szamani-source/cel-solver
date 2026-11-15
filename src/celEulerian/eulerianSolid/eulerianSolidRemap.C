@@ -529,7 +529,8 @@ static void faceValues
     const scalarField& q,
     const limiterType lim,
     scalarField& qfInt,
-    List<scalarField>& qfPatch
+    List<scalarField>& qfPatch,
+    const scalarField* smooth = nullptr
 )
 {
     const labelUList& own = mesh.owner();
@@ -538,7 +539,19 @@ static void faceValues
     const scalarField& phiI = phi.primitiveField();
 
     const List<scalarField> qNbr(neighbourValues(mesh, q));
-    const vectorField g(limitedGradient(mesh, geo, phi, q, qNbr, lim));
+    vectorField g(limitedGradient(mesh, geo, phi, q, qNbr, lim));
+    if (smooth)
+    {
+        // Free surface: first order unless the cell and its neighbours
+        // are full (decision 0021 rule 6)
+        forAll(g, celli)
+        {
+            if ((*smooth)[celli] < 0.5)
+            {
+                g[celli] = Zero;
+            }
+        }
+    }
     const List<vectorField> gNbr(neighbourValues(mesh, g));
 
     qfInt.setSize(own.size());
@@ -580,12 +593,13 @@ static void remapMassWeighted
     const List<scalarField>& dmPatch,
     const scalarField& mNew,
     const limiterType lim,
-    scalarField& q
+    scalarField& q,
+    const scalarField* smooth = nullptr
 )
 {
     scalarField qfInt;
     List<scalarField> qfPatch;
-    faceValues(mesh, geo, phi, q, lim, qfInt, qfPatch);
+    faceValues(mesh, geo, phi, q, lim, qfInt, qfPatch, smooth);
 
     const labelUList& own = mesh.owner();
     const labelUList& nei = mesh.neighbour();
@@ -614,7 +628,11 @@ static void remapMassWeighted
 
     forAll(q, celli)
     {
-        if (sumF[celli] != 0)
+        if (mNew[celli] <= 0)
+        {
+            q[celli] = 0;       // emptied (free surface only)
+        }
+        else if (sumF[celli] != 0)
         {
             q[celli] -= sumF[celli]/mNew[celli];
         }
@@ -633,14 +651,18 @@ static void remapField
     const List<scalarField>& dmPatch,
     const scalarField& mNew,
     const limiterType lim,
-    GeometricField<Type, fvPatchField, volMesh>& f
+    GeometricField<Type, fvPatchField, volMesh>& f,
+    const scalarField* smooth = nullptr
 )
 {
     Field<Type>& fi = f.primitiveFieldRef();
     for (direction cmpt = 0; cmpt < pTraits<Type>::nComponents; ++cmpt)
     {
         scalarField q(fi.component(cmpt));
-        remapMassWeighted(mesh, geo, phi, dmInt, dmPatch, mNew, lim, q);
+        remapMassWeighted
+        (
+            mesh, geo, phi, dmInt, dmPatch, mNew, lim, q, smooth
+        );
         fi.replace(cmpt, q);
     }
     f.correctBoundaryConditions();
@@ -689,6 +711,12 @@ Foam::HashTable<Foam::word> Foam::eulerianSolid::readRemapLimiters
 void Foam::eulerianSolid::remap(const scalar dt)
 {
     using namespace remapDetail;
+
+    if (freeSurface_)
+    {
+        remapFreeSurface(dt);
+        return;
+    }
 
     const fvMesh& mesh = mesh_;
     const surfaceScalarField& phi = phiL_;
@@ -780,6 +808,317 @@ void Foam::eulerianSolid::remap(const scalar dt)
     remapField(mesh, geo, phi, dmInt, dmPatch, mNew, lim("sigma"), sigma_);
     remapField(mesh, geo, phi, dmInt, dmPatch, mNew, lim("epsP"), epsP_);
     remapField(mesh, geo, phi, dmInt, dmPatch, mNew, lim("epsPEq"), epsPEq_);
+}
+
+
+void Foam::eulerianSolid::remapFreeSurface(const scalar dt)
+{
+    // Decision 0031 (decision 0021 rule 6 face by face on a Cartesian mesh).
+    // The Lagrange step left rho = m/V_L (bulk), alphaL_ (material fraction
+    // of V_L), lean_ and smooth_ (from the alpha at the start of the step).
+    using namespace remapDetail;
+
+    const fvMesh& mesh = mesh_;
+    const surfaceScalarField& phi = phiL_;
+    const labelUList& own = mesh.owner();
+    const labelUList& nei = mesh.neighbour();
+    const fvBoundaryMesh& bm = mesh.boundary();
+    const scalarField& V = mesh.V().field();
+    const scalarField& phiI = phi.primitiveField();
+    const vectorField& Sf = mesh.Sf().primitiveField();
+    const scalarField& magSf = mesh.magSf().primitiveField();
+    const scalarField& dc = mesh.deltaCoeffs().primitiveField();
+    const label nCells = mesh.nCells();
+
+    auto lim = [&](const word& field)
+    {
+        return limiterFromWord(remapLimiter_[field], materialProperties_);
+    };
+    auto axisOf = [](const vector& S) -> direction
+    {
+        const vector a(cmptMag(S));
+        return a.x() >= a.y() && a.x() >= a.z() ? 0 : (a.y() >= a.z() ? 1 : 2);
+    };
+
+    const remapGeometry geo(makeGeometry(mesh, phi, dt));
+
+    // Lagrangian volume and lengths H_a = h_a + dt sum_{faces along a} phi/A_a
+    scalarField VL(V);
+    vectorField dVa(nCells, Zero);
+    forAll(own, facei)
+    {
+        const direction d = axisOf(Sf[facei]);
+        VL[own[facei]] += dt*phiI[facei];
+        VL[nei[facei]] -= dt*phiI[facei];
+        dVa[own[facei]][d] += dt*phiI[facei];
+        dVa[nei[facei]][d] -= dt*phiI[facei];
+    }
+    forAll(bm, patchi)
+    {
+        const labelUList& fc = bm[patchi].faceCells();
+        const vectorField& pS = bm[patchi].Sf();
+        const scalarField& pPhi = phi.boundaryField()[patchi];
+        forAll(fc, i)
+        {
+            VL[fc[i]] += dt*pPhi[i];
+            dVa[fc[i]][axisOf(pS[i])] += dt*pPhi[i];
+        }
+    }
+    vectorField H(hCell_);
+    forAll(H, celli)
+    {
+        for (direction d = 0; d < vector::nComponents; ++d)
+        {
+            H[celli][d] += dVa[celli][d]*hCell_[celli][d]/V[celli];
+        }
+    }
+
+    scalarField& rho = rho_.primitiveFieldRef();
+    const scalarField mL(rho*VL);
+    const scalarField AL(alphaL_*VL);
+    scalarField rhoM(nCells, Zero);
+    forAll(rhoM, celli)
+    {
+        if (AL[celli] > 0)
+        {
+            rhoM[celli] = mL[celli]/AL[celli];
+        }
+    }
+
+    // Material volume in the swept region of length ad at the end of a
+    // donor cell (fraction aL, length Hd) along its outward normal, slab
+    // side la (+1 towards that end, -1 away, 0 spread)
+    auto overlap = []
+    (
+        const scalar aL, const scalar Hd, const scalar ad, const scalar la
+    ) -> scalar
+    {
+        const scalar A = aL*Hd;
+        if (la > 0.5)
+        {
+            return min(ad, A);
+        }
+        if (la < -0.5)
+        {
+            return max(scalar(0), ad - (Hd - A));
+        }
+        return aL*ad;
+    };
+    auto sideOf = [&](const vector& lean, const vector& Sout) -> scalar
+    {
+        const direction d = axisOf(Sout);
+        return lean[d]*sign(Sout[d]);
+    };
+
+    const List<scalarField> aLNbr(neighbourValues(mesh, alphaL_));
+    const List<vectorField> HNbr(neighbourValues(mesh, H));
+    const List<vectorField> leanNbr(neighbourValues(mesh, lean_));
+    const List<scalarField> rhoMNbr(neighbourValues(mesh, rhoM));
+    const List<scalarField> smoothNbr(neighbourValues(mesh, smooth_));
+
+    // Raw material outflow per face, positive, from its donor; total per
+    // local donor cell
+    scalarField vfInt(own.size(), Zero);
+    List<scalarField> vfPatch(bm.size());
+    scalarField outTot(nCells, Zero);
+    forAll(own, facei)
+    {
+        if (phiI[facei] == 0) continue;
+        const bool fromP = phiI[facei] > 0;
+        const label D = fromP ? own[facei] : nei[facei];
+        const vector Sout(fromP ? Sf[facei] : -Sf[facei]);
+        const scalar ad = dt*mag(phiI[facei])/magSf[facei];
+        const scalar v =
+            overlap
+            (
+                alphaL_[D], H[D][axisOf(Sout)], ad, sideOf(lean_[D], Sout)
+            )*magSf[facei];
+        vfInt[facei] = v;
+        outTot[D] += v;
+    }
+    forAll(bm, patchi)
+    {
+        const fvPatch& p = bm[patchi];
+        const labelUList& fc = p.faceCells();
+        const vectorField& pS = p.Sf();
+        const scalarField& pmS = p.magSf();
+        const scalarField& pPhi = phi.boundaryField()[patchi];
+        scalarField& vp = vfPatch[patchi];
+        vp.setSize(fc.size(), Zero);
+        forAll(fc, i)
+        {
+            if (pPhi[i] == 0) continue;
+            const scalar ad = dt*mag(pPhi[i])/pmS[i];
+            if (pPhi[i] > 0)
+            {
+                const label D = fc[i];
+                vp[i] =
+                    overlap
+                    (
+                        alphaL_[D], H[D][axisOf(pS[i])], ad,
+                        sideOf(lean_[D], pS[i])
+                    )*pmS[i];
+                outTot[D] += vp[i];
+            }
+            else if (p.coupled())
+            {
+                const vector Sout(-pS[i]);
+                vp[i] =
+                    overlap
+                    (
+                        aLNbr[patchi][i], HNbr[patchi][i][axisOf(Sout)], ad,
+                        sideOf(leanNbr[patchi][i], Sout)
+                    )*pmS[i];
+            }
+            // inflow through other boundary faces: nothing outside
+        }
+    }
+
+    // A donor that would keep less than 1e-9 of its volume gives all of it
+    scalarField scale(nCells, scalar(1));
+    forAll(scale, celli)
+    {
+        if
+        (
+            AL[celli] > 0 && outTot[celli] > 0
+         && AL[celli] - outTot[celli] < 1e-9*V[celli]
+        )
+        {
+            scale[celli] = AL[celli]/outTot[celli];
+        }
+    }
+    const List<scalarField> scaleNbr(neighbourValues(mesh, scale));
+
+    // Signed material volume and mass fluxes (out of the owner / local
+    // cell); fluxes below 1e-9 of a cell are dropped. Mass: MUSCL density
+    // where the donor is smooth, else the donor's Lagrangian material
+    // density.
+    scalarField rhofInt;
+    List<scalarField> rhofPatch;
+    faceValues(mesh, geo, phi, rho, lim("rho"), rhofInt, rhofPatch);
+
+    scalarField dmInt(own.size(), Zero);
+    List<scalarField> dmPatch(bm.size());
+    scalarField dmOut(nCells, Zero);
+    scalarField vOut(nCells, Zero);
+    forAll(own, facei)
+    {
+        if (phiI[facei] == 0) continue;
+        const bool fromP = phiI[facei] > 0;
+        const label D = fromP ? own[facei] : nei[facei];
+        scalar v = vfInt[facei]*scale[D];
+        if (v <= 1e-9*magSf[facei]/dc[facei])
+        {
+            continue;
+        }
+        const scalar dm =
+            smooth_[D] > 0.5
+          ? dt*mag(phiI[facei])*rhofInt[facei]
+          : v*rhoM[D];
+        const scalar sgn = fromP ? 1 : -1;
+        dmInt[facei] = sgn*dm;
+        dmOut[own[facei]] += sgn*dm;
+        dmOut[nei[facei]] -= sgn*dm;
+        vOut[own[facei]] += sgn*v;
+        vOut[nei[facei]] -= sgn*v;
+    }
+    forAll(bm, patchi)
+    {
+        const fvPatch& p = bm[patchi];
+        const labelUList& fc = p.faceCells();
+        const scalarField& pPhi = phi.boundaryField()[patchi];
+        const scalarField& pmS = p.magSf();
+        const scalarField pdc(p.deltaCoeffs());
+        dmPatch[patchi].setSize(fc.size(), Zero);
+        forAll(fc, i)
+        {
+            if (pPhi[i] == 0) continue;
+            const bool local = pPhi[i] > 0;
+            const scalar v =
+                vfPatch[patchi][i]
+               *(local ? scale[fc[i]] : (p.coupled() ? scaleNbr[patchi][i] : 0));
+            if (v <= 1e-9*pmS[i]/pdc[i])
+            {
+                continue;
+            }
+            scalar dm;
+            if (local)
+            {
+                dm =
+                    (p.coupled() && smooth_[fc[i]] > 0.5)
+                  ? dt*pPhi[i]*rhofPatch[patchi][i]
+                  : v*rhoM[fc[i]];
+            }
+            else
+            {
+                dm =
+                    smoothNbr[patchi][i] > 0.5
+                  ? dt*mag(pPhi[i])*rhofPatch[patchi][i]
+                  : v*rhoMNbr[patchi][i];
+            }
+            const scalar sgn = local ? 1 : -1;
+            if (p.coupled())
+            {
+                dmPatch[patchi][i] = sgn*dm;
+            }
+            dmOut[fc[i]] += sgn*dm;
+            vOut[fc[i]] += sgn*v;
+        }
+    }
+
+    // New mass and volume fraction; round-off dust (alpha < 1e-9 with
+    // mass) gets its volume from its mass and no velocity or stress
+    scalarField& alpha = alpha_.primitiveFieldRef();
+    scalarField mNew(mL - dmOut);
+    boolList dust(nCells, false);
+    forAll(mNew, celli)
+    {
+        if (mNew[celli] <= 0)
+        {
+            mNew[celli] = 0;
+            alpha[celli] = 0;
+            rho[celli] = 0;
+            continue;
+        }
+        scalar a = (AL[celli] - vOut[celli])/V[celli];
+        a = min(max(a, scalar(0)), scalar(1));
+        if (a >= 1 - 1e-12)
+        {
+            a = 1;
+        }
+        if (a < 1e-9)
+        {
+            a = mNew[celli]/(rho0_*V[celli]);
+            dust[celli] = true;
+        }
+        alpha[celli] = a;
+        rho[celli] = mNew[celli]/V[celli];
+    }
+    rho_.correctBoundaryConditions();
+    alpha_.correctBoundaryConditions();
+
+    // dmPatch for non-coupled patches stays zero: remapMassWeighted skips
+    // them, and the boundary donor value is the cell's own (first order)
+    remapField(mesh, geo, phi, dmInt, dmPatch, mNew, lim("U"), U_, &smooth_);
+    remapField(mesh, geo, phi, dmInt, dmPatch, mNew, lim("sigma"), sigma_, &smooth_);
+    remapField(mesh, geo, phi, dmInt, dmPatch, mNew, lim("epsP"), epsP_, &smooth_);
+    remapField
+    (
+        mesh, geo, phi, dmInt, dmPatch, mNew, lim("epsPEq"), epsPEq_, &smooth_
+    );
+
+    vectorField& U = U_.primitiveFieldRef();
+    symmTensorField& sigma = sigma_.primitiveFieldRef();
+    forAll(U, celli)
+    {
+        if (dust[celli] || mNew[celli] <= 0)
+        {
+            U[celli] = Zero;
+            sigma[celli] = Zero;
+        }
+    }
+    U_.correctBoundaryConditions();
+    sigma_.correctBoundaryConditions();
 }
 
 
