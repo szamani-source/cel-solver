@@ -30,7 +30,7 @@ Constitutive models for bulk solids are tracked in `docs/constitutive-models.md`
 | 3.2p | Prototype free surface (material plus void) | Lake at rest, translating and falling blocks, separation |
 | 3.2q | Prototype column collapse (split from 3.2p, decision 0021) | Column collapse run-out, top and deposit slope within decision 0019 |
 | 3.2r | Prototype column collapse deposit slope (split from 3.2q, decision 0023) | Deposit body without whole-cell steps (done, decision 0024); toe split to 3.2s |
-| 3.2s | Prototype collapse toe: stress in partly filled cells (split from 3.2r, decision 0024) | Same test as 3.2q: run-out, top and deposit slope within decision 0019 |
+| 3.2s | Prototype collapse toe: stress in partly filled cells (split from 3.2r, decision 0024) | Same test as 3.2q: run-out, top and deposit slope within decision 0019 (slope as a fitted line, decision 0025; done) |
 | 3.3p | Prototype silo discharge (target T0) | Outlet opens, no leak before, mass balance exact, rate independent of head (rate law split to 3.3q, decision 0026) |
 | 3.3q | Prototype silo discharge rate (split from 3.3p, decision 0026) | Steady rate, D^1.5 law with C 1.0 to 1.9, independent of E and mesh |
 | 3.1 | C++ gravity and wall boundaries (smooth, frictional) | celFoam settles a tank, matches the prototype |
@@ -41,9 +41,10 @@ Constitutive models for bulk solids are tracked in `docs/constitutive-models.md`
 | 3B.1 | N-material volume fractions with isoAdvector | Pure advection keeps interfaces sharp |
 | 3B.2 | Mixed-cell closure | Two-material impact conserves mass and momentum |
 | 3B.3 | Per-material history remap | Plastic strain stays with its material |
+| 4.0 | Investigate Lagrangian-Eulerian contact schemes (LS-DYNA constraint and penalty coupling, Abaqus CEL contact, cut-cell, immersed boundary) | Sourced comparison, prototype experiments, recommendation agreed with Sia |
 | 4.1 | Rigid body: STL input and kinematics | Body moves on prescribed path |
 | 4.2 | Contact search near the body | Cut cells found, unit tested |
-| 4.3 | Penalty forces and reaction output | No leakage in a push test |
+| 4.3 | Coupling forces (scheme from WP 4.0) and reaction output | No leakage in a push test |
 | 4.4 | Footing and pile benchmarks | Bearing capacity factor near 5.14 |
 | 5.1 | Hex8 element with hourglass control | Patch test passes |
 | 5.2 | Lagrangian-only Taylor bar | Matches published result |
@@ -77,3 +78,8 @@ slope is split to 3.2r (2026-11-14). 3.2r removed the whole-cell staircase (deci
 dissipation, so the rate law is split to 3.3q (2026-11-15, decision 0026).
 Phases 4 to 6 (Lagrangian bodies, contact, FE, parallel scaling) are unchanged but come
 after T0. 2.6 (Taylor bar) waits for Phase 5.
+
+Note (2026-11-15): WP 4.0 added at Sia's request: a thorough comparison of contact
+schemes before any coupling code is written. It is the first package of Phase 4 and
+can be started earlier if wanted, since it needs only the 2D prototype. Tank walls are
+mesh boundaries, not contact, so the silo track does not depend on it.

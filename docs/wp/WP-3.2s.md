@@ -1,6 +1,6 @@
 # WP 3.2s: Prototype collapse toe: stress in partly filled cells (split from WP 3.2r)
 
-State: not started
+State: done (decision 0025)
 Branch: thread branch
 
 ## Goal
@@ -44,4 +44,28 @@ a = 0.5 keeps its top within 1 cell; run-out 0.30 to 0.90 (a = 0.5) and 1.2 to 3
 
 ## Log
 
-(none yet)
+### 2026-11-15
+
+- Partly filled cells are frictionless (rule 4 plus c = 0), as the brief said, but
+  giving them strength made the toe worse: `FLOOR` (overburden pressure in the yield
+  check of supported partly filled cells) gave a = 2 run-out 1.5, toe 59.9 deg.
+- The a = 0.5 creep (1 cm/s at t = 2 s) is full cells of the second row sliding over the
+  first along faces held at yield by the shear cap (active state near the front).
+  Turning the cap off at 0.6 s stops it at once. `VSTICK` (capped faces stick below a
+  slip speed) stops it too, but the toe slope then jumps between 30 and 54 deg with the
+  threshold: it reads whether the last column is just over or under one cell.
+- With the creep stopped the toe still reads 39.7 deg: the stopped nose of a flowing
+  layer one to two cells thick. Resolution limit; per-cell toe slope falls slowly with
+  refinement.
+- Added a fitted flank angle (10 to 90 % of H_f) to the `--collapse` output: 22.2 and
+  22.3 deg at 10 cells; a = 0.5 at 20 cells: toe 46.6, body 37.8, fitted 24.9.
+- Defaults unchanged bit for bit (both knobs off); `tests/test_proto_void.sh` passes.
+- a = 2 at 20 cells: toe 39.8, body 39.8, fitted 17.8. Excluding the last pair would
+  pass at 10 cells but fail at 20. Asked Sia (decision 0025) how the slope should be
+  judged; recommended the fitted flank angle (first card, recommending excluding the
+  last pair, withdrawn). Next step: apply Sia's choice to `collapse_check`, and if the
+  test passes move it from `tests/manual/` to `tests/`.
+- Sia chose the fitted flank angle (decision 0025). `collapse_check` now checks it
+  (single-cell slopes printed only); the test moved to `tests/test_proto_collapse.sh`
+  and passes (22.2 / 22.3 deg, run-outs 0.40 / 1.8, 237 s). The creep of the a = 0.5
+  deposit is left as a known issue (mu(I) is the physical cure).
