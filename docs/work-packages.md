@@ -85,6 +85,10 @@ still falls with E (81 / 73 / 54 kg/s/m at 0.1 / 1 / 10 MPa, 10 mm), split to 3.
 3.3r made the rate independent of E (normal jump cap and dispersed void, rules 12 and
 13, decision 0028), but the rules make the column collapse run too far, so they are on
 only in the discharge; reconciling them is split to 3.2t (2026-11-15).
+3.2t found no single rule set in the split prototype (decision 0029): every variant of
+rule 12 that keeps the 10 MPa collapse stopping also slows the discharge. Closed without
+its done-when; the C++ silo packages start with the full jump terms and measure both
+cases with one code (2026-11-15).
 Phases 4 to 6 (Lagrangian bodies, contact, FE, parallel scaling) are unchanged but come
 after T0. 2.6 (Taylor bar) waits for Phase 5.
 

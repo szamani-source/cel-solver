@@ -91,6 +91,11 @@ reasons for all of them are in docs/decisions/0021-void-treatment.md.
    overburden pressure added, so they have friction. ``VSTICK``: capped faces
    slipping slower than VSTICK stick. Neither fixed the collapse toe.
 
+WP 3.2t study knobs (decision 0029), all off: variants of rule 12 (``NCAP_*``)
+   and of rules 4 and 13 (``STRETCH_*``, ``DISPERSE_*``) tried in search of one rule
+   set for the collapse and the discharge. None served both; kept so that the
+   tables of decision 0029 can be reproduced.
+
 ``python3 void2d.py --verify`` runs the WP 3.2p checks
 (tests/test_proto_void.sh); ``--collapse`` the column collapse checks (WP 3.2q,
 slope as a fitted line, decision 0025) (tests/test_proto_collapse.sh). SI units, stress positive in tension, thickness
@@ -127,6 +132,18 @@ DUST = 1e-9          # al below which a cell with mass is round-off dust
 SLAB2D = True        # rule 9 (WP 3.2r, decision 0024): layers spread in the x sweep
 SLAB2D_MIN = 0.1     # rule 9: thinner layers keep the 1D slab rule (no thin-film spray)
 OUTLET_VOID = True   # rule 10b (WP 3.3q, decision 0027): void under a slab passes out
+NCAP_ETA = 0.0      # WP 3.2t study knob: rule 12 keeps at least a viscosity eta (Pa s)
+STRETCH_CONFINED = False  # WP 3.2t study knob: a full cell pressed across stretches its material
+DISPERSE_CONTACT = False  # WP 3.2t study knob: rule 13 changes contact only, not the remap slab
+STRETCH_ISO = False  # WP 3.2t study knob: isochoric stretch goes to the material
+NCAP_GAMMA = 0.0    # WP 3.2t study knob: rule 12 only above this strain rate (1/s)
+NCAP_FULL = 0.0     # WP 3.2t study knob: rule 12 only between cells at least this full
+NCAP_YIELD = 0.0    # WP 3.2t study knob: rule 12 only where both cells are within this of yield
+NCAP_STRAIN = "iso"  # WP 3.2t study knob: strain of capped cells, iso (0028) / own / common
+NCAP_HYPER = False  # WP 3.2t study knob: capped faces keep an odd-even (4th difference) jump
+NCAP_VOL = False     # WP 3.2t study knob: rule 12 caps only the deviatoric part of the jump
+DISPERSE_4 = False   # WP 3.2t study knob: rule 13 also needs the cross-sweep neighbours
+DISPERSE_SELF = 0.0  # WP 3.2t study knob: rule 13 only for cells at least this full
 FLOOR = False        # rule 10 (WP 3.2s, decision 0025): overburden pressure floor in the
                      # yield check of supported partly filled cells
 
@@ -233,7 +250,7 @@ def shear_cap(fn, ft, seff, zs, vt_star, snt_star, Gf, params):
     return vt_star, t_new, (np.where(bad, va, vt_star), np.where(bad, vb, vt_star))
 
 
-def normal_cap(fn, seff, snt_face, zp, Gf, params):
+def normal_cap(fn, seff, snt_face, zp, Gf, params, eta=0.0, h=1.0, ett=None, vpad=None):
     """Rule 12 (decision 0028): the normal jump term of the Riemann solution
     is scaled back (bisection, as in shear_cap) until the face stress, built
     as in shear_cap with the face shear traction snt_face, is no further
@@ -257,8 +274,23 @@ def normal_cap(fn, seff, snt_face, zp, Gf, params):
         s3 = np.minimum(cen - rad, fzz)
         return 0.5 * (s1 - s3) + 0.5 * (s1 + s3) * sphi - ccos
 
+    if ett is not None:
+        # WP 3.2t: the volumetric part of the face jump is always kept; only
+        # its deviatoric part is capped. dv = vR - vL, the in-plane volume
+        # change across the face is (dv + h ett) / 2
+        dv = fn[3] - fn[1]
+        dvs = np.where(np.abs(dv) > 1e-30, dv, 1e-30)
+        rv = np.where(np.abs(dv) > 1e-30, 0.5 * (dv + h * ett) / dvs, 1.0)
+        nv = nj * rv
+        base = fn[4] + nv
+        nb, nj = nb + nv, nj - nv
+    else:
+        base = fn[4]
     lim = np.maximum(yf(nb), 0.0)
     bad = yf(nb + nj) > lim
+    if NCAP_GAMMA > 0.0:
+        # WP 3.2t: only faces in fast flow (|vR - vL| / h above NCAP_GAMMA)
+        bad &= np.abs(fn[3] - fn[1]) > NCAP_GAMMA * h
     if not bad.any():
         return None
     lo = np.zeros_like(nb)
@@ -268,8 +300,22 @@ def normal_cap(fn, seff, snt_face, zp, Gf, params):
         ok = yf(nb + mid * nj) <= lim
         lo = np.where(ok, mid, lo)
         hi = np.where(ok, hi, mid)
-    t_new = fn[4] + np.where(bad, lo, 1.0) * nj
     zl, zr = zp[:, 1:-2], zp[:, 2:-1]
+    if eta > 0.0:
+        # viscous floor: the kept jump is at least eta (vR - vL) / h, where the
+        # full jump is z_h (vR - vL) with z_h = zL zR / (zL + zR)
+        zh = zl * zr / np.where(zl + zr > 0.0, zl + zr, 1.0)
+        lo = np.maximum(lo, np.clip(eta / np.where(zh > 0.0, zh * h, 1.0), 0.0, 1.0))
+    t_new = base + np.where(bad, lo, 1.0) * nj
+    if vpad is not None:
+        # WP 3.2t study: capped faces keep a fourth-difference (odd-even) jump
+        n1 = nb.shape[1]
+        c = vpad[:, NG - 2:NG + n1 + 1]
+        d = np.diff(c, axis=1)                    # d[:, k + 1] = v_k - v_{k-1}
+        dv4 = d[:, 1:-1] - 0.5 * (d[:, :-2] + d[:, 2:])
+        zh4 = zl * zr / np.where(zl + zr > 0.0, zl + zr, 1.0)
+        nj4 = np.clip(zh4 * dv4, -np.abs(nj), np.abs(nj))
+        t_new = t_new + np.where(bad, (1.0 - lo) * nj4, 0.0)
     va = fn[1] + (t_new - fn[0]) / np.where(zl > 0.0, zl, 1.0)
     vb = fn[3] - (t_new - fn[2]) / np.where(zr > 0.0, zr, 1.0)
     return t_new, va, vb, bad
@@ -332,8 +378,18 @@ def void_sweep(f, h0, dt, mat, ends, model, params, grav=0.0, mu=0.0,
     if disperse is not None:
         # rule 13 (decision 0028): void inside the bulk is porosity
         nb_min = np.minimum(alp[:, NG - 1:NG - 1 + n], alp[:, NG + 1:NG + 1 + n])
+        if DISPERSE_4:
+            # also the neighbours across the sweep (edges copied)
+            pe = np.pad(al, ((1, 1), (0, 0)), mode="edge")
+            nb_min = np.minimum(nb_min, np.minimum(pe[:-2], pe[2:]))
+        if DISPERSE_SELF > 0.0:
+            nb_min = np.where(al >= DISPERSE_SELF, nb_min, 0.0)
+        if DISPERSE_CONTACT:
+            lean_remap = np.where(full, 0.0, lean)
         lean = np.where(nb_min >= disperse, 0.0, lean)
     lean = np.where(full, 0.0, lean)
+    if disperse is None or not DISPERSE_CONTACT:
+        lean_remap = lean
     mask = smooth_mask(alp)                          # (rows, n + 2)
 
     # Material touching each face: right end of cell j-1, left end of cell j
@@ -418,7 +474,37 @@ def void_sweep(f, h0, dt, mat, ends, model, params, grav=0.0, mu=0.0,
         vt_star, snt_star, slip = shear_cap(fn, ft, seff, zs, vt_star, snt_star, Gf, params)
     ncap = None
     if normal_cap_on and "phi" in params:
-        ncap = normal_cap(fn, seff, snt_star, zp, Gf, params)
+        ett = None
+        if NCAP_VOL:
+            # transverse stretching rate per cell (vt across the rows), at faces
+            pv = np.pad(f["vt"], ((1, 1), (0, 0)), mode="edge")
+            et = (pv[2:] - pv[:-2]) / (2.0 * h0)
+            etp = mirror(et)
+            ett = 0.5 * (etp[:, 1:-2] + etp[:, 2:-1])
+        ncap = normal_cap(fn, seff, snt_star, zp, Gf, params, NCAP_ETA, h0, ett,
+                          vn if NCAP_HYPER else None)
+        if ncap is not None and NCAP_YIELD > 0.0:
+            # WP 3.2t study: only where both cells are at yield (own stress)
+            ss = f["s"]
+            sph = math.sin(math.radians(params["phi"]))
+            cen = 0.5 * (ss[..., 0] + ss[..., 1])
+            rad = np.sqrt((0.5 * (ss[..., 0] - ss[..., 1])) ** 2 + ss[..., 3] ** 2)
+            s1 = np.maximum(cen + rad, ss[..., 2])
+            s3 = np.minimum(cen - rad, ss[..., 2])
+            fy = 0.5 * (s1 - s3) + 0.5 * (s1 + s3) * sph
+            aty = fy >= NCAP_YIELD * 0.5 * (s1 + s3) * sph     # (s1 + s3) < 0
+            aty = mirror(aty.astype(float)) > 0.5
+            both = aty[:, 1:-2] & aty[:, 2:-1]
+            ncap = ncap[:3] + (ncap[3] & both,)
+            if not ncap[3].any():
+                ncap = None
+        if ncap is not None and NCAP_FULL > 0.0:
+            # WP 3.2t study: only between cells at least NCAP_FULL full
+            alq = mirror(al)
+            both = (alq[:, 1:-2] >= NCAP_FULL) & (alq[:, 2:-1] >= NCAP_FULL)
+            ncap = ncap[:3] + (ncap[3] & both,)
+            if not ncap[3].any():
+                ncap = None
         if ncap is not None:
             snn_star = np.where(ncap[3], ncap[0], snn_star)
 
@@ -500,6 +586,8 @@ def void_sweep(f, h0, dt, mat, ends, model, params, grav=0.0, mu=0.0,
             vA = np.where(capm, ncap[1], vn_star)    # seen by the cell on the left
             vB = np.where(capm, ncap[2], vn_star)    # seen by the cell on the right
             dstr = dt * ((vA[:, 1:] - vn_star[:, 1:]) - (vB[:, :-1] - vn_star[:, :-1])) / h0
+            if NCAP_STRAIN == "common":
+                dstr = None
 
     # --- Lagrange update ----------------------------------------------------
     vn_new = np.where(has, f["vn"] + dt * (snn_star[:, 1:] - snn_star[:, :-1]) / msafe, 0.0)
@@ -514,6 +602,17 @@ def void_sweep(f, h0, dt, mat, ends, model, params, grav=0.0, mu=0.0,
     cap = A0 * np.maximum(0.0, -s_nn_old) / M
     if not no_tension:
         cap = np.where(full, np.inf, cap)    # a full cell of a solid stretches
+    elif STRETCH_ISO:
+        # WP 3.2t: a stretch matched by a transverse contraction (isochoric
+        # flow, from the transverse velocity gradient) goes to the material;
+        # only the net in-plane expansion unloads it and opens void (rule 4)
+        pvt = np.pad(f["vt"], ((1, 1), (0, 0)), mode="edge")
+        ett_c = (pvt[2:] - pvt[:-2]) / (2.0 * h0)
+        cap = np.where(full, cap + np.maximum(0.0, -ett_c) * dt * h0, cap)
+    elif STRETCH_CONFINED:
+        # WP 3.2t study: a full cell still pressed across the sweep is flowing,
+        # not separating: its stretch goes to the material (MC return)
+        cap = np.where(full & (f["s"][..., 1] < 0.0), np.inf, cap)
     dmat = np.where(dh < 0.0, dh - np.maximum(dh, -vd), np.minimum(dh, cap))
     dmat = np.where(has, dmat, 0.0)
     A_new = A0 + dmat
@@ -526,8 +625,11 @@ def void_sweep(f, h0, dt, mat, ends, model, params, grav=0.0, mu=0.0,
         # rule 12: only the deviatoric part of the dropped strain is dropped;
         # its volume change is kept as an in-plane isotropic strain, so the
         # pressure stays tied to the density (full cells only)
-        deps[..., 0] = np.where(full, deps[..., 0] + 0.5 * dstr, deps[..., 0])
-        deps[..., 1] = np.where(full, -0.5 * dstr, 0.0)
+        if NCAP_STRAIN == "own":
+            deps[..., 0] = np.where(full, deps[..., 0] + dstr, deps[..., 0])
+        else:
+            deps[..., 0] = np.where(full, deps[..., 0] + 0.5 * dstr, deps[..., 0])
+            deps[..., 1] = np.where(full, -0.5 * dstr, 0.0)
     deps[..., 3] = gam
     s_old, ep_old = f["s"], f["ep"]
     if rotation == "jaumann":
@@ -553,8 +655,8 @@ def void_sweep(f, h0, dt, mat, ends, model, params, grav=0.0, mu=0.0,
     # --- remap: slab volume fluxes, no flux through the boundary faces --------
     dR = d[:, 1:]                      # right face of each cell
     dL = d[:, :-1]
-    outR = np.where(dR > 0.0, out_overlap(A_new, h_new, dR, lean, "right"), 0.0)
-    outL = np.where(dL < 0.0, out_overlap(A_new, h_new, dL, lean, "left"), 0.0)
+    outR = np.where(dR > 0.0, out_overlap(A_new, h_new, dR, lean_remap, "right"), 0.0)
+    outL = np.where(dL < 0.0, out_overlap(A_new, h_new, dL, lean_remap, "left"), 0.0)
     # a cell that would keep less than 1e-9 of a cell of material gives all
     # of it (no round-off dust left behind a moving edge)
     tot_out = outR + outL
@@ -933,7 +1035,8 @@ COLLAPSE_DELTA_B = 35.0
 
 
 def column_collapse(a, cells_short=20, cell=None, delta_b=COLLAPSE_DELTA_B,
-                    E=COLLAPSE_E, phi=35.0, t_max=2.0, ke_stop=1e-3, log=None):
+                    E=COLLAPSE_E, phi=35.0, t_max=2.0, ke_stop=1e-3, log=None,
+                    normal_cap=False, disperse=None):
     """Column L_i x H_i = L_i x a L_i against the smooth left wall, released
     from K0 rest on a frictional floor (delta_b), runs until the kinetic
     energy is below ke_stop times its peak."""
@@ -953,6 +1056,8 @@ def column_collapse(a, cells_short=20, cell=None, delta_b=COLLAPSE_DELTA_B,
     walls = {"left": "smooth", "right": "smooth", "bottom": "friction", "top": "smooth"}
     box = make_box(nx, ny, nx * cell, ny * cell, params=params, walls=walls,
                    delta_w=delta_b)
+    box.normal_cap = normal_cap
+    box.disperse = disperse
     box.fill(rect(-1.0, L_i, -1.0, H_i, cell, cell), K0=sd.k0_elastic(params["nu"]))
     m0 = box.total_mass()
     t0 = time.perf_counter()
