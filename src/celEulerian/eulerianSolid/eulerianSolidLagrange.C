@@ -42,6 +42,15 @@
     (then zero traction); sticking shear kept if at most mu times the wall
     pressure, else clipped to it with v_t from the interior characteristic.
     Damping U <- U/(1 + damping dt) after the momentum update.
+
+    Free surface (WP 3.2a, decision 0031; materialProperties freeSurface):
+    one material plus void on a Cartesian hex mesh, decision 0021 rules 1
+    to 7 face by face. Partly filled cells are homogenised (alpha sigma,
+    alpha z) and first order; each leans along each axis towards its fuller
+    neighbour; faces the material does not touch on both sides are
+    traction-free (also a pulling contact face of material without tensile
+    strength); compression closes void first, expansion unloads the
+    material and then opens void. alphaL_, lean_ and smooth_ go to the remap.
 \*---------------------------------------------------------------------------*/
 
 #include "eulerianSolid.H"
@@ -239,7 +248,9 @@ void faceStates
     GeometricField<Type, fvsPatchField, surfaceMesh>& qO,
     GeometricField<Type, fvsPatchField, surfaceMesh>& qN,
     const volScalarField* rho = nullptr,
-    const vector& gravity = Zero
+    const vector& gravity = Zero,
+    const volScalarField* smooth = nullptr,
+    const volScalarField* eFac = nullptr
 )
 {
     const bool grav = rho && magSqr(gravity) > 0;
@@ -261,7 +272,7 @@ void faceStates
     // and the vector dPQ from owner to neighbour centre
     // eP, eQ: hydrostatic jumps of the two cells over dPQ (zero without
     // gravity, which leaves the original scheme unchanged)
-    auto states = [&]
+    auto states0 = [&]
     (
         const Type& qP, const Type& qQ,
         const UList<vector>* gP, const UList<vector>* gQ,
@@ -306,6 +317,44 @@ void faceStates
         }
     };
 
+    // With the free surface (decision 0031): a side whose cell or a
+    // neighbour of it is not full is first order; under gravity it keeps
+    // the fraction f = 1 - phi of its hydrostatic jump (rule 7 of decision
+    // 0021). The other side as usual. Without, states0 unchanged.
+    auto states = [&]
+    (
+        const Type& qP, const Type& qQ,
+        const UList<vector>* gP, const UList<vector>* gQ,
+        const vector& dPQ,
+        Type& outP, Type& outQ,
+        const Type& eP, const Type& eQ,
+        const scalar smP = 1, const scalar smQ = 1,
+        const scalar fP = 1, const scalar fQ = 1
+    )
+    {
+        if (smP > 0.5 && smQ > 0.5)
+        {
+            states0(qP, qQ, gP, gQ, dPQ, outP, outQ, eP, eQ);
+            return;
+        }
+        Type tP(qP), tQ(qQ);
+        if (smP > 0.5 || smQ > 0.5)
+        {
+            states0(qP, qQ, gP, gQ, dPQ, tP, tQ, eP, eQ);
+        }
+        outP = smP > 0.5 ? tP : (grav ? Type(qP + (0.5*fP)*eP) : qP);
+        outQ = smQ > 0.5 ? tQ : (grav ? Type(qQ - (0.5*fQ)*eQ) : qQ);
+    };
+
+    auto sm = [&](const label celli) -> scalar
+    {
+        return smooth ? (*smooth)[celli] : 1;
+    };
+    auto ef = [&](const label celli) -> scalar
+    {
+        return eFac ? (*eFac)[celli] : 1;
+    };
+
     auto eqJump = [&](const scalar r, const vector& d) -> Type
     {
         return grav ? equilibriumJump<Type>(r, d, gravity) : zeroT;
@@ -329,7 +378,8 @@ void faceStates
         (
             q[P], q[N], &gP, &gQ, delta[facei], qO[facei], qN[facei],
             eqJump(grav ? (*rho)[P] : 0, delta[facei]),
-            eqJump(grav ? (*rho)[N] : 0, delta[facei])
+            eqJump(grav ? (*rho)[N] : 0, delta[facei]),
+            sm(P), sm(N), ef(P), ef(N)
         );
     }
 
@@ -349,6 +399,18 @@ void faceStates
                 grav
               ? rho->boundaryField()[patchi].patchNeighbourField()
               : tmp<scalarField>::New(p.size(), Zero)
+            );
+            const scalarField smN
+            (
+                smooth
+              ? smooth->boundaryField()[patchi].patchNeighbourField()
+              : tmp<scalarField>::New(p.size(), scalar(1))
+            );
+            const scalarField efN
+            (
+                eFac
+              ? eFac->boundaryField()[patchi].patchNeighbourField()
+              : tmp<scalarField>::New(p.size(), scalar(1))
             );
 
             PtrList<vectorField> gn(secondOrder ? nCmpt : 0);
@@ -378,7 +440,8 @@ void faceStates
                 (
                     q[fc[i]], qn[i], &gP, &gQ, pd[i], pO[i], pN[i],
                     eqJump(grav ? (*rho)[fc[i]] : 0, pd[i]),
-                    eqJump(rn[i], pd[i])
+                    eqJump(rn[i], pd[i]),
+                    sm(fc[i]), smN[i], ef(fc[i]), efN[i]
                 );
             }
         }
@@ -404,7 +467,8 @@ void faceStates
                 states
                 (
                     q[fc[i]], 2*qb[i] - q[fc[i]] + e, &gP, &gP,
-                    dG, pO[i], ghost, e, e
+                    dG, pO[i], ghost, e, e,
+                    sm(fc[i]), sm(fc[i]), ef(fc[i]), ef(fc[i])
                 );
                 pN[i] = pO[i];
             }
@@ -693,6 +757,205 @@ inline tensor hughesWinget(const tensor& dW)
     return inv(I - 0.5*dW) & (I + 0.5*dW);
 }
 
+
+// Free surface (WP 3.2a, decision 0031) ---------------------------------------
+
+//- Volume fraction thresholds (decision 0021 rule 1)
+static const scalar alphaEmpty = 1e-12;
+static const scalar alphaFull = 1 - 1e-12;
+
+
+//- Axis of a face normal to an axis (Cartesian mesh, checked at start)
+inline direction faceAxis(const vector& S)
+{
+    const vector a(cmptMag(S));
+    return a.x() >= a.y() && a.x() >= a.z() ? 0 : (a.y() >= a.z() ? 1 : 2);
+}
+
+
+//- Slab side per axis (+1 towards +x_a, -1 towards -x_a, 0 spread or
+//  full) and the smooth flag (cell and every neighbour full), decision
+//  0021 rule 2 face by face: the slab leans towards the fuller of the two
+//  neighbours along each axis; walls, symmetry planes and prescribed
+//  velocity patches mirror the cell, traction-free patches count as empty.
+//  alpha must have its coupled patches evaluated.
+void slabSides
+(
+    const fvMesh& mesh,
+    const volScalarField& alpha,
+    const UList<boundaryKind>& kinds,
+    vectorField& lean,
+    scalarField& smooth
+)
+{
+    const labelUList& own = mesh.owner();
+    const labelUList& nei = mesh.neighbour();
+    const vectorField& Sf = mesh.Sf().primitiveField();
+    const scalarField& a = alpha.primitiveField();
+
+    // Fraction beyond the + and - face along each axis (default: mirror)
+    vectorField aPlus(mesh.nCells()), aMinus(mesh.nCells());
+    forAll(a, celli)
+    {
+        aPlus[celli] = a[celli]*vector::one;
+        aMinus[celli] = aPlus[celli];
+    }
+    auto set = [&](const label c, const vector& Sout, const scalar ab)
+    {
+        const direction d = faceAxis(Sout);
+        if (Sout[d] > 0)
+        {
+            aPlus[c][d] = ab;
+        }
+        else
+        {
+            aMinus[c][d] = ab;
+        }
+    };
+    forAll(own, facei)
+    {
+        set(own[facei], Sf[facei], a[nei[facei]]);
+        set(nei[facei], -Sf[facei], a[own[facei]]);
+    }
+    forAll(mesh.boundary(), patchi)
+    {
+        const fvPatch& p = mesh.boundary()[patchi];
+        const labelUList& fc = p.faceCells();
+        const vectorField& pS = p.Sf();
+        if (kinds[patchi] == boundaryKind::coupled)
+        {
+            const scalarField an
+            (
+                alpha.boundaryField()[patchi].patchNeighbourField()
+            );
+            forAll(fc, i)
+            {
+                set(fc[i], pS[i], an[i]);
+            }
+        }
+        else if (kinds[patchi] == boundaryKind::traction)
+        {
+            forAll(fc, i)
+            {
+                set(fc[i], pS[i], 0);
+            }
+        }
+    }
+
+    lean.setSize(mesh.nCells());
+    smooth.setSize(mesh.nCells());
+    forAll(a, celli)
+    {
+        const bool full = a[celli] >= alphaFull;
+        const vector dif(aPlus[celli] - aMinus[celli]);
+        for (direction d = 0; d < vector::nComponents; ++d)
+        {
+            lean[celli][d] =
+                (full || mag(dif[d]) <= 1e-9) ? 0 : sign(dif[d]);
+        }
+        smooth[celli] =
+            (
+                full
+             && cmptMin(aPlus[celli]) >= alphaFull
+             && cmptMin(aMinus[celli]) >= alphaFull
+            )
+          ? 1 : 0;
+    }
+}
+
+
+//- Does the material of a cell touch its face with outward area vector
+//  Sout (non-empty and its slab not leaning away)?
+inline bool touches(const scalar a, const vector& lean, const vector& Sout)
+{
+    if (a <= alphaEmpty)
+    {
+        return false;
+    }
+    if (a >= alphaFull)
+    {
+        return true;
+    }
+    const direction d = faceAxis(Sout);
+    return lean[d]*sign(Sout[d]) > -0.5;
+}
+
+
+//- Velocity of a traction-free face from the one-sided (characteristic)
+//  relation of one side. n from L to R; side +1: the L state (vL, sL)
+//  with impedances of L; side -1: the R state.
+inline vector oneSided
+(
+    const vector& n, const label side,
+    const vector& v, const symmTensor& s, const scalar zp, const scalar zs
+)
+{
+    const vector t(s & n);
+    const scalar vn = v & n;
+    const scalar tn = t & n;
+    const vector vt(v - vn*n);
+    const vector tt(t - tn*n);
+    return (vn - side*tn/zp)*n + vt - side*tt/zs;
+}
+
+
+//- Free-surface face (decision 0021 rules 3 and 4): contact face (both
+//  sides touch) gets the Riemann solution unless the material has no
+//  tensile strength and the solution pulls; every other face is
+//  traction-free with the one-sided velocity of the side that touches it
+//  (owner first), else of the side(s) holding material, else zero.
+inline void voidFace
+(
+    const vector& n,
+    const vector& vL, const symmTensor& sL, const scalar zpL, const scalar zsL,
+    const bool hasL, const bool touchL,
+    const vector& vR, const symmTensor& sR, const scalar zpR, const scalar zsR,
+    const bool hasR, const bool touchR,
+    const bool noTension,
+    vector& vS,
+    vector& tS
+)
+{
+    if (touchL && touchR)
+    {
+        riemann(n, vL, sL, zpL, zsL, vR, sR, zpR, zsR, vS, tS);
+        if (!noTension || (tS & n) <= 0)
+        {
+            return;
+        }
+    }
+    tS = Zero;
+    if (touchL)
+    {
+        vS = oneSided(n, 1, vL, sL, zpL, zsL);
+    }
+    else if (touchR)
+    {
+        vS = oneSided(n, -1, vR, sR, zpR, zsR);
+    }
+    else if (hasL && hasR)
+    {
+        vS =
+            0.5
+           *(
+                oneSided(n, 1, vL, sL, zpL, zsL)
+              + oneSided(n, -1, vR, sR, zpR, zsR)
+            );
+    }
+    else if (hasL)
+    {
+        vS = oneSided(n, 1, vL, sL, zpL, zsL);
+    }
+    else if (hasR)
+    {
+        vS = oneSided(n, -1, vR, sR, zpR, zsR);
+    }
+    else
+    {
+        vS = Zero;
+    }
+}
+
 } // End namespace lagrangeStepDetail
 } // End namespace Foam
 
@@ -731,8 +994,116 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
     volScalarField& zs = tzs.ref();
     zp.primitiveFieldRef() = sqrt(M*rho_.primitiveField());
     zs.primitiveFieldRef() = sqrt(G*rho_.primitiveField());
+
+    // Free surface (decision 0031): homogenised partly filled cells
+    // (decision 0021 rule 3): traction alpha sigma, impedance alpha z of
+    // the material (density rho/alpha, bounded), mass rho V. The face
+    // states and forces use seff = alpha sigma.
+    const bool fs = freeSurface_;
+    List<boundaryKind> kinds(mesh.boundary().size());
+    forAll(mesh.boundary(), patchi)
+    {
+        kinds[patchi] =
+            kindOf(mesh.boundary()[patchi], U_.boundaryField()[patchi], wallFriction_);
+    }
+    tmp<volScalarField> tsmooth, teFac;
+    tmp<volSymmTensorField> tseff;
+    if (fs)
+    {
+        alpha_.correctBoundaryConditions();
+        const scalarField& a = alpha_.primitiveField();
+        const scalarField& r = rho_.primitiveField();
+        forAll(a, celli)
+        {
+            if (a[celli] > alphaEmpty)
+            {
+                const scalar rm =
+                    min(max(r[celli]/a[celli], 0.5*rho0_), 2*rho0_);
+                zp[celli] = a[celli]*sqrt(M*rm);
+                zs[celli] = a[celli]*sqrt(G*rm);
+            }
+            else
+            {
+                zp[celli] = 0;
+                zs[celli] = 0;
+            }
+        }
+
+        slabSides(mesh, alpha_, kinds, lean_, smooth_);
+
+        tsmooth = workField<scalar>(mesh, "smooth", dimless);
+        tsmooth.ref().primitiveFieldRef() = smooth_;
+        tsmooth.ref().correctBoundaryConditions();
+
+        // copy of sigma (zero-gradient patches, as sigma), times alpha
+        tseff.reset
+        (
+            new volSymmTensorField
+            (
+                IOobject
+                (
+                    "seff",
+                    mesh.time().timeName(),
+                    mesh,
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE,
+                    IOobject::NO_REGISTER
+                ),
+                sigma_
+            )
+        );
+        tseff.ref().primitiveFieldRef() = a*sigma_.primitiveField();
+        tseff.ref().correctBoundaryConditions();
+
+        // Rule 7 of decision 0021: a first-order cell keeps 1 - phi of its
+        // hydrostatic jump, phi = 1 - |s_gg|/(w/2) in [0, 1], w its own
+        // weight per area along g (phi 0: supported, at rest; 1: free fall)
+        teFac = workField<scalar>(mesh, "eFac", dimless);
+        scalarField& f = teFac.ref().primitiveFieldRef();
+        f = 1;
+        const scalar gm = mag(g);
+        if (gm > 0)
+        {
+            const vector gHat(g/gm);
+            const symmTensorField& se = tseff().primitiveField();
+            forAll(f, celli)
+            {
+                const scalar w =
+                    gm*r[celli]*(cmptMag(gHat) & hCell_[celli]);
+                if (w > 0)
+                {
+                    const scalar sgg = gHat & (se[celli] & gHat);
+                    f[celli] = 1 - min(max(1 - mag(sgg)/(0.5*w), 0), 1);
+                }
+            }
+        }
+        teFac.ref().correctBoundaryConditions();
+    }
     zp.correctBoundaryConditions();
     zs.correctBoundaryConditions();
+    const volSymmTensorField& sref = fs ? tseff() : sigma_;
+    const volScalarField* smoothPtr = fs ? &tsmooth() : nullptr;
+    const volScalarField* eFacPtr = fs ? &teFac() : nullptr;
+
+    // Neighbour alpha and slab sides across coupled patches
+    List<scalarField> aNbr(mesh.boundary().size());
+    List<vectorField> leanNbr(mesh.boundary().size());
+    if (fs)
+    {
+        tmp<volVectorField> tl = workField<vector>(mesh, "lean", dimless);
+        tl.ref().primitiveFieldRef() = lean_;
+        tl.ref().correctBoundaryConditions();
+        forAll(mesh.boundary(), patchi)
+        {
+            if (mesh.boundary()[patchi].coupled())
+            {
+                aNbr[patchi] =
+                    alpha_.boundaryField()[patchi].patchNeighbourField();
+                leanNbr[patchi] =
+                    tl().boundaryField()[patchi].patchNeighbourField();
+            }
+        }
+    }
 
 
     // 1. Face states ---------------------------------------------------------
@@ -754,8 +1125,14 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
         "sN", IOobject::NO_REGISTER, mesh, dimensionedSymmTensor(dimPressure, Zero)
     );
 
-    faceStates(U_, secondOrder_, UO.ref(), UN.ref());
-    faceStates(sigma_, secondOrder_, sO.ref(), sN.ref(), &rho_, g);
+    faceStates
+    (
+        U_, secondOrder_, UO.ref(), UN.ref(), nullptr, Zero, smoothPtr
+    );
+    faceStates
+    (
+        sref, secondOrder_, sO.ref(), sN.ref(), &rho_, g, smoothPtr, eFacPtr
+    );
 
     if (secondOrder_)
     {
@@ -773,8 +1150,8 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
             const label P = own[facei];
             const label N = nei[facei];
             const vector& S = Sf[facei];
-            divS[P] += (sO()[facei] - sigma_[P]) & S;
-            divS[N] -= (sN()[facei] - sigma_[N]) & S;
+            divS[P] += (sO()[facei] - sref[P]) & S;
+            divS[N] -= (sN()[facei] - sref[N]) & S;
             gradU[P] += S*(UO()[facei] - U_[P]);
             gradU[N] -= S*(UN()[facei] - U_[N]);
         }
@@ -795,22 +1172,38 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                 forAll(fc, i)
                 {
                     const label P = fc[i];
-                    vector v, t;
-                    wallFace(pS[i]/pmS[i], pu[i], ps[i], zp[P], zs[P], mu, v, t);
-                    divS[P] += t*pmS[i] - (sigma_[P] & pS[i]);
+                    vector v(U_[P]), t(Zero);
+                    if (!fs || touches(alpha_[P], lean_[P], pS[i]))
+                    {
+                        wallFace
+                        (
+                            pS[i]/pmS[i], pu[i], ps[i], zp[P], zs[P], mu, v, t
+                        );
+                    }
+                    divS[P] += t*pmS[i] - (sref[P] & pS[i]);
                     gradU[P] += pS[i]*(v - U_[P]);
                 }
                 continue;
             }
             forAll(fc, i)
             {
-                divS[fc[i]] += (ps[i] - sigma_[fc[i]]) & pS[i];
+                divS[fc[i]] += (ps[i] - sref[fc[i]]) & pS[i];
                 gradU[fc[i]] += pS[i]*(pu[i] - U_[fc[i]]);
             }
         }
 
         forAll(V, celli)
         {
+            if (fs && smooth_[celli] < 0.5)
+            {
+                // First-order cell (decision 0021): no stress predictor;
+                // empty cells do not move
+                if (solveMomentum_ && m[celli] > 0)
+                {
+                    dU[celli] = 0.5*dt*(divS[celli]/m[celli] + g);
+                }
+                continue;
+            }
             if (solveMomentum_)
             {
                 dU[celli] = 0.5*dt*(divS[celli]/m[celli] + g);
@@ -882,13 +1275,29 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
         const label N = nei[facei];
         const vector n(Sf[facei]/magSf[facei]);
         vector t;
-        riemann
-        (
-            n,
-            UO()[facei], sO()[facei], zp[P], zs[P],
-            UN()[facei], sN()[facei], zp[N], zs[N],
-            vS[facei], t
-        );
+        if (fs)
+        {
+            const scalar aP = alpha_[P], aN = alpha_[N];
+            voidFace
+            (
+                n,
+                UO()[facei], sO()[facei], zp[P], zs[P], aP > alphaEmpty,
+                touches(aP, lean_[P], Sf[facei]),
+                UN()[facei], sN()[facei], zp[N], zs[N], aN > alphaEmpty,
+                touches(aN, lean_[N], -Sf[facei]),
+                noTension_, vS[facei], t
+            );
+        }
+        else
+        {
+            riemann
+            (
+                n,
+                UO()[facei], sO()[facei], zp[P], zs[P],
+                UN()[facei], sN()[facei], zp[N], zs[N],
+                vS[facei], t
+            );
+        }
         if (!solveMomentum_)
         {
             // Prescribed motion: the face moves with the material on both
@@ -937,13 +1346,30 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
             {
                 const vector n(pS[i]/pmS[i]);
                 vector t;
-                riemann
-                (
-                    n,
-                    puo[i], pso[i], zp[fc[i]], zs[fc[i]],
-                    pun[i], psn[i], zpn[i], zsn[i],
-                    pvS[i], t
-                );
+                if (fs)
+                {
+                    const scalar aP = alpha_[fc[i]];
+                    const scalar aN = aNbr[patchi][i];
+                    voidFace
+                    (
+                        n,
+                        puo[i], pso[i], zp[fc[i]], zs[fc[i]], aP > alphaEmpty,
+                        touches(aP, lean_[fc[i]], pS[i]),
+                        pun[i], psn[i], zpn[i], zsn[i], aN > alphaEmpty,
+                        touches(aN, leanNbr[patchi][i], -pS[i]),
+                        noTension_, pvS[i], t
+                    );
+                }
+                else
+                {
+                    riemann
+                    (
+                        n,
+                        puo[i], pso[i], zp[fc[i]], zs[fc[i]],
+                        pun[i], psn[i], zpn[i], zsn[i],
+                        pvS[i], t
+                    );
+                }
                 if (!solveMomentum_)
                 {
                     pvS[i] = 0.5*(puo[i] + pun[i]);
@@ -966,7 +1392,13 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
             const vector ttL(tL - tnL*n);
 
             vector v, t;
-            if (kind == boundaryKind::velocity)
+            if (fs && !touches(alpha_[P], lean_[P], pS[i]))
+            {
+                // Material not at the face (decision 0021 rule 3)
+                v = Zero;
+                t = Zero;
+            }
+            else if (kind == boundaryKind::velocity)
             {
                 // Prescribed velocity; traction from the interior
                 // characteristic s* - z v* = sL - z vL
@@ -1011,6 +1443,28 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
     vectorField force(mesh.nCells(), Zero);
     tensorField T(mesh.nCells(), Zero);      // sum Sf * vStar
     scalarField dV(mesh.nCells(), Zero);     // sum phiL out of the cell
+    vectorField dVa;                         // the same per face axis (fs)
+    if (fs)
+    {
+        dVa.setSize(mesh.nCells(), Zero);
+        forAll(own, facei)
+        {
+            const direction d = faceAxis(Sf[facei]);
+            dVa[own[facei]][d] += phiL_[facei];
+            dVa[nei[facei]][d] -= phiL_[facei];
+        }
+        forAll(mesh.boundary(), patchi)
+        {
+            const fvPatch& p = mesh.boundary()[patchi];
+            const labelUList& fc = p.faceCells();
+            const vectorField& pS = Sf.boundaryField()[patchi];
+            const scalarField& pphi = phiL_.boundaryField()[patchi];
+            forAll(fc, i)
+            {
+                dVa[fc[i]][faceAxis(pS[i])] += pphi[i];
+            }
+        }
+    }
 
     forAll(own, facei)
     {
@@ -1045,6 +1499,11 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
         vectorField& U = U_.primitiveFieldRef();
         forAll(U, celli)
         {
+            if (fs && m[celli] <= 0)
+            {
+                U[celli] = Zero;
+                continue;
+            }
             U[celli] += dt*(force[celli]/m[celli] + g);
             if (damping_ > 0)
             {
@@ -1068,8 +1527,70 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
 
         // T/V = grad(v) in OpenFOAM order (d_i v_j); L = grad(v)^T
         const tensor L(dt*T[celli].T()/Vmid);
-        const symmTensor dEps(symm(L));
+        symmTensor dEps(symm(L));
         const tensor dW(skew(L));
+
+        if (fs)
+        {
+            // Void closure (decision 0021 rule 5), per axis of the
+            // Cartesian cell: compression closes the void first; expansion
+            // first unloads the material to zero normal stress (no cap for
+            // a full cell of a material with tensile strength), the rest
+            // opens void. Shear goes to the material. A full cell that
+            // opens no void keeps the strain of the full scheme.
+            const scalar a = alpha_[celli];
+            if (a <= alphaEmpty)
+            {
+                sigma[celli] = Zero;
+                rho[celli] = 0;
+                alphaL_[celli] = 0;
+                continue;
+            }
+            const bool full = a >= alphaFull;
+            const Vector<label>& geomD = mesh.geometricD();
+            static const direction diag[3] =
+                {symmTensor::XX, symmTensor::YY, symmTensor::ZZ};
+            bool same = full;
+            scalar matV = full ? 1 : a;     // material volume / V
+            symmTensor dE(dEps);
+            for (direction d = 0; d < vector::nComponents; ++d)
+            {
+                if (geomD[d] < 0)
+                {
+                    continue;
+                }
+                const scalar r = dt*dVa[celli][d]/V[celli];
+                scalar dm;
+                if (r < 0)
+                {
+                    dm = full ? r : min(scalar(0), r + (1 - a));
+                }
+                else
+                {
+                    const scalar cap =
+                        (full && !noTension_)
+                      ? GREAT
+                      : a*max(scalar(0), -sigma[celli].component(diag[d]))/M;
+                    dm = min(r, cap);
+                }
+                if (dm != r)
+                {
+                    same = false;
+                }
+                matV += dm;
+                dE.component(diag[d]) = dm/(a + 0.5*dm);
+            }
+            if (!same)
+            {
+                dEps = dE;
+                alphaL_[celli] =
+                    min(max(matV*V[celli]/VL, scalar(0)), scalar(1));
+            }
+            else
+            {
+                alphaL_[celli] = 1;
+            }
+        }
 
         if (dW != tensor::zero)
         {

@@ -50,6 +50,12 @@ Description
       patch name -> { friction <deg>; } makes that patch a rigid wall: no
       normal velocity, no tension (material separates), Coulomb shear
       traction at most tan(friction) times the wall pressure (0: smooth).
+    - constant/materialProperties, optional freeSurface (default no; WP 3.2a,
+      decision 0031): one material plus void. Field alpha (material volume
+      fraction, read if present, default 1); rho is then the bulk density
+      (cell mass over cell volume, 0 in empty cells) and U, sigma, epsP,
+      epsPEq are per unit material mass. Cartesian hex meshes only.
+      Material with c 0 or sigmaT 0 separates instead of carrying tension.
 
 SourceFiles
     eulerianSolid.C
@@ -148,8 +154,38 @@ class eulerianSolid
         //  the cell (diagnostics: wall and bottom forces)
         surfaceVectorField Fstar_;
 
+        //- Free surface (WP 3.2a, decision 0031): materialProperties
+        //  freeSurface yes; one material plus void on a Cartesian hex mesh
+        Switch freeSurface_;
+
+        //- Material volume fraction [-] (1 full, 0 empty), freeSurface only
+        volScalarField alpha_;
+
+        //- Reference (material) density [kg/m^3], materialProperties rho
+        scalar rho0_;
+
+        //- Material without tensile strength (c 0 or sigmaT 0): separates
+        bool noTension_;
+
+        //- Cell lengths along x, y, z (Cartesian hex cells, freeSurface)
+        vectorField hCell_;
+
+        //- Passed from lagrangeStep to remap (freeSurface): slab side per
+        //  axis (+1, -1 or 0 spread), material fraction of the Lagrangian
+        //  cell, and 1 where the cell and all its neighbours are full
+        //  (second order allowed)
+        vectorField lean_;
+        scalarField alphaL_;
+        scalarField smooth_;
+
 
     // Private Member Functions
+
+        //- Cell lengths, checking that every face is normal to an axis
+        void setCartesianGeometry();
+
+        //- Remap with void (freeSurface): slab volume fluxes, decision 0031
+        void remapFreeSurface(const scalar dt);
 
         //- Limiters from materialProperties, with the defaults
         static HashTable<word> readRemapLimiters(const dictionary& dict);
@@ -192,6 +228,10 @@ public:
         const vector& g() const { return g_; }
         scalar damping() const { return damping_; }
         const HashTable<scalar>& wallFriction() const { return wallFriction_; }
+        bool freeSurface() const { return freeSurface_; }
+        const volScalarField& alpha() const { return alpha_; }
+        scalar rho0() const { return rho0_; }
+        bool noTension() const { return noTension_; }
 
         //- Gravity at time t, with the ramp
         vector gravityAt(const scalar t) const;
@@ -208,6 +248,7 @@ public:
         volSymmTensorField& epsPRef() { return epsP_; }
         volScalarField& epsPEqRef() { return epsPEq_; }
         surfaceScalarField& phiLRef() { return phiL_; }
+        volScalarField& alphaRef() { return alpha_; }
 
 
     // Explicit cycle
