@@ -30,7 +30,7 @@ Constitutive models for bulk solids are tracked in `docs/constitutive-models.md`
 | 3.2p | Prototype free surface (material plus void) | Lake at rest, translating and falling blocks, separation |
 | 3.2q | Prototype column collapse (split from 3.2p, decision 0021) | Column collapse run-out, top and deposit slope within decision 0019 |
 | 3.2r | Prototype column collapse deposit slope (split from 3.2q, decision 0023) | Deposit body without whole-cell steps (done, decision 0024); toe split to 3.2s |
-| 3.2s | Prototype collapse toe: stress in partly filled cells (split from 3.2r, decision 0024) | Same test as 3.2q: run-out, top and deposit slope within decision 0019 |
+| 3.2s | Prototype collapse toe: stress in partly filled cells (split from 3.2r, decision 0024) | Same test as 3.2q: run-out, top and deposit slope within decision 0019 (slope as a fitted line, decision 0025; done) |
 | 3.3p | Prototype silo discharge (target T0) | Steady rate, D^1.5 law, rate independent of head |
 | 3.1 | C++ gravity and wall boundaries (smooth, frictional) | celFoam settles a tank, matches the prototype |
 | 3.2 | C++ void and free surface | celFoam passes the 3.2p checks |
