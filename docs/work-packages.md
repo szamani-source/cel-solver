@@ -40,6 +40,7 @@ Constitutive models for bulk solids are tracked in `docs/constitutive-models.md`
 | 3.2b | C++ column collapse: shear cap (rule 8), rule 9, neither rule 12 nor 13 (decision 0029; split from 3.2) | Column collapse run-out at E = 0.1, 1, 10 MPa recorded against decision 0019 |
 | 3.3 | C++ outlet boundary that opens | Material leaves only after the opening time, mass balance exact |
 | 3.4 | Silo discharge in celFoam (target T0), serial and parallel | Matches the prototype and the reference values; rate at E = 0.1, 1, 10 MPa within 10 % with the same code as the collapse (settles rules 12 and 13, decision 0029) |
+| 3.4b | C++ discharge rate independent of E (split from 3.4, decision 0034) | `tests/manual/test_discharge_stiffness.sh` passes at 10 mm and at 5 mm (0.1, 1 MPa) while `tests/test_collapse.sh` still passes |
 | 3.5 | Cohesion in the silo (arching, flow or no flow) | Flow stops below a critical outlet width |
 | 3B.1 | N-material volume fractions with isoAdvector | Pure advection keeps interfaces sharp |
 | 3B.2 | Mixed-cell closure | Two-material impact conserves mass and momentum |
@@ -90,6 +91,9 @@ only in the discharge; reconciling them is split to 3.2t (2026-11-15).
 rule 12 that keeps the 10 MPa collapse stopping also slows the discharge. Closed without
 its done-when; the C++ silo packages start with the full jump terms and measure both
 cases with one code (2026-11-15).
+3.4 found the C++ rate falls with E with the collapse code (10 mm: 74 / 66 / 71 kg/s/m
+at 0.1 / 1 / 10 MPa; 5 mm: 78 / 55 at 0.1 / 1 MPa) and parallel matches serial; closed
+without its done-when, the E independence split to 3.4b (2026-11-16, decision 0034).
 Phases 4 to 6 (Lagrangian bodies, contact, FE, parallel scaling) are unchanged but come
 after T0. 2.6 (Taylor bar) waits for Phase 5.
 
