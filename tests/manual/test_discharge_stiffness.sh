@@ -6,6 +6,9 @@
 #
 #   tests/manual/test_discharge_stiffness.sh                       # 10 mm, serial
 #   tests/manual/test_discharge_stiffness.sh --cell 0.005 --procs 4 0.1 1
+#
+# With rule 12 (WP 3.4b, decision 0035): prefix CEL_EXTRA_MATERIAL='normalCap yes;'
+# (10 mm then passes: 78.6 / 73.8 / 84.8; 5 mm still fails: 82.6 / 69.7).
 set -eu
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 work="$(mktemp -d)"

@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-11-16 (WP 3.4)
+Last updated: 2026-11-16 (WP 3.4b)
 
 Plan doc: https://claude.ai/artifact/DTT6kSikz9ZUTBkUxY6Grr
 
@@ -44,6 +44,7 @@ Phase 2 (the C++ Eulerian solver: 2.1 to 2.5c and 2.4b done; 2.6 waits for Phase
 | 3.2b | C++ column collapse: shear cap and rule 9 | Done (recorded; creep and E dependence remain) | Decision 0032: `shearCap yes` (rule 8, face by face, capped faces slip) and `spreadLayers yes` (rule 9) in materialProperties, both default off. `tests/test_collapse.sh` passes (about 2.5 min, 10 mm): a = 0.5 run-out 0.55 / 0.35 / 0.20 at E = 0.1 / 1 / 10 MPa (prototype 0.55 / 0.40 / 0.25), top kept, fitted slope 17 to 24 deg; a = 2 at 1 MPa 1.40 (prototype 1.8), stops at 1.5 s. The a = 0.5 columns still creep at 2 s (as the prototype at 10 cells). 10 MPa run-out below the 0019 band (normal jump term uncapped, the rule 12 question for WP 3.4). Without the cap 0.25 at 1 MPa. 2 processors match serial to 8e-13 at 0.1 s; later round-off flips cap/rule 9 switches and the runs part |
 | 3.3 | C++ outlet boundary that opens | Done | Decision 0033: `outlets { outlet { friction 20; openTime 0.3; } }` in materialProperties (needs `freeSurface yes`): a closed wall until it opens, then a traction-free outflow face with rule 10b; damping off on opening; `discharged()` counts the mass out. `tests/test_outlet.sh` passes (about 30 s, 10 mm, E = 0.1 MPa, shear cap and rule 9 on): nothing through the closed outlet (0 exactly), tank plus discharged constant to 4e-14, rate 74.1 kg/s/m, C 0.89 (prototype without rules 12/13 81.35, -9 %); without rule 10b 27.4. Not tested in parallel (WP 3.4) |
 | 3.4 | C++ silo discharge across E, serial and parallel | Closed, done-when not met; E independence split to 3.4b | Decision 0034. `tests/test_discharge.sh` passes (about 50 s): mass 4e-14, no stress in void, 2 processors with the outlet split give the serial rate (74.09 both). Rate with the collapse code falls with E: 10 mm 74.1 / 65.7 / 70.9 kg/s/m at 0.1 / 1 / 10 MPa (1 MPa -11 %), 5 mm 78.0 / 55.0 at 0.1 / 1 MPa (-29 %). The E sweep is `tests/manual/test_discharge_stiffness.sh` (fails now) |
+| 3.4b | C++ discharge rate independent of E (rule 12) | Closed, done-when not met; Sia chose mu(I) (decision 0036) | Decision 0035: rule 12 in C++ behind `normalCap yes` (default off). With it: 10 mm 78.6 / 73.8 / 84.8 kg/s/m at 0.1 / 1 / 10 MPa (met), 5 mm 82.6 / 69.7 at 0.1 / 1 MPa (-16 %, was -29 %: not met). Collapse unharmed, unlike the prototype (a = 0.5: 0.50 / 0.35 / 0.25; a = 2: 1.50). 2-processor discharge rate +0.6 %; collapse cell-by-cell parallel check fails with the switch on (bisection round-off). Drivers read `CEL_EXTRA_MATERIAL` |
 
 ## Standing instruction from Sia (2026-11-14)
 
@@ -53,6 +54,8 @@ anything that cannot be undone outside this repository.
 
 ## Waiting on Sia
 
+- mu(I) constants (mu_s, mu_2, I0) and grain size and density for the T0 material, if
+  measured (decision 0036); literature placeholders until then.
 - Optional: real tank dimensions and material data for the silo problem (placeholders
   are in `docs/spec/target-problems.md`).
 - Optional: paste the setup line from `docs/wp/WP-0.4.md` into the cloud environment's
@@ -94,10 +97,16 @@ Silo track (decision 0016), one thread each:
 12. WP 3.4: C++ discharge across E. Closed without its done-when (decision 0034): with
    the collapse code the rate falls with E (5 mm: 78 at 0.1 MPa, 55 at 1 MPa; 10 mm
    hides most of it); two processors give the serial rate.
-13. Next: WP 3.4b, rule 12 (normal jump cap) in the C++ Lagrange step behind a switch,
-   checked by `tests/manual/test_discharge_stiffness.sh` (10 mm and 5 mm) and
-   `tests/test_collapse.sh` together. If it cannot serve both (as in the prototype,
-   decision 0029), ask Sia: run T0 at a soft numerical E = 0.1 MPa, or add mu(I).
+13. WP 3.4b: rule 12 in C++. Closed without its done-when (decision 0035): the collapse
+   is fine with it and 10 mm passes, but at 5 mm the rate still falls 16 % from 0.1 to
+   1 MPa.
+14. Sia chose rate-dependent friction over a soft E (2026-11-16: parameters must be
+   measurable). Survey `docs/rate-dependent-friction-survey.md`, plan decision 0036:
+   mu(I) with the Barker-Gray regularisation in the return mapping, plus an impedance
+   from the plastic tangent at flowing faces (mu(I) alone is estimated to be ~100 times
+   too weak against the numerical viscosity at 5 mm).
+15. Next: WP 3.6a (mu(I) in the constitutive library), then 3.6b (inclined layer, which
+   measures the numerical viscosity), 3.6c, 3.6d (silo E sweep), 3.6e. WP 3.5 waits.
    Keep runs coarse and short: Sia asked to be frugal with Claude usage (2026-11-15).
 
 Then the C++ counterparts 3.1 to 3.4 (2.4b is done; briefs not written yet) and 3.5
@@ -111,8 +120,9 @@ is built. Silo walls are mesh boundaries with friction, not contact.
 
 ## Known issues
 
-- C++ silo (decision 0034): with the collapse code the discharge rate falls with E
-  (-29 % from 0.1 to 1 MPa at 5 mm). Use E = 0.1 MPa for T0 until WP 3.4b.
+- C++ silo (decisions 0034, 0035): with the collapse code the discharge rate falls with E
+  (-29 % from 0.1 to 1 MPa at 5 mm; -16 % with `normalCap yes`). Fix planned as WP 3.6
+  (decision 0036); Sia rejected a soft E as unmeasurable.
 
 - C++ silo (WP 3.1, decision 0030): the free top of a full tank lets material in through
   the remap as the column settles (mass +6e-4); WP 3.2 replaces it with void. Velocity,

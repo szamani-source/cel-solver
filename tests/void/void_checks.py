@@ -85,7 +85,8 @@ snGradSchemes { default corrected; }
     walls = "".join(f"    {w} {{ friction 0; }}\n" for w in sides)
     cs.write(f"{path}/constant/materialProperties",
              H_.format(cls="dictionary", obj="materialProperties")
-             + f"rho {RHO};\nfreeSurface yes;\n" + material + "walls\n{\n" + walls + "}\n")
+             + f"rho {RHO};\nfreeSurface yes;\n" + material
+             + os.environ.get("CEL_EXTRA_MATERIAL", "") + "walls\n{\n" + walls + "}\n")
     if gravity:
         cs.write(f"{path}/constant/g", H_.format(cls="uniformDimensionedVectorField", obj="g")
                  + f"dimensions [0 1 -2 0 0 0 0];\nvalue (0 {-G_ACC!r} 0);\n")
