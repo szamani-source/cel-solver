@@ -56,6 +56,14 @@ Description
       (cell mass over cell volume, 0 in empty cells) and U, sigma, epsP,
       epsPEq are per unit material mass. Cartesian hex meshes only.
       Material with c 0 or sigmaT 0 separates instead of carrying tension.
+    - constant/materialProperties, optional subdictionary outlets (WP 3.3,
+      decision 0033; needs freeSurface yes): patch name ->
+      { friction <deg>; openTime <s>; } makes that patch a closed wall with
+      that friction until the start of the first step at or after openTime
+      (default: never; openOutlets() opens them at once), then a
+      traction-free outflow face (prototype rules 10 and 10b): the material
+      swept across it leaves the domain and is counted in discharged().
+      Opening an outlet ends the settling stage: damping is set to 0.
 
 SourceFiles
     eulerianSolid.C
@@ -188,6 +196,14 @@ class eulerianSolid
         //  (this processor, owner side of coupled faces)
         label nCapped_;
 
+        //- Outlet patches (WP 3.3): opening time [s]; a closed outlet is
+        //  in wallFriction_, an open one is not
+        HashTable<scalar> outletOpenTime_;
+
+        //- Mass that left through non-coupled boundary faces (this
+        //  processor) [kg]
+        scalar discharged_;
+
         //- Cell lengths along x, y, z (Cartesian hex cells, freeSurface)
         vectorField hCell_;
 
@@ -256,6 +272,23 @@ public:
         bool shearCap() const { return shearCap_; }
         bool spreadLayers() const { return spreadLayers_; }
         label nCapped() const { return nCapped_; }
+
+        //- Is the patch an outlet, and is it open (WP 3.3)?
+        bool isOutlet(const word& patch) const
+        {
+            return outletOpenTime_.found(patch);
+        }
+        bool outletOpen(const word& patch) const
+        {
+            return isOutlet(patch) && !wallFriction_.found(patch);
+        }
+
+        //- Open every outlet now (damping off)
+        void openOutlets();
+
+        //- Mass that left through non-coupled boundaries, all processors
+        //  [kg]
+        scalar discharged() const;
 
         //- Gravity at time t, with the ramp
         vector gravityAt(const scalar t) const;

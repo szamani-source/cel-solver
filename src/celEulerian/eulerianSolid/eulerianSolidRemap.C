@@ -1061,6 +1061,11 @@ void Foam::eulerianSolid::remapFreeSurface(const scalar dt)
             {
                 dmPatch[patchi][i] = sgn*dm;
             }
+            else
+            {
+                // Leaves the domain (an open outlet, WP 3.3)
+                discharged_ += dm;
+            }
             dmOut[fc[i]] += sgn*dm;
             vOut[fc[i]] += sgn*v;
         }

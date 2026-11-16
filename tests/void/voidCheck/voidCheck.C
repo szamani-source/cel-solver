@@ -27,9 +27,10 @@ Description
 
     Output (master unless noted):
         history.dat  step t mass px py cx cy max|s| max|s|_empty max|U|
-                     Fy_bottom max(s_xx, s_yy) KE nCapped
+                     Fy_bottom max(s_xx, s_yy) KE nCapped discharged
                      (s: material stress; Fy_bottom: force of the patch
-                     bottom on the material)
+                     bottom on the material; discharged: mass that
+                     left through outlets, WP 3.3)
         cells.dat    (cells.dat.procN in parallel) at the end:
                      x y alpha rho Ux Uy s_xx s_yy s_xy
 \*---------------------------------------------------------------------------*/
@@ -139,7 +140,7 @@ int main(int argc, char *argv[])
         hist.reset(new OFstream("history.dat"));
         hist().precision(17);
         hist() << "# step t mass px py cx cy smax smaxEmpty Umax FyBottom snMax"
-            << " KE nCapped" << nl;
+            << " KE nCapped discharged" << nl;
     }
 
     auto record = [&](const label step)
@@ -154,6 +155,7 @@ int main(int argc, char *argv[])
         const vector mc = gSum(m*C);
         const scalar ke = 0.5*gSum(m*magSqr(u));
         const label nCap = returnReduce(solid.nCapped(), sumOp<label>());
+        const scalar out = solid.discharged();
         scalar smax = 0, sEmpty = 0, umax = 0, snMax = -GREAT;
         forAll(m, celli)
         {
@@ -181,7 +183,7 @@ int main(int argc, char *argv[])
             hist() << step << ' ' << runTime.value() << ' ' << mass << ' '
                 << p.x() << ' ' << p.y() << ' ' << mc.x()/mass << ' '
                 << mc.y()/mass << ' ' << smax << ' ' << sEmpty << ' ' << umax
-                << ' ' << fy << ' ' << snMax << ' ' << ke << ' ' << nCap << nl;
+                << ' ' << fy << ' ' << snMax << ' ' << ke << ' ' << nCap << ' ' << out << nl;
         }
     };
 
