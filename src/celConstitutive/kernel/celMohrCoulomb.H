@@ -28,12 +28,17 @@ Description
     and the first admissible one is taken (multipliers >= 0, order kept,
     all yield functions <= 0), as _mc_tension_return in models.py.
     phi = 0 gives Tresca (no apex; a failed corner return throws).
+
+    Optional mu(I) friction (WP 3.6a, celMuI.H): parameters mu2, I0, d, rhoS,
+    muIAlpha. The return then uses phi_m = atan(mu(I)) for phi; sigmaT is
+    lowered to c cot(phi_m) where it would lie above that apex.
 \*---------------------------------------------------------------------------*/
 
 #ifndef celMohrCoulomb_H
 #define celMohrCoulomb_H
 
 #include "celConstitutiveKernel.H"
+#include "celMuI.H"
 
 namespace cel
 {
@@ -73,9 +78,37 @@ private:
     bool tension_;
     double sigmaT_;
 
+    //- mu(I) friction, or null (rate-independent)
+    std::unique_ptr<FrictionLaw> law_;
+
+    //- Friction-dependent constants of one return
+    struct Friction
+    {
+        double sinPhi;
+        double cosPhi;
+        double sigmaT;
+    };
+
+    //- Return mapping with the given friction constants
+    Return returnAt
+    (
+        const Friction& fr,
+        const Voigt deps,
+        const Voigt sigOld,
+        const History& hOld,
+        Voigt sigNew,
+        History& hNew
+    ) const;
+
     //- Active-set return onto Mohr-Coulomb plus Rankine planes, sorted
     //  principal trial w -> s. Returns the kind of return taken.
-    Return tensionReturn(const double w[3], double scale, double s[3]) const;
+    Return tensionReturn
+    (
+        const Friction& fr,
+        const double w[3],
+        double scale,
+        double s[3]
+    ) const;
 
 public:
 
@@ -94,6 +127,27 @@ public:
         Voigt sigNew,
         History& hNew
     ) const override;
+
+    void updateRate
+    (
+        const Voigt deps,
+        double dt,
+        const Voigt sigOld,
+        const History& hOld,
+        Voigt sigNew,
+        History& hNew
+    ) const override;
+
+    bool rateDependent() const override
+    {
+        return bool(law_);
+    }
+
+    //- The mu(I) law, or null
+    const FrictionLaw* frictionLaw() const override
+    {
+        return law_.get();
+    }
 
     //- As update, and report which return was taken
     Return updateReturn

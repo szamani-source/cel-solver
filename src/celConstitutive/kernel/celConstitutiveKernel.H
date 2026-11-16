@@ -34,6 +34,8 @@ namespace cel
 namespace constitutive
 {
 
+class FrictionLaw;
+
 //- Six Voigt components, order xx, yy, zz, xy, yz, zx
 typedef double Voigt[6];
 
@@ -115,6 +117,34 @@ public:
         Voigt sigNew,
         History& hNew
     ) const = 0;
+
+    //- One increment over a time step dt [s]. Rate-dependent models (mu(I)
+    //  friction, WP 3.6a) need dt; the others ignore it and call update.
+    virtual void updateRate
+    (
+        const Voigt deps,
+        double dt,
+        const Voigt sigOld,
+        const History& hOld,
+        Voigt sigNew,
+        History& hNew
+    ) const
+    {
+        (void)dt;
+        update(deps, sigOld, hOld, sigNew, hNew);
+    }
+
+    //- True if updateRate depends on dt
+    virtual bool rateDependent() const
+    {
+        return false;
+    }
+
+    //- The mu(I) friction law of a rate-dependent model, or null
+    virtual const FrictionLaw* frictionLaw() const
+    {
+        return nullptr;
+    }
 
     //- Elastic P-wave modulus K + 4G/3 (stable time step)
     virtual double waveModulus() const = 0;

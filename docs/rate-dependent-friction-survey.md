@@ -59,6 +59,8 @@ not make the rate independent of E.** The survey therefore covers both the rate 
   Gray (2019, JFM 874, "Constitutive relations for compressible granular flow in the
   inertial regime"): full compressible mu(I)/phi(I) model. phi(I) is measurable (volume
   fraction against I in the same shear tests), but it brings a second field law.
+- WP 3.6a (decision 0037): for mu_s = tan 35 deg the Jop law has no well-posed range of
+  I at all, so the Barker-Gray branch cannot be built for T0. It is optional in the code.
 - Relevance: our model is compressible already (elastic pressure tied to density), so
   the low-I ill-posedness may be less severe than in the incompressible form, but a
   rate law with mu'(I) large at I -> 0 still needs the Barker-Gray branch to avoid

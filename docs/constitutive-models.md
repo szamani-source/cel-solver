@@ -31,9 +31,13 @@ then ported to C++ with the same tests (WP 2.2, 2.5a, 2.5b).
 - **Large deformation.** Stress is carried with an objective rate (WP 2.3) and remapped
   with its history variables (WP 2.4, 3.4).
 
+- **Rate-dependent friction (WP 3.6a, decision 0037).** Both frictional models take an
+  optional mu(I) law (mu2, I0, d, rhoS; optional Barker-Gray muIAlpha): the return uses
+  phi_m = atan(mu(I)) with I from the plastic shear rate and pressure. Without mu2 (or
+  with mu2 = tan(phi)) the models are unchanged.
+
 ## Later candidates (not scheduled)
 
 - Strain softening / critical state (state-dependent friction and dilation).
-- mu(I) rheology for fast dense granular flow.
 - Hypoplasticity for sand under cyclic or complex loading.
 - Cap models for compaction.

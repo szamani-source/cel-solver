@@ -112,11 +112,64 @@ DruckerPrager::DruckerPrager(const Parameters& p, const Options& opts)
     double unused;
     coefficients(fit_, phi, eta_, xi_);
     coefficients(fit_, psi, etaBar_, unused);
+
+    law_ = FrictionLaw::New(p, phi);
 }
 
 
 void DruckerPrager::update
 (
+    const Voigt deps,
+    const Voigt sigOld,
+    const History& hOld,
+    Voigt sigNew,
+    History& hNew
+) const
+{
+    returnMap(eta_, xi_, deps, sigOld, hOld, sigNew, hNew);
+}
+
+
+void DruckerPrager::updateRate
+(
+    const Voigt deps,
+    double dt,
+    const Voigt sigOld,
+    const History& hOld,
+    Voigt sigNew,
+    History& hNew
+) const
+{
+    if (!law_)
+    {
+        update(deps, sigOld, hOld, sigNew, hNew);
+        return;
+    }
+    Voigt trial;
+    el_.addStress(sigOld, deps, trial);
+    muIReturn
+    (
+        *law_, el_, trial, dt,
+        [&](double mu, Voigt s, History& h)
+        {
+            if (mu == law_->muS())
+            {
+                update(deps, sigOld, hOld, s, h);
+                return;
+            }
+            double eta, xi;
+            coefficients(fit_, std::atan(mu)*180.0/M_PI, eta, xi);
+            returnMap(eta, xi, deps, sigOld, hOld, s, h);
+        },
+        sigNew, hNew
+    );
+}
+
+
+void DruckerPrager::returnMap
+(
+    const double eta,
+    const double xi,
     const Voigt deps,
     const Voigt sigOld,
     const History& hOld,
@@ -133,7 +186,7 @@ void DruckerPrager::update
     Voigt s;
     deviator(trial, s);
     const double sqj = std::sqrt(J2(trial));
-    const double f = sqj + eta_*p - xi_*c_;
+    const double f = sqj + eta*p - xi*c_;
 
     if (f <= yieldTol*std::max({std::abs(p), sqj, c_, 1.0}))
     {
@@ -143,9 +196,9 @@ void DruckerPrager::update
         return;
     }
 
-    const double dgam = f/(G + K*eta_*etaBar_);
+    const double dgam = f/(G + K*eta*etaBar_);
 
-    if (sqj - G*dgam >= 0.0 || eta_ == 0.0)
+    if (sqj - G*dgam >= 0.0 || eta == 0.0)
     {
         // Return to the smooth cone
         const double factor = sqj > 0.0 ? 1.0 - G*dgam/sqj : 1.0;
@@ -159,7 +212,7 @@ void DruckerPrager::update
     }
 
     // Apex: zero deviator, mean stress at the cone tip (zero if cohesionless)
-    const double pApex = xi_*c_/eta_;
+    const double pApex = xi*c_/eta;
     for (int i = 0; i < 6; ++i)
     {
         sigNew[i] = i < 3 ? pApex : 0.0;

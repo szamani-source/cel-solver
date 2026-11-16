@@ -23,7 +23,19 @@ Description
     tension plane, hydrostatic tension the tension apex, tension-then-shear a mixed Mohr-Coulomb/tension corner, and
     the random paths every tension return (plane, edge, apex, corner).
 
-    Build and run: tests/test_constitutive_cpp.sh
+    WP 3.6a: a case with a "dt <value>" line (tests/gen_mu_i_reference.py) is
+    replayed with updateRate(dt) and must be rate dependent; return counting
+    is skipped for it. Its apex flag may differ from Python's on a step where
+    the cone return lands at the apex to round-off (the root of the mu(I)
+    return decides which side); stress and history must still match.
+
+    compareReference --mu2-equal-mus <file> (WP 3.6a): replays only the
+    Drucker-Prager and Mohr-Coulomb cases, with mu2 = tan(phi) (and I0, d,
+    rhoS) added and updateRate(dt = 1e-4): the model must not be rate
+    dependent and must give the rate-independent C++ model's path along the
+    file's increments bit for bit (tolerance 0).
+
+    Build and run: tests/test_constitutive_cpp.sh, tests/test_mu_i.sh
 \*---------------------------------------------------------------------------*/
 
 #include "celConstitutiveKernel.H"
@@ -58,6 +70,7 @@ struct Case
     std::string model;
     Parameters params;
     Options options;
+    double dt = 0;
     double sigma0[6];
     std::vector<Step> steps;
 };
@@ -92,6 +105,10 @@ std::vector<Case> readCases(const char* file)
             }
             cases.push_back(c);
         }
+        else if (key == "dt")
+        {
+            is >> cases.back().dt;
+        }
         else if (key == "option")
         {
             std::string k, v;
@@ -124,21 +141,64 @@ std::vector<Case> readCases(const char* file)
 
 int main(int argc, char* argv[])
 {
-    if (argc != 2)
+    const bool muSame =
+        argc == 3 && std::string(argv[1]) == "--mu2-equal-mus";
+    if (argc != 2 && !muSame)
     {
-        std::cerr << "usage: compareReference <reference file>\n";
+        std::cerr
+            << "usage: compareReference [--mu2-equal-mus] <reference file>\n";
         return 2;
     }
 
-    const double tol = 1e-10;
+    const double tol = muSame ? 0 : 1e-10;
     int failures = 0;
 
-    const std::vector<Case> cases = readCases(argv[1]);
+    std::vector<Case> cases = readCases(argv[argc - 1]);
+    if (muSame)
+    {
+        std::vector<Case> kept;
+        for (Case c : cases)
+        {
+            if (c.model == "druckerPrager" || c.model == "mohrCoulomb")
+            {
+                // The expected path is the rate-independent C++ model's own
+                const auto plain = makeModel(c.model, c.params, c.options);
+                double sig[6];
+                std::copy(c.sigma0, c.sigma0 + 6, sig);
+                History h;
+                for (Step& st : c.steps)
+                {
+                    History hNew;
+                    plain->update(st.deps, sig, h, st.sigma, hNew);
+                    std::copy(hNew.epsP, hNew.epsP + 6, st.epsP);
+                    st.epsPEq = hNew.epsPEq;
+                    st.apex = hNew.apex;
+                    std::copy(st.sigma, st.sigma + 6, sig);
+                    h = hNew;
+                }
+                c.params["mu2"] =
+                    std::tan(c.params["phi"]*3.14159265358979323846/180.0);
+                c.params["I0"] = 0.279;
+                c.params["d"] = 1e-3;
+                c.params["rhoS"] = 2650;
+                c.dt = 1e-4;
+                kept.push_back(c);
+            }
+        }
+        cases = kept;
+    }
     std::cout << "Read " << cases.size() << " reference paths\n";
 
     for (const Case& c : cases)
     {
         const auto model = makeModel(c.model, c.params, c.options);
+        if (muSame && c.dt > 0 && model->rateDependent())
+        {
+            std::cout << "FAIL  " << c.name
+                << ": mu2 = tan(phi) gave a rate-dependent model\n";
+            ++failures;
+            continue;
+        }
 
         double sig[6];
         std::copy(c.sigma0, c.sigma0 + 6, sig);
@@ -147,14 +207,23 @@ int main(int argc, char* argv[])
         double sigScale = 0, epsScale = 0, sigErr = 0, epsErr = 0;
         int apexMismatch = 0, nPlastic = 0, nApex = 0;
 
-        const auto* mc = dynamic_cast<const MohrCoulomb*>(model.get());
+        const bool rate = c.dt > 0;
+        // Rate-dependent cases must give a rate-dependent model, except in
+        // the --mu2-equal-mus mode, where none may
+        const bool wantRate = rate && !muSame;
+        const auto* mc =
+            rate ? nullptr : dynamic_cast<const MohrCoulomb*>(model.get());
         int nRet[MohrCoulomb::nReturns] = {};
 
         for (const Step& s : c.steps)
         {
             double sigNew[6];
             History hNew;
-            if (mc)
+            if (rate)
+            {
+                model->updateRate(s.deps, c.dt, sig, h, sigNew, hNew);
+            }
+            else if (mc)
             {
                 ++nRet[int(mc->updateReturn(s.deps, sig, h, sigNew, hNew))];
             }
@@ -242,12 +311,13 @@ int main(int argc, char* argv[])
         }
 
         const bool ok =
-            relSig < tol
-         && (epsScale > 0 ? relEps < tol : epsErr == 0)
-         && apexMismatch == 0
+            (muSame ? relSig == 0 : relSig < tol)
+         && (epsScale > 0 && !muSame ? relEps < tol : epsErr == 0)
+         && ((rate && !muSame) || apexMismatch == 0)
          && (!needPlastic || nPlastic > 0)
          && (!needApex || nApex > 0)
-         && returnsOk;
+         && returnsOk
+         && model->rateDependent() == wantRate;
 
         char buf[256];
         std::snprintf
