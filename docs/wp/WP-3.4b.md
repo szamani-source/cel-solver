@@ -29,4 +29,4 @@ rule 12 (normal Riemann jump capped at yield) while the column collapse still pa
   84.8 kg/s/m at 0.1 / 1 / 10 MPa (met); 5 mm 82.6 / 69.7 at 0.1 / 1 MPa (-15.7 %, not
   met; was -29 %). Collapse passes its physics checks (0.50 / 0.35 / 0.25 at a = 0.5,
   1.50 at a = 2); its 2-processor bitwise check fails with the switch on (bisection
-  grid, round-off). CI unchanged (switch off). Next: Sia chooses E = 0.1 MPa or mu(I).
+  grid, round-off). CI unchanged (switch off). Sia then chose mu(I) (decision 0036, survey in `docs/rate-dependent-friction-survey.md`).

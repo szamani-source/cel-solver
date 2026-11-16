@@ -73,7 +73,7 @@ Column collapse (`tests/collapse/collapse_checks.py`, 10 mm):
   (to keep the package small): the shear cap leaves the shear jump of still-elastic
   faces, and the outlet zone may still hold void. mu(I) adds rate dependence that is
   physical rather than numerical.
-- Choice for Sia (decision 0034 item 4): run T0 at a soft numerical E = 0.1 MPa (rate
+- Choice put to Sia (decision 0034 item 4; Sia chose mu(I), decision 0036): run T0 at a soft numerical E = 0.1 MPa (rate
   C 0.95 to 1.0, collapse as the prototype; explicit codes use mass scaling the same
   way) or build mu(I) rate-dependent friction.
 - If the switch is used in parallel, compare runs by rate, not cell by cell.

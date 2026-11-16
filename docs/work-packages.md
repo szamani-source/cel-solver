@@ -41,6 +41,11 @@ Constitutive models for bulk solids are tracked in `docs/constitutive-models.md`
 | 3.3 | C++ outlet boundary that opens | Material leaves only after the opening time, mass balance exact |
 | 3.4 | Silo discharge in celFoam (target T0), serial and parallel | Matches the prototype and the reference values; rate at E = 0.1, 1, 10 MPa within 10 % with the same code as the collapse (settles rules 12 and 13, decision 0029) |
 | 3.4b | C++ discharge rate independent of E (split from 3.4, decision 0034) | `tests/manual/test_discharge_stiffness.sh` passes at 10 mm and at 5 mm (0.1, 1 MPa) while `tests/test_collapse.sh` still passes |
+| 3.6a | mu(I) friction (Barker-Gray regularised) in the constitutive library, Python then C++ (decision 0036) | Single-point simple shear at fixed pressure gives mu(I) to 1e-6 over I = 1e-4 to 1; mu_2 = mu_s reproduces the present MC/DP paths bit for bit; C++ matches Python |
+| 3.6b | Steady inclined layer (Bagnold profile) in celFoam with mu(I), E = 0.1, 1, 10 MPa | Surface speed and profile within 5 % of the exact solution at 0.1 MPa; the error against E measures the numerical viscosity (recorded either way) |
+| 3.6c | Plastic-wave impedance at flowing faces in the Riemann solver (replaces rules 8 and 12 if it matches them) | 3.6b profile within 5 % at all three E, `tests/test_collapse.sh` still passes |
+| 3.6d | Silo discharge with mu(I) and the new impedance | `tests/manual/test_discharge_stiffness.sh` passes at 10 mm and 5 mm (the 3.4b done-when), C within decision 0019 |
+| 3.6e | Column collapse with mu(I) against experiments (Lube 2005, Lajeunesse 2005) | Run-out and final height within the decision 0019 bands at a = 0.5 and 2, at T0's real E |
 | 3.5 | Cohesion in the silo (arching, flow or no flow) | Flow stops below a critical outlet width |
 | 3B.1 | N-material volume fractions with isoAdvector | Pure advection keeps interfaces sharp |
 | 3B.2 | Mixed-cell closure | Two-material impact conserves mass and momentum |
