@@ -4,6 +4,7 @@ kernel/celVonMises.C
 kernel/celDruckerPrager.C
 kernel/celEigen.C
 kernel/celMohrCoulomb.C
+kernel/celMuI.C
 
 constitutiveModel/constitutiveModel.C
 constitutiveModel/constitutiveModelNew.C

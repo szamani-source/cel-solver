@@ -203,6 +203,8 @@ MohrCoulomb::MohrCoulomb(const Parameters& p)
             );
         }
     }
+
+    law_ = FrictionLaw::New(p, phi);
 }
 
 
@@ -219,6 +221,47 @@ void MohrCoulomb::update
 }
 
 
+void MohrCoulomb::updateRate
+(
+    const Voigt deps,
+    double dt,
+    const Voigt sigOld,
+    const History& hOld,
+    Voigt sigNew,
+    History& hNew
+) const
+{
+    if (!law_)
+    {
+        update(deps, sigOld, hOld, sigNew, hNew);
+        return;
+    }
+    Voigt trial;
+    el_.addStress(sigOld, deps, trial);
+    muIReturn
+    (
+        *law_, el_, trial, dt,
+        [&](double mu, Voigt s, History& h)
+        {
+            if (mu == law_->muS())
+            {
+                update(deps, sigOld, hOld, s, h);
+                return;
+            }
+            // phi_m in degrees and back, as mu_i.py, so both sides round alike
+            const double phi = std::atan(mu)*180.0/pi*pi/180.0;
+            Friction fr{std::sin(phi), std::cos(phi), sigmaT_};
+            if (tension_)
+            {
+                fr.sigmaT = std::min(sigmaT_, c_*fr.cosPhi/fr.sinPhi);
+            }
+            returnAt(fr, deps, sigOld, hOld, s, h);
+        },
+        sigNew, hNew
+    );
+}
+
+
 MohrCoulomb::Return MohrCoulomb::updateReturn
 (
     const Voigt deps,
@@ -228,6 +271,26 @@ MohrCoulomb::Return MohrCoulomb::updateReturn
     History& hNew
 ) const
 {
+    return returnAt
+    (
+        Friction{sinPhi_, cosPhi_, sigmaT_}, deps, sigOld, hOld, sigNew, hNew
+    );
+}
+
+
+MohrCoulomb::Return MohrCoulomb::returnAt
+(
+    const Friction& fr,
+    const Voigt deps,
+    const Voigt sigOld,
+    const History& hOld,
+    Voigt sigNew,
+    History& hNew
+) const
+{
+    const double sigT = fr.sigmaT;
+    const double cphi = fr.cosPhi;
+
     Voigt trial;
     el_.addStress(sigOld, deps, trial);
 
@@ -238,14 +301,14 @@ MohrCoulomb::Return MohrCoulomb::updateReturn
     voigtToMatrix(trial, A);
     symmetricEigen(A, w, V);
 
-    const double sphi = sinPhi_;
+    const double sphi = fr.sinPhi;
     const double spsi = sinPsi_;
-    const double k = 2.0*c_*cosPhi_;
+    const double k = 2.0*c_*cphi;
     const double scale =
         std::max({std::abs(w[0]), std::abs(w[1]), std::abs(w[2]), c_, 1.0});
     const double fTrial = (w[0] - w[2]) + (w[0] + w[2])*sphi - k;
     const double tTrial =
-        tension_ ? w[0] - sigmaT_ : -std::numeric_limits<double>::infinity();
+        tension_ ? w[0] - sigT : -std::numeric_limits<double>::infinity();
 
     if (fTrial <= yieldTol*scale && tTrial <= yieldTol*scale)
     {
@@ -308,20 +371,20 @@ MohrCoulomb::Return MohrCoulomb::updateReturn
                 apex = true;
             }
         }
-        if (!apex && sphi > 0 && 0.5*(s[0] + s[2]) > c_*cosPhi_/sphi + tol)
+        if (!apex && sphi > 0 && 0.5*(s[0] + s[2]) > c_*cphi/sphi + tol)
         {
             apex = true;
         }
         if (apex)
         {
-            s[0] = s[1] = s[2] = c_*cosPhi_/sphi;
+            s[0] = s[1] = s[2] = c_*cphi/sphi;
             ret = Return::apex;
         }
     }
 
-    if (tension_ && (!mcDone || s[0] > sigmaT_ + tol))
+    if (tension_ && (!mcDone || s[0] > sigT + tol))
     {
-        ret = tensionReturn(w, scale, s);
+        ret = tensionReturn(fr, w, scale, s);
         apex = (ret == Return::tensionApex);
     }
 
@@ -336,14 +399,16 @@ MohrCoulomb::Return MohrCoulomb::updateReturn
 
 MohrCoulomb::Return MohrCoulomb::tensionReturn
 (
+    const Friction& fr,
     const double w[3],
     double scale,
     double s[3]
 ) const
 {
-    const double sphi = sinPhi_;
+    const double sigT = fr.sigmaT;
+    const double sphi = fr.sinPhi;
     const double spsi = sinPsi_;
-    const double k = 2.0*c_*cosPhi_;
+    const double k = 2.0*c_*fr.cosPhi;
 
     // Planes in the order of _MC_T_SETS in models.py: main, s1 = s2 edge
     // (edge_23), s2 = s3 edge (edge_12), then the Rankine planes T1, T2, T3
@@ -356,7 +421,7 @@ MohrCoulomb::Return MohrCoulomb::tensionReturn
         {{0, 1, 0}, {0, 1, 0}},
         {{0, 0, 1}, {0, 0, 1}}
     };
-    const double rhs[6] = {k, k, k, sigmaT_, sigmaT_, sigmaT_};
+    const double rhs[6] = {k, k, k, sigT, sigT, sigT};
 
     double Dng[6][3];
     for (int j = 0; j < 6; ++j)
@@ -365,7 +430,7 @@ MohrCoulomb::Return MohrCoulomb::tensionReturn
     }
 
     const double M = el_.K + 4.0*el_.G/3.0;
-    const double tol = 1e-10*std::max(scale, sigmaT_);
+    const double tol = 1e-10*std::max(scale, sigT);
 
     // Active sets: one, two, then three planes, in lexicographic order
     int sets[41][3];
@@ -436,7 +501,7 @@ MohrCoulomb::Return MohrCoulomb::tensionReturn
             continue;
         }
         const double fMC = (t[0] - t[2]) + (t[0] + t[2])*sphi - k;
-        if (fMC > tol || t[0] - sigmaT_ > tol)
+        if (fMC > tol || t[0] - sigT > tol)
         {
             continue;
         }

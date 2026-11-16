@@ -2075,7 +2075,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
             hOld.epsPEq = epsPEq[celli];
 
             symmTensor sNew;
-            material_->update(dEps, sigma[celli], hOld, sNew, hNew);
+            material_->update(dEps, dt, sigma[celli], hOld, sNew, hNew);
 
             sigma[celli] = sNew;
             symmTensor e(constitutiveModel::fromVoigt(hNew.epsP));

@@ -13,7 +13,9 @@ Description
     Return to the smooth cone, or to the apex (zero deviator, p = xi c/eta)
     when the cone return would overshoot the axis.
 
-    Parameters: E [Pa], nu [-], phi [deg], c [Pa], psi [deg].
+    Parameters: E [Pa], nu [-], phi [deg], c [Pa], psi [deg], and the
+                optional mu(I) set mu2, I0, d, rhoS, muIAlpha (celMuI.H,
+                WP 3.6a): the cone slope then follows phi_m = atan(mu(I)).
     Options:    fit = compression | extension | plane_strain.
     Reference: dp_coefficients and drucker_prager in models.py.
 
@@ -25,6 +27,7 @@ SourceFiles
 #define celDruckerPrager_H
 
 #include "celConstitutiveKernel.H"
+#include "celMuI.H"
 
 namespace cel
 {
@@ -61,6 +64,21 @@ private:
     double xi_;
     double etaBar_;
 
+    //- mu(I) friction, or null (rate-independent)
+    std::unique_ptr<FrictionLaw> law_;
+
+    //- Return mapping with cone coefficients eta, xi
+    void returnMap
+    (
+        double eta,
+        double xi,
+        const Voigt deps,
+        const Voigt sigOld,
+        const History& hOld,
+        Voigt sigNew,
+        History& hNew
+    ) const;
+
 
 public:
 
@@ -79,6 +97,27 @@ public:
         Voigt sigNew,
         History& hNew
     ) const override;
+
+    void updateRate
+    (
+        const Voigt deps,
+        double dt,
+        const Voigt sigOld,
+        const History& hOld,
+        Voigt sigNew,
+        History& hNew
+    ) const override;
+
+    bool rateDependent() const override
+    {
+        return bool(law_);
+    }
+
+    //- The mu(I) law, or null
+    const FrictionLaw* frictionLaw() const override
+    {
+        return law_.get();
+    }
 
     double waveModulus() const override
     {

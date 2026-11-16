@@ -20,6 +20,12 @@ Description
     mohrCoulomb reads E, nu, phi [deg], c [Pa], psi [deg] and the optional
     tensile strength sigmaT [Pa] (tension cut-off; absent = none).
 
+    Both also read the optional mu(I) friction (WP 3.6a, decision 0037,
+    kernel/celMuI.H): mu2 [-] (absent or tan(phi): rate-independent), I0 [-],
+    d [m] grain diameter, rhoS [kg/m^3] grain density, muIAlpha [-]
+    (Barker-Gray regularisation, absent: none). The model is then rate
+    dependent and needs the time step: call update with dt.
+
     update() takes OpenFOAM symmTensors. The strain increment is the tensor
     strain increment (e.g. symm(gradU)*dt), so its shear components are
     eps_ij, not gamma_ij; the wrapper doubles them for the kernel. Component
@@ -135,6 +141,24 @@ public:
             symmTensor& sigNew,
             history& hNew
         ) const;
+
+        //- One increment over the time step dt (mu(I) needs it; the other
+        //  models give the same result as update without dt)
+        void update
+        (
+            const symmTensor& deps,
+            const scalar dt,
+            const symmTensor& sigOld,
+            const history& hOld,
+            symmTensor& sigNew,
+            history& hNew
+        ) const;
+
+        //- True if the model's response depends on the time step
+        bool rateDependent() const
+        {
+            return kernel_->rateDependent();
+        }
 
 
     // Conversions

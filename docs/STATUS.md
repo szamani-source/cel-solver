@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-11-16 (WP 3.4b)
+Last updated: 2026-11-16 (WP 3.6a)
 
 Plan doc: https://claude.ai/artifact/DTT6kSikz9ZUTBkUxY6Grr
 
@@ -45,6 +45,7 @@ Phase 2 (the C++ Eulerian solver: 2.1 to 2.5c and 2.4b done; 2.6 waits for Phase
 | 3.3 | C++ outlet boundary that opens | Done | Decision 0033: `outlets { outlet { friction 20; openTime 0.3; } }` in materialProperties (needs `freeSurface yes`): a closed wall until it opens, then a traction-free outflow face with rule 10b; damping off on opening; `discharged()` counts the mass out. `tests/test_outlet.sh` passes (about 30 s, 10 mm, E = 0.1 MPa, shear cap and rule 9 on): nothing through the closed outlet (0 exactly), tank plus discharged constant to 4e-14, rate 74.1 kg/s/m, C 0.89 (prototype without rules 12/13 81.35, -9 %); without rule 10b 27.4. Not tested in parallel (WP 3.4) |
 | 3.4 | C++ silo discharge across E, serial and parallel | Closed, done-when not met; E independence split to 3.4b | Decision 0034. `tests/test_discharge.sh` passes (about 50 s): mass 4e-14, no stress in void, 2 processors with the outlet split give the serial rate (74.09 both). Rate with the collapse code falls with E: 10 mm 74.1 / 65.7 / 70.9 kg/s/m at 0.1 / 1 / 10 MPa (1 MPa -11 %), 5 mm 78.0 / 55.0 at 0.1 / 1 MPa (-29 %). The E sweep is `tests/manual/test_discharge_stiffness.sh` (fails now) |
 | 3.4b | C++ discharge rate independent of E (rule 12) | Closed, done-when not met; Sia chose mu(I) (decision 0036) | Decision 0035: rule 12 in C++ behind `normalCap yes` (default off). With it: 10 mm 78.6 / 73.8 / 84.8 kg/s/m at 0.1 / 1 / 10 MPa (met), 5 mm 82.6 / 69.7 at 0.1 / 1 MPa (-16 %, was -29 %: not met). Collapse unharmed, unlike the prototype (a = 0.5: 0.50 / 0.35 / 0.25; a = 2: 1.50). 2-processor discharge rate +0.6 %; collapse cell-by-cell parallel check fails with the switch on (bisection round-off). Drivers read `CEL_EXTRA_MATERIAL` |
+| 3.6a | mu(I) friction in Drucker-Prager and Mohr-Coulomb (Python, C++) | Done | Decision 0037. Optional `mu2`, `I0`, `d`, `rhoS` (and `muIAlpha`): the return uses phi_m = atan(mu(I)), I from the plastic shear rate and the pressure after the return, solved per point (Illinois). `tests/test_mu_i.sh` passes (about 55 s): steady simple shear at fixed pressure gives mu(I) to 2e-14 for I = 1e-4 to 1; mu2 = tan(phi) bit for bit (Python and C++); C++ matches Python on 30 paths to 1e-12; celFoam passes dt and prints the law. Barker-Gray regularisation impossible for mu_s = tan 35 deg (no well-posed range), so T0 uses the plain Jop law. Placeholders: mu_2 - mu_s, I0 from glass beads |
 
 ## Standing instruction from Sia (2026-11-14)
 
@@ -54,8 +55,9 @@ anything that cannot be undone outside this repository.
 
 ## Waiting on Sia
 
-- mu(I) constants (mu_s, mu_2, I0) and grain size and density for the T0 material, if
-  measured (decision 0036); literature placeholders until then.
+- mu(I) constants (mu_2, I0) and grain size and density for the T0 material, if
+  measured (decisions 0036, 0037). Placeholders now: mu_s = tan 35 deg, mu_2 - mu_s =
+  0.26 and I0 = 0.279 from Jop et al. (2005) glass beads, d = 1 mm, rho_s = 2650 kg/m^3.
 - Optional: real tank dimensions and material data for the silo problem (placeholders
   are in `docs/spec/target-problems.md`).
 - Optional: paste the setup line from `docs/wp/WP-0.4.md` into the cloud environment's
@@ -105,8 +107,11 @@ Silo track (decision 0016), one thread each:
    mu(I) with the Barker-Gray regularisation in the return mapping, plus an impedance
    from the plastic tangent at flowing faces (mu(I) alone is estimated to be ~100 times
    too weak against the numerical viscosity at 5 mm).
-15. Next: WP 3.6a (mu(I) in the constitutive library), then 3.6b (inclined layer, which
-   measures the numerical viscosity), 3.6c, 3.6d (silo E sweep), 3.6e. WP 3.5 waits.
+15. WP 3.6a: mu(I) in the constitutive library. Done (decision 0037). The Barker-Gray
+   regularisation does not exist for mu_s = tan 35 deg; T0 uses the plain Jop law.
+16. Next: WP 3.6b (inclined layer, which measures the numerical viscosity; also look
+   for mesh-dependent shear bands, since T0's mu(I) is not regularised), then 3.6c,
+   3.6d (silo E sweep), 3.6e. WP 3.5 waits.
    Keep runs coarse and short: Sia asked to be frugal with Claude usage (2026-11-15).
 
 Then the C++ counterparts 3.1 to 3.4 (2.4b is done; briefs not written yet) and 3.5
@@ -119,6 +124,11 @@ coupling, Abaqus CEL contact, cut-cell, immersed boundary), requested by Sia on
 is built. Silo walls are mesh boundaries with friction, not contact.
 
 ## Known issues
+
+- mu(I) (WP 3.6a, decision 0037): for mu_s = tan 35 deg the Jop law is ill posed (in
+  Barker and Gray's incompressible sense) at every I, and their regularisation cannot be
+  built. Whether our compressible elastic model is affected is not known (WP 3.6b).
+  The cost of the per-point mu(I) solve in celFoam is not measured.
 
 - C++ silo (decisions 0034, 0035): with the collapse code the discharge rate falls with E
   (-29 % from 0.1 to 1 MPa at 5 mm; -16 % with `normalCap yes`). Fix planned as WP 3.6

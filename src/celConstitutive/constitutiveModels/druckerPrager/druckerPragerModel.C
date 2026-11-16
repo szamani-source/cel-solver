@@ -22,7 +22,7 @@ Foam::constitutiveModels::druckerPrager::druckerPrager(const dictionary& dict)
         dict,
         typeName,
         wordList({"E", "nu", "phi", "c", "psi"}),
-        wordList(),
+        wordList({"mu2", "I0", "d", "rhoS", "muIAlpha"}),
         wordList({"fit"})
     )
 {}

@@ -102,4 +102,22 @@ void Foam::constitutiveModel::update
 }
 
 
+void Foam::constitutiveModel::update
+(
+    const symmTensor& deps,
+    const scalar dt,
+    const symmTensor& sigOld,
+    const history& hOld,
+    symmTensor& sigNew,
+    history& hNew
+) const
+{
+    double d[6], s[6], sn[6];
+    toVoigt(deps, d, 2);    // engineering shear for the kernel
+    toVoigt(sigOld, s);
+    kernel_->updateRate(d, dt, s, hOld, sn, hNew);
+    sigNew = fromVoigt(sn);
+}
+
+
 // ************************************************************************* //

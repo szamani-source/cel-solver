@@ -34,3 +34,11 @@ type    linearElastic;
 rho     1800;      // kg/m^3
 E       1e7;       // Pa
 nu      0.3;
+
+// Optional mu(I) friction for druckerPrager and mohrCoulomb (WP 3.6a, decision
+// 0037; with mu2 absent or equal to tan(phi) the models are rate-independent):
+//   mu2       0.9618;   // friction at large I [-] (mu_s = tan(phi))
+//   I0        0.279;    // inertial number scale [-]
+//   d         1e-3;     // grain diameter [m]
+//   rhoS      2650;     // grain density [kg/m^3]
+//   muIAlpha  1.9;      // Barker-Gray regularisation, only where it exists
