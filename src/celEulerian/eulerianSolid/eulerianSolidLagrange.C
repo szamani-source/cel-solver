@@ -1153,6 +1153,81 @@ inline bool capShear
     return true;
 }
 
+
+//- Rule 12 (decision 0028; C++ WP 3.4b, decision 0035): normal jump cap at
+//  a contact face with unit normal n (L to R), after the shear cap. The
+//  face stress is the tangential block of sMean with the n row from the
+//  traction tS (tangential part as left by rule 8). The normal jump term
+//  zpL zpR (vnR - vnL)/(zpL + zpR) is scaled back (20 bisection steps)
+//  until the yield function is no larger than without it (or zero). The
+//  face keeps one normal velocity (geometry, remap); each side's own
+//  characteristic at the capped traction gives the normal velocity it
+//  sees, returned as dL, dR (along n, relative to vS). Returns true if
+//  capped, with tS changed.
+inline bool capNormal
+(
+    const vector& n,
+    const vector& vL, const symmTensor& sL, const scalar zpL,
+    const vector& vR, const symmTensor& sR, const scalar zpR,
+    const symmTensor& sMean,
+    const scalar sinPhi, const scalar cCos,
+    const vector& vS,
+    vector& tS,
+    vector& dL,
+    vector& dR
+)
+{
+    if (zpL <= 0 || zpR <= 0)
+    {
+        return false;
+    }
+    const scalar tnL = (sL & n) & n;
+    const scalar tnR = (sR & n) & n;
+    const scalar vnL = vL & n;
+    const scalar vnR = vR & n;
+    const scalar zp = zpL + zpR;
+    const scalar nb = (zpR*tnL + zpL*tnR)/zp;
+    const scalar nj = zpL*zpR*(vnR - vnL)/zp;
+    const vector tt(tS - (tS & n)*n);
+
+    const tensor P(I - sqr(n));
+    const tensor A(P & tensor(sMean) & P);
+    auto faceYield = [&](const scalar tn)
+    {
+        return mcYield
+        (
+            symm(A + tn*sqr(n) + (n*tt) + (tt*n)),
+            sinPhi,
+            cCos
+        );
+    };
+
+    const scalar lim = max(faceYield(nb), scalar(0));
+    if (faceYield(nb + nj) <= lim)
+    {
+        return false;
+    }
+    scalar lo = 0, hi = 1;
+    for (label k = 0; k < 20; ++k)
+    {
+        const scalar mid = 0.5*(lo + hi);
+        if (faceYield(nb + mid*nj) <= lim)
+        {
+            lo = mid;
+        }
+        else
+        {
+            hi = mid;
+        }
+    }
+    const scalar tn = nb + lo*nj;
+    tS = tn*n + tt;
+    const scalar vnS = vS & n;
+    dL = (vnL + (tn - tnL)/zpL - vnS)*n;
+    dR = (vnR - (tn - tnR)/zpR - vnS)*n;
+    return true;
+}
+
 } // End namespace lagrangeStepDetail
 } // End namespace Foam
 
@@ -1507,6 +1582,24 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
         );
     }
 
+    // Normal cap (rule 12): normal velocity seen by the owner and the
+    // neighbour cell of a capped face, relative to vStar (zero elsewhere)
+    tmp<surfaceVectorField> tnO, tnN;
+    nNormalCapped_ = 0;
+    if (normalCap_)
+    {
+        tnO = surfaceVectorField::New
+        (
+            "nslipO", IOobject::NO_REGISTER, mesh,
+            dimensionedVector(dimVelocity, Zero)
+        );
+        tnN = surfaceVectorField::New
+        (
+            "nslipN", IOobject::NO_REGISTER, mesh,
+            dimensionedVector(dimVelocity, Zero)
+        );
+    }
+
     forAll(own, facei)
     {
         const label P = own[facei];
@@ -1547,6 +1640,18 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                 0.5*(sref[P] + sref[N]),
                 capSinPhi_, capCCos_, vS[facei], t,
                 tdO.ref()[facei], tdN.ref()[facei]
+            );
+        }
+        if (normalCap_ && contact && solveMomentum_)
+        {
+            nNormalCapped_ += capNormal
+            (
+                n,
+                UO()[facei], sO()[facei], zp[P],
+                UN()[facei], sN()[facei], zp[N],
+                0.5*(sref[P] + sref[N]),
+                capSinPhi_, capCCos_, vS[facei], t,
+                tnO.ref()[facei], tnN.ref()[facei]
             );
         }
         if (!solveMomentum_)
@@ -1594,7 +1699,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
             const scalarField zpn(zp.boundaryField()[patchi].patchNeighbourField());
             const scalarField zsn(zs.boundaryField()[patchi].patchNeighbourField());
             symmTensorField srn;
-            if (shearCap_)
+            if (shearCap_ || normalCap_)
             {
                 srn = sref.boundaryField()[patchi].patchNeighbourField();
             }
@@ -1638,6 +1743,19 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                         capSinPhi_, capCCos_, pvS[i], t,
                         tdO.ref().boundaryFieldRef()[patchi][i],
                         tdN.ref().boundaryFieldRef()[patchi][i]
+                    );
+                }
+                if (normalCap_ && contact && solveMomentum_)
+                {
+                    nNormalCapped_ += capNormal
+                    (
+                        n,
+                        puo[i], pso[i], zp[fc[i]],
+                        pun[i], psn[i], zpn[i],
+                        0.5*(sref[fc[i]] + srn[i]),
+                        capSinPhi_, capCCos_, pvS[i], t,
+                        tnO.ref().boundaryFieldRef()[patchi][i],
+                        tnN.ref().boundaryFieldRef()[patchi][i]
                     );
                 }
                 if (!solveMomentum_)
@@ -1723,6 +1841,11 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
     {
         syncCoupled(mesh, vS, F, phiL_);
     }
+    if (normalCap_)
+    {
+        // copies vS, F and phiL again (unchanged) and the normal slips
+        syncCoupled(mesh, vS, F, phiL_, &tnO.ref(), &tnN.ref());
+    }
     vStar_ = vS;
     Fstar_ = F;
 
@@ -1732,6 +1855,28 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
     vectorField force(mesh.nCells(), Zero);
     tensorField T(mesh.nCells(), Zero);      // sum Sf * vStar
     scalarField dV(mesh.nCells(), Zero);     // sum phiL out of the cell
+    tensorField Tn;                          // sum Sf * normal slip (rule 12)
+    if (normalCap_)
+    {
+        Tn.setSize(mesh.nCells(), Zero);
+        const surfaceVectorField& nO = tnO();
+        const surfaceVectorField& nN = tnN();
+        forAll(own, facei)
+        {
+            Tn[own[facei]] += Sf[facei]*nO[facei];
+            Tn[nei[facei]] -= Sf[facei]*nN[facei];
+        }
+        forAll(mesh.boundary(), patchi)
+        {
+            const labelUList& fc = mesh.boundary()[patchi].faceCells();
+            const vectorField& pS = Sf.boundaryField()[patchi];
+            const vectorField& pnO = nO.boundaryField()[patchi];
+            forAll(fc, i)
+            {
+                Tn[fc[i]] += pS[i]*pnO[i];
+            }
+        }
+    }
     vectorField dVa;                         // the same per face axis (fs)
     if (fs)
     {
@@ -1836,6 +1981,22 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
         symmTensor dEps(symm(L));
         const tensor dW(skew(L));
 
+        // Rule 12: a full cell next to capped faces strains with its own
+        // characteristic velocities there, deviatoric part only; the
+        // volume stays tied to the geometry (decision 0028)
+        symmTensor dDev(Zero);
+        if (normalCap_ && (!fs || alpha_[celli] >= alphaFull))
+        {
+            const symmTensor e(symm(dt*Tn[celli].T()/Vmid));
+            const Vector<label>& gD = mesh.geometricD();
+            symmTensor Pg(Zero);
+            if (gD[0] >= 0) Pg.xx() = 1;
+            if (gD[1] >= 0) Pg.yy() = 1;
+            if (gD[2] >= 0) Pg.zz() = 1;
+            const scalar nD = tr(Pg);
+            dDev = e - (tr(e)/nD)*Pg;
+        }
+
         if (fs)
         {
             // Void closure (decision 0021 rule 5), per axis of the
@@ -1897,6 +2058,8 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                 alphaL_[celli] = 1;
             }
         }
+
+        dEps += dDev;
 
         if (dW != tensor::zero)
         {

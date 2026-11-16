@@ -182,6 +182,13 @@ class eulerianSolid
         //  a capped face slips (each side sees its own tangential velocity)
         Switch shearCap_;
 
+        //- Rule 12 (decision 0028; C++ WP 3.4b, decision 0035):
+        //  materialProperties normalCap yes; at contact faces the normal
+        //  jump term is capped at Mohr-Coulomb yield as rule 8 caps the
+        //  shear jump; a full cell strains with its own characteristic
+        //  velocity at capped faces (deviatoric part, volume kept)
+        Switch normalCap_;
+
         //- sin(phi) and c cos(phi) of the shear cap
         scalar capSinPhi_;
         scalar capCCos_;
@@ -195,6 +202,9 @@ class eulerianSolid
         //- Number of faces capped by rule 8 in the last Lagrange step
         //  (this processor, owner side of coupled faces)
         label nCapped_;
+
+        //- Number of faces capped by rule 12 in the last Lagrange step
+        label nNormalCapped_;
 
         //- Outlet patches (WP 3.3): opening time [s]; a closed outlet is
         //  in wallFriction_, an open one is not
@@ -272,6 +282,7 @@ public:
         bool shearCap() const { return shearCap_; }
         bool spreadLayers() const { return spreadLayers_; }
         label nCapped() const { return nCapped_; }
+        label nNormalCapped() const { return nNormalCapped_; }
 
         //- Is the patch an outlet, and is it open (WP 3.3)?
         bool isOutlet(const word& patch) const

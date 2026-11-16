@@ -252,15 +252,16 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
         )
     ),
     shearCap_(materialProperties_.getOrDefault<Switch>("shearCap", false)),
+    normalCap_(materialProperties_.getOrDefault<Switch>("normalCap", false)),
     capSinPhi_
     (
-        shearCap_
+        (shearCap_ || normalCap_)
       ? Foam::sin(degToRad(materialProperties_.get<scalar>("phi")))
       : 0
     ),
     capCCos_
     (
-        shearCap_
+        (shearCap_ || normalCap_)
       ? materialProperties_.getOrDefault<scalar>("c", 0)
        *Foam::cos(degToRad(materialProperties_.get<scalar>("phi")))
       : 0
@@ -270,6 +271,7 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
         materialProperties_.getOrDefault<Switch>("spreadLayers", false)
     ),
     nCapped_(0),
+    nNormalCapped_(0),
     outletOpenTime_(readOutlets(mesh, materialProperties_, wallFriction_)),
     discharged_(0)
 {
@@ -305,6 +307,10 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
     {
         Info<< "Shear cap at Mohr-Coulomb yield (rule 8): sin(phi) "
             << capSinPhi_ << ", c cos(phi) " << capCCos_ << " Pa" << nl;
+    }
+    if (normalCap_)
+    {
+        Info<< "Normal jump cap at Mohr-Coulomb yield (rule 12)" << nl;
     }
     if (spreadLayers_)
     {
