@@ -17,9 +17,13 @@ cell the nearest surface point, outward normal and body velocity (`velocityAt`).
 
 ## Build
 
-- `src/celCoupling/bodyCells` (or the name 4.0 suggests): search only near each body
-  (bounding box, then `triSurfaceSearch`), exact clipping of axis-aligned hex cells by
-  the triangulated surface (volume and face fractions).
+- `src/celCoupling/bodyCells`: search only near each body (bounding box, then
+  `triSurfaceSearch`), exact clipping of axis-aligned hex cells by the triangulated
+  surface. Per cell and step, as decision 0042 needs: body fraction, open fraction of
+  each face, the wall segment (area times normal = minus the sum of open face areas
+  times normals), body velocity there (`rigidBody::velocityAt`), and the mixing
+  neighbour for cells with open fraction below 0.5. Python reference:
+  `prototype/contact2d.py` (`Rect`, `HalfPlane`).
 - Decide and record: walls as closed STL volumes only, or also one-sided open surfaces
   with a thickness (decision 0041 consequences).
 - Field `alphaBody` written for ParaView; a small utility or celFoam option to write it

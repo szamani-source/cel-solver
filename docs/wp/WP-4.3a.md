@@ -11,7 +11,7 @@ Sia asked for (2026-11-17): silo walls and hopper inserts that do not follow the
 
 ## Read first
 
-- `docs/decisions/0030` (mesh-boundary walls), `0041`, WP 4.0's decision;
+- `docs/decisions/0030` (mesh-boundary walls), `0041`, `0042`; `prototype/contact2d.py`;
   `tests/test_silo_settle.sh` (the Janssen tank)
 
 ## Build

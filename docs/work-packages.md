@@ -54,8 +54,8 @@ Constitutive models for bulk solids are tracked in `docs/constitutive-models.md`
 | 4.0 | Investigate Lagrangian-Eulerian contact schemes (LS-DYNA constraint and penalty coupling, Abaqus CEL contact, cut-cell, immersed boundary) | Sourced comparison, prototype experiments, recommendation agreed with Sia |
 | 4.1 | Rigid body: STL input and kinematics (decision 0041) | Body moves on prescribed path |
 | 4.2 | Contact search near the body | Cut cells found, unit tested |
-| 4.3a | Fixed STL walls with Coulomb friction (scheme from WP 4.0) | Janssen tank with STL walls, aligned and tilted 10 deg, within 2 / 5 % of mesh-boundary walls, no leakage |
-| 4.3b | Moving bodies: coupling forces both ways and reaction output | No leakage in a push test |
+| 4.3a | Fixed STL walls with Coulomb friction (cut-cell moving walls, decision 0042) | Janssen tank with STL walls, aligned and tilted 10 deg, within 2 / 5 % of mesh-boundary walls, no leakage |
+| 4.3b | Moving bodies: coupling forces both ways and reaction output (decision 0042) | No leakage in a push test |
 | 4.5 | Silo and hopper discharge with STL walls | Flat tank rate within 5 % of mesh-boundary walls; hopper runs and its rate is recorded |
 | 4.4 | Footing and pile benchmarks | Bearing capacity factor near 5.14 |
 | 5.1 | Hex8 element with hourglass control | Patch test passes |

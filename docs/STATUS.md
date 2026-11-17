@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-11-17 (WP 4.1)
+Last updated: 2026-11-17 (WP 4.1, WP 4.0)
 
 Plan doc: https://claude.ai/artifact/DTT6kSikz9ZUTBkUxY6Grr
 
@@ -46,6 +46,7 @@ Phase 2 (the C++ Eulerian solver: 2.1 to 2.5c and 2.4b done; 2.6 waits for Phase
 | 3.4 | C++ silo discharge across E, serial and parallel | Closed, done-when not met; E independence split to 3.4b | Decision 0034. `tests/test_discharge.sh` passes (about 50 s): mass 4e-14, no stress in void, 2 processors with the outlet split give the serial rate (74.09 both). Rate with the collapse code falls with E: 10 mm 74.1 / 65.7 / 70.9 kg/s/m at 0.1 / 1 / 10 MPa (1 MPa -11 %), 5 mm 78.0 / 55.0 at 0.1 / 1 MPa (-29 %). The E sweep is `tests/manual/test_discharge_stiffness.sh` (fails now) |
 | 3.4b | C++ discharge rate independent of E (rule 12) | Closed, done-when not met; Sia chose mu(I) (decision 0036) | Decision 0035: rule 12 in C++ behind `normalCap yes` (default off). With it: 10 mm 78.6 / 73.8 / 84.8 kg/s/m at 0.1 / 1 / 10 MPa (met), 5 mm 82.6 / 69.7 at 0.1 / 1 MPa (-16 %, was -29 %: not met). Collapse unharmed, unlike the prototype (a = 0.5: 0.50 / 0.35 / 0.25; a = 2: 1.50). 2-processor discharge rate +0.6 %; collapse cell-by-cell parallel check fails with the switch on (bisection round-off). Drivers read `CEL_EXTRA_MATERIAL` |
 | 3.6a | mu(I) friction in Drucker-Prager and Mohr-Coulomb (Python, C++) | Done | Decision 0037. Optional `mu2`, `I0`, `d`, `rhoS` (and `muIAlpha`): the return uses phi_m = atan(mu(I)), I from the plastic shear rate and the pressure after the return, solved per point (Illinois). `tests/test_mu_i.sh` passes (about 55 s): steady simple shear at fixed pressure gives mu(I) to 2e-14 for I = 1e-4 to 1; mu2 = tan(phi) bit for bit (Python and C++); C++ matches Python on 30 paths to 1e-12; celFoam passes dt and prints the law. Barker-Gray regularisation impossible for mu_s = tan 35 deg (no well-posed range), so T0 uses the plain Jop law. Placeholders: mu_2 - mu_s, I0 from glass beads |
+| 4.0 | Contact scheme investigation (LS-DYNA, Abaqus, cut cell) | Done; shown to Sia | Decision 0042: cut-cell moving walls (Riemann wall face with the body velocity, Coulomb cap, small-cell mixing), no penalty. `docs/research/contact-schemes.md` (9 sources), `prototype/contact2d.py`; `tests/test_proto_contact_schemes.sh` passes (about 25 s): piston stress 1.006 zv, noise 0.2 % (penalty at k = M/h: 27 %), 30 deg frictional wall acceleration within 0.3 % (penalty 11 % off), mass 1e-15 |
 | 4.1 | Rigid body: STL input and kinematics | Done | Decision 0041: STL walls and bodies are immersed rigid surfaces on the Cartesian mesh (Sia, 2026-11-17). `src/celLagrangian` (`rigidBody`, `rigidBodies`), `constant/rigidBodies` (tutorial `rigidBodyMotion`): Function1 velocity and omega, exact path; no forces yet. `tests/test_rigid_body.sh` passes in about 1 s: pose 4e-16, STL 3e-8, 2 processors identical |
 
 ## Standing instruction from Sia (2026-11-14)
@@ -55,6 +56,9 @@ CI is green. Sia is away; report results, do not wait for review. Still ask befo
 anything that cannot be undone outside this repository.
 
 ## Waiting on Sia
+
+- Decision 0042 (WP 4.0): cut-cell moving walls instead of LS-DYNA/Abaqus-style
+  penalty coupling. Work continues on it (WP 4.2) unless Sia objects.
 
 - mu(I) constants (mu_2, I0) and grain size and density for the T0 material, if
   measured (decisions 0036, 0037). Placeholders now: mu_s = tan 35 deg, mu_2 - mu_s =
@@ -123,10 +127,9 @@ interactions defined by STL (decision 0041: immersed rigid surfaces on the Carte
 mesh, as Abaqus CEL). Order:
 
 1. WP 4.1: STL input and kinematics. Done.
-2. WP 4.0: contact scheme investigation (Sia, 2026-11-15, `docs/wp/WP-4.0.md`), now
-   with a fixed inclined frictional wall among its experiments. Its recommendation is
-   shown to Sia before 4.3a and 4.3b are built.
-3. WP 4.2: cut cells near each body (may run beside 4.0, `docs/wp/WP-4.2.md`).
+2. WP 4.0: contact scheme investigation. Done (decision 0042: cut-cell moving walls,
+   not penalty). Shown to Sia 2026-11-17.
+3. WP 4.2: cut cells near each body (`docs/wp/WP-4.2.md`). Next.
 4. WP 4.3a: fixed STL walls with friction (what Sia asked for, `docs/wp/WP-4.3a.md`).
 5. WP 4.5: silo and hopper with STL walls (`docs/wp/WP-4.5.md`).
 6. WP 4.3b: moving bodies, forces both ways; then 4.4 benchmarks.

@@ -1,7 +1,7 @@
 # WP 4.0: Investigate Lagrangian-Eulerian contact schemes (LS-DYNA, Abaqus, others)
 
-State: not started. Scheduled before WP 4.3a and 4.3b (WP 4.1 is done; 4.2 may run beside it).
-Branch: `wp-4.0-contact-investigation`
+State: done (2026-11-17); recommendation (decision 0042) waiting to be shown to Sia
+Branch: `claude/project-thread-hilqye`
 
 Requested by Sia (2026-11-15): LS-DYNA is said to handle this contact better than
 Abaqus; investigate thoroughly when the time comes, before building ours.
@@ -75,4 +75,11 @@ move through the Eulerian mesh (footing, pile, cone, projectile: targets T1 to T
 
 ## Log
 
-(none yet)
+- 2026-11-17: Done in one session, kept lean at the coordinator's request. Nine sources
+  opened (vendor manuals, LS-DYNA conference paper, forum answer by Ansys, three
+  cut-cell papers), `docs/research/contact-schemes.md`. Experiments in
+  `prototype/contact2d.py` (first order, linear elastic): piston, translating block,
+  30 deg frictional wall. Cut-cell Riemann: stress 1.006 zv, noise 0.2 %, friction 0.3 %;
+  penalty: noise 27 % at k = M/h, friction 11 % off. Decision 0042. The CLIS
+  constraint coupling (CTYPE 1 to 3) was not read in a primary source and not tried.
+  Next: show Sia, then WP 4.2.
