@@ -183,7 +183,9 @@ double FrictionLaw::inertialNumber
         return 0;
     }
     const double P = -meanStress(sigNew);
-    if (P <= 0)
+    // P <= 0, or so small that rhoS/P would overflow (a floating-point
+    // trap in OpenFOAM; seen at a free surface, WP 3.6s): I is infinite
+    if (!(P > 1e-300*rhoS_))
     {
         return std::numeric_limits<double>::infinity();
     }
