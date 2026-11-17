@@ -11,7 +11,7 @@ DOI check: Crossref and doi.org are blocked from the cloud container. "Search" m
 the DOI was confirmed by a web search on 2026-11-17; "memory" means it was not
 resolved and must be checked before a value is copied from the paper.
 
-## The six papers
+## The papers
 
 | # | Paper | Journal | DOI / open copy | DOI check | Data it gives | Serves |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -21,6 +21,7 @@ resolved and must be checked before a value is copied from the paper.
 | V4 | G. Lube, H. E. Huppert, R. S. J. Sparks, A. Freundt, "Collapses of two-dimensional granular columns" (2005) | Phys. Rev. E 72, 041301 | 10.1103/PhysRevE.72.041301 | Search | Quasi-2D **experiments**, several materials: run-out and final height against aspect ratio, profiles over time, failure surface | Column collapse (WP 3.2 tests) |
 | V5 | P.-Y. Lagree, L. Staron, S. Popinet, "The granular column collapse as a continuum: validity of a two-dimensional Navier-Stokes model with a mu(I)-rheology" (2011) | J. Fluid Mech. 686, 378 | Memory (10.1017/jfm.2011.335) | Memory | Continuum mu(I) against DEM for 2D collapse: free-surface profiles at fixed times, run-out against aspect ratio, deposit shape; same group and law as V1 | Column collapse with mu(I) (WP 3.6) |
 | V6 | GDR MiDi, "On dense granular flows" (2004) | Eur. Phys. J. E 14, 341 | Memory (10.1140/epje/i2003-10153-0) | Memory | Compiled experiments and DEM in six geometries; inclined plane: h_stop(theta), Pouliquen flow rule, Bagnold velocity profile; source of the mu(I) form | WP 3.6b inclined layer, mu(I) constants |
+| V7 | N. J. Balmforth, R. R. Kerswell, "Granular collapse in two dimensions" (2005) | J. Fluid Mech. 538, 399 | [author PDF](https://secure.math.ubc.ca/~njb/Research/gran.pdf) | Search (journal and title; added in WP 3.6s, numbers not read) | Quasi-2D **experiments** in narrow and wide channels with several grains: run-out and final height against aspect ratio, sensitivity to channel width and grain friction | Column collapse (WP 3.6e), with V4 |
 
 For the later targets (T1 footing, T2 pile), the first cross-check is
 S. Qiu, S. Henke, J. Grabe (2011), "Applying the coupled Eulerian-Lagrangian method

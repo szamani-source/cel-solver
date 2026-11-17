@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-11-17 (WP 4.1, 4.0, 4.2, validation references)
+Last updated: 2026-11-17 (WP 4.1, 4.0, 4.2, 3.6s; validation references)
 
 Plan doc: https://claude.ai/artifact/DTT6kSikz9ZUTBkUxY6Grr
 
@@ -46,6 +46,7 @@ Phase 2 (the C++ Eulerian solver: 2.1 to 2.5c and 2.4b done; 2.6 waits for Phase
 | 3.4 | C++ silo discharge across E, serial and parallel | Closed, done-when not met; E independence split to 3.4b | Decision 0034. `tests/test_discharge.sh` passes (about 50 s): mass 4e-14, no stress in void, 2 processors with the outlet split give the serial rate (74.09 both). Rate with the collapse code falls with E: 10 mm 74.1 / 65.7 / 70.9 kg/s/m at 0.1 / 1 / 10 MPa (1 MPa -11 %), 5 mm 78.0 / 55.0 at 0.1 / 1 MPa (-29 %). The E sweep is `tests/manual/test_discharge_stiffness.sh` (fails now) |
 | 3.4b | C++ discharge rate independent of E (rule 12) | Closed, done-when not met; Sia chose mu(I) (decision 0036) | Decision 0035: rule 12 in C++ behind `normalCap yes` (default off). With it: 10 mm 78.6 / 73.8 / 84.8 kg/s/m at 0.1 / 1 / 10 MPa (met), 5 mm 82.6 / 69.7 at 0.1 / 1 MPa (-16 %, was -29 %: not met). Collapse unharmed, unlike the prototype (a = 0.5: 0.50 / 0.35 / 0.25; a = 2: 1.50). 2-processor discharge rate +0.6 %; collapse cell-by-cell parallel check fails with the switch on (bisection round-off). Drivers read `CEL_EXTRA_MATERIAL` |
 | 3.6a | mu(I) friction in Drucker-Prager and Mohr-Coulomb (Python, C++) | Done | Decision 0037. Optional `mu2`, `I0`, `d`, `rhoS` (and `muIAlpha`): the return uses phi_m = atan(mu(I)), I from the plastic shear rate and the pressure after the return, solved per point (Illinois). `tests/test_mu_i.sh` passes (about 55 s): steady simple shear at fixed pressure gives mu(I) to 2e-14 for I = 1e-4 to 1; mu2 = tan(phi) bit for bit (Python and C++); C++ matches Python on 30 paths to 1e-12; celFoam passes dt and prints the law. Barker-Gray regularisation impossible for mu_s = tan 35 deg (no well-posed range), so T0 uses the plain Jop law. Placeholders: mu_2 - mu_s, I0 from glass beads |
+| 3.6s | Mesh dependence of the collapse shear band (split from 3.6b) | Done (finding recorded) | Decision 0038, `docs/wp/WP-3.6s.md`. a = 0.5, E = 1 MPa on 10 / 5 / 2.5 mm: band 1 to 4 cells wide on every mesh, peak shear rate 10 / 23 / 30 1/s, run-out (5 mm front) 0.30 / 0.33 / 0.43 at 1 s: **mesh dependent, not converged**; deposit body and top converge. mu(I) with the placeholders changes nothing at 10 and 5 mm (I about 0.05). Cure deferred (compressible mu(I)/phi(I) preferred). Fixed a floating-point trap in `inertialNumber` at P about 1e-320 Pa. `tests/manual/test_shear_band.sh` (about 9 min) |
 | 4.0 | Contact scheme investigation (LS-DYNA, Abaqus, cut cell) | Done; Sia agreed 2026-11-17 | Decision 0042: cut-cell moving walls (Riemann wall face with the body velocity, Coulomb cap, small-cell mixing), no penalty. `docs/research/contact-schemes.md` (9 sources), `prototype/contact2d.py`; `tests/test_proto_contact_schemes.sh` passes (about 25 s): piston stress 1.006 zv, noise 0.2 % (penalty at k = M/h: 27 %), 30 deg frictional wall acceleration within 0.3 % (penalty 11 % off), mass 1e-15. LS-DYNA-style coupling points tried after Sia's note: smoother than a plain spring but leak 2 % and half the force; decision 0042 addendum adopts its point density, leak report and controls into the cut-cell wall |
 | 4.1 | Rigid body: STL input and kinematics | Done | Decision 0041: STL walls and bodies are immersed rigid surfaces on the Cartesian mesh (Sia, 2026-11-17). `src/celLagrangian` (`rigidBody`, `rigidBodies`), `constant/rigidBodies` (tutorial `rigidBodyMotion`): Function1 velocity and omega, exact path; no forces yet. `tests/test_rigid_body.sh` passes in about 1 s: pose 4e-16, STL 3e-8, 2 processors identical |
 | 4.2 | Cut cells near each body | Done | Decision 0043: exact edge, face and cell coverage from the STL triangles (no sampling), body-frame octree, utility `celBodyCells`. `tests/test_body_cells.sh` passes in about 6 s: faceted sphere volume to 4e-16, plane at 30 deg to 2e-7 (single-precision STL), moving and turning cube exact, 2 processors 9e-16. Search 6e-5 s per searched cell |
@@ -118,9 +119,11 @@ Silo track (decision 0016), one thread each:
    too weak against the numerical viscosity at 5 mm).
 15. WP 3.6a: mu(I) in the constitutive library. Done (decision 0037). The Barker-Gray
    regularisation does not exist for mu_s = tan 35 deg; T0 uses the plain Jop law.
-16. Next: WP 3.6b (inclined layer, which measures the numerical viscosity; also look
-   for mesh-dependent shear bands, since T0's mu(I) is not regularised), then 3.6c,
-   3.6d (silo E sweep), 3.6e. WP 3.5 waits.
+16. WP 3.6s: shear bands. Done (decision 0038): the collapse band is set by the cell
+   (1 to 4 cells at 10, 5, 2.5 mm) and run-out does not converge; mu(I) does not change
+   that. The cure (compressible mu(I)/phi(I), or non-local) is a later package.
+17. Next: WP 3.6b (inclined layer, which measures the numerical viscosity), then 3.6c,
+   3.6d (silo E sweep, on two meshes per decision 0038), 3.6e. WP 3.5 waits.
    Keep runs coarse and short: Sia asked to be frugal with Claude usage (2026-11-15).
 
 Then the C++ counterparts 3.1 to 3.4 (2.4b is done; briefs not written yet) and 3.5
@@ -144,6 +147,11 @@ mesh, as Abaqus CEL). Order:
   mesh (every face normal to an axis; grading allowed). Without void the code runs on
   any mesh but is untested there: face states assume the face midway between centres,
   and the time step uses cbrt(V). General meshes are WP 3B.4, not planned.
+
+- Shear bands (WP 3.6s, decision 0038): the C++ column collapse localises into bands 1 to
+  4 cells wide on every mesh; run-out grows with refinement (0.30 / 0.33 / 0.43 at 10 / 5 /
+  2.5 mm, a = 0.5, E = 1 MPa). mu(I) as in T0 does not regularise it. Collapse run-outs
+  are mesh-bound until a regularisation package is done.
 
 - mu(I) (WP 3.6a, decision 0037): for mu_s = tan 35 deg the Jop law is ill posed (in
   Barker and Gray's incompressible sense) at every I, and their regularisation cannot be
