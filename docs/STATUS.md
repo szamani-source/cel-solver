@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-11-17 (WP 3.6b)
+Last updated: 2026-11-17 (WP 3.6b; validation references)
 
 Plan doc: https://claude.ai/artifact/DTT6kSikz9ZUTBkUxY6Grr
 
@@ -47,6 +47,12 @@ Phase 2 (the C++ Eulerian solver: 2.1 to 2.5c and 2.4b done; 2.6 waits for Phase
 | 3.4b | C++ discharge rate independent of E (rule 12) | Closed, done-when not met; Sia chose mu(I) (decision 0036) | Decision 0035: rule 12 in C++ behind `normalCap yes` (default off). With it: 10 mm 78.6 / 73.8 / 84.8 kg/s/m at 0.1 / 1 / 10 MPa (met), 5 mm 82.6 / 69.7 at 0.1 / 1 MPa (-16 %, was -29 %: not met). Collapse unharmed, unlike the prototype (a = 0.5: 0.50 / 0.35 / 0.25; a = 2: 1.50). 2-processor discharge rate +0.6 %; collapse cell-by-cell parallel check fails with the switch on (bisection round-off). Drivers read `CEL_EXTRA_MATERIAL` |
 | 3.6a | mu(I) friction in Drucker-Prager and Mohr-Coulomb (Python, C++) | Done | Decision 0037. Optional `mu2`, `I0`, `d`, `rhoS` (and `muIAlpha`): the return uses phi_m = atan(mu(I)), I from the plastic shear rate and the pressure after the return, solved per point (Illinois). `tests/test_mu_i.sh` passes (about 55 s): steady simple shear at fixed pressure gives mu(I) to 2e-14 for I = 1e-4 to 1; mu2 = tan(phi) bit for bit (Python and C++); C++ matches Python on 30 paths to 1e-12; celFoam passes dt and prints the law. Barker-Gray regularisation impossible for mu_s = tan 35 deg (no well-posed range), so T0 uses the plain Jop law. Placeholders: mu_2 - mu_s, I0 from glass beads |
 | 3.6b | Steady inclined layer (Bagnold) with mu(I), E = 0.1, 1, 10 MPa | Closed, done-when not met; measurement recorded | Decision 0039. Layer 0.05 m on 31 deg, x periodic, tilted gravity, from the exact steady state, 4 s. The body flows at 0.14 to 0.20 of the exact speed at 0.1 MPa, 0.05 to 0.09 at 1 MPa, 0.01 to 0.02 at 10 MPa (5 mm; 2.5 mm doubles it): numerical viscosity about 0.06 rho c_s h (2.8 / 6.5 / 29 Pa s) against a mu(I) tangent viscosity of 0.8 Pa s, so mu(I) alone cannot remove the E dependence. Fixed: the hydrostatic face reconstruction for gravity off the mesh axes (the layer slid uphill; axis-aligned runs unchanged bit for bit). The top cell slides over the body at 1 and 10 MPa. `tests/test_inclined_layer.sh` (CI, 10 s: at rest at 25 deg, 2.4e-5 m/s); done-when `tests/manual/test_inclined_layer.sh` (3 min, fails now) |
+
+## Validation references
+
+`docs/spec/validation-references.md` (2026-11-17): six papers with field data (silo
+velocity and pressure fields, collapse profiles, inclined-plane mu(I) data) for later
+comparison packages, after WP 3.6b to 3.6e. Some DOIs still to resolve.
 
 ## Standing instruction from Sia (2026-11-14)
 
