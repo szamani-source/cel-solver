@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-11-17 (WP 3.6c)
+Last updated: 2026-11-17 (WP 3.6c2)
 
 Plan doc: https://claude.ai/artifact/DTT6kSikz9ZUTBkUxY6Grr
 
@@ -48,6 +48,7 @@ Phase 2 (the C++ Eulerian solver: 2.1 to 2.5c and 2.4b done; 2.6 waits for Phase
 | 3.6a | mu(I) friction in Drucker-Prager and Mohr-Coulomb (Python, C++) | Done | Decision 0037. Optional `mu2`, `I0`, `d`, `rhoS` (and `muIAlpha`): the return uses phi_m = atan(mu(I)), I from the plastic shear rate and the pressure after the return, solved per point (Illinois). `tests/test_mu_i.sh` passes (about 55 s): steady simple shear at fixed pressure gives mu(I) to 2e-14 for I = 1e-4 to 1; mu2 = tan(phi) bit for bit (Python and C++); C++ matches Python on 30 paths to 1e-12; celFoam passes dt and prints the law. Barker-Gray regularisation impossible for mu_s = tan 35 deg (no well-posed range), so T0 uses the plain Jop law. Placeholders: mu_2 - mu_s, I0 from glass beads |
 | 3.6b | Steady inclined layer (Bagnold) with mu(I), E = 0.1, 1, 10 MPa | Closed, done-when not met; measurement recorded | Decision 0039. Layer 0.05 m on 31 deg, x periodic, tilted gravity, from the exact steady state, 4 s. The body flows at 0.14 to 0.20 of the exact speed at 0.1 MPa, 0.05 to 0.09 at 1 MPa, 0.01 to 0.02 at 10 MPa (5 mm; 2.5 mm doubles it): numerical viscosity about 0.06 rho c_s h (2.8 / 6.5 / 29 Pa s) against a mu(I) tangent viscosity of 0.8 Pa s, so mu(I) alone cannot remove the E dependence. Fixed: the hydrostatic face reconstruction for gravity off the mesh axes (the layer slid uphill; axis-aligned runs unchanged bit for bit). The top cell slides over the body at 1 and 10 MPa. `tests/test_inclined_layer.sh` (CI, 10 s: at rest at 25 deg, 2.4e-5 m/s); done-when `tests/manual/test_inclined_layer.sh` (3 min, fails now) |
 | 3.6c | Flow impedance at flowing faces | Closed, done-when not met at 5 mm; rest split to 3.6c2 | Decision 0040: `flowImpedance yes` (MC with mu(I), default off). Three sources of resistance, not one: the elastic Hancock predictor (G dt gamma_dot / 2 on the faces), the elastic shear jump, and the static-phi shear cap (flowing faces slip). Now: mu(I) tangent viscosity in the shear jump between flowing cells and at walls, plastic predictor along the flow direction, cap skipped between flowing cells and at phi_m elsewhere. Layer body 0.65 to 0.97 of exact at 0.1 MPa (was 0.14 to 0.20), 0.41 to 0.92 at 1 MPa, 0.03 to 0.74 at 10 MPa (5 mm); 2.5 mm within 5 % at 0.1 and 1 MPa. Not met: 5 mm (floor cells), 10 MPa (floor cell stuck), top cell slides at 1 and 10 MPa. CI guard in `tests/test_inclined_layer.sh` |
+| 3.6c2 | Stiff inclined layer: floor cell and top cell (split from 3.6c) | Done | Decision 0044, both behind `flowImpedance yes`: the wall reconstruction of a flowing cell mirrors about the wall's last velocity (the wall jump counted the drag twice; the 10 MPa floor cell stuck), and void below 1e-4 counts as full (noise void switched the top cell to the partly filled rules, which kicked its stress). `tests/manual/test_inclined_layer.sh` passes: profile error 3.6 / 0.9 / 0.8 % at 0.1 / 1 / 10 MPa, 5 mm (was 7.8 / 22 / 136). CI runs 0.1 and 10 MPa. Left: the 0.1 MPa layer creeps faster over time (+0.7 %/s) |
 
 ## Standing instruction from Sia (2026-11-14)
 
@@ -117,8 +118,10 @@ Silo track (decision 0016), one thread each:
 17. WP 3.6c: flow impedance. Closed without its done-when (decision 0040): the layer
    now flows at 0.65 to 0.97 of exact at 0.1 MPa (was 0.14 to 0.20) and within 5 % at
    2.5 mm for 0.1 and 1 MPa; 10 MPa and the top cell remain.
-18. Next: WP 3.6c2 (10 MPa layer: stuck floor cell; top cell next to void slides), same
-   done-when. Then 3.6d (silo E sweep with `flowImpedance yes`), 3.6e. WP 3.5 waits.
+18. WP 3.6c2: stiff layer. Done (decision 0044): wall ghost for flowing cells and a 1e-4
+   void tolerance; the layer is within 5 % of Bagnold at 0.1, 1 and 10 MPa (5 mm).
+19. Next: WP 3.6d (silo E sweep with `flowImpedance yes`; the first mu(I) silo case to
+   look at), then 3.6e. WP 3.5 waits.
    Keep runs coarse and short: Sia asked to be frugal with Claude usage (2026-11-15).
 
 Then the C++ counterparts 3.1 to 3.4 (2.4b is done; briefs not written yet) and 3.5
@@ -142,9 +145,10 @@ is built. Silo walls are mesh boundaries with friction, not contact.
   gravity slides over the body (2.6 times the exact speed at 10 MPa); likely the shear
   cap at the static phi. WP 3.6c (decision 0040) found three sources (elastic Hancock
   predictor, elastic shear jump, static-phi cap) and fixed most of it behind
-  `flowImpedance yes`; left for WP 3.6c2: at 10 MPa the floor cell sticks and the body
-  is 25 to 35 % slow; the top cell still slides at 1 and 10 MPa (at 10 MPa it unloads to
-  zero stress and has no friction). `flowImpedance` counts cells within 3 % of the static
+  `flowImpedance yes`; WP 3.6c2 (decision 0044) fixed the 10 MPa floor cell and the
+  sliding top cell. Left: at 0.1 MPa the layer creeps faster over time (+0.7 % of the
+  surface speed per second at 5 mm, +1.05 % at 2.5 mm; cells 3 to 11 % fast at 4 s).
+  `flowImpedance` counts void below 1e-4 as full and cells within 3 % of the static
   surface as flowing: watch static regions in the silo (WP 3.6d).
 
 - C++ silo (decisions 0034, 0035): with the collapse code the discharge rate falls with E

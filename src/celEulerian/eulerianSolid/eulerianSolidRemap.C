@@ -57,6 +57,13 @@ static const scalar perpTol = 1e-10;
 // Relative size below which a face flux counts as round-off noise
 static const scalar fluxTol = 1e-10;
 
+// With flowImpedance (WP 3.6c2, decision 0044): a cell whose void fraction
+// is below this is full. In stiff material the top cell of a flowing layer
+// opens 1e-9 to 1e-5 of void from round-off and wave noise; without the
+// tolerance every such void switches it to the partly filled rules (first
+// order, no flow viscosity, leaning slab) and back, which kicks its stress
+static const scalar nearlyFull = 1e-4;
+
 //- Limiter types, see the file header
 enum class limiterType { upwind, minmod, MC, superbee };
 
@@ -1087,7 +1094,7 @@ void Foam::eulerianSolid::remapFreeSurface(const scalar dt)
         }
         scalar a = (AL[celli] - vOut[celli])/V[celli];
         a = min(max(a, scalar(0)), scalar(1));
-        if (a >= 1 - 1e-12)
+        if (a >= 1 - (flowImpedance_ ? nearlyFull : 1e-12))
         {
             a = 1;
         }
