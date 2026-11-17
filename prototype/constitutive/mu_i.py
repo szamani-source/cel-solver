@@ -140,7 +140,7 @@ def inertial_number(dgam, sig_new, params):
     if dgam == 0.0:
         return 0.0
     P = -models.mean_stress(sig_new)
-    if P <= 0.0:
+    if not P > 1e-300 * params["rho_s"]:   # as celMuI.C (overflow guard, WP 3.6s)
         return math.inf
     return dgam / params["dt"] * params["d"] * math.sqrt(params["rho_s"] / P)
 
