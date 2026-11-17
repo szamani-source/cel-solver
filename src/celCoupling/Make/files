@@ -1,0 +1,4 @@
+bodyCells/cutGeometry.C
+bodyCells/bodyCells.C
+
+LIB = $(FOAM_USER_LIBBIN)/libcelCoupling

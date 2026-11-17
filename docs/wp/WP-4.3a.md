@@ -11,10 +11,14 @@ Sia asked for (2026-11-17): silo walls and hopper inserts that do not follow the
 
 ## Read first
 
-- `docs/decisions/0030` (mesh-boundary walls), `0041`, `0042`; `prototype/contact2d.py`;
+- `docs/decisions/0030` (mesh-boundary walls), `0041`, `0042`, `0043`; `prototype/contact2d.py`;
   `tests/test_silo_settle.sh` (the Janssen tank)
 
 ## Build
+
+- From WP 4.2 (decision 0043): `bodyCells` gives the geometry; mixing across processor
+  faces is not done there; add the thin-wall and coarse-facet warnings (decision 0042
+  addendum).
 
 - Wall friction per body in `constant/rigidBodies` (`friction <deg>`, as `walls` in
   materialProperties), the coupling at cut cells, wall force output per body.

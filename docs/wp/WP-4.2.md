@@ -1,7 +1,7 @@
 # WP 4.2: Contact search near the body (cut cells)
 
-State: not started. May start beside WP 4.0: every candidate scheme needs this geometry.
-Branch: the thread's `claude/project-thread-*` branch
+State: done (2026-11-17)
+Branch: `claude/project-thread-hilqye`
 
 ## Goal
 
@@ -42,4 +42,12 @@ match serial to 1e-12; search cost per step reported.
 
 ## Log
 
-(none yet)
+- 2026-11-17: Done in one session (decision 0043). `src/celCoupling/bodyCells` (exact
+  edge, face and cell coverage, body-frame octree), utility `celBodyCells` (writes
+  alphaBody, bodyFaceOpen, wallArea, wallVelocity, mixNeighbour at selected times).
+  `tests/test_body_cells.sh` passes in about 6 s: sphere volume 4e-16 at 10 and 20 cells per
+  diameter (the done-when asked 1 % and 0.3 % of the true sphere; the faceted STL itself is
+  0.86 % below it, so the check is against the STL's own volume), plane at 30 deg 2e-7
+  (single-precision STL), moving cube shifted exactly, turning cube 4e-16, 2 processors 9e-16.
+  Search 6e-5 s per searched cell. Thin-wall and coarse-facet warnings moved to 4.3a.
+  Next: WP 4.3a.

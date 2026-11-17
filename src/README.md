@@ -11,4 +11,5 @@ Libraries are added here by later work packages, one folder per library:
   The Lagrange step (WP 2.3) is in `eulerianSolidLagrange.C` (decision 0018).
 - `celLagrangian/` (WP 4.1, then 5.x): rigid bodies from STL with prescribed motion
   (`rigidBody`, `rigidBodies`, decision 0041), later explicit hex8 FE.
-- `celCoupling/` (WP 4.x): Eulerian-Lagrangian contact search and penalty forces.
+- `celCoupling/` (WP 4.2, then 4.3a, 4.3b): `bodyCells`, exact cells and faces covered by
+  each rigid body (decision 0043); the cut-cell wall coupling comes in 4.3a (decision 0042).
