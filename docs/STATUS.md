@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-11-16 (WP 3.6a)
+Last updated: 2026-11-17 (WP 3.6b)
 
 Plan doc: https://claude.ai/artifact/DTT6kSikz9ZUTBkUxY6Grr
 
@@ -46,6 +46,7 @@ Phase 2 (the C++ Eulerian solver: 2.1 to 2.5c and 2.4b done; 2.6 waits for Phase
 | 3.4 | C++ silo discharge across E, serial and parallel | Closed, done-when not met; E independence split to 3.4b | Decision 0034. `tests/test_discharge.sh` passes (about 50 s): mass 4e-14, no stress in void, 2 processors with the outlet split give the serial rate (74.09 both). Rate with the collapse code falls with E: 10 mm 74.1 / 65.7 / 70.9 kg/s/m at 0.1 / 1 / 10 MPa (1 MPa -11 %), 5 mm 78.0 / 55.0 at 0.1 / 1 MPa (-29 %). The E sweep is `tests/manual/test_discharge_stiffness.sh` (fails now) |
 | 3.4b | C++ discharge rate independent of E (rule 12) | Closed, done-when not met; Sia chose mu(I) (decision 0036) | Decision 0035: rule 12 in C++ behind `normalCap yes` (default off). With it: 10 mm 78.6 / 73.8 / 84.8 kg/s/m at 0.1 / 1 / 10 MPa (met), 5 mm 82.6 / 69.7 at 0.1 / 1 MPa (-16 %, was -29 %: not met). Collapse unharmed, unlike the prototype (a = 0.5: 0.50 / 0.35 / 0.25; a = 2: 1.50). 2-processor discharge rate +0.6 %; collapse cell-by-cell parallel check fails with the switch on (bisection round-off). Drivers read `CEL_EXTRA_MATERIAL` |
 | 3.6a | mu(I) friction in Drucker-Prager and Mohr-Coulomb (Python, C++) | Done | Decision 0037. Optional `mu2`, `I0`, `d`, `rhoS` (and `muIAlpha`): the return uses phi_m = atan(mu(I)), I from the plastic shear rate and the pressure after the return, solved per point (Illinois). `tests/test_mu_i.sh` passes (about 55 s): steady simple shear at fixed pressure gives mu(I) to 2e-14 for I = 1e-4 to 1; mu2 = tan(phi) bit for bit (Python and C++); C++ matches Python on 30 paths to 1e-12; celFoam passes dt and prints the law. Barker-Gray regularisation impossible for mu_s = tan 35 deg (no well-posed range), so T0 uses the plain Jop law. Placeholders: mu_2 - mu_s, I0 from glass beads |
+| 3.6b | Steady inclined layer (Bagnold) with mu(I), E = 0.1, 1, 10 MPa | Closed, done-when not met; measurement recorded | Decision 0039. Layer 0.05 m on 31 deg, x periodic, tilted gravity, from the exact steady state, 4 s. The body flows at 0.14 to 0.20 of the exact speed at 0.1 MPa, 0.05 to 0.09 at 1 MPa, 0.01 to 0.02 at 10 MPa (5 mm; 2.5 mm doubles it): numerical viscosity about 0.06 rho c_s h (2.8 / 6.5 / 29 Pa s) against a mu(I) tangent viscosity of 0.8 Pa s, so mu(I) alone cannot remove the E dependence. Fixed: the hydrostatic face reconstruction for gravity off the mesh axes (the layer slid uphill; axis-aligned runs unchanged bit for bit). The top cell slides over the body at 1 and 10 MPa. `tests/test_inclined_layer.sh` (CI, 10 s: at rest at 25 deg, 2.4e-5 m/s); done-when `tests/manual/test_inclined_layer.sh` (3 min, fails now) |
 
 ## Standing instruction from Sia (2026-11-14)
 
@@ -109,9 +110,12 @@ Silo track (decision 0016), one thread each:
    too weak against the numerical viscosity at 5 mm).
 15. WP 3.6a: mu(I) in the constitutive library. Done (decision 0037). The Barker-Gray
    regularisation does not exist for mu_s = tan 35 deg; T0 uses the plain Jop law.
-16. Next: WP 3.6b (inclined layer, which measures the numerical viscosity; also look
-   for mesh-dependent shear bands, since T0's mu(I) is not regularised), then 3.6c,
-   3.6d (silo E sweep), 3.6e. WP 3.5 waits.
+16. WP 3.6b: inclined layer. Closed without its done-when (decision 0039): the
+   numerical viscosity is about 0.06 rho c_s h, 3 to 35 times the mu(I) tangent
+   viscosity from 0.1 to 10 MPa; the flow is 5 to 100 times too slow.
+17. Next: WP 3.6c, the plastic-wave impedance at flowing faces (and the shear cap with
+   phi_m); its done-when is `tests/manual/test_inclined_layer.sh` within 5 % at all
+   three E. Then 3.6d (silo E sweep), 3.6e. WP 3.5 waits.
    Keep runs coarse and short: Sia asked to be frugal with Claude usage (2026-11-15).
 
 Then the C++ counterparts 3.1 to 3.4 (2.4b is done; briefs not written yet) and 3.5
@@ -129,6 +133,11 @@ is built. Silo walls are mesh boundaries with friction, not contact.
   Barker and Gray's incompressible sense) at every I, and their regularisation cannot be
   built. Whether our compressible elastic model is affected is not known (WP 3.6b).
   The cost of the per-point mu(I) solve in celFoam is not measured.
+- Inclined layer (WP 3.6b, decision 0039): the face Riemann solver's numerical
+  viscosity (about 0.06 rho c_s h) swamps mu(I) even at 0.1 MPa; the steady layer runs
+  at 0.14 to 0.20 of the exact speed (5 mm). The top cell of a layer under tilted
+  gravity slides over the body (2.6 times the exact speed at 10 MPa); likely the shear
+  cap at the static phi. Fix planned in WP 3.6c.
 
 - C++ silo (decisions 0034, 0035): with the collapse code the discharge rate falls with E
   (-29 % from 0.1 to 1 MPa at 5 mm; -16 % with `normalCap yes`). Fix planned as WP 3.6

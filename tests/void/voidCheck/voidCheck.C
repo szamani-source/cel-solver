@@ -23,6 +23,10 @@ Description
                                     //   the stable dt of each step instead
         writeTimes  (0.5 1);        // optional (WP 3.2b): also write
                                     //   cells_<t>.dat at these times
+        layer { theta 31; kzz 0.6; Us 1; }
+                                    // optional (WP 3.6b): steady inclined
+                                    //   layer stress and Bagnold velocity
+                                    //   (fill top = surface, floor y = 0)
     \endverbatim
 
     Output (master unless noted):
@@ -109,6 +113,29 @@ int main(int argc, char *argv[])
                 rho0*max(box[3] - bb.max().y(), 0) + 0.5*rho[celli]*hy;
             const scalar syy = -gMag*above/a;
             s[celli] = symmTensor(K0*syy, 0, 0, syy, 0, K0*syy);
+        }
+        if (a > 0 && dict.found("layer"))
+        {
+            // Steady inclined layer (WP 3.6b): x down the slope, y normal
+            // to it, surface at y1, gravity (g sin theta, -g cos theta).
+            // Normal stresses equal in plane (s_xx = s_yy = sn), s_zz =
+            // kzz sn, shear rho g sin theta (y1 - y); velocity
+            // Us (1 - (1 - y/y1)^1.5) along x (Bagnold, cell centre).
+            const dictionary& ld = dict.subDict("layer");
+            const scalar th =
+                ld.get<scalar>("theta")*constant::mathematical::pi/180;
+            const scalar depth = max(box[3] - C[celli].y(), 0);
+            const scalar sn = -rho0*gMag*Foam::cos(th)*depth;
+            const scalar tau = rho0*gMag*Foam::sin(th)*depth;
+            s[celli] =
+                symmTensor(sn, tau, 0, sn, 0, ld.get<scalar>("kzz")*sn);
+            U[celli] = vector
+            (
+                ld.get<scalar>("Us")
+               *(1 - Foam::pow(max(1 - C[celli].y()/box[3], 0), 1.5)),
+                0,
+                0
+            );
         }
     }
     solid.alphaRef().correctBoundaryConditions();
