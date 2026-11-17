@@ -4,4 +4,5 @@ cd "${0%/*}" || exit
 set -e
 wmake libso src/celConstitutive
 wmake libso src/celEulerian
+wmake libso src/celLagrangian
 wmake applications/solvers/celFoam

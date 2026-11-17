@@ -9,11 +9,13 @@ Description
     cycle live in library celEulerian (class eulerianSolid). Each cycle:
     stable time step, Lagrange step (WP 2.3), remap (WP 2.4), write. The
     two together are checked by tests/test_eulerian_cycle.sh (WP 2.4b);
-    contact comes in WP 4.x (see docs/work-packages.md).
+    rigid bodies from STL move on prescribed paths (WP 4.1, no forces yet);
+    contact comes in WP 4.2, 4.3 (see docs/work-packages.md).
 \*---------------------------------------------------------------------------*/
 
 #include "fvCFD.H"
 #include "eulerianSolid.H"
+#include "rigidBodies.H"
 
 // Print total mass and momentum with enough digits to compare runs
 static void printDiagnostics(const Foam::eulerianSolid& solid)
@@ -40,6 +42,9 @@ int main(int argc, char *argv[])
     #include "createTime.H"
     #include "createMesh.H"
     #include "createFields.H"
+
+    // Rigid bodies from constant/rigidBodies (WP 4.1); none if absent
+    rigidBodies bodies(runTime);
 
     // Stable time step at the start, printed once. Recomputed every cycle
     // below because density and stress will change once the physics is in.
@@ -71,13 +76,16 @@ int main(int argc, char *argv[])
 
         solid.lagrangeStep(dt);     // WP 2.3
 
-        // WP 4.x: Eulerian-Lagrangian contact forces
+        bodies.move();              // WP 4.1: prescribed motion to t
+
+        // WP 4.2, 4.3: Eulerian-Lagrangian contact forces
 
         solid.remap(dt);            // WP 2.4
 
         if (runTime.write())
         {
             printDiagnostics(solid);
+            bodies.write();
         }
 
         runTime.printExecutionTime(Info);

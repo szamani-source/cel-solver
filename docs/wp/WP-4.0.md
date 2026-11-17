@@ -1,6 +1,6 @@
 # WP 4.0: Investigate Lagrangian-Eulerian contact schemes (LS-DYNA, Abaqus, others)
 
-State: not started. Scheduled before WP 4.1 (first package of the Lagrangian-body phase).
+State: not started. Scheduled before WP 4.3a and 4.3b (WP 4.1 is done; 4.2 may run beside it).
 Branch: `wp-4.0-contact-investigation`
 
 Requested by Sia (2026-11-15): LS-DYNA is said to handle this contact better than
@@ -11,9 +11,10 @@ Abaqus; investigate thoroughly when the time comes, before building ours.
 A recommendation, backed by sources and by small numerical experiments, for how a moving
 Lagrangian body exchanges force with the Eulerian material in `celCoupling`.
 
-Scope note: tank and silo walls are mesh boundaries with Coulomb friction
-(`docs/decisions/0020`), not contact. This package concerns bodies that move through
-the Eulerian mesh (footing, pile, cone, projectile: targets T1 to T3).
+Scope note: walls that follow the box are mesh boundaries with Coulomb friction
+(`docs/decisions/0020`, `0030`). Since 2026-11-17 (Sia, decision 0041) fixed STL walls
+that cut the mesh (silo walls, hopper inserts) use the same coupling as bodies that
+move through the Eulerian mesh (footing, pile, cone, projectile: targets T1 to T3).
 
 ## Read first
 
@@ -52,7 +53,8 @@ the Eulerian mesh (footing, pile, cone, projectile: targets T1 to T3).
    schemes (a penalty coupling and a moving-wall/cut-cell Riemann coupling). Measure
    leakage (mass inside the body), force noise against the analytic or converged
    force, and sensitivity to the penalty stiffness and to where the body edge sits
-   in a cell.
+   in a cell. Add a fixed frictional wall inclined to the mesh (30 deg) with material
+   sliding along it: leakage, and wall friction ratio against tan(delta_w) (WP 4.3a).
 6. **Whether the claim holds**: say plainly, with the evidence, whether and in what
    respect LS-DYNA's coupling is better than Abaqus's, and what that means for us.
 
@@ -64,8 +66,8 @@ the Eulerian mesh (footing, pile, cone, projectile: targets T1 to T3).
 - `tests/test_proto_contact_schemes.sh` runs the experiments in CI and asserts the
   recommended scheme's leakage and force-noise numbers.
 - `docs/decisions/NNNN-contact-scheme.md` records the recommendation and what it changes
-  in WP 4.1 to 4.4 (whose rows and briefs are then updated).
-- Sia is shown the recommendation before WP 4.2 and 4.3 are built on it.
+  in WP 4.2 to 4.5 (whose rows and briefs are then updated).
+- Sia is shown the recommendation before WP 4.3a and 4.3b are built on it.
 
 ## Out of scope
 

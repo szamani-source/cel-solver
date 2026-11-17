@@ -50,10 +50,13 @@ Constitutive models for bulk solids are tracked in `docs/constitutive-models.md`
 | 3B.1 | N-material volume fractions with isoAdvector | Pure advection keeps interfaces sharp |
 | 3B.2 | Mixed-cell closure | Two-material impact conserves mass and momentum |
 | 3B.3 | Per-material history remap | Plastic strain stays with its material |
+| 3B.4 | General meshes (polyhedral, snappyHexMesh): PLIC void on general cells, void closure along face normals, face extrapolation to the face centre, time step from cell inradius (not planned, decision 0041) | Silo settle and outlet tests pass on a polyhedral mesh |
 | 4.0 | Investigate Lagrangian-Eulerian contact schemes (LS-DYNA constraint and penalty coupling, Abaqus CEL contact, cut-cell, immersed boundary) | Sourced comparison, prototype experiments, recommendation agreed with Sia |
-| 4.1 | Rigid body: STL input and kinematics | Body moves on prescribed path |
+| 4.1 | Rigid body: STL input and kinematics (decision 0041) | Body moves on prescribed path |
 | 4.2 | Contact search near the body | Cut cells found, unit tested |
-| 4.3 | Coupling forces (scheme from WP 4.0) and reaction output | No leakage in a push test |
+| 4.3a | Fixed STL walls with Coulomb friction (scheme from WP 4.0) | Janssen tank with STL walls, aligned and tilted 10 deg, within 2 / 5 % of mesh-boundary walls, no leakage |
+| 4.3b | Moving bodies: coupling forces both ways and reaction output | No leakage in a push test |
+| 4.5 | Silo and hopper discharge with STL walls | Flat tank rate within 5 % of mesh-boundary walls; hopper runs and its rate is recorded |
 | 4.4 | Footing and pile benchmarks | Bearing capacity factor near 5.14 |
 | 5.1 | Hex8 element with hourglass control | Patch test passes |
 | 5.2 | Lagrangian-only Taylor bar | Matches published result |
@@ -109,3 +112,11 @@ mesh boundaries, not contact, so the silo track does not depend on it.
 
 Note (2026-11-15): 3.2 split into 3.2a (void, decision 0031) and 3.2b (shear cap and
 column collapse) to keep each within three sessions.
+
+Note (2026-11-17): Sia asked for wall interactions from STL and about mesh types.
+Decision 0041: the Eulerian mesh stays Cartesian hex and STL walls are immersed rigid
+surfaces (as in Abaqus CEL); polyhedral or snappyHexMesh meshes would need a PLIC void
+on general cells first (3 to 4 packages, not planned). 4.3 split into 4.3a (fixed STL
+walls with friction, what Sia asked for) and 4.3b (moving bodies); 4.5 added (silo and
+hopper with STL walls). Order: 4.1 (done), 4.0 and 4.2 (may run side by side), 4.3a,
+4.5, 4.3b, 4.4.

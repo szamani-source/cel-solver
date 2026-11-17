@@ -1,0 +1,29 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      controlDict;
+}
+
+application     celFoam;
+startFrom       startTime;
+startTime       0;
+stopAt          endTime;
+endTime         0.01;
+deltaT          1e-6;      // overwritten by celFoam from the stable step
+writeControl    timeStep;
+writeInterval   5;
+purgeWrite      0;
+writeFormat     ascii;
+writePrecision  8;
+timeFormat      general;
+timePrecision   8;
+runTimeModifiable false;
+
+maxCo           0.5;       // fraction of the CFL limit used for deltaT
+
+// Lagrange step switches (WP 2.3, decision 0018), shown with their defaults:
+// solveMomentum   yes;    // no: hold U fixed (prescribed-motion tests)
+// secondOrder     yes;    // no: first-order (cell value) face states
+// The default maxCo is 0.4 (stable in 3D); 0.5 here is kept for the WP 0.1 test.
