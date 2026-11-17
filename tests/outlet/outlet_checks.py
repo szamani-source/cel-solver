@@ -51,6 +51,7 @@ DELTA_W = 20.0
 T_RAMP, DAMPING, T_OPEN = 0.1, 250.0, 0.3
 T_DIS = 1.0                        # run this long after opening
 WINDOW = (0.97, 0.88)
+WRITE_TIMES = []                   # optional cells_<t>.dat snapshots (WP 3.6d)
 # prototype/discharge2d.py run_case(cell=0.01, H=0.6, D=0.06, E=1e5,
 # window=(0.97, 0.88), new_rules=False), 2026-11-15: neither rule 12 nor 13, as here
 PROTO_RATE = 81.35
@@ -100,6 +101,8 @@ def setup(work, name="tank"):
                 "sigmaT 0;\nshearCap yes;\nspreadLayers yes;\n")
     check = dict(fill=[0.0, 0.0, W, H], U0=[0.0, 0.0, 0.0], tEnd=T_OPEN + T_DIS,
                  maxCo=0.4)
+    if WRITE_TIMES:
+        check["writeTimes"] = list(WRITE_TIMES)
     vc.make_case(path, nx, ny, material, check)
     block_mesh(path, nx, ny)
     mp = f"{path}/constant/materialProperties"

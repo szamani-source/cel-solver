@@ -49,7 +49,7 @@ int main(int argc, char *argv[])
     Info<< "Smallest cell size  minDelta = "
         << gMin(cbrt(mesh.V().field())) << nl
         << "P-wave speed        c = "
-        << Foam::sqrt(solid.material().waveModulus()/gMin(solid.rho().primitiveField()))
+        << Foam::sqrt(solid.material().waveModulus()/solid.rho0())
         << nl
         << "Stable time step    deltaT = " << deltaT0 << nl << endl;
 
