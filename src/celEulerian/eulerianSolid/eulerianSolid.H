@@ -193,6 +193,18 @@ class eulerianSolid
         scalar capSinPhi_;
         scalar capCCos_;
 
+        //- WP 3.6c (decision 0040): materialProperties flowImpedance yes
+        //  (Mohr-Coulomb with mu(I) only). In flowing cells (stress at the
+        //  Mohr-Coulomb surface of phi_m >= phi) the face shear jump term
+        //  uses the mu(I) tangent viscosity instead of the elastic S
+        //  impedance, the Hancock predictor drops the elastic stress rate
+        //  along the plastic flow direction, and the shear cap is skipped
+        //  between two flowing cells and uses phi_m elsewhere
+        Switch flowImpedance_;
+
+        //- mu_s, mu_2, I0, d, rho_s of the flow impedance
+        FixedList<scalar, 5> flowLaw_;
+
         //- Rule 9 (decision 0024; decision 0032): materialProperties
         //  spreadLayers yes (freeSurface only); a partly filled cell
         //  (alpha >= 0.1) whose alpha gradient points more along gravity
@@ -280,6 +292,9 @@ public:
         scalar rho0() const { return rho0_; }
         bool noTension() const { return noTension_; }
         bool shearCap() const { return shearCap_; }
+
+        //- Flow impedance on (WP 3.6c)
+        bool flowImpedance() const { return flowImpedance_; }
         bool spreadLayers() const { return spreadLayers_; }
         label nCapped() const { return nCapped_; }
         label nNormalCapped() const { return nNormalCapped_; }
