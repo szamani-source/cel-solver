@@ -45,3 +45,29 @@ acceleration on a 30 deg frictional wall within 0.3 %.
   with its edge on a face, 2 % off it).
 - Thin walls thinner than a cell need a closed STL with thickness of at least a cell, as
   Abaqus advises for its own coupling (S5); recorded for WP 4.2.
+
+## Addendum (2026-11-17): Sia's note on LS-DYNA
+
+Sia: LS-DYNA handles contact points better than Abaqus; use its method or a similar
+one. We built an LS-DYNA-style coupling-point variant in the prototype
+(`docs/research/contact-schemes.md`, follow-up; manual details not verified). It is
+smoother than a cell-overlap spring (Abaqus-like), which supports Sia's point, but
+it does not beat the cut-cell wall on any measure; with leak control it becomes as
+noisy as the plain spring. The decision stands: cut-cell moving walls. What we take
+from LS-DYNA into them:
+
+1. **Coupling-point density**: the wall face in each cut cell comes from exact clipping
+   of the STL facets, the limit of many coupling points per cell. WP 4.2 warns when an
+   STL feature is thinner than about two cells, and when facets are much larger than a
+   cell on a curved surface (S3: mesh ratio near 1:1, a few cells around thin parts).
+2. **Leakage control**: per body, report the material found inside it (covered cells,
+   overfilled cut cells) at every write, as LS-DYNA's leak diagnostics; such material is
+   handed out of the body (point 2 above). If WP 4.3a still finds leakage, a soft
+   penalty on it, like ILEAK, is the fallback, off by default.
+3. **Damping and stiffness**: nothing to tune. The wall Riemann solution already acts
+   with the material's impedance, the exact non-reflecting damping; no PFAC.
+4. **Compression only and friction** (as DIREC and the friction coefficient): no tension
+   across the wall, Coulomb cap on the shear, per body friction in `constant/rigidBodies`.
+5. **Keep the comparison runnable**: the `points` and `penalty` schemes stay in
+   `prototype/contact2d.py`, so a penalty coupling can be revisited for deformable bodies
+   (Phase 5), where LS-DYNA's approach is the usual one.

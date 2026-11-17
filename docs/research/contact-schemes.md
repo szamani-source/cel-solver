@@ -77,3 +77,43 @@ element of penetration at corners. So "better" holds in the sense of more contro
 an actively developed leakage treatment, not of a different principle; no side-by-side
 published comparison was found (not verified either way). For us the point is that a
 cell-centred Godunov code can avoid the penalty trade altogether.
+
+## Follow-up: LS-DYNA-style coupling points (Sia, 2026-11-17)
+
+Sia noted that LS-DYNA handles contact points better than Abaqus and asked us to use
+its method or a similar one. LS-DYNA's coupling differs from Abaqus's in three ways
+we could act on: coupling points spread over each Lagrangian segment (NQUAD, at least
+two per ALE element, S3), penetration tracked at each point rather than from the
+volume fractions of a cell, and controls on top of the spring (PFAC curve, damping,
+leakage control ILEAK, S1 to S3). The keyword card and theory text for
+`*CONSTRAINED_LAGRANGE_IN_SOLID` could not be read online (the R14 theory manual and
+the 960 keyword and 2005 theory manuals returned only their contents pages), so the
+details below are our reconstruction, **not verified** against the manual.
+
+`prototype/contact2d.py` scheme `points`: points every h / NQUAD along the body
+surface; at each point the material velocity is interpolated from the cells holding
+material, penetration d grows by the relative normal velocity into the body (never
+below 0, compression only), pressure k d (or a pressure-penetration curve) plus a
+damper DAMP z (relative normal velocity), Coulomb friction; the force goes to the
+four nearest cells by weight times mass, the reaction to the body. Leak control
+(`ileak`) adds the cell-overlap penalty on top.
+
+| Variant (k in M/h) | Piston stress / zv | Piston noise | Piston leak | Block noise | Incline acc. / exact | Incline leak |
+| --- | --- | --- | --- | --- | --- | --- |
+| points, k 0.1 | 0.48, 0.46 | 0.03, 0.07 | 2.1e-2 | 0.007 | 1.03 | 3.9e-2 |
+| points, k 1 | 0.46, 0.48 | 0.06, 0.09 | 2.0e-2 | 0.015 | 1.03 | 3.9e-2 |
+| points, k 1, DAMP 0.5 | 0.46, 0.47 | 0.05, 0.08 | 2.0e-2 | 0.014 | 1.03 | 3.9e-2 |
+| points, k 10, DAMP 0.5 | 0.46, 0.47 | 0.20, 0.13 | 2.0e-2 | 0.02 | 1.03 | 4.0e-2 |
+| points, k 1, NQUAD 4 | 0.46, 0.48 | 0.06, 0.09 | 2.0e-2 | 0.013 | 1.03 | 3.9e-2 |
+| points, k 1, leak control | 0.98, 1.00 | 0.27, 0.26 | 3.8e-3 | 0.30, 0.16 | 1.11 | 5.7e-4 |
+| cut-cell Riemann (decision 0042) | 1.006, 1.006 | 0.002 | 5e-4 | 0.06, 0.02 | 1.003 | 4e-6 |
+
+Coupling points give a smooth force (noise 3 to 9 % instead of 27 %) and friction close
+to right, which is the improvement over a cell-overlap spring that LS-DYNA users report.
+But the material in a cell the surface cuts is spread over the whole cell, so it sits
+partly inside the body (leak 2 to 4 %) and the plate pushes on it at about half the
+right stress; more points or damping change nothing. Leak control fixes the leak and
+the force but brings back the noise of the plain spring. In this test the point idea
+and the cut-cell wall agree on what matters: the force must act at the true surface
+position, and the material must not be spread across it. The cut-cell wall does both
+exactly, with no stiffness to tune.

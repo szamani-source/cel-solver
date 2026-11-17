@@ -8,6 +8,11 @@ written so the two couplings differ only where they touch the body:
               invisible to the face fluxes; material that overlaps the body (cell fill
               a above the open fraction phi) gets a spring force k d along the body
               normal (d = overlap depth), a damper, and Coulomb friction.
+  "points"    (LS-DYNA-style coupling points, our reconstruction, not verified against
+              the manual): points every h / nquad on the body surface track the
+              penetration of the material (integrated relative normal velocity),
+              pressure k d or a curve, damper, friction; optional leak control
+              (ileak) adds the "penalty" overlap spring.
   "riemann"   (cut cell / embedded boundary, Natarajan et al. 2021): faces are cut to
               their open length, the body surface inside a cut cell is one more face
               where the material meets a moving wall (one-sided acoustic Riemann
@@ -113,6 +118,12 @@ class Rect:
         ny = np.where(np.abs(dx) < np.abs(dy), np.sign(dy), 0.0)
         return b, bx, by, np.stack([nx, ny], -1)
 
+    def points(self, g, t, spacing):
+        """Coupling points (LS-DYNA style) at time t, fixed in the body: the
+        same order every call, so a penetration history can be kept per point."""
+        P, N, A = rect_points(self.box0, spacing)
+        return P + self.v * t, N, A
+
     def depth(self, g, t, n):
         """Distance from each cell centre to the body surface along n (inside > 0)."""
         x0, x1, y0, y1 = self.box(t)
@@ -120,6 +131,23 @@ class Rect:
         d = np.where(n[..., 0] > 0, x1 - X, 0.0) + np.where(n[..., 0] < 0, X - x0, 0.0) \
             + np.where(n[..., 1] > 0, y1 - Y, 0.0) + np.where(n[..., 1] < 0, Y - y0, 0.0)
         return d
+
+
+def rect_points(box, spacing):
+    """Coupling points on the four sides of a rectangle box = (x0, x1, y0, y1):
+    positions, outward normals, and the side length each stands for."""
+    x0, x1, y0, y1 = box
+    P, N, A = [], [], []
+    for (a, b), nrm in ((((x0, y0), (x1, y0)), (0.0, -1.0)), (((x1, y0), (x1, y1)), (1.0, 0.0)),
+                        (((x1, y1), (x0, y1)), (0.0, 1.0)), (((x0, y1), (x0, y0)), (-1.0, 0.0))):
+        L = math.hypot(b[0] - a[0], b[1] - a[1])
+        n = max(1, int(round(L / spacing)))
+        for k in range(n):
+            f = (k + 0.5) / n
+            P.append((a[0] + f * (b[0] - a[0]), a[1] + f * (b[1] - a[1])))
+            N.append(nrm)
+            A.append(L / n)
+    return np.array(P), np.array(N), np.array(A)
 
 
 class HalfPlane:
@@ -156,6 +184,23 @@ class HalfPlane:
         X, Y = np.meshgrid(g.xc, g.yc)
         return self.c - (self.n[0] * X + self.n[1] * Y)
 
+    def points(self, g, t, spacing):
+        """Coupling points along the part of the wall line inside the box."""
+        tv = np.array([-self.n[1], self.n[0]])
+        p0 = self.c * self.n
+        W, H = g.xf[-1], g.yf[-1]
+        # parameter range of the line inside [0, W] x [0, H]
+        lo, hi = -1e9, 1e9
+        for k, (a, b) in enumerate(((0.0, W), (0.0, H))):
+            if abs(tv[k]) > 1e-14:
+                s1, s2 = (a - p0[k]) / tv[k], (b - p0[k]) / tv[k]
+                lo, hi = max(lo, min(s1, s2)), min(hi, max(s1, s2))
+        L = hi - lo
+        n = max(1, int(round(L / spacing)))
+        sk = lo + (np.arange(n) + 0.5) * L / n
+        P = p0 + sk[:, None] * tv
+        return P, np.broadcast_to(self.n, P.shape).copy(), np.full(n, L / n)
+
 
 # --- the solver ----------------------------------------------------------------------
 
@@ -186,7 +231,7 @@ class Box:
     State: mass m, momentum via v (vx, vy), mass-weighted stress s (xx, yy, xy)."""
 
     def __init__(self, grid, E, nu, rho0, body, scheme, mu_body=0.0, gravity=(0.0, 0.0),
-                 pfac=1.0, cfl=0.4):
+                 pfac=1.0, cfl=0.4, nquad=2, damp=0.0, curve=None, ileak=False):
         self.g = grid
         self.E, self.nu, self.rho0 = E, nu, rho0
         self.lam = E * nu / ((1 + nu) * (1 - 2 * nu))
@@ -199,6 +244,13 @@ class Box:
         self.mu_b = mu_body
         self.grav = np.array(gravity, float)
         self.kpen = pfac * self.M / grid.h          # penalty stiffness [Pa/m]
+        # coupling points (scheme "points", LS-DYNA CLIS/S-ALE style): nquad points
+        # per cell length of body surface, damping as a fraction of the impedance
+        # (critical for a wave leaving the surface), optional pressure-penetration
+        # curve (d, p) pairs replacing k d
+        self.nquad, self.damp, self.curve = nquad, damp, curve
+        self.dpen = None
+        self.ileak = ileak       # points plus the cell-overlap penalty (leak control)
         self.dt = cfl * grid.h / self.c
         ny, nx = grid.ny, grid.nx
         self.m = np.zeros((ny, nx))
@@ -216,7 +268,7 @@ class Box:
     def geom(self, t):
         g = self.g
         b, bx, by, nb = self.body.fractions(g, t)
-        if self.scheme == "penalty":
+        if self.scheme in ("penalty", "points"):
             z = np.zeros_like
             return z(b), z(bx), z(by), b, nb
         return b, bx, by, b, nb
@@ -325,7 +377,9 @@ class Box:
             ub = un_star[..., None] * n + ut_star[..., None] * tt
             L += np.where(cut[..., None, None],
                           ub[..., :, None] * An[..., None, :], 0.0)
-        else:
+        if self.scheme == "points":
+            self._couple_points(F, tm, vel, sig)
+        if self.scheme == "penalty" or (self.scheme == "points" and self.ileak):
             # penalty on the overlap of material and body (cells with b > 0)
             # material volume (mass over the density its stress implies), so that
             # elastic compression of a full cell is not taken for overlap
@@ -433,6 +487,60 @@ class Box:
         self.v = np.where(has[..., None], p / ms[..., None], 0.0)
         self.s = np.where(has[..., None], s_m, 0.0)
 
+    def _couple_points(self, F, t, vel, sig):
+        """LS-DYNA-style coupling: points on the body surface track how far the
+        material has moved into the body (integrated relative normal velocity of
+        the material interpolated at the point); a penalty pressure p(d) plus a
+        damper acts on the material there and the reaction on the body."""
+        g, h, dt = self.g, self.g.h, self.dt
+        P, N, A = self.body.points(g, t, h / self.nquad)
+        if self.dpen is None:
+            self.dpen = np.zeros(len(P))
+        # bilinear weights over the four nearest cell centres holding material
+        fx = P[:, 0] / h - 0.5
+        fy = P[:, 1] / h - 0.5
+        i0 = np.floor(fx).astype(int)
+        j0 = np.floor(fy).astype(int)
+        tx, ty = fx - i0, fy - j0
+        idx, wts = [], []
+        for di, dj, w in ((0, 0, (1 - tx) * (1 - ty)), (1, 0, tx * (1 - ty)),
+                          (0, 1, (1 - tx) * ty), (1, 1, tx * ty)):
+            ii = np.clip(i0 + di, 0, g.nx - 1)
+            jj = np.clip(j0 + dj, 0, g.ny - 1)
+            w = w * (self.m[jj, ii] > 0)
+            idx.append((jj, ii))
+            wts.append(w)
+        wsum = sum(wts)
+        inbox = (P[:, 0] > 0) & (P[:, 0] < g.xf[-1]) & (P[:, 1] > 0) & (P[:, 1] < g.yf[-1])
+        on = (wsum > 1e-12) & inbox
+        ws = np.where(on, wsum, 1.0)
+        um = sum(w[:, None] * vel[jj, ii] for (jj, ii), w in zip(idx, wts)) / ws[:, None]
+        rel = um - self.body.v
+        rin = -(rel * N).sum(-1)                         # into the body > 0
+        self.dpen = np.where(on, np.maximum(self.dpen + dt * rin, 0.0), 0.0)
+        d = self.dpen
+        if self.curve is None:
+            p = self.kpen * d
+        else:
+            cd, cp = np.array(self.curve).T
+            slope = (cp[-1] - cp[-2]) / (cd[-1] - cd[-2])
+            p = np.where(d <= cd[-1], np.interp(d, cd, cp), cp[-1] + slope * (d - cd[-1]))
+        p = np.where(d > 0, np.maximum(p + self.damp * self.zp * rin, 0.0), 0.0)
+        fn = p * A
+        tvec = rel + rin[:, None] * N
+        tmag = np.linalg.norm(tvec, axis=-1)
+        ft = np.minimum(self.mu_b * fn, self.zs * A * tmag)
+        tdir = np.where(tmag[:, None] > 0, tvec / np.where(tmag > 0, tmag, 1)[:, None], 0)
+        fp = fn[:, None] * N - ft[:, None] * tdir     # on the material
+        # the force goes to the cells in proportion to weight times mass, so
+        # nearly empty cells are not flung (LS-DYNA spreads it to the nodes)
+        wm = [w * self.m[jj, ii] for (jj, ii), w in zip(idx, wts)]
+        wms = sum(wm)
+        wms = np.where(wms > 0, wms, 1.0)
+        for (jj, ii), w in zip(idx, wm):
+            np.add.at(F, (jj, ii), (w / wms)[:, None] * fp)
+        self.force -= fp.sum(0)
+
     # diagnostics
     def leak(self):
         """Material inside the body: mass beyond the open volume (overfill above 2 %
@@ -451,7 +559,7 @@ class Box:
 MAT = dict(E=10e6, nu=0.3, rho0=1800.0)
 
 
-def piston(scheme, h=0.005, offset=0.0, pfac=1.0, v=2.0, t_end=None):
+def piston(scheme, h=0.005, offset=0.0, pfac=1.0, v=2.0, t_end=None, **kw):
     """Full-width rigid piston pushed down into an elastic layer at speed v. Exact
     contact stress until the wave returns from the floor: z v (1D impedance)."""
     W, H = 0.1, 0.3
@@ -460,7 +568,7 @@ def piston(scheme, h=0.005, offset=0.0, pfac=1.0, v=2.0, t_end=None):
     top = 0.2
     y0 = top + offset * h
     body = Rect(-1.0, W + 1.0, y0, H + 1.0, v=(0.0, -v))
-    box = Box(g, MAT["E"], MAT["nu"], MAT["rho0"], body, scheme, pfac=pfac)
+    box = Box(g, MAT["E"], MAT["nu"], MAT["rho0"], body, scheme, pfac=pfac, **kw)
     box.fill(lambda X, Y: np.clip((y0 - (Y - 0.5 * h)) / h, 0.0, 1.0))
     t_end = t_end or 1.6 * top / box.c       # before the floor reflection returns
     m0 = box.mass()
@@ -478,7 +586,7 @@ def piston(scheme, h=0.005, offset=0.0, pfac=1.0, v=2.0, t_end=None):
     return dict(mean=mean, noise=noise, leak=max(Lk), mass=abs(box.mass() / m0 - 1))
 
 
-def block(scheme, h=0.005, offset=0.0, pfac=1.0, v=2.0, cells=6):
+def block(scheme, h=0.005, offset=0.0, pfac=1.0, v=2.0, cells=6, **kw):
     """Rigid block (4 x 4 cells) translating along x through material at rest for
     `cells` cells; returns leakage, drag noise and mass error."""
     W, H = 0.3, 0.15
@@ -487,7 +595,7 @@ def block(scheme, h=0.005, offset=0.0, pfac=1.0, v=2.0, cells=6):
     x0 = 0.08 + offset * h
     y0 = 0.055 + offset * h
     body = Rect(x0, x0 + 4 * h, y0, y0 + 4 * h, v=(v, 0.0))
-    box = Box(g, MAT["E"], MAT["nu"], MAT["rho0"], body, scheme, pfac=pfac)
+    box = Box(g, MAT["E"], MAT["nu"], MAT["rho0"], body, scheme, pfac=pfac, **kw)
     box.fill(lambda X, Y: np.ones_like(X))
     m0 = box.mass()
     t_end = cells * h / v
@@ -506,7 +614,7 @@ def block(scheme, h=0.005, offset=0.0, pfac=1.0, v=2.0, cells=6):
                 leak_end=Lk[-1], mass=abs(box.mass() / m0 - 1))
 
 
-def incline(scheme, h=0.005, pfac=1.0, theta=30.0, delta=20.0, t_end=0.12):
+def incline(scheme, h=0.005, pfac=1.0, theta=30.0, delta=20.0, t_end=0.12, **kw):
     """Elastic block on a fixed frictional wall inclined at theta (not aligned with the
     mesh), under gravity. Exact sliding acceleration g (sin theta - tan delta cos
     theta); measured from the block's velocity along the slope over the second half."""
@@ -520,7 +628,7 @@ def incline(scheme, h=0.005, pfac=1.0, theta=30.0, delta=20.0, t_end=0.12):
     body = HalfPlane(n, c)
     grav = (0.0, -9.81)
     box = Box(g, MAT["E"], MAT["nu"], MAT["rho0"], body, scheme,
-              mu_body=math.tan(math.radians(delta)), gravity=grav, pfac=pfac)
+              mu_body=math.tan(math.radians(delta)), gravity=grav, pfac=pfac, **kw)
     # block: 0.12 along the slope, 0.05 thick, centred at s = 0.18 along the wall
     tv = np.array([math.cos(th), math.sin(th)])
     nv = np.array(n)
