@@ -15,6 +15,9 @@ Description
         U0          (0 0 0);        // initial velocity of the material
         xSplit      0.3;            // optional: material left of xSplit
         Uleft       (-0.5 0 0);     //   starts with Uleft instead
+        sigma0      (-1e5 0 0 -1e5 0 -1e5);
+                                    // optional (WP 4.4b): uniform initial
+                                    //   stress (xx xy xz yy yz zz)
         initK0      0.4286;         // optional: K0 stress of the weight
                                     //   above (g along -y, top at y1)
         tEnd        0.1;            // run to tEnd with dt = tEnd/ceil(...)
@@ -126,6 +129,12 @@ int main(int argc, char *argv[])
                 rho0*max(box[3] - bb.max().y(), 0) + 0.5*rho[celli]*hy;
             const scalar syy = -gMag*above/a;
             s[celli] = symmTensor(K0*syy, 0, 0, syy, 0, K0*syy);
+        }
+        if (a > 0 && dict.found("sigma0"))
+        {
+            // uniform initial material stress (WP 4.4b): a confining
+            // pressure in weightless runs
+            s[celli] = dict.get<symmTensor>("sigma0");
         }
         if (a > 0 && dict.found("layer"))
         {
