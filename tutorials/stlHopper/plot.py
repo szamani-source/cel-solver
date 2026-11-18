@@ -1,0 +1,142 @@
+"""Plots and discharge rate for the stlHopper tutorial (WP 4.5), adapted from
+siloDischarge/plot.py (WP 3.6d).
+
+Run after ./Allrun (needs numpy and matplotlib; OpenFOAM sourced for the
+cell centres):
+
+    python3 plot.py
+
+Writes snapshots.png (material and speed at six times), mass.png (mass in
+the tank against time) and rate.txt (steady rate and Beverloo constant).
+The rate is the least-squares slope of the tank mass from 97 to 88 percent
+of the mass at opening, as tests/discharge/discharge_checks.py.
+"""
+
+import math
+import os
+import re
+import subprocess
+
+import numpy as np
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt  # noqa: E402
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+T_OPEN, D, RHO, G, DEPTH = 0.3, 0.06, 1800.0, 9.81, None
+SNAPS = [0.3, 1.0, 2.0, 3.0, 4.0, 5.0]
+INK, MUTED, SURFACE, SERIES = "#1f1f1e", "#6b6b68", "#fcfcfb", "#2a78d6"
+
+
+def read_internal(path, n):
+    txt = open(path).read()
+    m = re.search(r"internalField\s+uniform\s+([^;]+);", txt)
+    if m:
+        v = m.group(1).strip("() ").split()
+        return np.tile(np.array(v, float), (n, 1)).squeeze()
+    m = re.search(r"internalField\s+nonuniform\s+List<\w+>\s*\n?(\d+)\s*\n?\(", txt)
+    body = txt[m.end():]
+    rows = re.findall(r"\(([^()]*)\)|([-+0-9.eE]+)", body[:body.index("\n)")])
+    if rows and rows[0][0]:
+        return np.array([r[0].split() for r in rows[:n]], float)
+    return np.array([r[1] for r in rows[:n]], float)
+
+
+def time_dirs():
+    out = []
+    for d in os.listdir(HERE):
+        try:
+            out.append((float(d), d))
+        except ValueError:
+            pass
+    return sorted(out)
+
+
+def main():
+    if not os.path.exists(f"{HERE}/0/C"):
+        subprocess.run(["postProcess", "-func", "writeCellCentres", "-time", "0"],
+                       cwd=HERE, check=True, stdout=subprocess.DEVNULL)
+    C = read_internal(f"{HERE}/0/C", 10 ** 9)
+    n = len(C)
+    x, y = C[:, 0], C[:, 1]
+    h = np.diff(np.unique(np.round(x, 9)))[0]
+    depth = h                                   # one cell thick (2D)
+
+    # tank mass at every write time from the log (printed at writes)
+    log = open(f"{HERE}/log.celFoam").read()
+    blocks = re.findall(r"Time = ([0-9.e+-]+)  deltaT[^\n]*\n(?:(?!Time = ).)*?"
+                        r"Total mass\s+= ([0-9.e+-]+)", log, re.S)
+    t = np.array([float(a) for a, _ in blocks])
+    m = np.array([float(b) for _, b in blocks]) / depth   # kg per m of depth
+    m0 = float(re.search(r"Total mass\s+= ([0-9.e+-]+)", log).group(1)) / depth
+    t = np.r_[0.0, t]
+    m = np.r_[m0, m]
+    E = float(re.search(r"^E\s+([0-9.e+-]+);", open(f"{HERE}/constant/materialProperties")
+                        .read(), re.M).group(1))
+    i_open = int(np.argmin(abs(t - T_OPEN)))
+    m_open = m[i_open]
+    sel = (t > T_OPEN) & (m <= 0.97 * m_open) & (m >= 0.88 * m_open)
+    rate = -np.polyfit(t[sel], m[sel], 1)[0] if sel.sum() >= 3 else float("nan")
+    Cb = rate / (RHO * math.sqrt(G) * D ** 1.5)
+    msg = (f"E = {E / 1e6:g} MPa, {h * 1000:g} mm cells: steady rate {rate:.1f} kg/s per m "
+           f"of depth, Beverloo C = {Cb:.2f} (reference 1.45, test band 1.0 to 1.9, "
+           f"decision 0019); mass at opening {m_open:.1f} kg/m, at the end "
+           f"{m[-1] / m_open:.2f} of it\n")
+    open(f"{HERE}/rate.txt", "w").write(msg)
+    print(msg, end="")
+
+    plt.rcParams.update({"font.size": 9, "text.color": INK, "axes.labelcolor": INK,
+                         "xtick.color": MUTED, "ytick.color": MUTED,
+                         "axes.edgecolor": MUTED, "figure.facecolor": SURFACE,
+                         "axes.facecolor": SURFACE})
+
+    # snapshots: material (alpha) shaded by speed
+    dirs = dict(time_dirs())
+    fig, axs = plt.subplots(1, len(SNAPS), figsize=(12, 3.6), sharey=True)
+    X0, X1, Y1 = -0.0275, 0.4325, 0.65          # the mesh (blockMeshDict)
+    nx, ny = int(round((X1 - X0) / h)), int(round(Y1 / h))
+    ix = np.floor((x - X0) / h + 1e-6).astype(int)
+    iy = np.floor(y / h + 1e-6).astype(int)
+    im = None
+    for ax, ts in zip(axs, SNAPS):
+        key = min(dirs, key=lambda k: abs(k - ts))
+        a = read_internal(f"{HERE}/{dirs[key]}/alpha", n)
+        U = read_internal(f"{HERE}/{dirs[key]}/U", n)
+        sp = np.hypot(U[:, 0], U[:, 1])
+        grid = np.full((ny, nx), np.nan)
+        grid[iy, ix] = np.where(a > 0.5, sp, np.nan)
+        cmap = matplotlib.colormaps["Blues"].copy()
+        cmap.set_bad("#d6d6d3")
+        im = ax.imshow(grid, origin="lower", extent=(X0, X1, 0, Y1), cmap=cmap,
+                       vmin=0, vmax=1.5, interpolation="nearest")
+        # the STL walls (constant/triSurface): inner faces
+        FL = 0.0125
+        R = 0.17 * math.tan(math.radians(60.0))   # hopper walls, 60 deg
+        ax.plot([0, 0, 0.17, 0.17], [Y1, FL + R, FL, 0], color=INK, lw=2)
+        ax.plot([0.4, 0.4, 0.23, 0.23], [Y1, FL + R, FL, 0], color=INK, lw=2)
+        ax.set_title(f"t = {key:g} s" + (" (opens)" if abs(key - T_OPEN) < 1e-9 else ""),
+                     fontsize=9)
+        ax.set_xlabel("x (m)")
+        ax.set_xticks([0, 0.2, 0.4])
+    axs[0].set_ylabel("y (m)")
+    cb = fig.colorbar(im, ax=axs, shrink=0.8, pad=0.01)
+    cb.set_label("speed (m/s); grey = empty")
+    fig.suptitle(f"STL hopper discharge, E = {E / 1e6:g} MPa, {h * 1000:g} mm cells", fontsize=10)
+    fig.savefig(f"{HERE}/snapshots.png", dpi=150, bbox_inches="tight")
+
+    fig, ax = plt.subplots(figsize=(5, 3.2))
+    ax.plot(t, m, color=SERIES, lw=2)
+    ax.axvline(T_OPEN, color=MUTED, lw=1, ls=":")
+    ax.text(T_OPEN + 0.01, m0 * 0.55, "outlet opens", color=MUTED)
+    ax.set_xlabel("time (s)")
+    ax.set_ylabel("mass in tank (kg per m depth)")
+    ax.set_title(f"Mass in the hopper: steady rate {rate:.0f} kg/s/m, C = {Cb:.2f}", fontsize=10)
+    ax.grid(color="#e4e4e1", lw=0.6)
+    ax.set_ylim(0, None)
+    for s in ("top", "right"):
+        ax.spines[s].set_visible(False)
+    fig.savefig(f"{HERE}/mass.png", dpi=150, bbox_inches="tight")
+
+
+if __name__ == "__main__":
+    main()
