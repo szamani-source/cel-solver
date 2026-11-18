@@ -1,5 +1,5 @@
 """WP 3.7a done-when: a solid inlet (materialProperties inlets, decision
-0057) feeds fresh material into an empty box.
+0060) feeds fresh material into an empty box.
 
 Set-up (10 mm cells, 2D): box W = 0.2 m by H = 0.3 m, walls and floor
 friction 20 deg, a smooth lid with the inlet (w = 0.04 m) in its middle.

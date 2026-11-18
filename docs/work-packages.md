@@ -52,7 +52,7 @@ Constitutive models for bulk solids are tracked in `docs/constitutive-models.md`
 | 3.6h | Smooth blend of the full and partly filled rules (proposed in decision 0048). Closed 2026-11-18 without its done-when (decision 0049) | Silo bands within 10 % at 10 mm, inclined layer still passes |
 | 3.6e | Column collapse with mu(I) against experiments (Lube 2005, Lajeunesse 2005). Done 2026-11-18 at 10 mm (decision 0050: T0 rule set mu(I) + flowImpedance + normalCap) | Run-out and final height within the decision 0019 bands at a = 0.5 and 2, at T0's real E |
 | 3.5 | Cohesion in the silo (arching, flow or no flow) | Flow stops below a critical outlet width |
-| 3.7a | Solid inlet: a patch that feeds fresh material (speed over time, density, stress), decision 0057. Done 2026-11-18 | `tests/test_inlet.sh`: nothing in while closed, fed mass exact, mass balance 1e-12, the fed material lands and comes to rest, 2 processors match serial |
+| 3.7a | Solid inlet: a patch that feeds fresh material (speed over time, density, stress), decision 0060. Done 2026-11-18 | `tests/test_inlet.sh`: nothing in while closed, fed mass exact, mass balance 1e-12, the fed material lands and comes to rest, 2 processors match serial |
 | 3.7b | Silo fed from the top while it discharges (tutorial, first with `inlets`) | Fed T0 tank reaches a steady level when the feed matches the discharge; level falls when the feed is below it; mass in = mass out + change, 1e-10 |
 | 3.8a | Axisymmetric wedge: wedge patches in the Lagrange step and remap, time step from the in-plane cell size (no free surface) | Lamé thick cylinder under pressure within 1 %; cylindrical Janssen tank (lid) within 2 % of Janssen for a circular bin; 2 processors match serial |
 | 3.8b | Free surface on the wedge: radius-weighted slab rules, the triangle cells at the axis | Lake at rest, falling block and void-top settle on a wedge, as `tests/test_void.sh`; mass 1e-12 |
@@ -71,6 +71,7 @@ Constitutive models for bulk solids are tracked in `docs/constitutive-models.md`
 | 4.5 | Silo and hopper discharge with STL walls | Flat tank rate within 5 % of mesh-boundary walls; hopper runs and its rate is recorded |
 | 4.4 | Strip footing benchmark (split 2026-11-18: pile to 4.4b) | Bearing capacity factor near 5.14 |
 | 4.4b | Pile section moving sideways through clay (Randolph and Houlsby 1984) | Smooth limit 9.14 cu D within 10 % |
+| 4.4c | Strip footing on sand (Martin 2005 N_gamma, phi 30) | Smooth N_gamma 7.653 within 15 % (closed without it, decision 0057) |
 | 5.1 | Hex8 element with hourglass control | Patch test passes |
 | 5.2 | Lagrangian-only Taylor bar | Matches published result |
 | 5.3 | Two-way deformable coupling | Deformable push test stable |

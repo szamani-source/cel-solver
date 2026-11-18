@@ -1,4 +1,4 @@
-# 0057 Solid inlet: a face that moves in, a swept volume filled with fresh material (WP 3.7a)
+# 0060 Solid inlet: a face that moves in, a swept volume filled with fresh material (WP 3.7a)
 
 Date: 2026-11-18. Status: accepted (WP 3.7a done).
 

@@ -37,7 +37,7 @@ counted.
 
 ## Log
 
-- 2026-11-18: done. Test written first, then the inlet (decision 0057). Counting an
+- 2026-11-18: done. Test written first, then the inlet (decision 0060). Counting an
   open inlet as full for the slab side made the stream fall in place; as empty it
   falls and lands. Plain MC packs the landing (+4.3 %); the test uses the T0 rule set
   (+0.82 %). All seven checks pass in 25 s; test_void and test_outlet unchanged. Next:

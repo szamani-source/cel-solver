@@ -68,7 +68,7 @@ Description
       swept across it leaves the domain and is counted in discharged().
       Opening an outlet ends the settling stage: damping is set to 0.
     - constant/materialProperties, optional subdictionary inlets (WP 3.7a,
-      decision 0057; needs freeSurface yes): patch name ->
+      decision 0060; needs freeSurface yes): patch name ->
       { speed <Function1 of t, m/s>; startTime <s>; endTime <s>;
         density <kg/m^3>; pressure <Pa>; friction <deg>; }
       feeds fresh material into the domain through that patch: between
@@ -264,7 +264,7 @@ class eulerianSolid
         //  processor) [kg]
         scalar discharged_;
 
-        //- Inlets (WP 3.7a, decision 0057): name, patch, speed into the
+        //- Inlets (WP 3.7a, decision 0060): name, patch, speed into the
         //  domain over time [m/s], start and end time [s], closed-wall
         //  friction coefficient, inlet density [kg/m^3], inlet pressure [Pa]
         wordList inletName_;

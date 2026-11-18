@@ -577,7 +577,7 @@ void Foam::eulerianSolid::readInlets()
 void Foam::eulerianSolid::updateInlets(const scalar t0, const scalar dt)
 {
     // An inlet is open for the steps that start in [startTime, endTime)
-    // (WP 3.7a, decision 0057); its speed is taken at mid-step
+    // (WP 3.7a, decision 0060); its speed is taken at mid-step
     forAll(inletName_, k)
     {
         const word& name = inletName_[k];
