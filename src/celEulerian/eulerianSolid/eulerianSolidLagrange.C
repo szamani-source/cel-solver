@@ -1108,8 +1108,9 @@ inline vector oneSided
 
 
 //- Free-surface face (decision 0021 rules 3 and 4): contact face (both
-//  sides touch) gets the Riemann solution unless the material has no
-//  tensile strength and the solution pulls; every other face is
+//  sides touch) gets the Riemann solution unless its normal traction pulls
+//  harder than the tensile strength sT (0: no tensile strength, decision
+//  0054); every other face is
 //  traction-free with the one-sided velocity of the side that touches it
 //  (owner first), else of the side(s) holding material, else zero.
 //  Returns true for a contact face (Riemann solution kept).
@@ -1120,7 +1121,7 @@ inline bool voidFace
     const bool hasL, const bool touchL,
     const vector& vR, const symmTensor& sR, const scalar zpR, const scalar zsR,
     const bool hasR, const bool touchR,
-    const bool noTension,
+    const scalar sT,
     vector& vS,
     vector& tS,
     const scalar kj = -1
@@ -1129,7 +1130,7 @@ inline bool voidFace
     if (touchL && touchR)
     {
         riemann(n, vL, sL, zpL, zsL, vR, sR, zpR, zsR, vS, tS, kj);
-        if (!noTension || (tS & n) <= 0)
+        if ((tS & n) <= sT)
         {
             return true;
         }
@@ -2008,7 +2009,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                 touches(aP, lean_[P], Sf[facei]),
                 UN()[facei], sN()[facei], zp[N], zs[N], aN > alphaEmpty,
                 touches(aN, lean_[N], -Sf[facei]),
-                noTension_, vS[facei], t, kj
+                tensileStrength_, vS[facei], t, kj
             );
         }
         else
@@ -2134,7 +2135,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                         touches(aP, lean_[fc[i]], pS[i]),
                         pun[i], psn[i], zpn[i], zsn[i], aN > alphaEmpty,
                         touches(aN, leanNbr[patchi][i], -pS[i]),
-                        noTension_, pvS[i], t, kj
+                        tensileStrength_, pvS[i], t, kj
                     );
                 }
                 else
@@ -2525,8 +2526,9 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
         {
             // Void closure (decision 0021 rule 5), per axis of the
             // Cartesian cell: compression closes the void first; expansion
-            // first unloads the material to zero normal stress (no cap for
-            // a full cell of a material with tensile strength), the rest
+            // first unloads the material to its tensile strength (zero
+            // when cohesionless; no cap for a full cell of a material
+            // without a strength limit, decision 0054), the rest
             // opens void. Shear goes to the material. A full cell that
             // opens no void keeps the strain of the full scheme.
             const scalar a = alpha_[celli];
@@ -2563,10 +2565,15 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                 }
                 else
                 {
+                    // the material carries tension up to its strength
+                    // sT; a full cell of a material without a strength
+                    // limit (elastic, J2) never opens void (decision 0054)
+                    const scalar sT =
+                        tensileStrength_ < GREAT ? tensileStrength_ : 0;
                     const scalar cap =
-                        (full && !noTension_)
+                        (full && tensileStrength_ >= GREAT)
                       ? GREAT
-                      : a*max(scalar(0), -sigma[celli].component(diag[d]))/M;
+                      : a*max(scalar(0), sT - sigma[celli].component(diag[d]))/M;
                     dm = min(r, cap);
                 }
                 if (dm != r)
