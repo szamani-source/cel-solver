@@ -47,6 +47,8 @@ K0 = NU / (1.0 - NU)
 # rule 9, decisions 0024 and 0025)
 PROTO = {(0.5, 0.1): 0.55, (0.5, 1.0): 0.40, (0.5, 10.0): 0.25, (2.0, 1.0): 1.8}
 BAND = {0.5: (0.30, 0.90), 2.0: (1.2, 3.6)}
+# WP 3.6e (decision 0050): check every case, not only 1 MPa
+CHECK_ALL = os.environ.get("CEL_COLLAPSE_CHECK_ALL", "") == "1"
 # history columns (voidCheck)
 STEP, T, MASS, SEMPTY, KE, NCAP = 0, 1, 2, 8, 12, 13
 
@@ -173,7 +175,7 @@ def main():
         in_band = lo <= r["runout"] <= hi
         top = abs(r["H_f"] - r["H_i"]) <= CELL if a < 1.0 else True
         basic = r["dm"] <= 1e-10 and r["s_empty"] == 0.0 and np.isfinite(r["runout"])
-        checked = E == 1.0
+        checked = E == 1.0 or CHECK_ALL
         good = basic and (not checked or (in_band and top and r["slope"] <= 37.0))
         ok &= good
         stop = (f"stops at t = {r['t_stop']:.2f} s" if r["t_stop"] is not None

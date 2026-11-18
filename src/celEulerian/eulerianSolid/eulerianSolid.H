@@ -69,7 +69,7 @@ Description
       friction <deg> per body; see celCoupling setImmersedWalls). Material
       then fills only the open volume of each cell (rho per open volume),
       crosses only open face areas, and rests on a wall face per cut cell.
-      With freeSurface (WP 4.3c, decision 0049) alpha is the material
+      With freeSurface (WP 4.3c, decision 0051) alpha is the material
       fraction of the open volume.
 
 SourceFiles
@@ -209,6 +209,16 @@ class eulerianSolid
         //  between two flowing cells and uses phi_m elsewhere
         Switch flowImpedance_;
 
+        //- WP 3.6h (decision 0049): materialProperties fullBlend yes (with
+        //  freeSurface). Instead of the nearly-full snap (decisions 0044,
+        //  0045), cells with void between 1e-4 and 1e-2 blend the full and
+        //  partly filled rules with a weight that falls from 1 to 0 in
+        //  log(void): face states, stress predictor and flow viscosity
+        Switch fullBlend_;
+
+        //- Void range of the blend, fullBlendVoid (v1 v2), default (1e-4 1e-2)
+        FixedList<scalar, 2> blendVoid_;
+
         //- mu_s, mu_2, I0, d, rho_s of the flow impedance
         FixedList<scalar, 5> flowLaw_;
 
@@ -283,7 +293,7 @@ class eulerianSolid
         //  the run (this processor) [kg]
         scalarList bodyMassIn_;
 
-        //- Free surface with immersed walls (WP 4.3c, decision 0049):
+        //- Free surface with immersed walls (WP 4.3c, decision 0051):
         //  volume flux of each cell's wall face in the last Lagrange step
         //  (v.A, out of the cell), for the remap's Lagrangian volume
         scalarField wallPhi_;

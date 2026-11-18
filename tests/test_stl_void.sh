@@ -1,6 +1,6 @@
 #!/bin/bash
 # WP 4.3c: STL cut-cell walls (decision 0047) with the free surface (void,
-# decision 0031); the combination is decision 0049. Lake at rest in an STL
+# decision 0031); the combination is decision 0051. Lake at rest in an STL
 # tank, a block falling onto a 10 deg STL floor without leaking, and the
 # WP 4.3a tilted tank with a void top against its lid version.
 # Builds celVoidCheck and celSiloCheck and runs

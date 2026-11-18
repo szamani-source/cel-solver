@@ -42,6 +42,7 @@
 
 #include "eulerianSolid.H"
 #include "calculatedFvPatchFields.H"
+#include "celMuI.H"
 
 // * * * * * * * * * * * * * * * Local helpers * * * * * * * * * * * * * * //
 
@@ -900,7 +901,7 @@ void Foam::eulerianSolid::remapFreeSurface(const scalar dt)
         return a.x() >= a.y() && a.x() >= a.z() ? 0 : (a.y() >= a.z() ? 1 : 2);
     };
 
-    // Immersed walls (WP 4.3c, decision 0049): alpha and rho per open
+    // Immersed walls (WP 4.3c, decision 0051): alpha and rho per open
     // volume Vo; phiL carries only the open part of each face (open area
     // Ao); the slab rule works on the open area with the open length along
     // each axis; the wall face's volume flux counts in V_L along its main
@@ -1224,6 +1225,10 @@ void Foam::eulerianSolid::remapFreeSurface(const scalar dt)
     const scalar Kbulk =
         material().waveModulus() - 4.0*material().shearModulus()/3.0;
     boolList dust(nCells, false);
+    // With mu(I) dilatancy (WP 3.6g, decision 0048) the stress-implied
+    // density is that of the dilated material, rho0 exp(-tr(epsP))
+    const auto* law = material().kernel().frictionLaw();
+    const bool dilatant = law && law->dilatant();
     forAll(mNew, celli)
     {
         if (grouped[celli])
@@ -1248,10 +1253,12 @@ void Foam::eulerianSolid::remapFreeSurface(const scalar dt)
             a >= 1 - 1e-12
          || (
                 flowImpedance_
+             && !fullBlend_
              && a >= 1 - nearlyFull
              && mNew[celli]
              >= (1 - nearlyFullRho)*rho0_*Vo[celli]
                *(1 + max(-tr(sigma_[celli])/3, scalar(0))/Kbulk)
+               *(dilatant ? Foam::exp(-tr(epsP_[celli])) : scalar(1))
             )
         )
         {

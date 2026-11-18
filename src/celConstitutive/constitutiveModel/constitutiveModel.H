@@ -24,7 +24,9 @@ Description
     kernel/celMuI.H): mu2 [-] (absent or tan(phi): rate-independent), I0 [-],
     d [m] grain diameter, rhoS [kg/m^3] grain density, muIAlpha [-]
     (Barker-Gray regularisation, absent: none). The model is then rate
-    dependent and needs the time step: call update with dt.
+    dependent and needs the time step: call update with dt. With mu(I),
+    the optional dilatancy entries phi0, phiC, bPhi, KDil [-] (all four or
+    none; WP 3.6g, decision 0048) make psi follow the state.
 
     update() takes OpenFOAM symmTensors. The strain increment is the tensor
     strain increment (e.g. symm(gradU)*dt), so its shear components are

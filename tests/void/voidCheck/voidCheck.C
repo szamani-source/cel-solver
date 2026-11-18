@@ -30,7 +30,7 @@ Description
     \endverbatim
 
     STL walls (WP 4.3c): fixed bodies in constant/rigidBodies, if present,
-    are cut-cell walls (decision 0047, 0049). alpha is then the material
+    are cut-cell walls (decision 0047, 0051). alpha is then the material
     fraction of each cell's open volume; mass and momentum are summed over
     open volumes, and history.dat gets three more columns: the force of the
     bodies on the material (x, y) and the mass in cells whose centre lies

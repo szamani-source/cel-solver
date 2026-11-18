@@ -41,6 +41,11 @@ Foam::autoPtr<Foam::constitutiveModel> Foam::constitutiveModel::New
         {
             Info<< ", no regularisation" << endl;
         }
+        if (law->dilatant())
+        {
+            Info<< "    with dilatancy (phi0 " << law->phi0()
+                << "): tan(psi) = KDil (phi - phiC + bPhi I)" << endl;
+        }
     }
 
     return model;

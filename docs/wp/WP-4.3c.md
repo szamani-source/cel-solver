@@ -30,7 +30,7 @@ lid version; lake at rest in an STL tank keeps speeds below 1e-10 m/s.
 
 ## Log
 
-- 2026-11-18: Done in one session (decision 0049), on top of the WP 4.3a branch (PR #43).
+- 2026-11-18: Done in one session (decision 0051), on top of the WP 4.3a branch (PR #43).
   Free surface with cut-cell walls in `eulerianSolid`: alpha per open volume, closed faces
   mirror in `slabSides`, wall face only where the material touches it (volume flux on its
   main axis, no mass in when material pulls away: void opens), slab remap on open areas

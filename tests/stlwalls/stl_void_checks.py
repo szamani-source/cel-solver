@@ -1,5 +1,5 @@
 """WP 4.3c done-when checks: STL cut-cell walls (decision 0047) with the free
-surface (void, decision 0031); the combination is decision 0049. Run by
+surface (void, decision 0031); the combination is decision 0051. Run by
 tests/test_stl_void.sh after celVoidCheck and celSiloCheck are built:
 
     python3 stl_void_checks.py WORKDIR
@@ -10,7 +10,7 @@ Material T0 (cohesionless Mohr-Coulomb, rho 1800, E 10 MPa, nu 0.3, phi 35),
 1. Lake at rest in an STL tank: STL side walls cutting cells at a quarter
    (open 0.75) and three quarters (open 0.25, a small cell mixed with its
    neighbour), mesh-wall floor (an STL floor makes corner cells with one
-   oblique wall face, not in discrete equilibrium: decision 0049), 0.1 m wide,
+   oblique wall face, not in discrete equilibrium: decision 0051), 0.1 m wide,
    filled to 0.455 m (top cell half full), K0 stress of the weight above,
    full gravity, 1000 steps: speeds below 1e-10 m/s, mass to 1e-12.
 2. Block falling onto a 10 deg STL floor: a 0.1 x 0.1 m block of T0 falls
@@ -27,7 +27,7 @@ Material T0 (cohesionless Mohr-Coulomb, rho 1800, E 10 MPa, nu 0.3, phi 35),
    the same tank with mesh walls and freeSurface at every depth >= W; mass
    to 1e-12. (The brief compared with the lid version, without void; the
    free-surface tank itself differs from that by up to 17 % at the bottom,
-   with mesh walls as with STL walls: WP 4.3c log, decision 0049.)
+   with mesh walls as with STL walls: WP 4.3c log, decision 0051.)
 
 Prints PASS/FAIL per check, exits non-zero on any failure.
 """

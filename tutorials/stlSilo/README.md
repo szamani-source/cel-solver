@@ -1,7 +1,7 @@
 # stlSilo: the T0 tank built from STL walls
 
 The siloDischarge tank (Sia's target problem T0) with its side walls and floor given as
-STL surfaces instead of mesh boundaries (WP 4.3c, decisions 0047 and 0049). The walls
+STL surfaces instead of mesh boundaries (WP 4.3c, decisions 0047 and 0051). The walls
 cut the 10 mm mesh at a quarter and three quarters of a cell, there is void above the
 material, and the outlet is the mesh patch under the gap in the STL floor: closed while
 the material settles for 0.3 s, then open for 2 s.
