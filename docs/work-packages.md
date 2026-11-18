@@ -64,7 +64,7 @@ Constitutive models for bulk solids are tracked in `docs/constitutive-models.md`
 | 4.3b | Moving bodies: coupling forces both ways and reaction output (decision 0042) | No leakage in a push test |
 | 4.5 | Silo and hopper discharge with STL walls | Flat tank rate within 5 % of mesh-boundary walls; hopper runs and its rate is recorded |
 | 4.4 | Strip footing benchmark (split 2026-11-18: pile to 4.4b) | Bearing capacity factor near 5.14 |
-| 4.4b | Pile: shaft friction and base capacity with a moving STL body | Pile capacity against a reference to be agreed |
+| 4.4b | Pile section moving sideways through clay (Randolph and Houlsby 1984) | Smooth limit 9.14 cu D within 10 % |
 | 5.1 | Hex8 element with hourglass control | Patch test passes |
 | 5.2 | Lagrangian-only Taylor bar | Matches published result |
 | 5.3 | Two-way deformable coupling | Deformable push test stable |
@@ -142,4 +142,4 @@ Note (2026-11-18): WP 4.3b done (decision 0053): prescribed-motion bodies push t
 free bodies (motion from the force) are left for when a case needs them. Next: 4.4.
 
 Note (2026-11-18): WP 4.4 split: the strip footing is 4.4 (done, decision 0055, Prandtl
-within 8 % at 10 mm and 1.9 % at 5 mm); the pile is 4.4b, its reference still to be chosen.
+within 8 % at 10 mm and 1.9 % at 5 mm); the pile is 4.4b: the lateral limit of Randolph and Houlsby (1984), done (decision 0056).
