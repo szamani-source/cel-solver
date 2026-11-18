@@ -46,6 +46,10 @@ spreadLayers    yes;
 
 flowImpedance   yes;
 
+// Normal Riemann jump capped at yield (rule 12, decision 0035); part of the
+// T0 rule set with mu(I) and flowImpedance (decision 0050)
+normalCap       yes;
+
 walls
 {
     left

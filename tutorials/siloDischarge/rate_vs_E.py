@@ -1,8 +1,9 @@
-"""Discharge rate against stiffness E, WP 3.6d (decision 0045).
+"""Discharge rate against stiffness E (decisions 0045, 0046, 0050).
 
-The numbers are from tests/manual/test_discharge_stiffness.sh (celVoidCheck,
-rate over 97 to 88 percent of the mass at opening) on 2026-11-17. Writes
-rate_vs_E.png. Rerun the sweep to refresh them.
+Means of three runs (maxCo 0.40 / 0.38 / 0.36) from
+tests/manual/test_discharge_scatter.sh (celVoidCheck, rate over 97 to 88
+percent of the mass at opening), 10 mm, 2026-11-18; error bars show the
+range. Writes rate_vs_E.png. Rerun the sweep to refresh them.
 """
 import math
 
@@ -11,10 +12,11 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 E = [0.1, 1.0, 10.0]
-RUNS = [  # label, E values, rates (kg/s per m depth), colour, marker, style
-    ("mu(I) + flow impedance, 10 mm (this package)", E, [65.5, 53.8, 67.7], "#2a78d6", "o", "-"),
-    ("mu(I) + flow impedance, 5 mm (this package)", E[:2], [77.6, 61.2], "#1baf7a", "s", "-"),
-    ("flow impedance before the fix, 10 mm", E, [62.3, 49.8, 12.4], "#eb6834", "^", "--"),
+RUNS = [  # label, E values, mean rates, lows, highs (kg/s per m depth), colour, marker, style
+    ("T0 rule set: mu(I) + flow impedance + normal cap (this tutorial)", E,
+     [73.6, 61.0, 58.8], [73.5, 59.4, 51.6], [73.8, 63.2, 67.6], "#2a78d6", "o", "-"),
+    ("mu(I) + flow impedance (decision 0046)", E,
+     [65.8, 52.0, 60.8], [65.5, 50.6, 56.5], [66.3, 53.8, 67.7], "#eb6834", "s", "--"),
 ]
 RHO, G, D = 1800.0, 9.81, 0.06
 scale = RHO * math.sqrt(G) * D ** 1.5            # rate for C = 1
@@ -28,9 +30,10 @@ ax.axhspan(1.0 * scale, 1.9 * scale, color="#e4e4e1", lw=0)
 ax.axhline(1.45 * scale, color=MUTED, lw=1, ls=":")
 ax.text(0.085, 1.45 * scale + 2, "Beverloo, continuum mu(I) refs: C = 1.45 (band 1.0 to 1.9)",
         color=MUTED, fontsize=8)
-for label, e, r, c, mk, ls in RUNS:
-    ax.plot(e, r, color=c, marker=mk, ms=7, lw=2, ls=ls, label=label,
-            markeredgecolor=SURFACE, markeredgewidth=1.5)
+for label, e, r, lo, hi, c, mk, ls in RUNS:
+    ax.errorbar(e, r, yerr=[[a - b for a, b in zip(r, lo)], [b - a for a, b in zip(r, hi)]],
+                color=c, marker=mk, ms=7, lw=2, ls=ls, label=label, capsize=3,
+                markeredgecolor=SURFACE, markeredgewidth=1.5)
 ax.set_xscale("log")
 ax.set_xticks(E)
 ax.set_xticklabels(["0.1", "1", "10"])
