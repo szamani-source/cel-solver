@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-11-17 (WP 3.6d silo with mu(I); 3.6c2; 3.6s; validation references)
+Last updated: 2026-11-18 (WP 4.1, 4.0, 4.2; 2026-11-17: 3.6d, 3.6c2, 3.6c, 3.6b, 3.6s, validation references)
 
 Plan doc: https://claude.ai/artifact/DTT6kSikz9ZUTBkUxY6Grr
 
@@ -51,6 +51,9 @@ Phase 2 (the C++ Eulerian solver: 2.1 to 2.5c and 2.4b done; 2.6 waits for Phase
 | 3.6c2 | Stiff inclined layer: floor cell and top cell (split from 3.6c) | Done | Decision 0044, both behind `flowImpedance yes`: the wall reconstruction of a flowing cell mirrors about the wall's last velocity (the wall jump counted the drag twice; the 10 MPa floor cell stuck), and void below 1e-4 counts as full (noise void switched the top cell to the partly filled rules, which kicked its stress). `tests/manual/test_inclined_layer.sh` passes: profile error 3.6 / 0.9 / 0.8 % at 0.1 / 1 / 10 MPa, 5 mm (was 7.8 / 22 / 136). CI runs 0.1 and 10 MPa. Left: the 0.1 MPa layer creeps faster over time (+0.7 %/s) |
 | 3.6d | Silo discharge with mu(I) and the flow impedance, E sweep | Closed, done-when not met; first case for Sia | Decision 0045, `tutorials/siloDischarge` (celFoam, Allrun, plots, README). Fixed: crash at step 1 of a stress-free fill (P ~ 1e-320), and the 0044 nearly-full snap, which inflated the stream above the outlet at 10 MPa (rate 12 kg/s/m): now bounded by the stress-implied density. Rate 65.5 / 53.8 / 67.7 kg/s/m at 0.1 / 1 / 10 MPa (10 mm), 77.6 / 61.2 at 0.1 / 1 MPa (5 mm): 1 MPa about 20 % slow on both meshes. C 0.69 to 0.94, below the 1.0 to 1.9 band (references use mu_s 0.32 to 0.38, T0 0.70). 10 mm rates scatter about 15 % from round-off. Layer still passes. `tests/manual/test_discharge_stiffness.sh` now runs mu(I) |
 | 3.6s | Mesh dependence of the collapse shear band (split from 3.6b) | Done (finding recorded) | Decision 0038, `docs/wp/WP-3.6s.md`. a = 0.5, E = 1 MPa on 10 / 5 / 2.5 mm: band 1 to 4 cells wide on every mesh, peak shear rate 10 / 23 / 30 1/s, run-out (5 mm front) 0.30 / 0.33 / 0.43 at 1 s: **mesh dependent, not converged**; deposit body and top converge. mu(I) with the placeholders changes nothing at 10 and 5 mm (I about 0.05). Cure deferred (compressible mu(I)/phi(I) preferred). Fixed a floating-point trap in `inertialNumber` at P about 1e-320 Pa. `tests/manual/test_shear_band.sh` (about 9 min) |
+| 4.0 | Contact scheme investigation (LS-DYNA, Abaqus, cut cell) | Done; Sia agreed 2026-11-17 | Decision 0042: cut-cell moving walls (Riemann wall face with the body velocity, Coulomb cap, small-cell mixing), no penalty. `docs/research/contact-schemes.md` (9 sources), `prototype/contact2d.py`; `tests/test_proto_contact_schemes.sh` passes (about 25 s): piston stress 1.006 zv, noise 0.2 % (penalty at k = M/h: 27 %), 30 deg frictional wall acceleration within 0.3 % (penalty 11 % off), mass 1e-15. LS-DYNA-style coupling points tried after Sia's note: smoother than a plain spring but leak 2 % and half the force; decision 0042 addendum adopts its point density, leak report and controls into the cut-cell wall |
+| 4.1 | Rigid body: STL input and kinematics | Done | Decision 0041: STL walls and bodies are immersed rigid surfaces on the Cartesian mesh (Sia, 2026-11-17). `src/celLagrangian` (`rigidBody`, `rigidBodies`), `constant/rigidBodies` (tutorial `rigidBodyMotion`): Function1 velocity and omega, exact path; no forces yet. `tests/test_rigid_body.sh` passes in about 1 s: pose 4e-16, STL 3e-8, 2 processors identical |
+| 4.2 | Cut cells near each body | Done | Decision 0043: exact edge, face and cell coverage from the STL triangles (no sampling), body-frame octree, utility `celBodyCells`. `tests/test_body_cells.sh` passes in about 6 s: faceted sphere volume to 4e-16, plane at 30 deg to 2e-7 (single-precision STL), moving and turning cube exact, 2 processors 9e-16. Search 6e-5 s per searched cell |
 
 ## Validation references
 
@@ -142,11 +145,17 @@ Silo track (decision 0016), one thread each:
 Then the C++ counterparts 3.1 to 3.4 (2.4b is done; briefs not written yet) and 3.5
 (cohesion).
 
-After the silo (Phase 4, Lagrangian bodies): WP 4.0 comes first, a thorough
-investigation of body-to-material contact schemes (LS-DYNA constraint and penalty
-coupling, Abaqus CEL contact, cut-cell, immersed boundary), requested by Sia on
-2026-11-15 (`docs/wp/WP-4.0.md`). Its recommendation is shown to Sia before the coupling
-is built. Silo walls are mesh boundaries with friction, not contact.
+Phase 4 (Lagrangian bodies and STL walls). Sia asked on 2026-11-17 for wall
+interactions defined by STL (decision 0041: immersed rigid surfaces on the Cartesian
+mesh, as Abaqus CEL). Order:
+
+1. WP 4.1: STL input and kinematics. Done.
+2. WP 4.0: contact scheme investigation. Done (decision 0042: cut-cell moving walls,
+   not penalty). Shown to Sia 2026-11-17.
+3. WP 4.2: cut cells near each body. Done (decision 0043).
+4. WP 4.3a: fixed STL walls with friction (what Sia asked for, `docs/wp/WP-4.3a.md`). Next.
+5. WP 4.5: silo and hopper with STL walls (`docs/wp/WP-4.5.md`).
+6. WP 4.3b: moving bodies, forces both ways; then 4.4 benchmarks.
 
 ## Known issues
 
@@ -154,6 +163,10 @@ is built. Silo walls are mesh boundaries with friction, not contact.
   10 MPa on both meshes; any use of the nearly-full snap (decision 0044) moves it, no snap
   at all fixes it but fails the inclined layer. Single 10 mm rates scatter about 15 %
   (round-off growth in plastic flow): compare bands of runs, not single runs.
+- Meshes (decision 0041): `freeSurface yes` (the silo physics) needs a Cartesian hex
+  mesh (every face normal to an axis; grading allowed). Without void the code runs on
+  any mesh but is untested there: face states assume the face midway between centres,
+  and the time step uses cbrt(V). General meshes are WP 3B.4, not planned.
 
 - Shear bands (WP 3.6s, decision 0038): the C++ column collapse localises into bands 1 to
   4 cells wide on every mesh; run-out grows with refinement (0.30 / 0.33 / 0.43 at 10 / 5 /

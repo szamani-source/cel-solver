@@ -1,0 +1,58 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      rigidBodies;
+}
+
+// Rigid bodies (WP 4.1, decision 0041). Each body is a closed or open
+// triangulated surface in constant/triSurface (STL, OBJ, ... by extension),
+// given in its pose at time zero, with a prescribed motion:
+//
+//   surface   <file>;          required
+//   centre    (x y z);         reference point the body rotates about and
+//                              whose velocity is given [m]; default: the
+//                              area-weighted centroid of the surface
+//   velocity  <Function1>;     velocity of the centre [m/s]; default zero
+//   omega     <Function1>;     angular velocity [rad/s]; default zero
+//
+// velocity and omega are OpenFOAM Function1<vector>s of time: constant,
+// table, sine, square, ... (any type that can be integrated). Position is
+// the exact integral of velocity; rotation is exact while the axis of
+// omega stays fixed. A body without velocity and omega is a fixed wall.
+// Bodies move but exert no force yet (contact: WP 4.2, 4.3).
+//
+// Output: postProcessing/rigidBodies/<name>.dat (t, centre, rotation, v,
+// omega at write times) and postProcessing/rigidBodies/<time>/<name>.stl.
+
+bodies
+{
+    // Fixed inclined wall (hopper side), 45 degrees
+    hopperWall
+    {
+        surface     hopperWall.stl;
+    }
+
+    // Pushed down: velocity ramps from 0 to 1 m/s over 5 ms, then constant
+    pusher
+    {
+        surface     cube.stl;
+        velocity    table
+        (
+            (0      (0 0 0))
+            (0.005  (0 0 -1))
+            (1      (0 0 -1))
+        );
+    }
+
+    // Translates along x and spins about the vertical edge through
+    // (0.4 0.4 z) at 100 rad/s
+    spinner
+    {
+        surface     cube.stl;
+        centre      (0.4 0.4 0.7);
+        velocity    constant (0.5 0 0);
+        omega       constant (0 0 100);
+    }
+}

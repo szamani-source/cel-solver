@@ -1,0 +1,4 @@
+rigidBody/rigidBody.C
+rigidBodies/rigidBodies.C
+
+LIB = $(FOAM_USER_LIBBIN)/libcelLagrangian
