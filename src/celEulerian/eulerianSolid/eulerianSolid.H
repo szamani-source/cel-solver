@@ -286,6 +286,9 @@ class eulerianSolid
         //- Mass fed in through inlets (this processor) [kg]
         scalar charged_;
 
+        //- Axisymmetric wedge mesh: has wedge patches (WP 3.8a)
+        bool wedge_;
+
         //- Cell lengths along x, y, z (Cartesian hex cells, freeSurface)
         vectorField hCell_;
 
@@ -363,6 +366,10 @@ class eulerianSolid
 
 
     // Private Member Functions
+
+        //- Cell size for the stable time step: cbrt(V), or on a wedge
+        //  mesh the smallest in-plane length (WP 3.8a)
+        tmp<scalarField> cellSize() const;
 
         //- Read materialProperties inlets (WP 3.7a)
         void readInlets();

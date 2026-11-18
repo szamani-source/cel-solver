@@ -210,6 +210,125 @@ void componentGradients
 }
 
 
+//- Axisymmetric wedge meshes (WP 3.8a, decision 0061): a copy of q whose
+//  values on non-coupled, non-wedge boundary faces normal to gravity (all
+//  of them without gravity), such as the side wall of a vertical cylinder,
+//  are linear extrapolations of the cell value instead of the cell value.
+//  The cell gradient is the Gauss gradient made consistent with those
+//  extrapolated face values, g_a = g0_a/(1 - K_aa), K = sum S_b d_b / V
+//  over the extrapolated faces (diagonal on axis-aligned faces). On a wedge the hoop stress of a cell beside such a
+//  wall is what balances the radial face forces over one cell, so a first-
+//  order wall traction (the cell value) leaves an O(1) hoop stress error
+//  (Lame cylinder); extrapolated, it is O(h). Faces along gravity keep the
+//  hydrostatic mirror (decision 0030).
+template<class Type>
+tmp<GeometricField<Type, fvPatchField, volMesh>> extrapolatedWalls
+(
+    const GeometricField<Type, fvPatchField, volMesh>& q,
+    const vector& gravity
+)
+{
+    typedef GeometricField<Type, fvPatchField, volMesh> fieldType;
+    const fvMesh& mesh = q.mesh();
+    const direction nCmpt = pTraits<Type>::nComponents;
+    const vector gHat(mag(gravity) > 0 ? gravity/mag(gravity) : vector::zero);
+
+    wordList types(q.boundaryField().types());
+    List<boolList> extrap(mesh.boundary().size());
+    forAll(mesh.boundary(), patchi)
+    {
+        const fvPatch& p = mesh.boundary()[patchi];
+        if (p.coupled() || isA<emptyFvPatch>(p) || isA<wedgeFvPatch>(p))
+        {
+            continue;
+        }
+        types[patchi] = fvPatchFieldBase::calculatedType();
+        const vectorField nf(p.nf());
+        extrap[patchi].setSize(p.size());
+        forAll(nf, i)
+        {
+            extrap[patchi][i] = mag(nf[i] & gHat) < 1e-6;
+        }
+    }
+    tmp<fieldType> tx
+    (
+        new fieldType
+        (
+            IOobject
+            (
+                q.name() + "Walls",
+                mesh.time().timeName(),
+                mesh,
+                IOobject::NO_READ,
+                IOobject::NO_WRITE,
+                IOobject::NO_REGISTER
+            ),
+            q,
+            types
+        )
+    );
+    fieldType& x = tx.ref();
+
+    PtrList<volVectorField> g0;
+    componentGradients(q, g0);
+    const vectorField& C = mesh.C().primitiveField();
+    const scalarField& V = mesh.V().field();
+
+    tensorField K(mesh.nCells(), Zero);
+    boolList touched(mesh.nCells(), false);
+    forAll(mesh.boundary(), patchi)
+    {
+        if (extrap[patchi].empty()) continue;
+        const fvPatch& p = mesh.boundary()[patchi];
+        const labelUList& fc = p.faceCells();
+        const vectorField& Sf = p.Sf();
+        const vectorField& Cf = p.Cf();
+        forAll(fc, i)
+        {
+            if (!extrap[patchi][i]) continue;
+            K[fc[i]] += (Sf[i]*(Cf[i] - C[fc[i]]))/V[fc[i]];
+            touched[fc[i]] = true;
+        }
+    }
+    forAll(mesh.boundary(), patchi)
+    {
+        if (extrap[patchi].empty()) continue;
+        const fvPatch& p = mesh.boundary()[patchi];
+        const labelUList& fc = p.faceCells();
+        const vectorField& Cf = p.Cf();
+        Field<Type>& xb = x.boundaryFieldRef()[patchi];
+        forAll(fc, i)
+        {
+            const label P = fc[i];
+            Type v(q[P]);
+            if (extrap[patchi][i] && touched[P])
+            {
+                // Faces are along the mesh axes, so K is diagonal: along
+                // axis a, g_a = g0_a/(1 - K_aa). A cell with extrapolated
+                // faces on both sides of an axis (one cell across) has no
+                // gradient there: it keeps the cell value
+                const vector d(Cf[i] - C[P]);
+                const vector Kd(K[P].diag());
+                for (direction c = 0; c < nCmpt; ++c)
+                {
+                    scalar dq = 0;
+                    for (direction a = 0; a < vector::nComponents; ++a)
+                    {
+                        if (1 - Kd[a] > 0.25)
+                        {
+                            dq += g0[c][P][a]/(1 - Kd[a])*d[a];
+                        }
+                    }
+                    setComponent(v, c) = component(q[P], c) + dq;
+                }
+            }
+            xb[i] = v;
+        }
+    }
+    return tx;
+}
+
+
 //- Limited face states of q on the owner side (qO) and neighbour side (qN)
 //  of every internal and coupled face. Non-coupled boundary faces: qO from a
 //  mirror ghost cell at 2 (Cf - C) holding 2 q_b - q_P (q_b the patch value),
@@ -509,7 +628,7 @@ inline void riemann
 //- Boundary kinds (decision 0018)
 enum class boundaryKind
 {
-    coupled, empty, velocity, symmetry, traction, wall
+    coupled, empty, velocity, symmetry, traction, wall, wedge
 };
 
 
@@ -547,9 +666,7 @@ boundaryKind kindOf
     }
     if (isA<wedgeFvPatch>(p))
     {
-        FatalErrorInFunction
-            << "Patch " << p.name() << ": wedge is not supported"
-            << exit(FatalError);
+        return boundaryKind::wedge;     // WP 3.8a, decision 0061
     }
     if (isA<symmetryFvPatch>(p) || isA<symmetryPlaneFvPatch>(p))
     {
@@ -1710,9 +1827,16 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
         tUw.valid() ? tUw() : U_, secondOrder_, UO.ref(), UN.ref(), nullptr, Zero,
         smoothPtr
     );
+    // Axisymmetric wedge (WP 3.8a, decision 0061): wall stress extrapolated
+    tmp<volSymmTensorField> tsWalls;
+    if (wedge_ && secondOrder_)
+    {
+        tsWalls = extrapolatedWalls(sref, g);
+    }
     faceStates
     (
-        sref, secondOrder_, sO.ref(), sN.ref(), &rho_, g, smoothPtr, eFacPtr
+        tsWalls.valid() ? tsWalls() : sref, secondOrder_, sO.ref(), sN.ref(),
+        &rho_, g, smoothPtr, eFacPtr
     );
 
     // Cell state the wall face of an immersed wall cell sees: the cell
@@ -1723,6 +1847,17 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
     {
         Uwall = U_.primitiveField();
         Swall = sref.primitiveField();
+    }
+
+    // Predicted cell state (Hancock half step; the cell state when first
+    // order): what a wedge side carries (WP 3.8b, decision 0061), so the
+    // wedge faces move with the other faces of the cell
+    vectorField Upred;
+    symmTensorField Spred;
+    if (wedge_)
+    {
+        Upred = U_.primitiveField();
+        Spred = sref.primitiveField();
     }
 
     if (secondOrder_)
@@ -1787,6 +1922,19 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                 continue;
             }
             const vectorField& pSo = Sfo.boundaryField()[patchi];
+            if (isA<wedgeFvPatch>(p))
+            {
+                // Wedge side (decision 0061): the rotated cell state, as in
+                // the corrector, so a cell at rest stays at rest
+                const tensor& Tw = refCast<const wedgeFvPatch>(p).faceT();
+                forAll(fc, i)
+                {
+                    const label P = fc[i];
+                    divS[P] += (transform(Tw, sref[P]) - sref[P]) & pSo[i];
+                    gradU[P] += pSo[i]*(transform(Tw, U_[P]) - U_[P]);
+                }
+                continue;
+            }
             forAll(fc, i)
             {
                 divS[fc[i]] += (ps[i] - sref[fc[i]]) & pSo[i];
@@ -1887,6 +2035,11 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
         }
         dU.correctBoundaryConditions();
         dS.correctBoundaryConditions();
+        if (wedge_)
+        {
+            Upred += dU.primitiveField();
+            Spred += dS.primitiveField();
+        }
         if (imm)
         {
             Uwall += dU.primitiveField();
@@ -2203,7 +2356,21 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
             const vector ttL(tL - tnL*n);
 
             vector v, t;
-            if (ink >= 0 && inletOpen_[ink])
+            if (kind == boundaryKind::wedge)
+            {
+                // Axisymmetric wedge side (WP 3.8a, decision 0061): the
+                // state beyond is the cell's own (predicted), turned onto the face's
+                // plane (faceT, as OpenFOAM's wedge patch field). No jump,
+                // so the face carries the rotated cell velocity and stress:
+                // with the other side, the hoop strain rate and the hoop
+                // stress. A swirl velocity crosses the face, but what
+                // leaves one side enters the other, so no volume flux
+                // (phiL = 0 below)
+                const tensor& T = refCast<const wedgeFvPatch>(p).faceT();
+                v = transform(T, Upred[P]);
+                t = transform(T, Spred[P]) & n;
+            }
+            else if (ink >= 0 && inletOpen_[ink])
             {
                 // Open inlet (WP 3.7a, decision 0060): the face moves into
                 // the domain at the inlet speed; the remap fills the volume
@@ -2276,7 +2443,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
             }
             pvS[i] = v;
             pF[i] = t*pmS[i];
-            pphi[i] = v & pS[i];
+            pphi[i] = kind == boundaryKind::wedge ? 0 : (v & pS[i]);
         }
     }
 

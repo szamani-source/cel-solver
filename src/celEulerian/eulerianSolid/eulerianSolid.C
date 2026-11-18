@@ -9,6 +9,7 @@
 #include "uniformDimensionedFields.H"
 #include "mathematicalConstants.H"
 #include "emptyFvPatch.H"
+#include "wedgeFvPatch.H"
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -293,6 +294,7 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
     discharged_(0),
     inletOfPatch_(mesh.boundary().size(), -1),
     charged_(0),
+    wedge_(false),
     immersed_(false),
     nUnmixed_(0),
     movingWalls_(false),
@@ -323,6 +325,18 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
             << iter.val() << " s" << nl;
     }
     readInlets();
+    forAll(mesh.boundary(), patchi)
+    {
+        if (isA<wedgeFvPatch>(mesh.boundary()[patchi]))
+        {
+            wedge_ = true;
+        }
+    }
+    if (wedge_)
+    {
+        Info<< "Axisymmetric wedge mesh (WP 3.8a): wedge sides carry the "
+            << "rotated cell state; wall stresses extrapolated" << nl;
+    }
     if (spreadLayers_ && !freeSurface_)
     {
         FatalIOErrorInFunction(materialProperties_)
@@ -678,6 +692,75 @@ void Foam::eulerianSolid::setCartesianGeometry()
 }
 
 
+Foam::tmp<Foam::scalarField> Foam::eulerianSolid::cellSize() const
+{
+    if (!wedge_)
+    {
+        return cbrt(mesh_.V().field());
+    }
+    // Axisymmetric wedge (WP 3.8a, decision 0061): cbrt(V) goes to zero at
+    // the axis (V ~ r); use the smallest in-plane length V/A_a, A_a half
+    // the summed |S| of the cell's faces along each geometric axis a (the
+    // axis cell's inner face has no area: h_r = its radial length),
+    // combined with the radius for the hoop strain
+    const fvMesh& mesh = mesh_;
+    const vectorField& Sf = mesh.Sf().primitiveField();
+    const labelUList& own = mesh.owner();
+    const labelUList& nei = mesh.neighbour();
+    vectorField A(mesh.nCells(), Zero);
+    vectorField Sw(mesh.nCells(), Zero);
+    forAll(own, facei)
+    {
+        A[own[facei]] += 0.5*cmptMag(Sf[facei]);
+        A[nei[facei]] += 0.5*cmptMag(Sf[facei]);
+    }
+    forAll(mesh.boundary(), patchi)
+    {
+        const fvPatch& p = mesh.boundary()[patchi];
+        if (isA<emptyFvPatch>(p)) continue;
+        const labelUList& fc = p.faceCells();
+        const vectorField& pS = p.Sf();
+        if (isA<wedgeFvPatch>(p))
+        {
+            forAll(fc, i)
+            {
+                Sw[fc[i]] += pS[i];
+            }
+            continue;
+        }
+        forAll(fc, i)
+        {
+            A[fc[i]] += 0.5*cmptMag(pS[i]);
+        }
+    }
+    const Vector<label>& geomD = mesh.geometricD();
+    const scalarField& V = mesh.V().field();
+    auto td = tmp<scalarField>::New(mesh.nCells(), GREAT);
+    scalarField& d = td.ref();
+    forAll(d, celli)
+    {
+        for (direction a = 0; a < vector::nComponents; ++a)
+        {
+            if (geomD[a] >= 0 && A[celli][a] > VSMALL)
+            {
+                d[celli] = min(d[celli], V[celli]/A[celli][a]);
+            }
+        }
+        // Hoop stiffness: the hoop strain u_r/r adds a spring of length r,
+        // the cell's distance from the axis, V/|S1 + S2| over its two wedge
+        // faces. An axis cell (r = 2h/3) is unstable at maxCo 0.4 on h
+        // alone; combine the two lengths like frequencies
+        const scalar sw = mag(Sw[celli]);
+        if (sw > VSMALL)
+        {
+            const scalar r = V[celli]/sw;
+            d[celli] = 1/sqrt(1/sqr(d[celli]) + 1/sqr(r));
+        }
+    }
+    return td;
+}
+
+
 Foam::scalar Foam::eulerianSolid::stableDeltaT() const
 {
     if (freeSurface_)
@@ -686,7 +769,7 @@ Foam::scalar Foam::eulerianSolid::stableDeltaT() const
         // Lagrange step); empty cells take the reference density
         const scalarField& r = rho_.primitiveField();
         const scalarField& a = alpha_.primitiveField();
-        const scalarField delta(cbrt(mesh_.V().field()));
+        const scalarField delta(cellSize());
         scalar dt = GREAT;
         forAll(r, celli)
         {
@@ -700,7 +783,7 @@ Foam::scalar Foam::eulerianSolid::stableDeltaT() const
     }
 
     // Cell size cbrt(V) over P-wave speed sqrt(M/rho), smallest over the mesh
-    const scalarField delta(cbrt(mesh_.V().field()));
+    const scalarField delta(cellSize());
     const scalarField c(sqrt(material_->waveModulus()/rho_.primitiveField()));
 
     return maxCo_*gMin(delta/c);
