@@ -1115,6 +1115,7 @@ void Foam::eulerianSolid::remapFreeSurface(const scalar dt)
             a >= 1 - 1e-12
          || (
                 flowImpedance_
+             && !fullBlend_
              && a >= 1 - nearlyFull
              && mNew[celli]
              >= (1 - nearlyFullRho)*rho0_*V[celli]

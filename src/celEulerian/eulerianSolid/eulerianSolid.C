@@ -270,6 +270,17 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
     (
         materialProperties_.getOrDefault<Switch>("flowImpedance", false)
     ),
+    fullBlend_
+    (
+        materialProperties_.getOrDefault<Switch>("fullBlend", false)
+    ),
+    blendVoid_
+    (
+        materialProperties_.getOrDefault<FixedList<scalar, 2>>
+        (
+            "fullBlendVoid", FixedList<scalar, 2>({1e-4, 1e-2})
+        )
+    ),
     flowLaw_(Zero),
     spreadLayers_
     (
@@ -316,6 +327,17 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
     if (normalCap_)
     {
         Info<< "Normal jump cap at Mohr-Coulomb yield (rule 12)" << nl;
+    }
+    if (fullBlend_)
+    {
+        if (!(blendVoid_[0] > 0 && blendVoid_[1] > blendVoid_[0]))
+        {
+            FatalIOErrorInFunction(materialProperties_)
+                << "fullBlendVoid needs 0 < v1 < v2" << exit(FatalIOError);
+        }
+        Info<< "Full / partly filled rules blended over void "
+            << blendVoid_[0] << " to " << blendVoid_[1]
+            << " (no nearly-full snap)" << nl;
     }
     if (flowImpedance_)
     {
