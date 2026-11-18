@@ -23,6 +23,15 @@ FoamFile
 // omega stays fixed. A body without velocity and omega is a fixed wall.
 // Bodies move but exert no force yet (contact: WP 4.2, 4.3).
 //
+// Free bodies (WP 4.3d, decision 0058): give a mass (kg, of the part the
+// mesh holds) and the motion follows from the force of the material and
+// gravity; velocity and omega are then initial values (plain vectors), and
+// an optional inertia (symmTensor, kg m^2, about the centre at time zero)
+// lets it rotate:
+//
+//     block { surface block.stl; mass 0.75; inertia (1e-3 0 0 1e-3 0 1e-3);
+//             velocity (0 0 0); }
+//
 // Output: postProcessing/rigidBodies/<name>.dat (t, centre, rotation, v,
 // omega at write times) and postProcessing/rigidBodies/<time>/<name>.stl.
 

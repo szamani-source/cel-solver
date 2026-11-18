@@ -95,6 +95,10 @@ Foam::rigidBody::rigidBody
     omega_(functionOrZero("omega", dict)),
     friction_(dict.getOrDefault<scalar>("friction", 0)),
     moving_(dict.found("velocity") || dict.found("omega")),
+    mass_(dict.getOrDefault<scalar>("mass", 0)),
+    inertia0_(dict.getOrDefault<symmTensor>("inertia", symmTensor::zero)),
+    v_(Zero),
+    w_(Zero),
     c_(c0_),
     R_(tensor::I),
     time_(0)
@@ -111,6 +115,26 @@ Foam::rigidBody::rigidBody
             << "Body " << name_ << ": friction " << friction_
             << " deg must be in [0, 90)" << exit(FatalIOError);
     }
+    if (mass_ < 0)
+    {
+        FatalIOErrorInFunction(dict)
+            << "Body " << name_ << ": mass " << mass_ << " must be positive"
+            << exit(FatalIOError);
+    }
+    if (mass_ > 0)
+    {
+        // Free body (WP 4.3d): velocity and omega are initial values
+        moving_ = true;
+        v_ = velocity_->value(0);
+        w_ = omega_->value(0);
+        if (runTime.value() > 0)
+        {
+            FatalIOErrorInFunction(dict)
+                << "Body " << name_ << ": a free body (mass) cannot restart"
+                << " from t = " << runTime.value() << " yet"
+                << exit(FatalIOError);
+        }
+    }
 }
 
 
@@ -118,13 +142,34 @@ Foam::rigidBody::rigidBody
 
 Foam::vector Foam::rigidBody::velocity(const scalar t) const
 {
-    return velocity_->value(t);
+    return free() ? v_ : velocity_->value(t);
 }
 
 
 Foam::vector Foam::rigidBody::omega(const scalar t) const
 {
-    return omega_->value(t);
+    return free() ? w_ : omega_->value(t);
+}
+
+
+void Foam::rigidBody::accelerate
+(
+    const vector& F,
+    const vector& M,
+    const scalar dt
+)
+{
+    if (!free())
+    {
+        return;
+    }
+    v_ += dt*F/mass_;
+    if (mag(inertia0_) > VSMALL)
+    {
+        // Inertia in the current pose; Euler's equations in the lab frame
+        const tensor J(R_ & tensor(inertia0_) & R_.T());
+        w_ += dt*(inv(J) & (M - (w_ ^ (J & w_))));
+    }
 }
 
 
@@ -161,8 +206,17 @@ void Foam::rigidBody::moveTo(const scalar t)
     {
         return;
     }
-    c_ += velocity_->integrate(time_, t);
-    R_ = rodrigues(omega_->integrate(time_, t)) & R_;
+    if (free())
+    {
+        // Free body (WP 4.3d): the current velocity over the step
+        c_ += (t - time_)*v_;
+        R_ = rodrigues((t - time_)*w_) & R_;
+    }
+    else
+    {
+        c_ += velocity_->integrate(time_, t);
+        R_ = rodrigues(omega_->integrate(time_, t)) & R_;
+    }
     time_ = t;
 }
 

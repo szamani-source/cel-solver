@@ -2405,6 +2405,8 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
         // body's friction), from the predicted cell state, in the body's
         // frame. The force on the body is minus the force on the material.
         bodyForce_ = Zero;
+        wallForce_.setSize(wallA_.size());
+        wallForce_ = Zero;
         if (fs)
         {
             wallPhi_ = 0;
@@ -2439,6 +2441,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
             T[celli] += A*v;
             dV[celli] += v & A;
             bodyForce_[b] += t*mA;
+            wallForce_[celli] = t*mA;
             if (fs)
             {
                 // With void (WP 4.3c, decision 0051) material that pulls
