@@ -65,6 +65,7 @@ Constitutive models for bulk solids are tracked in `docs/constitutive-models.md`
 | 4.5 | Silo and hopper discharge with STL walls | Flat tank rate within 5 % of mesh-boundary walls; hopper runs and its rate is recorded |
 | 4.4 | Strip footing benchmark (split 2026-11-18: pile to 4.4b) | Bearing capacity factor near 5.14 |
 | 4.4b | Pile section moving sideways through clay (Randolph and Houlsby 1984) | Smooth limit 9.14 cu D within 10 % |
+| 4.4c | Strip footing on sand (Martin 2005 N_gamma, phi 30) | Smooth N_gamma 7.653 within 15 % (closed without it, decision 0057) |
 | 5.1 | Hex8 element with hourglass control | Patch test passes |
 | 5.2 | Lagrangian-only Taylor bar | Matches published result |
 | 5.3 | Two-way deformable coupling | Deformable push test stable |

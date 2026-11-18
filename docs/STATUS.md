@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-11-18 (WP 4.4b, 4.4, 4.3b, WP 3.5 cohesion, tutorial T0 rule set, WP 4.5, 4.3c, 4.3a, 3.6e, 3.6h, 3.6g, 3.6f; 4.1, 4.0, 4.2; 2026-11-17: 3.6d, 3.6c2, 3.6c, 3.6b, 3.6s, validation references)
+Last updated: 2026-11-18 (WP 4.4c, 4.4b, 4.4, 4.3b, WP 3.5 cohesion, tutorial T0 rule set, WP 4.5, 4.3c, 4.3a, 3.6e, 3.6h, 3.6g, 3.6f; 4.1, 4.0, 4.2; 2026-11-17: 3.6d, 3.6c2, 3.6c, 3.6b, 3.6s, validation references)
 
 Plan doc: https://claude.ai/artifact/DTT6kSikz9ZUTBkUxY6Grr
 
@@ -65,6 +65,7 @@ Phase 2 (the C++ Eulerian solver: 2.1 to 2.5c and 2.4b done; 2.6 waits for Phase
 | 4.3b | Moving bodies: push the material, reaction output | Done | Decision 0053. Remap onto the open volume the body leaves (Vo + dt wallU.A), then re-cut at the new pose: mass, material volume, momentum kept per cell, covered cells hand over to an open neighbour, uncovered cells start empty (needs `freeSurface yes`). celFoam writes `postProcessing/bodyForces.dat`. `tests/test_stl_push.sh` passes (about 1 min): footing pushed 4.25 cm into T0 (T0 rule set) and pulled out: mass 1e-14, nothing lost, no gap under it, density 1.008 rho0, momentum balance 1e-6 of the footing impulse, separates. Plain Mohr-Coulomb (no flowImpedance) squeezes a nearly full corner cell to 1.39 rho0: use the T0 rule set |
 | 4.4 | Strip footing bearing capacity (pile split to 4.4b) | Done | Decision 0055. Smooth STL strip footing pushed into weightless Tresca clay (cu 10 kPa, E/cu 300) at 0.025 m/s. `tests/test_footing.sh` passes (about 1 min): q / cu 4.73 at 10 mm (-8.1 % from 5.14, band 10 %), 5.04 at 5 mm (-1.9 %, manual `--fine`). Force dips briefly when the footing bottom crosses a mesh line. Plot `docs/wp/WP-4.4-footing.png` |
 | 4.4b | Pile section moving through clay (Randolph and Houlsby 1984) | Done | Decision 0056. Smooth 64-sided pile D = 0.1 m moved sideways through weightless Tresca clay confined at 10 cu, `fullBlend yes`. `tests/test_pile.sh` passes (about 3.5 min): P / (cu D) 9.29 against 9.14 (+1.7 %). Plain void rules shake and read 1 to 5: use `fullBlend yes` with moving bodies in materials without mu(I) |
+| 4.4c | Strip footing on sand (Martin 2005 N_gamma) | Closed without done-when | Decision 0057. Smooth footing on phi 30 sand against exact N_gamma 7.653: psi 0 reads about 11 at 10 mm and 9.7 at 5 mm (+27 %); psi 30 blows up. Manual `tests/manual/test_sand_footing.sh` (fails, not in CI). Treat sand bearing results as upper estimates |
 
 ## Validation references
 
@@ -185,6 +186,7 @@ mesh, as Abaqus CEL). Order:
 7. WP 4.3b: moving bodies. Done (decision 0053; push test; prescribed motion only).
 8. WP 4.4: strip footing. Done (decision 0055; Prandtl within 8 % at 10 mm, 1.9 % at 5 mm).
 9. WP 4.4b: pile section (Randolph and Houlsby). Done (decision 0056; 9.29 against 9.14).
+   WP 4.4c: sand footing (N_gamma). Closed without its done-when (decision 0057; +27 % at 5 mm).
 10. Phase 4 done apart from free bodies and a rough wall; next phase per `docs/work-packages.md`.
 
 ## Known issues
