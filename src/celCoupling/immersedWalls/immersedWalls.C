@@ -29,6 +29,12 @@ void Foam::setImmersedWalls
         friction
     );
     solid.setMovingWalls(anyMoving(bodies));
+    scalarList adhesion(bodies.size());
+    forAll(bodies, b)
+    {
+        adhesion[b] = bodies[b].adhesion();
+    }
+    solid.setBodyAdhesion(adhesion);
 }
 
 
@@ -95,5 +101,34 @@ void Foam::moveBodies(const eulerianSolid& solid, rigidBodies& bodies)
     forAll(bodies, b)
     {
         bodies[b].accelerate(F[b], M[b], dt[b]);
+    }
+
+    // Deformable bodies (WP 5.3, decision 0072): the force of the material
+    // on each wall cell to the nodes of the nearest surface triangle, summed
+    // over processors, then the elements stepped to t
+    const vectorField& wf = solid.wallForce();
+    const labelList& wb = solid.wallBody();
+    const vectorField& C = solid.mesh().C().primitiveField();
+    forAll(bodies, b)
+    {
+        rigidBody& body = bodies[b];
+        if (!body.deformable())
+        {
+            continue;
+        }
+        if (b < nCoupled && wf.size() == wb.size())
+        {
+            forAll(wf, celli)
+            {
+                if (wb[celli] == b && magSqr(wf[celli]) > 0)
+                {
+                    body.addSurfaceForce(C[celli], -wf[celli]);
+                }
+            }
+        }
+        Pstream::listCombineReduce(body.nodeForce(), plusEqOp<vector>());
+        // The coming step taken as long as this one
+        const scalar dtStep = t - body.time();
+        body.advance(t, dtStep, solid.gravityAt(t));
     }
 }

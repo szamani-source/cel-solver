@@ -16,7 +16,9 @@ Description
     moveBodies (WP 4.3d, decision 0058): move the bodies to the current
     time, then change each free body's velocity by the force and moment of
     the material in the Lagrange step just taken (at the old pose) plus
-    gravity. Prescribed bodies just move.
+    gravity. Prescribed bodies just move. Deformable bodies (WP 5.3,
+    decision 0072) get the force of each wall cell on the nodes of the
+    nearest surface triangle and step their elements to the current time.
 
     The cycle with moving bodies:
         solid.lagrangeStep(dt); moveBodies(solid, bodies); solid.remap(dt);

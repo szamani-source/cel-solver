@@ -6,7 +6,13 @@ around it, P / (cu D) = 9.14 for a smooth pile (11.94 fully rough). The pile
 is a moving STL body (decision 0053). Run by tests/test_pile.sh after
 celVoidCheck is built:
 
-    python3 pile_checks.py WORKDIR [--fine]
+    python3 pile_checks.py WORKDIR [--fine] [--rough]
+
+--rough (WP 4.3e, decision 0059, run by tests/test_rough_pile.sh): the pile
+is fully rough, wall adhesion cu (`adhesion` in constant/rigidBodies), and
+the reference is 11.94. The rough limit needs the thin shear layer at the
+wall resolved: within 15 % at 10 mm (10.47, -12 %), 10 % at 5 mm (11.26,
+-5.7 %, tests/manual/test_rough_pile_fine.sh, 25 min).
 
 Weightless Tresca clay (Mohr-Coulomb phi 0, cu 10 kPa, E 3 MPa, nu 0.3,
 rho 1800) fills a 0.6 x 0.5 m box with frictionless mesh walls, under a
@@ -51,6 +57,8 @@ NSIDES = 64
 SPEED, T_RAMP = 0.025, 0.05
 TRAVEL = 0.3 * D
 NP = 9.14                       # smooth pile, Randolph and Houlsby (1984)
+NP_ROUGH = 11.94                # fully rough
+ROUGH = False
 TOL = 0.10
 WINDOW = (0.15, 0.3)            # travel / D
 
@@ -75,7 +83,8 @@ def add_pile(path):
     cs.write(f"{path}/constant/triSurface/pile.stl", ss.prism_stl("pile", poly))
     v, te = SPEED, t_end()
     table = f"table ((0 (0 0 0)) ({T_RAMP!r} ({v!r} 0 0)) ({te + 1!r} ({v!r} 0 0)))"
-    body = (f"    pile\n    {{\n        surface pile.stl;\n        friction 0;\n"
+    adh = f"        adhesion {CU!r};\n" if ROUGH else ""
+    body = (f"    pile\n    {{\n        surface pile.stl;\n        friction 0;\n{adh}"
             f"        velocity {table};\n    }}\n")
     cs.write(f"{path}/constant/rigidBodies",
              cs.HEADER.format(cls="dictionary", obj="rigidBodies")
@@ -83,7 +92,8 @@ def add_pile(path):
 
 
 def check_pile(work):
-    print(f"[1] Smooth pile section D = 0.1 m ({D / CELL:.0f} cells) moving sideways through")
+    kind, ref = ("Rough", NP_ROUGH) if ROUGH else ("Smooth", NP)
+    print(f"[1] {kind} pile section D = 0.1 m ({D / CELL:.0f} cells) moving sideways through")
     print("    weightless Tresca clay (cu 10 kPa, E/cu 300, confined at 10 cu), travel 0.3 D")
     mat = (f"type mohrCoulomb;\nE {E_CLAY!r};\nnu 0.3;\nphi 0;\nc {CU!r};\npsi 0;\n"
            "fullBlend yes;\n")
@@ -103,10 +113,10 @@ def check_pile(work):
     mass = h[0, sp.MASS]
     dm = abs(h[-1, sp.MASS] / mass - 1)
     lost = h[:, sp.LOST].max() / mass
-    err = qm / NP - 1
+    err = qm / ref - 1
     ok = abs(err) <= TOL and abs(rise) <= 0.05 and dm <= 1e-10 and lost == 0
     det = [f"P / (cu D) over a travel of {WINDOW[0]} D to {WINDOW[1]} D: {qm:.3f} "
-           f"(Randolph and Houlsby smooth 9.14, {100 * err:+.1f} %, limit {100 * TOL:.0f} %), "
+           f"(Randolph and Houlsby {kind.lower()} {ref}, {100 * err:+.1f} %, limit {100 * TOL:.0f} %), "
            f"change across it {100 * rise:+.1f} % (<= 5 %)"]
     for ub in (0.02, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3):
         i = int(np.argmin(np.abs(u - ub)))
@@ -118,14 +128,17 @@ def check_pile(work):
 
 
 def main():
-    global CELL, NX, NY
+    global CELL, NX, NY, ROUGH, TOL
     work = sys.argv[1]
+    ROUGH = "--rough" in sys.argv[2:]
+    if ROUGH and "--fine" not in sys.argv[2:]:
+        TOL = 0.15
     if "--fine" in sys.argv[2:]:
         vc.CELL = CELL = 0.005
         NX, NY = 120, 100
     t0 = time.perf_counter()
     ok = check_pile(work)
-    print(f"\nWP 4.4b checks: {'ALL PASS' if ok else 'FAILED'} "
+    print(f"\nWP {'4.3e' if ROUGH else '4.4b'} checks: {'ALL PASS' if ok else 'FAILED'} "
           f"({time.perf_counter() - t0:.0f} s)")
     sys.exit(0 if ok else 1)
 

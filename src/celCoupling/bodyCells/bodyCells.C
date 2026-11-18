@@ -303,6 +303,16 @@ void Foam::bodyCells::update()
 {
     nSearched_ = 0;
     nCut_ = 0;
+
+    // Deformable bodies (WP 5.3): the surface moved, rebuild its search
+    forAll(bodies_, i)
+    {
+        if (bodies_[i].deformable())
+        {
+            search_.set(i, new triSurfaceSearch(bodies_[i].surface0()));
+        }
+    }
+
     scalarField cellV(mesh_.nCells(), 0);
     scalarField faceA(mesh_.nFaces(), 0);
     scalarField bestCover(mesh_.nCells(), 0);
