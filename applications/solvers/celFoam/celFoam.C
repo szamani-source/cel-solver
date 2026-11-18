@@ -113,7 +113,7 @@ int main(int argc, char *argv[])
 
         solid.lagrangeStep(dt);     // WP 2.3
 
-        bodies.move();              // WP 4.1: prescribed motion to t
+        moveBodies(solid, bodies);  // WP 4.1, 4.3d: bodies to t
 
         solid.remap(dt);            // WP 2.4
 

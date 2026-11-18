@@ -65,3 +65,35 @@ void Foam::moveImmersedWalls
         cells.cellBody()
     );
 }
+
+
+void Foam::moveBodies(const eulerianSolid& solid, rigidBodies& bodies)
+{
+    const scalar t = solid.mesh().time().value();
+    const label nCoupled = solid.bodyNames().size();
+    List<vector> F(bodies.size(), Zero);
+    List<vector> M(bodies.size(), Zero);
+    scalarList dt(bodies.size(), 0);
+    forAll(bodies, b)
+    {
+        const rigidBody& body = bodies[b];
+        if (!body.free())
+        {
+            continue;
+        }
+        // Force and moment of the material on the body: minus those of the
+        // body on the material, at the pose of the Lagrange step
+        if (b < nCoupled)
+        {
+            F[b] = -solid.bodyForce(b);
+            M[b] = -solid.bodyMoment(b, body.centre());
+        }
+        F[b] += body.mass()*solid.gravityAt(t);
+        dt[b] = t - body.time();
+    }
+    bodies.move();
+    forAll(bodies, b)
+    {
+        bodies[b].accelerate(F[b], M[b], dt[b]);
+    }
+}

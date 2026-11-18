@@ -42,6 +42,27 @@ Description
     0053, freeSurface yes). The motion is prescribed: the force of the
     material on the body is reported, not applied to it.
 
+    Free bodies (WP 4.3d, decision 0058): with a mass the motion follows
+    from the force of the material and gravity (the solid's g):
+
+        block
+        {
+            surface     block.stl;
+            mass        5.4;                  // kg, of the part the mesh
+                                              // holds (2D: one cell deep)
+            inertia     (0.01 0 0 0.01 0 0.01); // optional, kg m^2, about
+                                              // the centre at time zero
+                                              // (symmTensor); without it
+                                              // the body does not rotate
+            velocity    (0 0 0);              // optional, initial, m/s
+            omega       (0 0 0);              // optional, initial, rad/s
+        }
+
+    Velocities are staggered in time (central difference): a step moves the
+    body with the velocity the material saw in its Lagrange step, then
+    changes the velocity by the step's impulse (accelerate). A free body
+    cannot restart from a later time yet.
+
 SourceFiles
     rigidBody.C
 \*---------------------------------------------------------------------------*/
@@ -83,8 +104,19 @@ class rigidBody
         //- Wall friction angle [deg]
         scalar friction_;
 
-        //- Velocity or omega given (a moving body)
+        //- Velocity or omega given, or free (a moving body)
         bool moving_;
+
+        //- Mass [kg]; zero: prescribed motion
+        scalar mass_;
+
+        //- Inertia about the centre at time zero [kg m^2]; zero: no
+        //  rotation
+        symmTensor inertia0_;
+
+        //- Free body: current velocity and angular velocity
+        vector v_;
+        vector w_;
 
         //- Current reference point
         point c_;
@@ -133,13 +165,23 @@ public:
         //- Wall friction angle [deg] of the material on this body
         scalar friction() const noexcept { return friction_; }
 
-        //- Does the body have a prescribed motion (velocity or omega)?
+        //- Does the body move (prescribed motion, or free)?
         bool moving() const noexcept { return moving_; }
 
-        //- Prescribed velocity of the reference point at time t
+        //- Is the motion free (follows from the forces, WP 4.3d)?
+        bool free() const noexcept { return mass_ > 0; }
+
+        //- Mass [kg] (free bodies)
+        scalar mass() const noexcept { return mass_; }
+
+        //- Change a free body's velocity by the force F and moment M (about
+        //  the current centre) over dt. Does nothing for prescribed bodies.
+        void accelerate(const vector& F, const vector& M, const scalar dt);
+
+        //- Velocity of the reference point at time t (free: current)
         vector velocity(const scalar t) const;
 
-        //- Prescribed angular velocity at time t
+        //- Angular velocity at time t (free: current)
         vector omega(const scalar t) const;
 
         //- Current position of a point given in the time-zero pose

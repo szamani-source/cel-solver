@@ -298,6 +298,10 @@ class eulerianSolid
         //- Force of each body on the material, last step (this processor)
         List<vector> bodyForce_;
 
+        //- Force of the body on the material through each cell's wall
+        //  face, last step (WP 4.3d: moments on free bodies)
+        vectorField wallForce_;
+
         //- Mass that entered through each body's wall faces, summed over
         //  the run (this processor) [kg]
         scalarList bodyMassIn_;
@@ -494,6 +498,11 @@ public:
         //- Force of body b on the material in the last step, all
         //  processors [N]
         vector bodyForce(const label b) const;
+
+        //- Moment of body b on the material about the point c in the last
+        //  step, all processors [N m] (WP 4.3d; forces act at the cut
+        //  cells' centres)
+        vector bodyMoment(const label b, const point& c) const;
 
         //- Mass that entered the domain through body b's wall faces since
         //  the start, all processors [kg] (leak report)
