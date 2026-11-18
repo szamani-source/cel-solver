@@ -127,6 +127,6 @@ hopper with STL walls). Order: 4.1 (done), 4.0 and 4.2 (may run side by side), 4
 Note (2026-11-18): WP 4.3a done without the free surface (decision 0047). 4.3c added:
 STL walls with void and outlets, which 4.5 needs. Order: 4.3c, 4.5, 4.3b, 4.4.
 
-Note (2026-11-18): WP 4.3c done (decision 0048, tutorial `stlSilo`). Its tank check
+Note (2026-11-18): WP 4.3c done (decision 0049, tutorial `stlSilo`). Its tank check
 compares with the mesh-wall tank with void (not the lid version): the free-surface tank
 itself is up to 17 % off the no-void one (STATUS known issues). Next: 4.5, 4.3b, 4.4.

@@ -69,7 +69,7 @@ Description
       friction <deg> per body; see celCoupling setImmersedWalls). Material
       then fills only the open volume of each cell (rho per open volume),
       crosses only open face areas, and rests on a wall face per cut cell.
-      With freeSurface (WP 4.3c, decision 0048) alpha is the material
+      With freeSurface (WP 4.3c, decision 0049) alpha is the material
       fraction of the open volume.
 
 SourceFiles
@@ -283,7 +283,7 @@ class eulerianSolid
         //  the run (this processor) [kg]
         scalarList bodyMassIn_;
 
-        //- Free surface with immersed walls (WP 4.3c, decision 0048):
+        //- Free surface with immersed walls (WP 4.3c, decision 0049):
         //  volume flux of each cell's wall face in the last Lagrange step
         //  (v.A, out of the cell), for the remap's Lagrangian volume
         scalarField wallPhi_;

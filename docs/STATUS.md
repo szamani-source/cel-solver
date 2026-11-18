@@ -55,7 +55,7 @@ Phase 2 (the C++ Eulerian solver: 2.1 to 2.5c and 2.4b done; 2.6 waits for Phase
 | 4.1 | Rigid body: STL input and kinematics | Done | Decision 0041: STL walls and bodies are immersed rigid surfaces on the Cartesian mesh (Sia, 2026-11-17). `src/celLagrangian` (`rigidBody`, `rigidBodies`), `constant/rigidBodies` (tutorial `rigidBodyMotion`): Function1 velocity and omega, exact path; no forces yet. `tests/test_rigid_body.sh` passes in about 1 s: pose 4e-16, STL 3e-8, 2 processors identical |
 | 4.2 | Cut cells near each body | Done | Decision 0043: exact edge, face and cell coverage from the STL triangles (no sampling), body-frame octree, utility `celBodyCells`. `tests/test_body_cells.sh` passes in about 6 s: faceted sphere volume to 4e-16, plane at 30 deg to 2e-7 (single-precision STL), moving and turning cube exact, 2 processors 9e-16. Search 6e-5 s per searched cell |
 | 4.3a | Fixed STL walls with friction | Done | Decision 0047: cut-cell walls in `eulerianSolid` (open areas and volumes, wall face with the body's friction, ghosts in covered cells, small cells one cell with a neighbour in the Lagrange step), `friction <deg>` per body in `constant/rigidBodies`, per-body wall force and leak report; celFoam couples fixed bodies (tutorial `stlTank`). `tests/test_stl_walls.sh` passes (about 3 min): STL side walls 0.24 % from the mesh-wall Janssen tank, tank turned 10 deg 2.1 %, leak 1e-11, force balance 0.06 %. Not with `freeSurface` (4.3c); no mixing across processors |
-| 4.3c | STL walls with the free surface and outlets (split from 4.3a) | Done | Decision 0048: alpha per open volume, closed faces mirror in the slab rules, wall face only where the material touches it (its volume flux on its main axis), slab remap on open areas and open lengths, mixing groups share their volume ratio (fixed material-volume loss), empty is not covered. Tutorial `stlSilo` (first case for Sia with STL walls): T0 tank of STL walls and floor, outlet = mesh patch under the floor gap; no mass lost while closed, 72 kg/s/m at 10 MPa. `tests/test_stl_void.sh` passes (about 7 min): lake at rest in an STL tank 4e-17 m/s; block on a 10 deg STL floor stops, nothing through it; tilted tank with void top 1.9 % from the mesh-wall void-top tank. Brief's 2 % against the lid (no void) version not met: the free-surface tank itself is up to 17 % off the no-void one (known issues) |
+| 4.3c | STL walls with the free surface and outlets (split from 4.3a) | Done | Decision 0049: alpha per open volume, closed faces mirror in the slab rules, wall face only where the material touches it (its volume flux on its main axis), slab remap on open areas and open lengths, mixing groups share their volume ratio (fixed material-volume loss), empty is not covered. Tutorial `stlSilo` (first case for Sia with STL walls): T0 tank of STL walls and floor, outlet = mesh patch under the floor gap; no mass lost while closed, 72 kg/s/m at 10 MPa. `tests/test_stl_void.sh` passes (about 7 min): lake at rest in an STL tank 4e-17 m/s; block on a 10 deg STL floor stops, nothing through it; tilted tank with void top 1.9 % from the mesh-wall void-top tank. Brief's 2 % against the lid (no void) version not met: the free-surface tank itself is up to 17 % off the no-void one (known issues) |
 
 ## Validation references
 
@@ -156,21 +156,21 @@ mesh, as Abaqus CEL). Order:
    not penalty). Shown to Sia 2026-11-17.
 3. WP 4.2: cut cells near each body. Done (decision 0043).
 4. WP 4.3a: fixed STL walls with friction. Done (decision 0047; tutorial `stlTank`).
-5. WP 4.3c: STL walls with the free surface and outlets. Done (decision 0048; tutorial
+5. WP 4.3c: STL walls with the free surface and outlets. Done (decision 0049; tutorial
    `stlSilo`).
 6. WP 4.5: silo and hopper with STL walls (`docs/wp/WP-4.5.md`). Next.
 7. WP 4.3b: moving bodies, forces both ways; then 4.4 benchmarks.
 
 ## Known issues
 
-- Free-surface tank without mu(I) (found in WP 4.3c, decision 0048): the WP 3.1 Janssen
+- Free-surface tank without mu(I) (found in WP 4.3c, decision 0049): the WP 3.1 Janssen
   tank run with `freeSurface yes` (mesh walls, plain Mohr-Coulomb) does not reach the
   settle criterion by 1 s and its bottom stress is 17 % above the no-void tank (16.4
   against 14.0 kPa). About 100 cells inside the column end with alpha just below 1 (from
   1e-10 noise to 0.1) and take the partly-filled rules; the nearly-full snap (decision
   0044) that cures noise void runs only with `flowImpedance`. Silo runs use it; plain
   free-surface tanks do not. Not fixed here.
-- STL corners (decision 0048): a cell closed on two sides (STL floor meeting an STL wall)
+- STL corners (decision 0049): a cell closed on two sides (STL floor meeting an STL wall)
   has one oblique wall face, not in discrete equilibrium; a lake in an all-STL tank
   moves up to 0.3 m/s at the floor corners without damping.
 

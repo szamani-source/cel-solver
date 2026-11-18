@@ -900,7 +900,7 @@ void Foam::eulerianSolid::remapFreeSurface(const scalar dt)
         return a.x() >= a.y() && a.x() >= a.z() ? 0 : (a.y() >= a.z() ? 1 : 2);
     };
 
-    // Immersed walls (WP 4.3c, decision 0048): alpha and rho per open
+    // Immersed walls (WP 4.3c, decision 0049): alpha and rho per open
     // volume Vo; phiL carries only the open part of each face (open area
     // Ao); the slab rule works on the open area with the open length along
     // each axis; the wall face's volume flux counts in V_L along its main

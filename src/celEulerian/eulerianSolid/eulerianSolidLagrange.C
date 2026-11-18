@@ -2304,7 +2304,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
             bodyForce_[b] += t*mA;
             if (fs)
             {
-                // With void (WP 4.3c, decision 0048) material that pulls
+                // With void (WP 4.3c, decision 0049) material that pulls
                 // away from the wall opens void in the remap: the wall
                 // face's volume flux counts in the Lagrangian volume, along
                 // the axis of the face's largest component (as a staircase
@@ -2381,7 +2381,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
         scalar VL = Vo[celli] + dt*dV[celli];
         if (imm && fs && VoG[celli] != Vo[celli])
         {
-            // Mixing group with void (WP 4.3c, decision 0048): each member
+            // Mixing group with void (WP 4.3c, decision 0049): each member
             // takes the group's volume ratio, so a sliver cell's own
             // volume change cannot clip its material volume; the remap
             // uses the same Lagrangian volume

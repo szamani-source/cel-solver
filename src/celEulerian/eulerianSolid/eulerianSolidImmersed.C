@@ -227,7 +227,7 @@ void Foam::eulerianSolid::setImmersedWalls
 
     if (freeSurface_)
     {
-        // WP 4.3c (decision 0048): alpha is the material fraction of the
+        // WP 4.3c (decision 0049): alpha is the material fraction of the
         // open volume. Open length per axis for the remap's slab rule: open
         // volume over the larger open area of the two faces across the axis
         wallPhi_.setSize(nCells);
