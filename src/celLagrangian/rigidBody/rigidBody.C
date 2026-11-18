@@ -93,6 +93,8 @@ Foam::rigidBody::rigidBody
     c0_(dict.getOrDefault<point>("centre", centroid(surface0_))),
     velocity_(functionOrZero("velocity", dict)),
     omega_(functionOrZero("omega", dict)),
+    friction_(dict.getOrDefault<scalar>("friction", 0)),
+    moving_(dict.found("velocity") || dict.found("omega")),
     c_(c0_),
     R_(tensor::I),
     time_(0)
@@ -102,6 +104,12 @@ Foam::rigidBody::rigidBody
         FatalIOErrorInFunction(dict)
             << "Body " << name_ << ": surface " << surfaceFile_
             << " has no triangles" << exit(FatalIOError);
+    }
+    if (friction_ < 0 || friction_ >= 90)
+    {
+        FatalIOErrorInFunction(dict)
+            << "Body " << name_ << ": friction " << friction_
+            << " deg must be in [0, 90)" << exit(FatalIOError);
     }
 }
 

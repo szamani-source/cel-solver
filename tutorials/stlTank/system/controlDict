@@ -1,0 +1,28 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      controlDict;
+}
+
+// WP 4.3a: the T0 tank (0.4 x 1.2 m, wall friction 20 deg) built from STL
+// boxes turned 10 deg against the mesh, with gravity turned with it. The
+// material settles under gravity and rests on the STL walls (Janssen).
+application     celFoam;
+startFrom       startTime;
+startTime       0;
+stopAt          endTime;
+endTime         0.3;
+deltaT          1e-6;      // overwritten by celFoam from the stable step
+writeControl    runTime;
+writeInterval   0.05;
+purgeWrite      0;
+writeFormat     ascii;
+writePrecision  8;
+timeFormat      general;
+timePrecision   6;
+runTimeModifiable false;
+
+gravityRamp     0.1;       // [s] gravity grows from 0 (decision 0030)
+damping         250;       // [1/s] settling damping (decision 0030)

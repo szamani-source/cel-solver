@@ -1,0 +1,15 @@
+#!/bin/sh
+# Silo (tank) discharge with the tank built from STL walls (WP 4.3c): the
+# siloDischarge tank (T0) with its side walls and floor as STL bodies that
+# cut the mesh, void above, outlet = the mesh patch under the floor gap.
+#   ./Allrun            # E = 10 MPa (T0), 10 mm cells, about 10 minutes
+#   ./Allrun 0.1        # E in MPa (0.1 runs in about a minute)
+# Then: python3 plot.py   (needs numpy and matplotlib)
+cd "${0%/*}" || exit
+. ${WM_PROJECT_DIR:?}/bin/tools/RunFunctions
+E_MPa="${1:-10}"
+foamDictionary -entry E -set "${E_MPa}e6" constant/materialProperties > /dev/null
+restore0Dir
+runApplication blockMesh
+runApplication setFields
+runApplication celFoam

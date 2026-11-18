@@ -60,6 +60,7 @@ Constitutive models for bulk solids are tracked in `docs/constitutive-models.md`
 | 4.1 | Rigid body: STL input and kinematics (decision 0041) | Body moves on prescribed path |
 | 4.2 | Contact search near the body | Cut cells found, unit tested |
 | 4.3a | Fixed STL walls with Coulomb friction (cut-cell moving walls, decision 0042) | Janssen tank with STL walls, aligned and tilted 10 deg, within 2 / 5 % of mesh-boundary walls, no leakage |
+| 4.3c | STL walls with the free surface and outlets (split from 4.3a) | Void and slab rules at cut cells; a block falling onto a tilted STL floor stops without leaking; silo settle with STL walls and void top |
 | 4.3b | Moving bodies: coupling forces both ways and reaction output (decision 0042) | No leakage in a push test |
 | 4.5 | Silo and hopper discharge with STL walls | Flat tank rate within 5 % of mesh-boundary walls; hopper runs and its rate is recorded |
 | 4.4 | Footing and pile benchmarks | Bearing capacity factor near 5.14 |
@@ -125,3 +126,10 @@ on general cells first (3 to 4 packages, not planned). 4.3 split into 4.3a (fixe
 walls with friction, what Sia asked for) and 4.3b (moving bodies); 4.5 added (silo and
 hopper with STL walls). Order: 4.1 (done), 4.0 and 4.2 (may run side by side), 4.3a,
 4.5, 4.3b, 4.4.
+
+Note (2026-11-18): WP 4.3a done without the free surface (decision 0047). 4.3c added:
+STL walls with void and outlets, which 4.5 needs. Order: 4.3c, 4.5, 4.3b, 4.4.
+
+Note (2026-11-18): WP 4.3c done (decision 0051, tutorial `stlSilo`). Its tank check
+compares with the mesh-wall tank with void (not the lid version): the free-surface tank
+itself is up to 17 % off the no-void one (STATUS known issues). Next: 4.5, 4.3b, 4.4.

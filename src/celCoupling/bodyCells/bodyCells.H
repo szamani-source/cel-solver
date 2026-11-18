@@ -20,6 +20,12 @@ Description
     must not overlap each other. The mesh must be made of convex cells with
     planar faces (Cartesian hexes in practice).
 
+    Warnings (decision 0042 addendum, WP 4.3a): at construction, facets
+    longer than 4 cells meeting at 10 to 45 deg (a curved surface faceted at
+    the mesh scale); at each update, cut cells with no face neighbour more
+    covered than themselves (a body thinner than about two cells: material
+    may pass).
+
 SourceFiles
     bodyCells.C
 \*---------------------------------------------------------------------------*/
@@ -54,6 +60,13 @@ class bodyCells
         volVectorField wallArea_;
         volVectorField wallVelocity_;
         labelList mixNbr_;
+
+        //- Body covering most of each cell (-1: none)
+        labelList cellBody_;
+
+        //- Cut cells with no face neighbour more covered than themselves
+        //  in the last update (a body thinner than about two cells there)
+        label nThin_;
 
         //- Number of cells looked at in the last update, and cut cells
         label nSearched_;
@@ -96,6 +109,10 @@ public:
             return wallVelocity_;
         }
         const labelList& mixNeighbour() const noexcept { return mixNbr_; }
+        const labelList& cellBody() const noexcept { return cellBody_; }
+
+        //- Cut cells without a more covered face neighbour (all processors)
+        label nThin() const;
 
         label nSearched() const noexcept { return nSearched_; }
         label nCut() const noexcept { return nCut_; }

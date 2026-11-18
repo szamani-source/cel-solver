@@ -64,6 +64,13 @@ Description
       traction-free outflow face (prototype rules 10 and 10b): the material
       swept across it leaves the domain and is counted in discharged().
       Opening an outlet ends the settling stage: damping is set to 0.
+    - Immersed STL walls (WP 4.3a, decision 0047): setImmersedWalls() hands
+      over the cut-cell geometry of fixed rigid bodies (constant/rigidBodies,
+      friction <deg> per body; see celCoupling setImmersedWalls). Material
+      then fills only the open volume of each cell (rho per open volume),
+      crosses only open face areas, and rests on a wall face per cut cell.
+      With freeSurface (WP 4.3c, decision 0051) alpha is the material
+      fraction of the open volume.
 
 SourceFiles
     eulerianSolid.C
@@ -247,6 +254,55 @@ class eulerianSolid
         scalarField alphaL_;
         scalarField smooth_;
 
+        // Immersed walls (WP 4.3a, decision 0047): rigid STL bodies cut
+        // the mesh; set by setImmersedWalls()
+
+        //- Bodies present
+        bool immersed_;
+
+        //- Open volume fraction per cell (0: covered, no material)
+        scalarField cellOpen_;
+
+        //- Open area fraction per face (0 where either side is covered)
+        autoPtr<surfaceScalarField> faceOpen_;
+
+        //- Wall face of a wall cell: area times unit normal into the body
+        //  (minus the sum of open face areas times outward normals)
+        vectorField wallA_;
+
+        //- Body velocity at the cell centre
+        vectorField wallU_;
+
+        //- Body of the wall face of each cell (-1: no wall face)
+        labelList wallBody_;
+
+        //- Body names and tan(friction) per body
+        wordList bodyNames_;
+        scalarList bodyMu_;
+
+        //- Small cut cell -> the cell it is mixed with (-1: none)
+        labelList mixTo_;
+
+        //- Small cut cells left unmixed (no neighbour on this processor)
+        label nUnmixed_;
+
+        //- Force of each body on the material, last step (this processor)
+        List<vector> bodyForce_;
+
+        //- Mass that entered through each body's wall faces, summed over
+        //  the run (this processor) [kg]
+        scalarList bodyMassIn_;
+
+        //- Free surface with immersed walls (WP 4.3c, decision 0051):
+        //  volume flux of each cell's wall face in the last Lagrange step
+        //  (v.A, out of the cell), for the remap's Lagrangian volume
+        scalarField wallPhi_;
+
+        //- Free surface with immersed walls: open length of each cell
+        //  along each axis, open volume over the larger open face area
+        //  across that axis (hCell_ for uncut cells)
+        vectorField openLen_;
+
 
     // Private Member Functions
 
@@ -259,8 +315,26 @@ class eulerianSolid
         //- Limiters from materialProperties, with the defaults
         static HashTable<word> readRemapLimiters(const dictionary& dict);
 
+        //- Immersed walls: ghost values in covered cells (velocity of the
+        //  body, density and stress of the open face neighbours, stress
+        //  with the hydrostatic jump), so reconstructions and limiters
+        //  next to a wall see a mirror-like state, as at a mesh wall
+        void fillCovered();
+
+        //- Immersed walls: mix each small cut cell with its neighbour
+        //  (decision 0042 item 2): mass, momentum, mass-weighted stress
+        //  (less the hydrostatic part) and history kept
+        void mixSmallCells();
+
 
 public:
+
+    //- Open fraction below which a cut cell is mixed with a neighbour
+    static constexpr scalar smallOpen = 0.5;
+
+    //- Open fraction below which a cell counts as covered
+    static constexpr scalar coveredOpen = 1e-6;
+
 
     // Constructors
 
@@ -331,6 +405,53 @@ public:
 
         //- Change the velocity damping (for example off once settled)
         void setDamping(const scalar alpha) { damping_ = alpha; }
+
+
+    // Immersed walls (WP 4.3a, decision 0047)
+
+        //- Rigid bodies cutting the mesh at their current pose: body
+        //  fraction per cell, open fraction per face, body velocity per
+        //  cell and body per cell (from bodyCells), names and wall
+        //  friction angles [deg] per body. Call again after the bodies
+        //  move. Not with freeSurface (yet).
+        void setImmersedWalls
+        (
+            const volScalarField& alphaBody,
+            const surfaceScalarField& faceOpen,
+            const volVectorField& wallVelocity,
+            const labelList& cellBody,
+            const wordList& bodyNames,
+            const scalarList& frictionDeg
+        );
+
+        bool immersed() const noexcept { return immersed_; }
+
+        //- Open volume fraction per cell (1 without bodies)
+        tmp<scalarField> cellOpen() const;
+
+        //- Material volume of each cell: V times the open fraction
+        tmp<scalarField> openVolume() const;
+
+        //- Wall face area vectors (into the body), wall cells only
+        const vectorField& wallArea() const noexcept { return wallA_; }
+
+        //- Body of each wall cell's wall face (-1 none)
+        const labelList& wallBody() const noexcept { return wallBody_; }
+
+        const wordList& bodyNames() const noexcept { return bodyNames_; }
+
+        //- Force of body b on the material in the last step, all
+        //  processors [N]
+        vector bodyForce(const label b) const;
+
+        //- Mass that entered the domain through body b's wall faces since
+        //  the start, all processors [kg] (leak report)
+        scalar bodyMassIn(const label b) const;
+
+        //- Number of small cut cells, and of those left unmixed, all
+        //  processors
+        label nSmallCells() const;
+        label nUnmixed() const;
 
     // Non-const access for test programs that set a state by hand
     // (for example a prescribed phiL to test remap() alone)
