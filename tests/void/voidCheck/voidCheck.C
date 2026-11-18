@@ -174,6 +174,16 @@ int main(int argc, char *argv[])
         cut.reset(new bodyCells(mesh, bodies));
         setImmersedWalls(solid, cut.ref(), bodies);
     }
+    // Initial heights of a deformable first body's nodes (WP 5.3)
+    scalarField y0Body;
+    scalar y0Top = 0, y0Bot = 0;
+    if (bodies.size() && bodies[0].deformable())
+    {
+        y0Body = bodies[0].hex().points().component(1);
+        y0Top = max(y0Body);
+        y0Bot = min(y0Body);
+    }
+
     auto cycle = [&](const scalar dtk)
     {
         solid.lagrangeStep(dtk);
@@ -212,7 +222,7 @@ int main(int argc, char *argv[])
         hist() << "# step t mass px py cx cy smax smaxEmpty Umax FyBottom snMax"
             << " KE nCapped discharged FxBodies FyBodies massBelow"
             << " FxWalls FyWalls lostMass maxRhoRatio charged"
-            << " body0: cx cy vx vy omegaz" << nl;
+            << " body0: cx cy vx vy omegaz (deformable: height)" << nl;
     }
 
     auto record = [&](const label step)
@@ -294,10 +304,33 @@ int main(int argc, char *argv[])
             {
                 // First body's pose and velocity (WP 4.3d)
                 const rigidBody& b0 = bodies[0];
+                if (b0.deformable())
+                {
+                    // Deformable (WP 5.3): mean node position and velocity,
+                    // and the height (mean y of the nodes that started on
+                    // top less that of the nodes that started at the
+                    // bottom) in place of omega
+                    const pointField& xp = b0.hex().points();
+                    const vector c(average(xp));
+                    const vector u(average(b0.hex().velocity()));
+                    scalar yt = 0, yb = 0;
+                    label nt = 0, nb = 0;
+                    forAll(xp, i)
+                    {
+                        if (y0Body[i] > y0Top - 1e-9) { yt += xp[i].y(); ++nt; }
+                        if (y0Body[i] < y0Bot + 1e-9) { yb += xp[i].y(); ++nb; }
+                    }
+                    hist() << ' ' << c.x() << ' ' << c.y() << ' ' << u.x()
+                        << ' ' << u.y() << ' '
+                        << yt/max(nt, label(1)) - yb/max(nb, label(1));
+                }
+                else
+                {
                 const vector v0(b0.velocity(runTime.value()));
                 hist() << ' ' << b0.centre().x() << ' ' << b0.centre().y()
                     << ' ' << v0.x() << ' ' << v0.y() << ' '
                     << b0.omega(runTime.value()).z();
+                }
             }
             hist() << nl;
         }

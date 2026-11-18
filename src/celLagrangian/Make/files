@@ -1,4 +1,5 @@
 rigidBody/rigidBody.C
 rigidBodies/rigidBodies.C
+hex8Body/hex8Body.C
 
 LIB = $(FOAM_USER_LIBBIN)/libcelLagrangian
