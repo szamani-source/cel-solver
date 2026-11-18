@@ -55,7 +55,10 @@ Description
       fraction, read if present, default 1); rho is then the bulk density
       (cell mass over cell volume, 0 in empty cells) and U, sigma, epsP,
       epsPEq are per unit material mass. Cartesian hex meshes only.
-      Material with c 0 or sigmaT 0 separates instead of carrying tension.
+      Material with c 0 or sigmaT 0 separates instead of carrying tension;
+      a cohesive Mohr-Coulomb or Drucker-Prager material carries tension up
+      to sigmaT (default c cot(phi)) and tears beyond it (WP 3.5, decision
+      0054).
     - constant/materialProperties, optional subdictionary outlets (WP 3.3,
       decision 0033; needs freeSurface yes): patch name ->
       { friction <deg>; openTime <s>; } makes that patch a closed wall with
@@ -181,6 +184,12 @@ class eulerianSolid
 
         //- Material without tensile strength (c 0 or sigmaT 0): separates
         bool noTension_;
+
+        //- Tensile strength [Pa] at contact faces and for void opening
+        //  (WP 3.5, decision 0054): 0 without tensile strength, sigmaT if
+        //  given, else c cot(phi) for a cohesive material, GREAT for a
+        //  material without a strength limit (elastic, J2)
+        scalar tensileStrength_;
 
         //- Rule 8 (decision 0023; C++ WP 3.2b, decision 0032):
         //  materialProperties shearCap yes; at contact faces the shear jump

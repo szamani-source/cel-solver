@@ -1,0 +1,40 @@
+#!/bin/sh
+# Silo (tank) with cohesion, Sia's target problem T0 with c > 0 (WP 3.5).
+# Each outlet width runs in its own folder D<width in mm>, side by side:
+#   ./Allrun              # c 500 Pa, outlets 100 mm (arches) and 140 mm (flows),
+#                         # E 10 MPa, about 7 minutes on two cores
+#   ./Allrun "60 100 140" # other widths: multiples of 20 mm up to 400
+# Then: python3 plot.py   (needs numpy and matplotlib)
+cd "${0%/*}" || exit
+. ${WM_PROJECT_DIR:?}/bin/tools/RunFunctions
+
+widths="${1:-100 140}"
+for D in $widths
+do
+    nOut=$((D / 10))
+    nSide=$(((40 - nOut) / 2))
+    if [ $((nOut % 2)) -ne 0 ] || [ "$nSide" -lt 1 ]
+    then
+        echo "outlet width $D mm: use a multiple of 20 mm below 400" 1>&2
+        exit 1
+    fi
+    xL=$(awk "BEGIN { print $nSide*0.01 }")
+    xR=$(awk "BEGIN { print ($nSide + $nOut)*0.01 }")
+    dir="D$D"
+    rm -rf "$dir"
+    mkdir "$dir"
+    cp -r 0.orig constant system "$dir"
+    sed -i \
+        -e "s/(0\.15 /($xL /g" -e "s/(0\.25 /($xR /g" \
+        -e "/hex (1 2 6 5/ s/(10 62 1)/($nOut 62 1)/" \
+        -e "/hex (0 1 5 4\|hex (2 3 7 6/ s/(15 62 1)/($nSide 62 1)/" \
+        "$dir/system/blockMeshDict"
+    (
+        cd "$dir" || exit
+        restore0Dir
+        runApplication blockMesh
+        runApplication setFields
+        runApplication celFoam
+    ) &
+done
+wait
