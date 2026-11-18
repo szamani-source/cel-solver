@@ -51,9 +51,15 @@ int main(int argc, char *argv[])
 
     // Bodies act on the material as cut-cell walls (WP 4.3a, decision
     // 0047); moving bodies push it and the cut cells follow them each step
-    // (WP 4.3b, decision 0053; freeSurface yes)
+    // (WP 4.3b, decision 0053). Moving bodies need freeSurface yes; without
+    // it they only move (kinematics, as in WP 4.1)
     autoPtr<bodyCells> cut;
-    if (bodies.size())
+    if (bodies.size() && anyMoving(bodies) && !solid.freeSurface())
+    {
+        Info<< "Moving rigid bodies without freeSurface yes: not coupled to "
+            << "the material (decision 0053)" << nl << endl;
+    }
+    else if (bodies.size())
     {
         cut.reset(new bodyCells(mesh, bodies));
         setImmersedWalls(solid, cut.ref(), bodies);
@@ -61,7 +67,7 @@ int main(int argc, char *argv[])
 
     // Reaction output: force of the material on each body, every step
     autoPtr<OFstream> forceFile;
-    if (bodies.size() && Pstream::master())
+    if (cut && Pstream::master())
     {
         mkDir(runTime.globalPath()/"postProcessing");
         forceFile.reset
@@ -138,7 +144,7 @@ int main(int argc, char *argv[])
         {
             printDiagnostics(solid);
             bodies.write();
-            forAll(bodies, b)
+            forAll(solid.bodyNames(), b)
             {
                 Info<< "Force on body " << bodies[b].name() << " = "
                     << -solid.bodyForce(b) << " N" << nl;

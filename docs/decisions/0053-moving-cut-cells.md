@@ -28,7 +28,8 @@ cell geometry changes between steps.
    of a mixing group may hold a small negative amount after the remap (overdrawn, 0051);
    it is handed over all the same (dropping it created mass). Group members are not
    clipped before mixing. A cell the body uncovers starts empty (void), so moving
-   bodies need `freeSurface yes` (FatalError otherwise). Mass a covered cell cannot hand
+   bodies need `freeSurface yes` (`setMovingWalls` stops otherwise; celFoam then leaves
+   moving bodies uncoupled, kinematics only, as in WP 4.1 and `tutorials/rigidBodyMotion`). Mass a covered cell cannot hand
    over is counted (`lostMass`); none was lost in the tests.
 4. **Reaction output.** celFoam writes the force of the material on each body every step
    to `postProcessing/bodyForces.dat` and prints it at write times with the hand-over
