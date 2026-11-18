@@ -33,7 +33,11 @@ FrictionLaw::FrictionLaw
     d_(d),
     rhoS_(rhoS),
     I1N_(0),
-    A_(0)
+    A_(0),
+    phi0_(0),
+    phiC_(0),
+    bPhi_(0),
+    KDil_(0)
 {
     if (!(mu2_ > muS_ && muS_ > 0 && I0_ > 0))
     {
@@ -122,7 +126,7 @@ std::unique_ptr<FrictionLaw> FrictionLaw::New
     {
         throw std::invalid_argument("mu(I): mu2 must not be below tan(phi)");
     }
-    return std::unique_ptr<FrictionLaw>
+    std::unique_ptr<FrictionLaw> law
     (
         new FrictionLaw
         (
@@ -134,6 +138,82 @@ std::unique_ptr<FrictionLaw> FrictionLaw::New
             parameter(p, "rhoS")
         )
     );
+    law->setDilatancy(p);
+    return law;
+}
+
+
+void FrictionLaw::setDilatancy(const Parameters& p)
+{
+    const char* names[4] = {"phi0", "phiC", "bPhi", "KDil"};
+    int n = 0;
+    for (const char* k : names)
+    {
+        n += p.count(k) > 0;
+    }
+    if (n == 0)
+    {
+        return;
+    }
+    if (n != 4)
+    {
+        throw std::invalid_argument
+        (
+            "mu(I) dilatancy needs all of phi0, phiC, bPhi and KDil"
+        );
+    }
+    phi0_ = parameter(p, "phi0");
+    phiC_ = parameter(p, "phiC");
+    bPhi_ = parameter(p, "bPhi");
+    KDil_ = parameter(p, "KDil");
+    if
+    (
+        !(phi0_ > 0 && phi0_ < 1 && phiC_ > 0 && phiC_ < 1
+       && bPhi_ >= 0 && KDil_ > 0)
+    )
+    {
+        throw std::invalid_argument
+        (
+            "mu(I) dilatancy: need 0 < phi0, phiC < 1, bPhi >= 0, KDil > 0"
+        );
+    }
+}
+
+
+double FrictionLaw::solidFraction(const History& h) const
+{
+    return phi0_*std::exp(-(h.epsP[0] + h.epsP[1] + h.epsP[2]));
+}
+
+
+double FrictionLaw::inverseJop(double mu) const
+{
+    if (!(mu > muS_))
+    {
+        return 0;
+    }
+    if (!(mu < mu2_))
+    {
+        return std::numeric_limits<double>::infinity();
+    }
+    return I0_*(mu - muS_)/(mu2_ - mu);
+}
+
+
+double FrictionLaw::tanPsi(const History& h, double mu) const
+{
+    // I infinite (mu at mu_2, P = 0): phiEq -> -infinity unless bPhi = 0
+    const double I = inverseJop(mu);
+    double phiEq = phiC_;
+    if (bPhi_ > 0)
+    {
+        phiEq =
+            std::isinf(I)
+          ? -std::numeric_limits<double>::infinity()
+          : phiC_ - bPhi_*I;
+    }
+    const double t = KDil_*(solidFraction(h) - phiEq);
+    return std::max(-mu, std::min(mu, t));
 }
 
 

@@ -42,6 +42,7 @@
 
 #include "eulerianSolid.H"
 #include "calculatedFvPatchFields.H"
+#include "celMuI.H"
 
 // * * * * * * * * * * * * * * * Local helpers * * * * * * * * * * * * * * //
 
@@ -1094,6 +1095,10 @@ void Foam::eulerianSolid::remapFreeSurface(const scalar dt)
     const scalar Kbulk =
         material().waveModulus() - 4.0*material().shearModulus()/3.0;
     boolList dust(nCells, false);
+    // With mu(I) dilatancy (WP 3.6g, decision 0048) the stress-implied
+    // density is that of the dilated material, rho0 exp(-tr(epsP))
+    const auto* law = material().kernel().frictionLaw();
+    const bool dilatant = law && law->dilatant();
     forAll(mNew, celli)
     {
         if (mNew[celli] <= 0)
@@ -1110,10 +1115,12 @@ void Foam::eulerianSolid::remapFreeSurface(const scalar dt)
             a >= 1 - 1e-12
          || (
                 flowImpedance_
+             && !fullBlend_
              && a >= 1 - nearlyFull
              && mNew[celli]
              >= (1 - nearlyFullRho)*rho0_*V[celli]
                *(1 + max(-tr(sigma_[celli])/3, scalar(0))/Kbulk)
+               *(dilatant ? Foam::exp(-tr(epsP_[celli])) : scalar(1))
             )
         )
         {

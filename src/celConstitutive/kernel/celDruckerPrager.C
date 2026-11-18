@@ -126,7 +126,7 @@ void DruckerPrager::update
     History& hNew
 ) const
 {
-    returnMap(eta_, xi_, deps, sigOld, hOld, sigNew, hNew);
+    returnMap(eta_, xi_, etaBar_, deps, sigOld, hOld, sigNew, hNew);
 }
 
 
@@ -152,14 +152,29 @@ void DruckerPrager::updateRate
         *law_, el_, trial, dt,
         [&](double mu, Voigt s, History& h)
         {
-            if (mu == law_->muS())
+            if (mu == law_->muS() && !law_->dilatant())
             {
                 update(deps, sigOld, hOld, s, h);
                 return;
             }
-            double eta, xi;
+            double eta, xi, etaBar = etaBar_, unused;
             coefficients(fit_, std::atan(mu)*180.0/M_PI, eta, xi);
-            returnMap(eta, xi, deps, sigOld, hOld, s, h);
+            if (law_->dilatant())
+            {
+                // Same fit for the potential; a negative angle gives a
+                // negative etaBar (contraction)
+                coefficients
+                (
+                    fit_, std::atan(law_->tanPsi(hOld, mu))*180.0/M_PI,
+                    etaBar, unused
+                );
+                // Contraction bounded so that G + K eta etaBar >= G/2
+                if (eta > 0)
+                {
+                    etaBar = std::max(etaBar, -0.5*el_.G/(el_.K*eta));
+                }
+            }
+            returnMap(eta, xi, etaBar, deps, sigOld, hOld, s, h);
         },
         sigNew, hNew
     );
@@ -170,6 +185,7 @@ void DruckerPrager::returnMap
 (
     const double eta,
     const double xi,
+    const double etaBar,
     const Voigt deps,
     const Voigt sigOld,
     const History& hOld,
@@ -196,13 +212,13 @@ void DruckerPrager::returnMap
         return;
     }
 
-    const double dgam = f/(G + K*eta*etaBar_);
+    const double dgam = f/(G + K*eta*etaBar);
 
     if (sqj - G*dgam >= 0.0 || eta == 0.0)
     {
         // Return to the smooth cone
         const double factor = sqj > 0.0 ? 1.0 - G*dgam/sqj : 1.0;
-        const double pNew = p - K*etaBar_*dgam;
+        const double pNew = p - K*etaBar*dgam;
         for (int i = 0; i < 6; ++i)
         {
             sigNew[i] = s[i]*factor + (i < 3 ? pNew : 0.0);

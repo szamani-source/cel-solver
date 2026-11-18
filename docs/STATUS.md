@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-11-18 (WP 3.6f; 4.1, 4.0, 4.2; 2026-11-17: 3.6d, 3.6c2, 3.6c, 3.6b, 3.6s, validation references)
+Last updated: 2026-11-18 (WP 3.6e, 3.6h, 3.6g, 3.6f; 4.1, 4.0, 4.2; 2026-11-17: 3.6d, 3.6c2, 3.6c, 3.6b, 3.6s, validation references)
 
 Plan doc: https://claude.ai/artifact/DTT6kSikz9ZUTBkUxY6Grr
 
@@ -51,6 +51,9 @@ Phase 2 (the C++ Eulerian solver: 2.1 to 2.5c and 2.4b done; 2.6 waits for Phase
 | 3.6c2 | Stiff inclined layer: floor cell and top cell (split from 3.6c) | Done | Decision 0044, both behind `flowImpedance yes`: the wall reconstruction of a flowing cell mirrors about the wall's last velocity (the wall jump counted the drag twice; the 10 MPa floor cell stuck), and void below 1e-4 counts as full (noise void switched the top cell to the partly filled rules, which kicked its stress). `tests/manual/test_inclined_layer.sh` passes: profile error 3.6 / 0.9 / 0.8 % at 0.1 / 1 / 10 MPa, 5 mm (was 7.8 / 22 / 136). CI runs 0.1 and 10 MPa. Left: the 0.1 MPa layer creeps faster over time (+0.7 %/s) |
 | 3.6d | Silo discharge with mu(I) and the flow impedance, E sweep | Closed, done-when not met; first case for Sia | Decision 0045, `tutorials/siloDischarge` (celFoam, Allrun, plots, README). Fixed: crash at step 1 of a stress-free fill (P ~ 1e-320), and the 0044 nearly-full snap, which inflated the stream above the outlet at 10 MPa (rate 12 kg/s/m): now bounded by the stress-implied density. Rate 65.5 / 53.8 / 67.7 kg/s/m at 0.1 / 1 / 10 MPa (10 mm), 77.6 / 61.2 at 0.1 / 1 MPa (5 mm): 1 MPa about 20 % slow on both meshes. C 0.69 to 0.94, below the 1.0 to 1.9 band (references use mu_s 0.32 to 0.38, T0 0.70). 10 mm rates scatter about 15 % from round-off. Layer still passes. `tests/manual/test_discharge_stiffness.sh` now runs mu(I) |
 | 3.6f | The 1 MPa dip in the silo rate (split from 3.6d) | Closed, finding recorded | Decision 0046. Bands of three runs (maxCo 0.40 / 0.38 / 0.36), 10 mm: 65.8 / 52.0 / 60.8 kg/s/m at 0.1 / 1 / 10 MPa; scatter 1 to 6 %, 18 % at 10 MPa. Cause: the nearly-full rule (0044/0045). Without it 65.5 / 60.5 / 63.1 (bands within 5 %) but the inclined layer fails; no tolerance serves both. The rate is set by whether loosened cells above the outlet count as full or partly filled (43.7 to 67.0 at 1 MPa), so the void closure is the lever. Proposed cure: compressible mu(I)/phi(I). `tests/manual/test_discharge_scatter.sh` |
+| 3.6g | Dilatancy in the mu(I) law | Closed, done-when not met; option kept off | Decision 0048. Entries `phi0`, `phiC`, `bPhi`, `KDil` (MC and DP with mu(I)): tan(psi) = KDil (phi - phiC + bPhi I), phi from tr(epsP); `tests/test_dilatancy.sh` passes (shear box reaches phi(I) to 1e-9, dense dilates, loose contracts). Tank bands (10 mm): dense fill 53.6 / 35.9 / 32.1, fill at critical 61.5 / 42.3 / 45.8 kg/s/m at 0.1 / 1 / 10 MPa (without 65.8 / 52.0 / 60.8): slower and more E dependent, since confined dilation raises the pressure by about K times the dilation. Layer 4.6 / 2.6 / 6.7 % (fails). Unchanged bit for bit without the entries |
+| 3.6h | Blend of the full and partly filled rules | Closed, done-when not met; option kept off | Decision 0049. `fullBlend yes`, `fullBlendVoid (1e-4 1e-2)`: weight falls with log(void), blends face states, stress predictor, flow viscosity; no snap. Tank bands (10 mm): 68.7 / 53.7 / 41.7 kg/s/m with the layer passing (3.6 / 0.9 / 0.9 %); 1e-6 to 1e-4: 62.5 / 42.6 / 47.0, layer fails at 10 MPa. Scatter drops to 0 to 7 %, E dependence stays. Unchanged bit for bit when off |
+| 3.6e | Column collapse with mu(I) against experiments | Done (10 mm) | Decision 0050. Fixed material stuck against a ceiling wall (slab side: a wall above counts as empty). T0 rule set mu(I) + `flowImpedance yes` + `normalCap yes`: run-out 0.40 / 1.70 at 1 MPa and 0.30 / 1.30 at 10 MPa (a = 0.5 / 2; bands 0.30 to 0.90 and 1.2 to 3.6), top kept, slopes 24 to 26 deg; same set keeps the inclined layer (3.5 / 0.8 / 0.8 %) and gives the tank 73.6 / 61.0 / 58.8 kg/s/m. `tests/manual/test_collapse_mui.sh` (2.5 min) passes. Run-outs at the bottom of the bands (mu_s 0.70 is rough; band is mesh dependent, decision 0038) |
 | 3.6s | Mesh dependence of the collapse shear band (split from 3.6b) | Done (finding recorded) | Decision 0038, `docs/wp/WP-3.6s.md`. a = 0.5, E = 1 MPa on 10 / 5 / 2.5 mm: band 1 to 4 cells wide on every mesh, peak shear rate 10 / 23 / 30 1/s, run-out (5 mm front) 0.30 / 0.33 / 0.43 at 1 s: **mesh dependent, not converged**; deposit body and top converge. mu(I) with the placeholders changes nothing at 10 and 5 mm (I about 0.05). Cure deferred (compressible mu(I)/phi(I) preferred). Fixed a floating-point trap in `inertialNumber` at P about 1e-320 Pa. `tests/manual/test_shear_band.sh` (about 9 min) |
 | 4.0 | Contact scheme investigation (LS-DYNA, Abaqus, cut cell) | Done; Sia agreed 2026-11-17 | Decision 0042: cut-cell moving walls (Riemann wall face with the body velocity, Coulomb cap, small-cell mixing), no penalty. `docs/research/contact-schemes.md` (9 sources), `prototype/contact2d.py`; `tests/test_proto_contact_schemes.sh` passes (about 25 s): piston stress 1.006 zv, noise 0.2 % (penalty at k = M/h: 27 %), 30 deg frictional wall acceleration within 0.3 % (penalty 11 % off), mass 1e-15. LS-DYNA-style coupling points tried after Sia's note: smoother than a plain spring but leak 2 % and half the force; decision 0042 addendum adopts its point density, leak report and controls into the cut-cell wall |
 | 4.1 | Rigid body: STL input and kinematics | Done | Decision 0041: STL walls and bodies are immersed rigid surfaces on the Cartesian mesh (Sia, 2026-11-17). `src/celLagrangian` (`rigidBody`, `rigidBodies`), `constant/rigidBodies` (tutorial `rigidBodyMotion`): Function1 velocity and omega, exact path; no forces yet. `tests/test_rigid_body.sh` passes in about 1 s: pose 4e-16, STL 3e-8, 2 processors identical |
@@ -141,9 +144,16 @@ Silo track (decision 0016), one thread each:
 21. WP 3.6f: the 1 MPa dip. Finding recorded (decision 0046): the nearly-full rule sets
    it; the void closure, not the friction law, decides the silo rate. Compare bands of
    three runs.
-22. Next: Sia reviews the tank case. Proposed: compressible mu(I)/phi(I) (dilatancy as a
-   material state), checked by the silo E sweep and the shear-band test; needs Sia's
-   go-ahead as a model change. Otherwise 3.6e (collapse). WP 3.5 waits.
+22. WP 3.6g: dilatancy (Sia's go-ahead 2026-11-18). Closed without its done-when
+   (decision 0048): it makes the tank slower and more E dependent; kept as an option.
+23. WP 3.6h: blend of the full and partly filled rules. Closed without its done-when
+   (decision 0049): less scatter, same E dependence. Stop tuning void rules for it.
+24. About 20 % rate uncertainty across artificial E accepted for now (coordinator,
+   2026-11-18; to confirm with Sia).
+25. WP 3.6e: collapse with mu(I). Done at 10 mm (decision 0050). T0 rule set:
+   mu(I) + flowImpedance + normalCap.
+26. Next: switch `tutorials/siloDischarge` to the T0 rule set (small), then WP 3.5
+   (cohesion).
    Keep runs coarse and short: Sia asked to be frugal with Claude usage (2026-11-15).
 
 Then the C++ counterparts 3.1 to 3.4 (2.4b is done; briefs not written yet) and 3.5
@@ -166,8 +176,10 @@ mesh, as Abaqus CEL). Order:
 - Silo with mu(I) (WP 3.6d/3.6f, decisions 0045, 0046): rate at 1 MPa about 20 % below
   0.1 and 10 MPa (bands of three runs: 65.8 / 52.0 / 60.8 kg/s/m at 10 mm). Caused by the
   nearly-full rule; removing it fixes the silo but fails the inclined layer. The silo
-  rate depends on how loosened cells count (full or partly filled), so the real cure is
-  dilatancy in the material law. 10 MPa rates scatter 18 % with the rule.
+  rate depends on how loosened cells count (full or partly filled). Dilatancy in the
+  material law (WP 3.6g, decision 0048) did not cure it (it made it worse), nor did a
+  gradual blend of the rules (WP 3.6h, decision 0049). 10 MPa rates scatter 18 % with
+  the rule.
 - Meshes (decision 0041): `freeSurface yes` (the silo physics) needs a Cartesian hex
   mesh (every face normal to an axis; grading allowed). Without void the code runs on
   any mesh but is untested there: face states assume the face midway between centres,

@@ -350,18 +350,23 @@ void faceStates
         const scalar fP = 1, const scalar fQ = 1
     )
     {
-        if (smP > 0.5 && smQ > 0.5)
+        if (smP == 1 && smQ == 1)
         {
             states0(qP, qQ, gP, gQ, dPQ, outP, outQ, eP, eQ);
             return;
         }
         Type tP(qP), tQ(qQ);
-        if (smP > 0.5 || smQ > 0.5)
+        if (smP > 0 || smQ > 0)
         {
             states0(qP, qQ, gP, gQ, dPQ, tP, tQ, eP, eQ);
         }
-        outP = smP > 0.5 ? tP : (grav ? Type(qP + (0.5*fP)*eP) : qP);
-        outQ = smQ > 0.5 ? tQ : (grav ? Type(qQ - (0.5*fQ)*eQ) : qQ);
+        const Type foP(grav ? Type(qP + (0.5*fP)*eP) : qP);
+        const Type foQ(grav ? Type(qQ - (0.5*fQ)*eQ) : qQ);
+        // smooth is 0 or 1 without the blend (WP 3.6h): one of the two
+        outP =
+            smP == 1 ? tP : (smP == 0 ? foP : Type(smP*tP + (1 - smP)*foP));
+        outQ =
+            smQ == 1 ? tQ : (smQ == 0 ? foQ : Type(smQ*tQ + (1 - smQ)*foQ));
     };
 
     auto sm = [&](const label celli) -> scalar
@@ -823,6 +828,33 @@ static const scalar alphaEmpty = 1e-12;
 static const scalar alphaFull = 1 - 1e-12;
 
 
+//- Weight of the full rules for a cell of volume fraction a, with the
+//  blend (WP 3.6h, decision 0049): 1 for void <= v1, 0 for void >= v2
+//  (defaults 1e-4, 1e-2), linear in log(void) between. Without the blend
+//  (v2 = 0): 1 if full, else 0.
+inline scalar fullWeight(const scalar a, const scalar v1, const scalar v2)
+{
+    if (a >= alphaFull)
+    {
+        return 1;
+    }
+    if (!(v2 > 0))
+    {
+        return 0;
+    }
+    const scalar v = 1 - a;
+    if (v <= v1)
+    {
+        return 1;
+    }
+    if (v >= v2)
+    {
+        return 0;
+    }
+    return Foam::log(v2/v)/Foam::log(v2/v1);
+}
+
+
 //- Axis of a face normal to an axis (Cartesian mesh, checked at start)
 inline direction faceAxis(const vector& S)
 {
@@ -848,7 +880,10 @@ void slabSides
     const UList<boundaryKind>& kinds,
     vectorField& lean,
     scalarField& smooth,
-    const label gAxis = -1
+    const label gAxis = -1,
+    const scalar v1 = 0,
+    const scalar v2 = 0,
+    const vector& gVec = Zero
 )
 {
     const labelUList& own = mesh.owner();
@@ -905,24 +940,83 @@ void slabSides
         }
     }
 
+    // A wall above the cell (outward normal against gravity, a ceiling)
+    // counts as empty for the slab side only (WP 3.6e, decision 0050):
+    // mirrored, it made splashed material lean against the ceiling, never
+    // touch the face below and fall in place forever. The smooth flag keeps
+    // the mirror (a full cell under a lid stays second order).
+    vectorField aPlusL(aPlus), aMinusL(aMinus);
+    if (mag(gVec) > 0)
+    {
+        forAll(mesh.boundary(), patchi)
+        {
+            if
+            (
+                kinds[patchi] != boundaryKind::wall
+             && kinds[patchi] != boundaryKind::velocity
+            )
+            {
+                continue;
+            }
+            const fvPatch& p = mesh.boundary()[patchi];
+            const labelUList& fc = p.faceCells();
+            const vectorField& pS = p.Sf();
+            forAll(fc, i)
+            {
+                if ((pS[i] & gVec) < -1e-6*mag(pS[i])*mag(gVec))
+                {
+                    const direction d = faceAxis(pS[i]);
+                    if (pS[i][d] > 0)
+                    {
+                        aPlusL[fc[i]][d] = 0;
+                    }
+                    else
+                    {
+                        aMinusL[fc[i]][d] = 0;
+                    }
+                }
+            }
+        }
+    }
+
     lean.setSize(mesh.nCells());
     smooth.setSize(mesh.nCells());
     forAll(a, celli)
     {
-        const bool full = a[celli] >= alphaFull;
-        const vector dif(aPlus[celli] - aMinus[celli]);
+        // With the blend a nearly full cell (weight >= 1/2, void below
+        // sqrt(v1 v2)) has an upright slab: it touches all its faces
+        const bool blend = v2 > 0;
+        const bool full =
+            blend
+          ? fullWeight(a[celli], v1, v2) >= 0.5
+          : a[celli] >= alphaFull;
+        const vector dif(aPlusL[celli] - aMinusL[celli]);
         for (direction d = 0; d < vector::nComponents; ++d)
         {
             lean[celli][d] =
                 (full || mag(dif[d]) <= 1e-9) ? 0 : sign(dif[d]);
         }
-        smooth[celli] =
-            (
-                full
-             && cmptMin(aPlus[celli]) >= alphaFull
-             && cmptMin(aMinus[celli]) >= alphaFull
-            )
-          ? 1 : 0;
+        if (blend)
+        {
+            // Smallest weight of the cell and its neighbours
+            scalar w = fullWeight(a[celli], v1, v2);
+            for (direction d = 0; d < vector::nComponents; ++d)
+            {
+                w = min(w, fullWeight(aPlus[celli][d], v1, v2));
+                w = min(w, fullWeight(aMinus[celli][d], v1, v2));
+            }
+            smooth[celli] = w;
+        }
+        else
+        {
+            smooth[celli] =
+                (
+                    full
+                 && cmptMin(aPlus[celli]) >= alphaFull
+                 && cmptMin(aMinus[celli]) >= alphaFull
+                )
+              ? 1 : 0;
+        }
     }
 
     if (gAxis < 0)
@@ -1420,7 +1514,11 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
         {
             gAxis = label(faceAxis(g_));
         }
-        slabSides(mesh, alpha_, kinds, lean_, smooth_, gAxis);
+        slabSides
+        (
+            mesh, alpha_, kinds, lean_, smooth_, gAxis,
+            blendVoid_[0], fullBlend_ ? blendVoid_[1] : 0, g_
+        );
 
         tsmooth = workField<scalar>(mesh, "smooth", dimless);
         tsmooth.ref().primitiveFieldRef() = smooth_;
@@ -1489,10 +1587,18 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
             capSinPhi_ > 0 ? capCCos_/capSinPhi_ : 0;
         forAll(e, celli)
         {
-            if (!fs || alpha_[celli] >= alphaFull)
+            const scalar w = 
+                fs
+              ? fullWeight
+                (
+                    alpha_[celli], blendVoid_[0],
+                    fullBlend_ ? blendVoid_[1] : 0
+                )
+              : 1;
+            if (w > 0)
             {
                 e[celli] =
-                    flowViscosity(sigma_[celli], flowLaw_, cCot, sm[celli]);
+                    w*flowViscosity(sigma_[celli], flowLaw_, cCot, sm[celli]);
             }
         }
         teta.ref().correctBoundaryConditions();
@@ -1648,7 +1754,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
 
         forAll(V, celli)
         {
-            if (fs && smooth_[celli] < 0.5)
+            if (fs && smooth_[celli] == 0)
             {
                 // First-order cell (decision 0021): no stress predictor;
                 // empty cells do not move
@@ -1691,6 +1797,11 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                 }
             }
             dS[celli] = 0.5*dt*(K*tr(D)*symmTensor::I + 2*G*Dd);
+            if (fs && smooth_[celli] < 1)
+            {
+                // Blended cell (WP 3.6h): part of the stress predictor
+                dS[celli] *= smooth_[celli];
+            }
         }
         dU.correctBoundaryConditions();
         dS.correctBoundaryConditions();
