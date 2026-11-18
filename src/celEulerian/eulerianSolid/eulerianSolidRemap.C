@@ -730,7 +730,6 @@ void Foam::eulerianSolid::remap(const scalar dt)
     const labelUList& own = mesh.owner();
     const labelUList& nei = mesh.neighbour();
     const fvBoundaryMesh& bm = mesh.boundary();
-    const scalarField& V = mesh.V().field();
     const scalarField& phiI = phi.primitiveField();
 
     auto lim = [&](const word& field)
@@ -738,7 +737,39 @@ void Foam::eulerianSolid::remap(const scalar dt)
         return limiterFromWord(remapLimiter_[field], materialProperties_);
     };
 
-    const remapGeometry geo(makeGeometry(mesh, phi, dt));
+    // Immersed walls (WP 4.3a): phiL carries only the open part of each
+    // face; the geometry (cell velocity fit, swept centroids) uses the face
+    // velocity, phiL over the open fraction (0 on closed faces, as a wall)
+    if (immersed_)
+    {
+        fillCovered();
+    }
+    const scalarField Vo(openVolume());
+    tmp<surfaceScalarField> tphiV(phi);
+    if (immersed_)
+    {
+        const surfaceScalarField& fo = faceOpen_();
+        tphiV = surfaceScalarField::New
+        (
+            "phiVel", IOobject::NO_REGISTER, phi
+        );
+        surfaceScalarField& pv = tphiV.ref();
+        forAll(pv, facei)
+        {
+            pv[facei] = fo[facei] > 0 ? phi[facei]/fo[facei] : 0;
+        }
+        forAll(pv.boundaryField(), patchi)
+        {
+            scalarField& pp = pv.boundaryFieldRef()[patchi];
+            const scalarField& pf = fo.boundaryField()[patchi];
+            const scalarField& p0 = phi.boundaryField()[patchi];
+            forAll(pp, i)
+            {
+                pp[i] = pf[i] > 0 ? p0[i]/pf[i] : 0;
+            }
+        }
+    }
+    const remapGeometry geo(makeGeometry(mesh, tphiV(), dt));
 
     // Lagrangian volume change dt*sum(phiL out), internal and coupled faces
     scalarField dVL(mesh.nCells(), Zero);
@@ -793,11 +824,19 @@ void Foam::eulerianSolid::remap(const scalar dt)
     scalar minRho = GREAT;
     forAll(rho, celli)
     {
+        if (Vo[celli] <= 0)
+        {
+            continue;       // covered by a body (no open face)
+        }
         if (dVL[celli] != 0 || dmOut[celli] != 0)
         {
-            rho[celli] += (rho[celli]*dVL[celli] - dmOut[celli])/V[celli];
+            rho[celli] += (rho[celli]*dVL[celli] - dmOut[celli])/Vo[celli];
         }
-        minRho = min(minRho, rho[celli]);
+        if (!immersed_ || cellOpen_[celli] >= smallOpen)
+        {
+            // a small cut cell may be overdrawn: its mixing group is not
+            minRho = min(minRho, rho[celli]);
+        }
     }
     reduce(minRho, minOp<scalar>());
     if (minRho <= 0)
@@ -809,12 +848,18 @@ void Foam::eulerianSolid::remap(const scalar dt)
     }
     rho_.correctBoundaryConditions();
 
-    const scalarField mNew(rho*V);
+    const scalarField mNew(rho*Vo);
 
     remapField(mesh, geo, phi, dmInt, dmPatch, mNew, lim("U"), U_);
     remapField(mesh, geo, phi, dmInt, dmPatch, mNew, lim("sigma"), sigma_);
     remapField(mesh, geo, phi, dmInt, dmPatch, mNew, lim("epsP"), epsP_);
     remapField(mesh, geo, phi, dmInt, dmPatch, mNew, lim("epsPEq"), epsPEq_);
+
+    if (immersed_)
+    {
+        mixSmallCells();
+        fillCovered();
+    }
 }
 
 

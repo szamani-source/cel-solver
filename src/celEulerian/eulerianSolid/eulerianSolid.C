@@ -278,7 +278,9 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
     nCapped_(0),
     nNormalCapped_(0),
     outletOpenTime_(readOutlets(mesh, materialProperties_, wallFriction_)),
-    discharged_(0)
+    discharged_(0),
+    immersed_(false),
+    nUnmixed_(0)
 {
     if (outletOpenTime_.size() && !freeSurface_)
     {
@@ -522,7 +524,7 @@ Foam::scalar Foam::eulerianSolid::stableDeltaT() const
 
 Foam::scalar Foam::eulerianSolid::totalMass() const
 {
-    return gSum(rho_.primitiveField()*mesh_.V().field());
+    return gSum(rho_.primitiveField()*openVolume());
 }
 
 
@@ -530,7 +532,7 @@ Foam::vector Foam::eulerianSolid::totalMomentum() const
 {
     return gSum
     (
-        rho_.primitiveField()*mesh_.V().field()*U_.primitiveField()
+        rho_.primitiveField()*openVolume()*U_.primitiveField()
     );
 }
 

@@ -31,9 +31,14 @@ Description
             centre      (0.2 0.5 0.05);       // optional, default centroid
             velocity    constant (0 0 0);     // optional, m/s
             omega       constant (0 0 0);     // optional, rad/s
+            friction    20;                   // optional, deg, default 0:
+                                              // wall friction angle of the
+                                              // material on this body
+                                              // (WP 4.3a, decision 0047)
         }
 
-    No forces act on the body and it exerts none yet (contact: WP 4.2, 4.3).
+    Fixed bodies act on the material as cut-cell walls (WP 4.3a, decision
+    0047); forces on moving bodies are WP 4.3b.
 
 SourceFiles
     rigidBody.C
@@ -72,6 +77,12 @@ class rigidBody
 
         //- Prescribed angular velocity
         autoPtr<Function1<vector>> omega_;
+
+        //- Wall friction angle [deg]
+        scalar friction_;
+
+        //- Velocity or omega given (a moving body)
+        bool moving_;
 
         //- Current reference point
         point c_;
@@ -116,6 +127,12 @@ public:
 
         //- Time of the current pose
         scalar time() const noexcept { return time_; }
+
+        //- Wall friction angle [deg] of the material on this body
+        scalar friction() const noexcept { return friction_; }
+
+        //- Does the body have a prescribed motion (velocity or omega)?
+        bool moving() const noexcept { return moving_; }
 
         //- Prescribed velocity of the reference point at time t
         vector velocity(const scalar t) const;

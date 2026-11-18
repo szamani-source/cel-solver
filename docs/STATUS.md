@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-11-18 (WP 4.1, 4.0, 4.2; 3.6c2, 3.6c, 3.6b, 3.6s, validation references)
+Last updated: 2026-11-18 (WP 4.3a; 4.1, 4.0, 4.2; 3.6c2, 3.6c, 3.6b, 3.6s, validation references)
 
 Plan doc: https://claude.ai/artifact/DTT6kSikz9ZUTBkUxY6Grr
 
@@ -53,6 +53,8 @@ Phase 2 (the C++ Eulerian solver: 2.1 to 2.5c and 2.4b done; 2.6 waits for Phase
 | 4.0 | Contact scheme investigation (LS-DYNA, Abaqus, cut cell) | Done; Sia agreed 2026-11-17 | Decision 0042: cut-cell moving walls (Riemann wall face with the body velocity, Coulomb cap, small-cell mixing), no penalty. `docs/research/contact-schemes.md` (9 sources), `prototype/contact2d.py`; `tests/test_proto_contact_schemes.sh` passes (about 25 s): piston stress 1.006 zv, noise 0.2 % (penalty at k = M/h: 27 %), 30 deg frictional wall acceleration within 0.3 % (penalty 11 % off), mass 1e-15. LS-DYNA-style coupling points tried after Sia's note: smoother than a plain spring but leak 2 % and half the force; decision 0042 addendum adopts its point density, leak report and controls into the cut-cell wall |
 | 4.1 | Rigid body: STL input and kinematics | Done | Decision 0041: STL walls and bodies are immersed rigid surfaces on the Cartesian mesh (Sia, 2026-11-17). `src/celLagrangian` (`rigidBody`, `rigidBodies`), `constant/rigidBodies` (tutorial `rigidBodyMotion`): Function1 velocity and omega, exact path; no forces yet. `tests/test_rigid_body.sh` passes in about 1 s: pose 4e-16, STL 3e-8, 2 processors identical |
 | 4.2 | Cut cells near each body | Done | Decision 0043: exact edge, face and cell coverage from the STL triangles (no sampling), body-frame octree, utility `celBodyCells`. `tests/test_body_cells.sh` passes in about 6 s: faceted sphere volume to 4e-16, plane at 30 deg to 2e-7 (single-precision STL), moving and turning cube exact, 2 processors 9e-16. Search 6e-5 s per searched cell |
+| 4.3a | Fixed STL walls with friction | Done | Decision 0047: cut-cell walls in `eulerianSolid` (open areas and volumes, wall face with the body's friction, ghosts in covered cells, small cells one cell with a neighbour in the Lagrange step), `friction <deg>` per body in `constant/rigidBodies`, per-body wall force and leak report; celFoam couples fixed bodies (tutorial `stlTank`). `tests/test_stl_walls.sh` passes (about 3 min): STL side walls 0.24 % from the mesh-wall Janssen tank, tank turned 10 deg 2.1 %, leak 1e-11, force balance 0.06 %. Not with `freeSurface` (4.3c); no mixing across processors |
+| 4.3c | STL walls with the free surface and outlets (split from 4.3a) | Next | Brief `docs/wp/WP-4.3c.md`; needed by 4.5 |
 
 ## Validation references
 
@@ -148,9 +150,10 @@ mesh, as Abaqus CEL). Order:
 2. WP 4.0: contact scheme investigation. Done (decision 0042: cut-cell moving walls,
    not penalty). Shown to Sia 2026-11-17.
 3. WP 4.2: cut cells near each body. Done (decision 0043).
-4. WP 4.3a: fixed STL walls with friction (what Sia asked for, `docs/wp/WP-4.3a.md`). Next.
-5. WP 4.5: silo and hopper with STL walls (`docs/wp/WP-4.5.md`).
-6. WP 4.3b: moving bodies, forces both ways; then 4.4 benchmarks.
+4. WP 4.3a: fixed STL walls with friction. Done (decision 0047; tutorial `stlTank`).
+5. WP 4.3c: STL walls with the free surface and outlets (`docs/wp/WP-4.3c.md`). Next.
+6. WP 4.5: silo and hopper with STL walls (`docs/wp/WP-4.5.md`).
+7. WP 4.3b: moving bodies, forces both ways; then 4.4 benchmarks.
 
 ## Known issues
 

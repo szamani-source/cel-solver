@@ -65,6 +65,7 @@
 #include "wedgeFvPatch.H"
 #include "PstreamBuffers.H"
 #include "calculatedFvPatchFields.H"
+#include "equilibriumJump.H"
 
 #include "transform.H"
 
@@ -104,46 +105,7 @@ inline scalar mcSlope(const scalar a, const scalar c)
 }
 
 
-//- Hydrostatic stress jump over the vector d in a cell of density rho
-//  under gravity g: -rho (g . d) gHat gHat for the stress, zero for other
-//  types (decision 0030). Gravity not along an axis (an inclined layer):
-//  the jump of a layer uniform across the dominant axis e of g,
-//  -rho (d . e) (g e + e g - (g . e) e e) (decision 0039)
-template<class Type>
-inline Type equilibriumJump(const scalar, const vector&, const vector&)
-{
-    return Zero;
-}
-
-template<>
-inline symmTensor equilibriumJump<symmTensor>
-(
-    const scalar rho,
-    const vector& d,
-    const vector& g
-)
-{
-    const scalar gg = magSqr(g);
-    if (gg <= 0)
-    {
-        return Zero;
-    }
-    // Dominant axis e of g
-    const vector ga(cmptMag(g));
-    const direction a =
-        ga.x() >= ga.y() && ga.x() >= ga.z() ? 0 : (ga.y() >= ga.z() ? 1 : 2);
-    if (sqr(g[a]) == gg)
-    {
-        // g along an axis: hydrostatic column (decision 0030)
-        return (-rho*(g & d)/gg)*sqr(g);
-    }
-    // Tilted g (WP 3.6b, decision 0039): a layer varying along e only,
-    // div sigma + rho g = 0, so sigma & e jumps by -rho g (d . e); the
-    // normal stresses across e do not jump
-    vector e(Zero);
-    e[a] = 1;
-    return (-rho*(d & e))*(twoSymm(g*e) - (g & e)*sqr(e));
-}
+using eulerianDetail::equilibriumJump;
 
 
 //- A vol field of Type with calculated patches (constraint patches keep
@@ -1321,6 +1283,30 @@ inline bool capNormal
     return true;
 }
 
+//- Immersed walls (WP 4.3a): a small cut cell and the cell it is mixed
+//  with act as one cell. Sums f over each group (target plus its small
+//  cells) and gives every member the sum. mixTo: target of each small cell
+//  (-1 for others)
+template<class Type>
+void groupSum(const labelList& mixTo, Field<Type>& f)
+{
+    const Field<Type> f0(f);
+    forAll(mixTo, celli)
+    {
+        if (mixTo[celli] >= 0)
+        {
+            f[mixTo[celli]] += f0[celli];
+        }
+    }
+    forAll(mixTo, celli)
+    {
+        if (mixTo[celli] >= 0)
+        {
+            f[celli] = f[mixTo[celli]];
+        }
+    }
+}
+
 } // End namespace lagrangeStepDetail
 } // End namespace Foam
 
@@ -1360,12 +1346,30 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
         }
     }
 
+    // Immersed walls (WP 4.3a, decision 0047): covered cells hold ghost
+    // values for the reconstruction; the material fills the open volume Vo
+    // of each cell and crosses only the open part of each face
+    // (Sfo = open fraction times Sf); a wall cell has one more face, the
+    // wall, with area vector wallA_ into the body
+    const bool imm = immersed_;
+    if (imm)
+    {
+        fillCovered();
+    }
+    const scalarField Vo(openVolume());
+    tmp<surfaceVectorField> tSfo(Sf);
+    if (imm)
+    {
+        tSfo = Sf*faceOpen_();
+    }
+    const surfaceVectorField& Sfo = tSfo();
+
     rho_.correctBoundaryConditions();
     U_.correctBoundaryConditions();
     sigma_.correctBoundaryConditions();
 
     // Cell mass, constant in the step
-    const scalarField m(rho_.primitiveField()*V);
+    const scalarField m(rho_.primitiveField()*Vo);
 
     // Gravity at mid-step (the driver advances the time before the step)
     const vector g(gravityAt(mesh.time().value() - 0.5*dt));
@@ -1577,6 +1581,16 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
         sref, secondOrder_, sO.ref(), sN.ref(), &rho_, g, smoothPtr, eFacPtr
     );
 
+    // Cell state the wall face of an immersed wall cell sees: the cell
+    // value plus the Hancock predictor increment (second order)
+    vectorField Uwall;
+    symmTensorField Swall;
+    if (imm)
+    {
+        Uwall = U_.primitiveField();
+        Swall = sref.primitiveField();
+    }
+
     if (secondOrder_)
     {
         // Hancock predictor from each cell's own face states
@@ -1592,7 +1606,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
         {
             const label P = own[facei];
             const label N = nei[facei];
-            const vector& S = Sf[facei];
+            const vector& S = Sfo[facei];
             divS[P] += (sO()[facei] - sref[P]) & S;
             divS[N] -= (sN()[facei] - sref[N]) & S;
             gradU[P] += S*(UO()[facei] - U_[P]);
@@ -1631,20 +1645,60 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                           : -1
                         );
                     }
-                    divS[P] += t*pmS[i] - (sref[P] & pS[i]);
-                    gradU[P] += pS[i]*(v - U_[P]);
+                    const scalar fo =
+                        imm ? faceOpen_().boundaryField()[patchi][i] : 1;
+                    divS[P] += fo*(t*pmS[i] - (sref[P] & pS[i]));
+                    gradU[P] += fo*pS[i]*(v - U_[P]);
                 }
                 continue;
             }
+            const vectorField& pSo = Sfo.boundaryField()[patchi];
             forAll(fc, i)
             {
-                divS[fc[i]] += (ps[i] - sref[fc[i]]) & pS[i];
-                gradU[fc[i]] += pS[i]*(pu[i] - U_[fc[i]]);
+                divS[fc[i]] += (ps[i] - sref[fc[i]]) & pSo[i];
+                gradU[fc[i]] += pSo[i]*(pu[i] - U_[fc[i]]);
+            }
+        }
+        if (imm)
+        {
+            // Immersed wall faces: wall Riemann solution from the cell
+            // state (WP 4.3a)
+            forAll(wallA_, celli)
+            {
+                if (wallBody_[celli] < 0 || m[celli] <= 0)
+                {
+                    continue;
+                }
+                const vector& A = wallA_[celli];
+                const scalar mA = mag(A);
+                vector v, t;
+                wallFace
+                (
+                    A/mA, U_[celli] - wallU_[celli], sref[celli],
+                    zp[celli], zs[celli], bodyMu_[wallBody_[celli]], v, t
+                );
+                v += wallU_[celli];
+                divS[celli] += t*mA - (sref[celli] & A);
+                gradU[celli] += A*(v - U_[celli]);
             }
         }
 
+        // Small cut cells move and strain with the cell they are mixed
+        // with (one cell for the predictor)
+        scalarField mP(m), VoP(Vo);
+        if (imm)
+        {
+            groupSum(mixTo_, divS);
+            groupSum(mixTo_, gradU);
+            groupSum(mixTo_, mP);
+            groupSum(mixTo_, VoP);
+        }
         forAll(V, celli)
         {
+            if (imm && m[celli] <= 0)
+            {
+                continue;       // covered by a body
+            }
             if (fs && smooth_[celli] < 0.5)
             {
                 // First-order cell (decision 0021): no stress predictor;
@@ -1657,9 +1711,9 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
             }
             if (solveMomentum_)
             {
-                dU[celli] = 0.5*dt*(divS[celli]/m[celli] + g);
+                dU[celli] = 0.5*dt*(divS[celli]/mP[celli] + g);
             }
-            const symmTensor D(symm(gradU[celli])/V[celli]);
+            const symmTensor D(symm(gradU[celli])/VoP[celli]);
             symmTensor Dd(dev(D));
             if (fi && teta()[celli] > 0)
             {
@@ -1691,6 +1745,11 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
         }
         dU.correctBoundaryConditions();
         dS.correctBoundaryConditions();
+        if (imm)
+        {
+            Uwall += dU.primitiveField();
+            Swall += dS.primitiveField();
+        }
 
         surfaceVectorField& uo = UO.ref();
         surfaceVectorField& un = UN.ref();
@@ -2070,6 +2129,12 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
         // copies vS, F and phiL again (unchanged) and the normal slips
         syncCoupled(mesh, vS, F, phiL_, &tnO.ref(), &tnN.ref());
     }
+    if (imm)
+    {
+        // Only the open part of a face carries force and volume (WP 4.3a)
+        F *= faceOpen_();
+        phiL_ *= faceOpen_();
+    }
     vStar_ = vS;
     Fstar_ = F;
 
@@ -2087,13 +2152,13 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
         const surfaceVectorField& nN = tnN();
         forAll(own, facei)
         {
-            Tn[own[facei]] += Sf[facei]*nO[facei];
-            Tn[nei[facei]] -= Sf[facei]*nN[facei];
+            Tn[own[facei]] += Sfo[facei]*nO[facei];
+            Tn[nei[facei]] -= Sfo[facei]*nN[facei];
         }
         forAll(mesh.boundary(), patchi)
         {
             const labelUList& fc = mesh.boundary()[patchi].faceCells();
-            const vectorField& pS = Sf.boundaryField()[patchi];
+            const vectorField& pS = Sfo.boundaryField()[patchi];
             const vectorField& pnO = nO.boundaryField()[patchi];
             forAll(fc, i)
             {
@@ -2133,12 +2198,12 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
         if (shearCap_)
         {
             // a capped face slips: each side sees its own velocity
-            T[P] += Sf[facei]*(vS[facei] + tdO()[facei]);
-            T[N] -= Sf[facei]*(vS[facei] + tdN()[facei]);
+            T[P] += Sfo[facei]*(vS[facei] + tdO()[facei]);
+            T[N] -= Sfo[facei]*(vS[facei] + tdN()[facei]);
         }
         else
         {
-            const tensor t(Sf[facei]*vS[facei]);
+            const tensor t(Sfo[facei]*vS[facei]);
             T[P] += t;
             T[N] -= t;
         }
@@ -2149,7 +2214,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
     {
         const fvPatch& p = mesh.boundary()[patchi];
         const labelUList& fc = p.faceCells();
-        const vectorField& pS = Sf.boundaryField()[patchi];
+        const vectorField& pS = Sfo.boundaryField()[patchi];
         const vectorField& pF = F.boundaryField()[patchi];
         const vectorField& pvS = vS.boundaryField()[patchi];
         const scalarField& pphi = phiL_.boundaryField()[patchi];
@@ -2169,17 +2234,72 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
         }
     }
 
+    if (imm)
+    {
+        // Immersed wall faces (WP 4.3a, decision 0047): one-sided Riemann
+        // solution against the body (no tension, Coulomb shear cap with the
+        // body's friction), from the predicted cell state, in the body's
+        // frame. The force on the body is minus the force on the material.
+        bodyForce_ = Zero;
+        forAll(wallA_, celli)
+        {
+            if (wallBody_[celli] < 0 || m[celli] <= 0)
+            {
+                continue;
+            }
+            const label b = wallBody_[celli];
+            const vector& A = wallA_[celli];
+            const scalar mA = mag(A);
+            vector v, t;
+            wallFace
+            (
+                A/mA, Uwall[celli] - wallU_[celli], Swall[celli],
+                zp[celli], zs[celli], bodyMu_[b], v, t
+            );
+            v += wallU_[celli];
+            force[celli] += t*mA;
+            T[celli] += A*v;
+            dV[celli] += v & A;
+            bodyForce_[b] += t*mA;
+            // Material that enters through the wall face (where it pulls
+            // away from the body: the face is then a free surface, as an
+            // open top), counted in the leak report
+            const scalar VL = Vo[celli] + dt*dV[celli];
+            if (VL > 0)
+            {
+                bodyMassIn_[b] -= dt*(v & A)*m[celli]/VL;
+            }
+        }
+    }
+    // Small cut cells: one cell with the cell they are mixed with for the
+    // momentum and the strain (decision 0047); each keeps its own volume
+    // change for its density
+    scalarField mG(m), VoG(Vo), dVG(dV);
+    tensorField TG(T);
+    if (imm)
+    {
+        groupSum(mixTo_, force);
+        groupSum(mixTo_, mG);
+        groupSum(mixTo_, VoG);
+        groupSum(mixTo_, dVG);
+        groupSum(mixTo_, TG);
+    }
     if (solveMomentum_)
     {
         vectorField& U = U_.primitiveFieldRef();
         forAll(U, celli)
         {
+            if (imm && m[celli] <= 0)
+            {
+                U[celli] = wallU_[celli];
+                continue;
+            }
             if (fs && m[celli] <= 0)
             {
                 U[celli] = Zero;
                 continue;
             }
-            U[celli] += dt*(force[celli]/m[celli] + g);
+            U[celli] += dt*(force[celli]/mG[celli] + g);
             if (damping_ > 0)
             {
                 U[celli] /= 1 + damping_*dt;
@@ -2197,11 +2317,18 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
 
     forAll(sigma, celli)
     {
-        const scalar VL = V[celli] + dt*dV[celli];
-        const scalar Vmid = 0.5*(V[celli] + VL);
+        if (imm && m[celli] <= 0)
+        {
+            continue;       // covered by a body: ghost values stay
+        }
+        const scalar VL = Vo[celli] + dt*dV[celli];
+        const scalar Vmid =
+            imm
+          ? VoG[celli] + 0.5*dt*dVG[celli]
+          : 0.5*(Vo[celli] + VL);
 
         // T/V = grad(v) in OpenFOAM order (d_i v_j); L = grad(v)^T
-        const tensor L(dt*T[celli].T()/Vmid);
+        const tensor L(dt*TG[celli].T()/Vmid);
         symmTensor dEps(symm(L));
         const tensor dW(skew(L));
 
