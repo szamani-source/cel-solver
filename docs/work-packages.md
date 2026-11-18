@@ -69,7 +69,8 @@ Constitutive models for bulk solids are tracked in `docs/constitutive-models.md`
 | 4.3c | STL walls with the free surface and outlets (split from 4.3a) | Void and slab rules at cut cells; a block falling onto a tilted STL floor stops without leaking; silo settle with STL walls and void top |
 | 4.3b | Moving bodies: coupling forces both ways and reaction output (decision 0042) | No leakage in a push test |
 | 4.5 | Silo and hopper discharge with STL walls | Flat tank rate within 5 % of mesh-boundary walls; hopper runs and its rate is recorded |
-| 4.4 | Footing and pile benchmarks | Bearing capacity factor near 5.14 |
+| 4.4 | Strip footing benchmark (split 2026-11-18: pile to 4.4b) | Bearing capacity factor near 5.14 |
+| 4.4b | Pile: shaft friction and base capacity with a moving STL body | Pile capacity against a reference to be agreed |
 | 5.1 | Hex8 element with hourglass control | Patch test passes |
 | 5.2 | Lagrangian-only Taylor bar | Matches published result |
 | 5.3 | Two-way deformable coupling | Deformable push test stable |
@@ -145,6 +146,9 @@ mesh walls (bands of three runs at 0.1 MPa); hopper rate recorded. Next: 4.3b, 4
 
 Note (2026-11-18): WP 4.3b done (decision 0053): prescribed-motion bodies push the material;
 free bodies (motion from the force) are left for when a case needs them. Next: 4.4.
+
+Note (2026-11-18): WP 4.4 split: the strip footing is 4.4 (done, decision 0055, Prandtl
+within 8 % at 10 mm and 1.9 % at 5 mm); the pile is 4.4b, its reference still to be chosen.
 
 Note (2026-11-18): Sia asked for two things Abaqus CEL cannot do and asked for both
 ("Please make these two possible in the solver"): a solid inlet (3.7a, 3.7b) and

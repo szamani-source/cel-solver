@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-11-18 (WP 3.7a solid inlet; WP 4.3b, WP 3.5 cohesion, tutorial T0 rule set, WP 4.5, 4.3c, 4.3a, 3.6e, 3.6h, 3.6g, 3.6f; 4.1, 4.0, 4.2; 2026-11-17: 3.6d, 3.6c2, 3.6c, 3.6b, 3.6s, validation references)
+Last updated: 2026-11-18 (WP 3.7a solid inlet; WP 4.4, 4.3b, WP 3.5 cohesion, tutorial T0 rule set, WP 4.5, 4.3c, 4.3a, 3.6e, 3.6h, 3.6g, 3.6f; 4.1, 4.0, 4.2; 2026-11-17: 3.6d, 3.6c2, 3.6c, 3.6b, 3.6s, validation references)
 
 Plan doc: https://claude.ai/artifact/DTT6kSikz9ZUTBkUxY6Grr
 
@@ -63,6 +63,7 @@ Phase 2 (the C++ Eulerian solver: 2.1 to 2.5c and 2.4b done; 2.6 waits for Phase
 | 4.3c | STL walls with the free surface and outlets (split from 4.3a) | Done | Decision 0051: alpha per open volume, closed faces mirror in the slab rules, wall face only where the material touches it (its volume flux on its main axis), slab remap on open areas and open lengths, mixing groups share their volume ratio (fixed material-volume loss), empty is not covered. Tutorial `stlSilo` (first case for Sia with STL walls): T0 tank of STL walls and floor, outlet = mesh patch under the floor gap; no mass lost while closed, 72 kg/s/m at 10 MPa. `tests/test_stl_void.sh` passes (about 7 min): lake at rest in an STL tank 4e-17 m/s; block on a 10 deg STL floor stops, nothing through it; tilted tank with void top 1.9 % from the mesh-wall void-top tank. Brief's 2 % against the lid (no void) version not met: the free-surface tank itself is up to 17 % off the no-void one (known issues) |
 | 4.5 | Silo and hopper discharge with STL walls | Done | Decision 0052. `tests/test_stl_silo.sh` passes (about 6 min, in CI): T0 tank (0.1 MPa, mu(I)) with STL walls and floor against mesh walls, bands of three runs (maxCo 0.40/0.38/0.36): 68.8 vs 65.8 kg/s/m, +4.4 % (limit 5 %; all STL runs above all mesh runs, cause not isolated); no leak while closed (4e-14). 60 deg STL hopper (tutorial `stlHopper`): mass flow, empty 5.0 s after opening, 66.2 kg/s/m, 1.01 times the flat tank (Rose-Tanaka 1.21; no pass band until Sia agrees one) |
 | 4.3b | Moving bodies: push the material, reaction output | Done | Decision 0053. Remap onto the open volume the body leaves (Vo + dt wallU.A), then re-cut at the new pose: mass, material volume, momentum kept per cell, covered cells hand over to an open neighbour, uncovered cells start empty (needs `freeSurface yes`). celFoam writes `postProcessing/bodyForces.dat`. `tests/test_stl_push.sh` passes (about 1 min): footing pushed 4.25 cm into T0 (T0 rule set) and pulled out: mass 1e-14, nothing lost, no gap under it, density 1.008 rho0, momentum balance 1e-6 of the footing impulse, separates. Plain Mohr-Coulomb (no flowImpedance) squeezes a nearly full corner cell to 1.39 rho0: use the T0 rule set |
+| 4.4 | Strip footing bearing capacity (pile split to 4.4b) | Done | Decision 0055. Smooth STL strip footing pushed into weightless Tresca clay (cu 10 kPa, E/cu 300) at 0.025 m/s. `tests/test_footing.sh` passes (about 1 min): q / cu 4.73 at 10 mm (-8.1 % from 5.14, band 10 %), 5.04 at 5 mm (-1.9 %, manual `--fine`). Force dips briefly when the footing bottom crosses a mesh line. Plot `docs/wp/WP-4.4-footing.png` |
 | 3.7a | Solid inlet (Sia: Abaqus CEL cannot) | Done | Decision 0056: `inlets { <patch> { speed <Function1>; startTime; endTime; density; pressure; friction; } }` in materialProperties (needs `freeSurface yes`): the face moves in at the speed, the swept volume is fresh material (inlet density, stress -p I, no history), counted in `charged()`; closed wall outside its times. `tests/test_inlet.sh` passes (about 25 s): nothing in while closed, fed mass exact to 1e-14, mass balance 1e-14, deposit +0.82 % density, at rest, 2 processors match serial. Open inlet counts as empty for the slab side (as full the stream fell in place). Use the T0 rule set where material lands (plain MC packs +4.3 %) |
 
 ## Validation references
@@ -186,7 +187,8 @@ mesh, as Abaqus CEL). Order:
    `stlSilo`).
 6. WP 4.5: silo and hopper with STL walls. Done (decision 0052; tutorial `stlHopper`).
 7. WP 4.3b: moving bodies. Done (decision 0053; push test; prescribed motion only).
-8. WP 4.4: footing and pile benchmarks. Next (moving bodies with the T0 rule set).
+8. WP 4.4: strip footing. Done (decision 0055; Prandtl within 8 % at 10 mm, 1.9 % at 5 mm).
+9. WP 4.4b: pile (shaft friction and base). Next in Phase 4.
 
 ## Known issues
 
