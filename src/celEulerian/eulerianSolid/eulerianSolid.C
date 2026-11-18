@@ -251,6 +251,7 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
          && materialProperties_.get<scalar>("sigmaT") == 0
         )
     ),
+    tensileStrength_(GREAT),
     shearCap_(materialProperties_.getOrDefault<Switch>("shearCap", false)),
     normalCap_(materialProperties_.getOrDefault<Switch>("normalCap", false)),
     capSinPhi_
@@ -382,6 +383,26 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
             << exit(FatalIOError);
     }
 
+    // Tensile strength (WP 3.5, decision 0054)
+    if (noTension_)
+    {
+        tensileStrength_ = 0;
+    }
+    else if (materialProperties_.found("sigmaT"))
+    {
+        tensileStrength_ = materialProperties_.get<scalar>("sigmaT");
+    }
+    else if
+    (
+        materialProperties_.found("c") && materialProperties_.found("phi")
+     && materialProperties_.get<scalar>("phi") > 0
+    )
+    {
+        tensileStrength_ =
+            materialProperties_.get<scalar>("c")
+           /Foam::tan(degToRad(materialProperties_.get<scalar>("phi")));
+    }
+
     if (freeSurface_)
     {
         setCartesianGeometry();
@@ -391,8 +412,16 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
         Info<< "Free surface: material plus void, alpha in ["
             << gMin(alpha_.primitiveField()) << ", "
             << gMax(alpha_.primitiveField()) << "], "
-            << (noTension_ ? "no tensile strength" : "tensile strength")
-            << nl;
+            << (
+                   noTension_ ? "no tensile strength"
+                 : tensileStrength_ < GREAT ? "tensile strength "
+                 : "no tensile limit"
+               );
+        if (!noTension_ && tensileStrength_ < GREAT)
+        {
+            Info<< tensileStrength_ << " Pa";
+        }
+        Info<< nl;
     }
     else
     {

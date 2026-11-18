@@ -1,0 +1,3 @@
+#!/bin/sh
+cd "${0%/*}" || exit
+rm -rf D[0-9]* result.txt   # the PNGs are kept: README shows them
