@@ -1,6 +1,6 @@
 # 0047 Fixed STL walls as cut-cell walls in the C++ solver (WP 4.3a)
 
-Date: 2026-11-18. Status: accepted.
+Date: 2026-11-18. Status: accepted; item 6 (no free surface) lifted by decision 0048.
 
 ## Context
 

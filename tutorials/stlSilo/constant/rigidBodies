@@ -1,0 +1,40 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  celFoam tutorial stlSilo (WP 4.3c)
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      rigidBodies;
+}
+// The tank as fixed STL bodies (closed surfaces, outward normals, in
+// constant/triSurface), acting on the material as cut-cell walls (decisions
+// 0047, 0048). friction: wall friction angle of the material on the body
+// [deg]. The two floor pieces leave a 0.06 m gap over the mesh patch
+// outlet (constant/materialProperties outlets: closed until 0.3 s).
+bodies
+{
+    leftWall
+    {
+        surface leftWall.stl;
+        friction 20;
+    }
+    rightWall
+    {
+        surface rightWall.stl;
+        friction 20;
+    }
+    leftFloor
+    {
+        surface leftFloor.stl;
+        friction 20;
+    }
+    rightFloor
+    {
+        surface rightFloor.stl;
+        friction 20;
+    }
+}
+
+// ************************************************************************* //

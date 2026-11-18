@@ -29,6 +29,13 @@ Description
                                     //   (fill top = surface, floor y = 0)
     \endverbatim
 
+    STL walls (WP 4.3c): fixed bodies in constant/rigidBodies, if present,
+    are cut-cell walls (decision 0047, 0048). alpha is then the material
+    fraction of each cell's open volume; mass and momentum are summed over
+    open volumes, and history.dat gets three more columns: the force of the
+    bodies on the material (x, y) and the mass in cells whose centre lies
+    below y = belowY (voidCheckDict, default -GREAT: none).
+
     Output (master unless noted):
         history.dat  step t mass px py cx cy max|s| max|s|_empty max|U|
                      Fy_bottom max(s_xx, s_yy) KE nCapped discharged
@@ -41,6 +48,9 @@ Description
 
 #include "fvCFD.H"
 #include "eulerianSolid.H"
+#include "rigidBodies.H"
+#include "bodyCells.H"
+#include "immersedWalls.H"
 #include "OFstream.H"
 #include "boundBox.H"
 #include <cmath>
@@ -73,7 +83,6 @@ int main(int argc, char *argv[])
         )
     );
 
-    const scalarField& V = mesh.V().field();
     const vectorField& C = mesh.C().primitiveField();
     const scalar rho0 = solid.rho0();
     const scalar gMag = mag(solid.g());
@@ -143,6 +152,17 @@ int main(int argc, char *argv[])
     solid.URef().correctBoundaryConditions();
     solid.sigmaRef().correctBoundaryConditions();
 
+    // STL walls (WP 4.3c): fixed bodies as cut-cell walls
+    rigidBodies bodies(runTime);
+    autoPtr<bodyCells> cut;
+    if (bodies.size())
+    {
+        cut.reset(new bodyCells(mesh, bodies));
+        setImmersedWalls(solid, cut.ref(), bodies);
+    }
+    const scalarField Vopen(solid.openVolume());
+    const scalar belowY = dict.getOrDefault<scalar>("belowY", -GREAT);
+
     const scalar dt0 = solid.stableDeltaT();
     label nSteps;
     scalar dt;
@@ -167,7 +187,7 @@ int main(int argc, char *argv[])
         hist.reset(new OFstream("history.dat"));
         hist().precision(17);
         hist() << "# step t mass px py cx cy smax smaxEmpty Umax FyBottom snMax"
-            << " KE nCapped discharged" << nl;
+            << " KE nCapped discharged FxBodies FyBodies massBelow" << nl;
     }
 
     auto record = [&](const label step)
@@ -176,7 +196,7 @@ int main(int argc, char *argv[])
         const scalarField& a = solid.alpha().primitiveField();
         const vectorField& u = solid.U().primitiveField();
         const symmTensorField& sg = solid.sigma().primitiveField();
-        const scalarField m(r*V);
+        const scalarField m(r*Vopen);
         const scalar mass = gSum(m);
         const vector p = gSum(m*u);
         const vector mc = gSum(m*C);
@@ -205,12 +225,24 @@ int main(int argc, char *argv[])
             fy = sum(solid.Fstar().boundaryField()[bottom].component(1));
         }
         reduce(fy, sumOp<scalar>());
+        vector fb(Zero);
+        forAll(solid.bodyNames(), b)
+        {
+            fb += solid.bodyForce(b);
+        }
+        scalar mBelow = 0;
+        forAll(m, celli)
+        {
+            if (C[celli].y() < belowY) mBelow += m[celli];
+        }
+        reduce(mBelow, sumOp<scalar>());
         if (Pstream::master())
         {
             hist() << step << ' ' << runTime.value() << ' ' << mass << ' '
                 << p.x() << ' ' << p.y() << ' ' << mc.x()/mass << ' '
                 << mc.y()/mass << ' ' << smax << ' ' << sEmpty << ' ' << umax
-                << ' ' << fy << ' ' << snMax << ' ' << ke << ' ' << nCap << ' ' << out << nl;
+                << ' ' << fy << ' ' << snMax << ' ' << ke << ' ' << nCap << ' ' << out
+                << ' ' << fb.x() << ' ' << fb.y() << ' ' << mBelow << nl;
         }
     };
 
@@ -224,7 +256,8 @@ int main(int argc, char *argv[])
         );
         OFstream os(runTime.globalPath()/name);
         os.precision(17);
-        os << "# x y alpha rho Ux Uy sxx syy sxy" << nl;
+        os << "# x y alpha rho Ux Uy sxx syy sxy szz open" << nl;
+        const scalarField open(solid.cellOpen());
         const scalarField& r = solid.rho().primitiveField();
         const scalarField& a = solid.alpha().primitiveField();
         const vectorField& u = solid.U().primitiveField();
@@ -234,7 +267,8 @@ int main(int argc, char *argv[])
             os << C[celli].x() << ' ' << C[celli].y() << ' ' << a[celli] << ' '
                 << r[celli] << ' ' << u[celli].x() << ' ' << u[celli].y()
                 << ' ' << sg[celli].xx() << ' ' << sg[celli].yy() << ' '
-                << sg[celli].xy() << ' ' << sg[celli].zz() << nl;
+                << sg[celli].xy() << ' ' << sg[celli].zz() << ' '
+                << open[celli] << nl;
         }
     };
 

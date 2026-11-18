@@ -810,7 +810,8 @@ void slabSides
     const UList<boundaryKind>& kinds,
     vectorField& lean,
     scalarField& smooth,
-    const label gAxis = -1
+    const label gAxis = -1,
+    const surfaceScalarField* faceOpen = nullptr
 )
 {
     const labelUList& own = mesh.owner();
@@ -837,8 +838,22 @@ void slabSides
             aMinus[c][d] = ab;
         }
     };
+    // Immersed walls (WP 4.3c): a face closed by a body mirrors the cell,
+    // as a wall patch
+    auto closed = [&](const label patchi, const label i) -> bool
+    {
+        if (!faceOpen)
+        {
+            return false;
+        }
+        return
+            patchi < 0
+          ? (*faceOpen)[i] <= 0
+          : faceOpen->boundaryField()[patchi][i] <= 0;
+    };
     forAll(own, facei)
     {
+        if (closed(-1, facei)) continue;
         set(own[facei], Sf[facei], a[nei[facei]]);
         set(nei[facei], -Sf[facei], a[own[facei]]);
     }
@@ -855,6 +870,7 @@ void slabSides
             );
             forAll(fc, i)
             {
+                if (closed(patchi, i)) continue;
                 set(fc[i], pS[i], an[i]);
             }
         }
@@ -862,6 +878,7 @@ void slabSides
         {
             forAll(fc, i)
             {
+                if (closed(patchi, i)) continue;
                 set(fc[i], pS[i], 0);
             }
         }
@@ -1424,7 +1441,11 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
         {
             gAxis = label(faceAxis(g_));
         }
-        slabSides(mesh, alpha_, kinds, lean_, smooth_, gAxis);
+        slabSides
+        (
+            mesh, alpha_, kinds, lean_, smooth_, gAxis,
+            imm ? &faceOpen_() : nullptr
+        );
 
         tsmooth = workField<scalar>(mesh, "smooth", dimless);
         tsmooth.ref().primitiveFieldRef() = smooth_;
@@ -1674,13 +1695,16 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                 }
                 const vector& A = wallA_[celli];
                 const scalar mA = mag(A);
-                vector v, t;
-                wallFace
-                (
-                    A/mA, U_[celli] - wallU_[celli], sref[celli],
-                    zp[celli], zs[celli], bodyMu_[wallBody_[celli]], v, t
-                );
-                v += wallU_[celli];
+                vector v(U_[celli]), t(Zero);
+                if (!fs || touches(alpha_[celli], lean_[celli], A))
+                {
+                    wallFace
+                    (
+                        A/mA, U_[celli] - wallU_[celli], sref[celli],
+                        zp[celli], zs[celli], bodyMu_[wallBody_[celli]], v, t
+                    );
+                    v += wallU_[celli];
+                }
                 divS[celli] += t*mA - (sref[celli] & A);
                 gradU[celli] += A*(v - U_[celli]);
             }
@@ -1698,7 +1722,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
         }
         forAll(V, celli)
         {
-            if (imm && m[celli] <= 0)
+            if (imm && cellOpen_[celli] <= 0)
             {
                 continue;       // covered by a body
             }
@@ -1708,7 +1732,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                 // empty cells do not move
                 if (solveMomentum_ && m[celli] > 0)
                 {
-                    dU[celli] = 0.5*dt*(divS[celli]/m[celli] + g);
+                    dU[celli] = 0.5*dt*(divS[celli]/mP[celli] + g);
                 }
                 continue;
             }
@@ -2244,6 +2268,10 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
         // body's friction), from the predicted cell state, in the body's
         // frame. The force on the body is minus the force on the material.
         bodyForce_ = Zero;
+        if (fs)
+        {
+            wallPhi_ = 0;
+        }
         forAll(wallA_, celli)
         {
             if (wallBody_[celli] < 0 || m[celli] <= 0)
@@ -2253,6 +2281,16 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
             const label b = wallBody_[celli];
             const vector& A = wallA_[celli];
             const scalar mA = mag(A);
+            if (fs && !touches(alpha_[celli], lean_[celli], A))
+            {
+                // Material not at the wall (WP 4.3c): the wall face stays
+                // with the body, no force
+                T[celli] += A*wallU_[celli];
+                wallPhi_[celli] = wallU_[celli] & A;
+                dV[celli] += wallPhi_[celli];
+                dVa[celli][faceAxis(A)] += wallPhi_[celli];
+                continue;
+            }
             vector v, t;
             wallFace
             (
@@ -2264,6 +2302,17 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
             T[celli] += A*v;
             dV[celli] += v & A;
             bodyForce_[b] += t*mA;
+            if (fs)
+            {
+                // With void (WP 4.3c, decision 0048) material that pulls
+                // away from the wall opens void in the remap: the wall
+                // face's volume flux counts in the Lagrangian volume, along
+                // the axis of the face's largest component (as a staircase
+                // face), and no mass enters
+                wallPhi_[celli] = v & A;
+                dVa[celli][faceAxis(A)] += wallPhi_[celli];
+                continue;
+            }
             // Material that enters through the wall face (where it pulls
             // away from the body: the face is then a free surface, as an
             // open top), counted in the leak report
@@ -2279,8 +2328,13 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
     // change for its density
     scalarField mG(m), VoG(Vo), dVG(dV);
     tensorField TG(T);
+    vectorField dVaG(dVa);
     if (imm)
     {
+        if (fs)
+        {
+            groupSum(mixTo_, dVaG);
+        }
         groupSum(mixTo_, force);
         groupSum(mixTo_, mG);
         groupSum(mixTo_, VoG);
@@ -2292,7 +2346,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
         vectorField& U = U_.primitiveFieldRef();
         forAll(U, celli)
         {
-            if (imm && m[celli] <= 0)
+            if (imm && cellOpen_[celli] <= 0)
             {
                 U[celli] = wallU_[celli];
                 continue;
@@ -2320,11 +2374,19 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
 
     forAll(sigma, celli)
     {
-        if (imm && m[celli] <= 0)
+        if (imm && cellOpen_[celli] <= 0)
         {
             continue;       // covered by a body: ghost values stay
         }
-        const scalar VL = Vo[celli] + dt*dV[celli];
+        scalar VL = Vo[celli] + dt*dV[celli];
+        if (imm && fs && VoG[celli] != Vo[celli])
+        {
+            // Mixing group with void (WP 4.3c, decision 0048): each member
+            // takes the group's volume ratio, so a sliver cell's own
+            // volume change cannot clip its material volume; the remap
+            // uses the same Lagrangian volume
+            VL = Vo[celli]*(VoG[celli] + dt*dVG[celli])/VoG[celli];
+        }
         const scalar Vmid =
             imm
           ? VoG[celli] + 0.5*dt*dVG[celli]
@@ -2380,7 +2442,12 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                 {
                     continue;
                 }
-                const scalar r = dt*dVa[celli][d]/V[celli];
+                // relative to the open volume; small cut cells: their
+                // mixing group's (WP 4.3c)
+                const scalar r =
+                    imm
+                  ? dt*dVaG[celli][d]/VoG[celli]
+                  : dt*dVa[celli][d]/V[celli];
                 scalar dm;
                 if (r < 0)
                 {
@@ -2405,7 +2472,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
             {
                 dEps = dE;
                 alphaL_[celli] =
-                    min(max(matV*V[celli]/VL, scalar(0)), scalar(1));
+                    min(max(matV*Vo[celli]/VL, scalar(0)), scalar(1));
             }
             else
             {

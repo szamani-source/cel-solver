@@ -70,13 +70,6 @@ void Foam::eulerianSolid::setImmersedWalls
 {
     using namespace immersedDetail;
 
-    if (freeSurface_)
-    {
-        FatalErrorInFunction
-            << "STL walls (constant/rigidBodies) with freeSurface yes are not "
-            << "supported yet (WP 4.3c, docs/work-packages.md)"
-            << exit(FatalError);
-    }
     if (bodyNames.size() != frictionDeg.size())
     {
         FatalErrorInFunction
@@ -232,6 +225,72 @@ void Foam::eulerianSolid::setImmersedWalls
 
     wallU_ = wallVelocity.primitiveField();
 
+    if (freeSurface_)
+    {
+        // WP 4.3c (decision 0048): alpha is the material fraction of the
+        // open volume. Open length per axis for the remap's slab rule: open
+        // volume over the larger open area of the two faces across the axis
+        wallPhi_.setSize(nCells);
+        wallPhi_ = 0;
+        vectorField Amax(nCells, Zero);
+        auto addA = [&](const label c, const vector& S, const scalar f)
+        {
+            const vector a(f*cmptMag(S));
+            Amax[c] = max(Amax[c], a);
+        };
+        forAll(own, facei)
+        {
+            addA(own[facei], Sf[facei], fo[facei]);
+            addA(nei[facei], Sf[facei], fo[facei]);
+        }
+        forAll(mesh.boundary(), patchi)
+        {
+            const fvPatch& p = mesh.boundary()[patchi];
+            const labelUList& fc = p.faceCells();
+            const vectorField& pS = p.Sf();
+            const scalarField& pf = fo.boundaryField()[patchi];
+            forAll(fc, i)
+            {
+                addA(fc[i], pS[i], pf[i]);
+            }
+        }
+        const scalarField& V = mesh.V().field();
+        const Vector<label>& geomD = mesh.geometricD();
+        openLen_ = hCell_;
+        forAll(openLen_, celli)
+        {
+            const scalar o = cellOpen_[celli];
+            if (o >= 1 || o <= 0)
+            {
+                continue;
+            }
+            for (direction d = 0; d < vector::nComponents; ++d)
+            {
+                if (geomD[d] < 0)
+                {
+                    continue;   // no cells along d (2D): the full length
+                }
+                openLen_[celli][d] =
+                    Amax[celli][d] > 0
+                  ? o*V[celli]/Amax[celli][d]
+                  : o*hCell_[celli][d];
+            }
+        }
+
+        // No material in covered cells (ghost values follow)
+        scalarField& a = alpha_.primitiveFieldRef();
+        scalarField& r = rho_.primitiveFieldRef();
+        forAll(a, celli)
+        {
+            if (cellOpen_[celli] <= 0)
+            {
+                a[celli] = 0;
+                r[celli] = 0;
+            }
+        }
+        alphaL_ = a;
+    }
+
     // Mixing partner of each small cut cell: the face neighbour on this
     // processor, not small itself, across the largest open area; if every
     // neighbour is small (a corner), step to the small neighbour across the
@@ -354,7 +413,11 @@ void Foam::eulerianSolid::fillCovered()
     symmTensorField& epsP = epsP_.primitiveFieldRef();
     scalarField& epsPEq = epsPEq_.primitiveFieldRef();
 
+    const bool fs = freeSurface_;
+    scalarField& alpha = alpha_.primitiveFieldRef();
+
     scalarField n(nCells, Zero), r(nCells, Zero), q(nCells, Zero);
+    scalarField al(nCells, Zero);
     vectorField u(nCells, Zero);
     symmTensorField s(nCells, Zero), e(nCells, Zero);
 
@@ -365,10 +428,12 @@ void Foam::eulerianSolid::fillCovered()
     (
         const label c,
         const scalar rk, const vector& uk, const symmTensor& sk,
-        const symmTensor& ek, const scalar qk, const vector& d
+        const symmTensor& ek, const scalar qk, const vector& d,
+        const scalar ak
     )
     {
         n[c] += 1;
+        al[c] += ak;
         r[c] += rk;
         u[c] += uk;
         s[c] += sk + equilibriumJump<symmTensor>(rk, d, g);
@@ -384,11 +449,19 @@ void Foam::eulerianSolid::fillCovered()
         if (oP == oN) continue;
         if (oP)
         {
-            add(N, rho[P], U[P], sigma[P], epsP[P], epsPEq[P], C[N] - C[P]);
+            add
+            (
+                N, rho[P], U[P], sigma[P], epsP[P], epsPEq[P], C[N] - C[P],
+                fs ? alpha[P] : 1
+            );
         }
         else
         {
-            add(P, rho[N], U[N], sigma[N], epsP[N], epsPEq[N], C[P] - C[N]);
+            add
+            (
+                P, rho[N], U[N], sigma[N], epsP[N], epsPEq[N], C[P] - C[N],
+                fs ? alpha[N] : 1
+            );
         }
     }
 
@@ -400,6 +473,7 @@ void Foam::eulerianSolid::fillCovered()
         tmp<volSymmTensorField> ts(work<symmTensor>(mesh, "s", sigma));
         tmp<volSymmTensorField> te(work<symmTensor>(mesh, "e", epsP));
         tmp<volScalarField> tq(work<scalar>(mesh, "q", epsPEq));
+        tmp<volScalarField> ta(work<scalar>(mesh, "a", alpha));
         forAll(mesh.boundary(), patchi)
         {
             const fvPatch& p = mesh.boundary()[patchi];
@@ -412,11 +486,16 @@ void Foam::eulerianSolid::fillCovered()
             const symmTensorField sn(ts().boundaryField()[patchi].patchNeighbourField());
             const symmTensorField en(te().boundaryField()[patchi].patchNeighbourField());
             const scalarField qn(tq().boundaryField()[patchi].patchNeighbourField());
+            const scalarField an(ta().boundaryField()[patchi].patchNeighbourField());
             forAll(fc, i)
             {
                 if (cellOpen_[fc[i]] <= 0 && on[i] > 0)
                 {
-                    add(fc[i], rn[i], un[i], sn[i], en[i], qn[i], -d[i]);
+                    add
+                    (
+                        fc[i], rn[i], un[i], sn[i], en[i], qn[i], -d[i],
+                        fs ? an[i] : 1
+                    );
                 }
             }
         }
@@ -432,6 +511,20 @@ void Foam::eulerianSolid::fillCovered()
             sigma[celli] = s[celli]/n[celli];
             epsP[celli] = e[celli]/n[celli];
             epsPEq[celli] = q[celli]/n[celli];
+            if (fs)
+            {
+                alpha[celli] = al[celli]/n[celli];
+            }
+        }
+        else if (fs)
+        {
+            // Away from the material: empty, at rest
+            rho[celli] = 0;
+            alpha[celli] = 0;
+            U[celli] = wallU_[celli];
+            sigma[celli] = Zero;
+            epsP[celli] = Zero;
+            epsPEq[celli] = 0;
         }
         else
         {
@@ -447,6 +540,10 @@ void Foam::eulerianSolid::fillCovered()
     sigma_.correctBoundaryConditions();
     epsP_.correctBoundaryConditions();
     epsPEq_.correctBoundaryConditions();
+    if (fs)
+    {
+        alpha_.correctBoundaryConditions();
+    }
 }
 
 
@@ -469,7 +566,10 @@ void Foam::eulerianSolid::mixSmallCells()
     // Group of each target: the target and the small cells mixed into it.
     // Stress is mixed less its hydrostatic part relative to the target's
     // centre, so a column at rest stays at rest.
+    const bool fs = freeSurface_;
+    scalarField& alpha = alpha_.primitiveFieldRef();
     scalarField gm(nCells, Zero), gV(nCells, Zero), gq(nCells, Zero);
+    scalarField ga(nCells, Zero);       // material volume (freeSurface)
     vectorField gp(nCells, Zero);
     symmTensorField gs(nCells, Zero), ge(nCells, Zero);
     boolList isTarget(nCells, false);
@@ -479,6 +579,10 @@ void Foam::eulerianSolid::mixSmallCells()
         const scalar mk = rho[k]*V[k]*cellOpen_[k];
         gm[t] += mk;
         gV[t] += V[k]*cellOpen_[k];
+        if (fs)
+        {
+            ga[t] += alpha[k]*V[k]*cellOpen_[k];
+        }
         gp[t] += mk*U[k];
         gs[t] += mk*(sigma[k] - equilibriumJump<symmTensor>(rho[k], C[k] - C[t], g));
         ge[t] += mk*epsP[k];
@@ -499,6 +603,17 @@ void Foam::eulerianSolid::mixSmallCells()
 
     auto set = [&](const label k, const label t)
     {
+        if (fs && (gm[t] <= 0 || ga[t] <= 0))
+        {
+            // Empty group (free surface, WP 4.3c)
+            rho[k] = 0;
+            alpha[k] = 0;
+            U[k] = Zero;
+            sigma[k] = Zero;
+            epsP[k] = Zero;
+            epsPEq[k] = 0;
+            return;
+        }
         const scalar r = gm[t]/gV[t];
         rho[k] = r;
         U[k] = gp[t]/gm[t];
@@ -506,18 +621,26 @@ void Foam::eulerianSolid::mixSmallCells()
             gs[t]/gm[t] + equilibriumJump<symmTensor>(r, C[k] - C[t], g);
         epsP[k] = ge[t]/gm[t];
         epsPEq[k] = gq[t]/gm[t];
+        if (fs)
+        {
+            const scalar a = ga[t]/gV[t];
+            // more material than open volume: clipped (its mass stays,
+            // compressed)
+            alpha[k] = a >= 1 - 1e-12 ? 1 : max(a, scalar(0));
+
+        }
     };
     forAll(mixTo_, celli)
     {
         const label t = mixTo_[celli];
-        if (t >= 0 && gm[t] > 0)
+        if (t >= 0 && (fs || gm[t] > 0))
         {
             set(celli, t);
         }
     }
     forAll(isTarget, t)
     {
-        if (isTarget[t] && gm[t] > 0)
+        if (isTarget[t] && (fs || gm[t] > 0))
         {
             set(t, t);
         }
@@ -527,6 +650,10 @@ void Foam::eulerianSolid::mixSmallCells()
     sigma_.correctBoundaryConditions();
     epsP_.correctBoundaryConditions();
     epsPEq_.correctBoundaryConditions();
+    if (fs)
+    {
+        alpha_.correctBoundaryConditions();
+    }
 }
 
 
