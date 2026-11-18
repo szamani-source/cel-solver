@@ -882,7 +882,8 @@ void slabSides
     scalarField& smooth,
     const label gAxis = -1,
     const scalar v1 = 0,
-    const scalar v2 = 0
+    const scalar v2 = 0,
+    const vector& gVec = Zero
 )
 {
     const labelUList& own = mesh.owner();
@@ -939,6 +940,45 @@ void slabSides
         }
     }
 
+    // A wall above the cell (outward normal against gravity, a ceiling)
+    // counts as empty for the slab side only (WP 3.6e, decision 0050):
+    // mirrored, it made splashed material lean against the ceiling, never
+    // touch the face below and fall in place forever. The smooth flag keeps
+    // the mirror (a full cell under a lid stays second order).
+    vectorField aPlusL(aPlus), aMinusL(aMinus);
+    if (mag(gVec) > 0)
+    {
+        forAll(mesh.boundary(), patchi)
+        {
+            if
+            (
+                kinds[patchi] != boundaryKind::wall
+             && kinds[patchi] != boundaryKind::velocity
+            )
+            {
+                continue;
+            }
+            const fvPatch& p = mesh.boundary()[patchi];
+            const labelUList& fc = p.faceCells();
+            const vectorField& pS = p.Sf();
+            forAll(fc, i)
+            {
+                if ((pS[i] & gVec) < -1e-6*mag(pS[i])*mag(gVec))
+                {
+                    const direction d = faceAxis(pS[i]);
+                    if (pS[i][d] > 0)
+                    {
+                        aPlusL[fc[i]][d] = 0;
+                    }
+                    else
+                    {
+                        aMinusL[fc[i]][d] = 0;
+                    }
+                }
+            }
+        }
+    }
+
     lean.setSize(mesh.nCells());
     smooth.setSize(mesh.nCells());
     forAll(a, celli)
@@ -950,7 +990,7 @@ void slabSides
             blend
           ? fullWeight(a[celli], v1, v2) >= 0.5
           : a[celli] >= alphaFull;
-        const vector dif(aPlus[celli] - aMinus[celli]);
+        const vector dif(aPlusL[celli] - aMinusL[celli]);
         for (direction d = 0; d < vector::nComponents; ++d)
         {
             lean[celli][d] =
@@ -1477,7 +1517,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
         slabSides
         (
             mesh, alpha_, kinds, lean_, smooth_, gAxis,
-            blendVoid_[0], fullBlend_ ? blendVoid_[1] : 0
+            blendVoid_[0], fullBlend_ ? blendVoid_[1] : 0, g_
         );
 
         tsmooth = workField<scalar>(mesh, "smooth", dimless);

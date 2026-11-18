@@ -50,7 +50,7 @@ Constitutive models for bulk solids are tracked in `docs/constitutive-models.md`
 | 3.6f | Why the silo drains about 20 % slower at 1 MPa (split from 3.6d). Closed 2026-11-18, finding recorded (decision 0046) | Each E as a band of three runs; the cause named with runs that switch it on and off |
 | 3.6g | Dilatancy in the mu(I) law (compressible mu(I)/phi(I), decision 0046 proposal). Closed 2026-11-18 without its done-when (decision 0048) | Silo bands at 1 and 10 MPa within 10 % of 0.1 MPa at 10 mm, inclined layer still passes; kernel `tests/test_dilatancy.sh` |
 | 3.6h | Smooth blend of the full and partly filled rules (proposed in decision 0048). Closed 2026-11-18 without its done-when (decision 0049) | Silo bands within 10 % at 10 mm, inclined layer still passes |
-| 3.6e | Column collapse with mu(I) against experiments (Lube 2005, Lajeunesse 2005) | Run-out and final height within the decision 0019 bands at a = 0.5 and 2, at T0's real E |
+| 3.6e | Column collapse with mu(I) against experiments (Lube 2005, Lajeunesse 2005). Done 2026-11-18 at 10 mm (decision 0050: T0 rule set mu(I) + flowImpedance + normalCap) | Run-out and final height within the decision 0019 bands at a = 0.5 and 2, at T0's real E |
 | 3.5 | Cohesion in the silo (arching, flow or no flow) | Flow stops below a critical outlet width |
 | 3B.1 | N-material volume fractions with isoAdvector | Pure advection keeps interfaces sharp |
 | 3B.2 | Mixed-cell closure | Two-material impact conserves mass and momentum |
