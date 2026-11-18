@@ -67,6 +67,16 @@ Description
       traction-free outflow face (prototype rules 10 and 10b): the material
       swept across it leaves the domain and is counted in discharged().
       Opening an outlet ends the settling stage: damping is set to 0.
+    - constant/materialProperties, optional subdictionary inlets (WP 3.7a,
+      decision 0060; needs freeSurface yes): patch name ->
+      { speed <Function1 of t, m/s>; startTime <s>; endTime <s>;
+        density <kg/m^3>; pressure <Pa>; friction <deg>; }
+      feeds fresh material into the domain through that patch: between
+      startTime (default 0) and endTime (default never) the face moves into
+      the domain at speed (normal to the patch) and the volume it sweeps is
+      filled with material at density (default rho), stress -pressure I
+      (default 0) and no plastic history, counted in charged(). Outside
+      that time the patch is a closed wall with friction (default 0).
     - Immersed STL walls (WP 4.3a, decision 0047): setImmersedWalls() hands
       over the cut-cell geometry of fixed rigid bodies (constant/rigidBodies,
       friction <deg> per body; see celCoupling setImmersedWalls). Material
@@ -91,6 +101,8 @@ SourceFiles
 #include "Switch.H"
 #include "constitutiveModel.H"
 #include "HashTable.H"
+#include "Function1.H"
+#include "PtrList.H"
 
 namespace Foam
 {
@@ -252,6 +264,28 @@ class eulerianSolid
         //  processor) [kg]
         scalar discharged_;
 
+        //- Inlets (WP 3.7a, decision 0060): name, patch, speed into the
+        //  domain over time [m/s], start and end time [s], closed-wall
+        //  friction coefficient, inlet density [kg/m^3], inlet pressure [Pa]
+        wordList inletName_;
+        labelList inletPatch_;
+        PtrList<Function1<scalar>> inletSpeed_;
+        scalarList inletStart_;
+        scalarList inletEnd_;
+        scalarList inletFriction_;
+        scalarList inletRho_;
+        scalarList inletP_;
+
+        //- Inlet index per patch (-1: not an inlet)
+        labelList inletOfPatch_;
+
+        //- Inlet open in the current step, and its speed then [m/s]
+        boolList inletOpen_;
+        scalarList inletNow_;
+
+        //- Mass fed in through inlets (this processor) [kg]
+        scalar charged_;
+
         //- Cell lengths along x, y, z (Cartesian hex cells, freeSurface)
         vectorField hCell_;
 
@@ -329,6 +363,12 @@ class eulerianSolid
 
 
     // Private Member Functions
+
+        //- Read materialProperties inlets (WP 3.7a)
+        void readInlets();
+
+        //- Open or close each inlet for the step starting at t0
+        void updateInlets(const scalar t0, const scalar dt);
 
         //- Cell lengths, checking that every face is normal to an axis
         void setCartesianGeometry();
@@ -419,6 +459,21 @@ public:
 
         //- Open every outlet now (damping off)
         void openOutlets();
+
+        //- Mass fed in through inlets, all processors [kg] (WP 3.7a)
+        scalar charged() const;
+
+        //- Is the patch an inlet, and is it open in the current step?
+        bool isInlet(const word& patch) const
+        {
+            const label patchi = mesh_.boundaryMesh().findPatchID(patch);
+            return patchi >= 0 && inletOfPatch_[patchi] >= 0;
+        }
+        bool inletOpen(const word& patch) const
+        {
+            return isInlet(patch)
+             && inletOpen_[inletOfPatch_[mesh_.boundaryMesh().findPatchID(patch)]];
+        }
 
         //- Mass that left through non-coupled boundaries, all processors
         //  [kg]

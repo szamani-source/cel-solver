@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-11-18 (WP 4.4c, 4.4b, 4.4, 4.3b, WP 3.5 cohesion, tutorial T0 rule set, WP 4.5, 4.3c, 4.3a, 3.6e, 3.6h, 3.6g, 3.6f; 4.1, 4.0, 4.2; 2026-11-17: 3.6d, 3.6c2, 3.6c, 3.6b, 3.6s, validation references)
+Last updated: 2026-11-18 (WP 3.7a solid inlet; WP 4.4c, 4.4b, 4.4, 4.3b, WP 3.5 cohesion, tutorial T0 rule set, WP 4.5, 4.3c, 4.3a, 3.6e, 3.6h, 3.6g, 3.6f; 4.1, 4.0, 4.2; 2026-11-17: 3.6d, 3.6c2, 3.6c, 3.6b, 3.6s, validation references)
 
 Plan doc: https://claude.ai/artifact/DTT6kSikz9ZUTBkUxY6Grr
 
@@ -64,6 +64,7 @@ Phase 2 (the C++ Eulerian solver: 2.1 to 2.5c and 2.4b done; 2.6 waits for Phase
 | 4.5 | Silo and hopper discharge with STL walls | Done | Decision 0052. `tests/test_stl_silo.sh` passes (about 6 min, in CI): T0 tank (0.1 MPa, mu(I)) with STL walls and floor against mesh walls, bands of three runs (maxCo 0.40/0.38/0.36): 68.8 vs 65.8 kg/s/m, +4.4 % (limit 5 %; all STL runs above all mesh runs, cause not isolated); no leak while closed (4e-14). 60 deg STL hopper (tutorial `stlHopper`): mass flow, empty 5.0 s after opening, 66.2 kg/s/m, 1.01 times the flat tank (Rose-Tanaka 1.21; no pass band until Sia agrees one) |
 | 4.3b | Moving bodies: push the material, reaction output | Done | Decision 0053. Remap onto the open volume the body leaves (Vo + dt wallU.A), then re-cut at the new pose: mass, material volume, momentum kept per cell, covered cells hand over to an open neighbour, uncovered cells start empty (needs `freeSurface yes`). celFoam writes `postProcessing/bodyForces.dat`. `tests/test_stl_push.sh` passes (about 1 min): footing pushed 4.25 cm into T0 (T0 rule set) and pulled out: mass 1e-14, nothing lost, no gap under it, density 1.008 rho0, momentum balance 1e-6 of the footing impulse, separates. Plain Mohr-Coulomb (no flowImpedance) squeezes a nearly full corner cell to 1.39 rho0: use the T0 rule set |
 | 4.4 | Strip footing bearing capacity (pile split to 4.4b) | Done | Decision 0055. Smooth STL strip footing pushed into weightless Tresca clay (cu 10 kPa, E/cu 300) at 0.025 m/s. `tests/test_footing.sh` passes (about 1 min): q / cu 4.73 at 10 mm (-8.1 % from 5.14, band 10 %), 5.04 at 5 mm (-1.9 %, manual `--fine`). Force dips briefly when the footing bottom crosses a mesh line. Plot `docs/wp/WP-4.4-footing.png` |
+| 3.7a | Solid inlet (Sia: Abaqus CEL cannot) | Done | Decision 0060: `inlets { <patch> { speed <Function1>; startTime; endTime; density; pressure; friction; } }` in materialProperties (needs `freeSurface yes`): the face moves in at the speed, the swept volume is fresh material (inlet density, stress -p I, no history), counted in `charged()`; closed wall outside its times. `tests/test_inlet.sh` passes (about 25 s): nothing in while closed, fed mass exact to 1e-14, mass balance 1e-14, deposit +0.82 % density, at rest, 2 processors match serial. Open inlet counts as empty for the slab side (as full the stream fell in place). Use the T0 rule set where material lands (plain MC packs +4.3 %) |
 | 4.4b | Pile section moving through clay (Randolph and Houlsby 1984) | Done | Decision 0056. Smooth 64-sided pile D = 0.1 m moved sideways through weightless Tresca clay confined at 10 cu, `fullBlend yes`. `tests/test_pile.sh` passes (about 3.5 min): P / (cu D) 9.29 against 9.14 (+1.7 %). Plain void rules shake and read 1 to 5: use `fullBlend yes` with moving bodies in materials without mu(I) |
 | 4.4c | Strip footing on sand (Martin 2005 N_gamma) | Closed without done-when | Decision 0057. Smooth footing on phi 30 sand against exact N_gamma 7.653: psi 0 reads about 11 at 10 mm and 9.7 at 5 mm (+27 %); psi 30 blows up. Manual `tests/manual/test_sand_footing.sh` (fails, not in CI). Treat sand bearing results as upper estimates |
 
@@ -92,6 +93,10 @@ anything that cannot be undone outside this repository.
 - Abaqus or LS-DYNA access for reference runs? Not needed for the silo problem.
 
 ## Next
+
+Sia's two Abaqus gaps (2026-11-18, thread "Add solid inflow inlet and axisymmetric
+wedge"): WP 3.7a (inlet) done; next WP 3.7b (fed silo tutorial), then the wedge,
+WP 3.8a to 3.8c (`docs/work-packages.md`).
 
 The C++ Eulerian cycle is done and checked against the prototypes: WP 2.3 (Lagrange
 step, decision 0018), WP 2.4 (remap, decision 0017), WP 2.4b (both together, decision
