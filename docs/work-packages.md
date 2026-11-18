@@ -24,7 +24,7 @@ Constitutive models for bulk solids are tracked in `docs/constitutive-models.md`
 | 2.5a | Drucker-Prager in C++ | Matches the 1.4 reference on all paths |
 | 2.5b | Mohr-Coulomb in C++ (corners, apex) | Matches the 1.4 reference on all paths |
 | 2.5c | Mohr-Coulomb tension cut-off (Python reference, then C++); split from 2.5b, decision 0011 | Cut-off returns match the reference; uniaxial tension stops at the cut-off |
-| 2.6 | Phase 2 benchmarks | Taylor bar within tolerance |
+| 2.6 | Phase 2 benchmarks. Done 2026-11-18 on the wedge, decision 0063 (`tests/test_taylor_wedge.sh`) | Taylor bar within tolerance (shortening 5 %, widening 20 % against the axisymmetric Abaqus benchmark) |
 | 3.0 | Silo benchmark definition and reference values | Janssen, Beverloo and column-collapse values sourced |
 | 3.1p | Prototype gravity, walls and settling | Settled tank follows Janssen |
 | 3.2p | Prototype free surface (material plus void) | Lake at rest, translating and falling blocks, separation |
@@ -118,7 +118,7 @@ cases with one code (2026-11-15).
 at 0.1 / 1 / 10 MPa; 5 mm: 78 / 55 at 0.1 / 1 MPa) and parallel matches serial; closed
 without its done-when, the E independence split to 3.4b (2026-11-16, decision 0034).
 Phases 4 to 6 (Lagrangian bodies, contact, FE, parallel scaling) are unchanged but come
-after T0. 2.6 (Taylor bar) waits for Phase 5.
+after T0. 2.6 (Taylor bar) done on the wedge (decision 0063).
 
 Note (2026-11-15): WP 4.0 added at Sia's request: a thorough comparison of contact
 schemes before any coupling code is written. It is the first package of Phase 4 and

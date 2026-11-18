@@ -1,12 +1,12 @@
 # Status
 
-Last updated: 2026-11-18 (WP 3.8c wedge silo, 3.8b, 3.8a wedge, WP 4.3d, WP 3.7b fed silo, WP 3.7a solid inlet; WP 4.4c, 4.4b, 4.4, 4.3b, WP 3.5 cohesion, tutorial T0 rule set, WP 4.5, 4.3c, 4.3a, 3.6e, 3.6h, 3.6g, 3.6f; 4.1, 4.0, 4.2; 2026-11-17: 3.6d, 3.6c2, 3.6c, 3.6b, 3.6s, validation references)
+Last updated: 2026-11-18 (WP 2.6 Taylor bar on the wedge, WP 3.8c wedge silo, 3.8b, 3.8a wedge, WP 4.3d, WP 3.7b fed silo, WP 3.7a solid inlet; WP 4.4c, 4.4b, 4.4, 4.3b, WP 3.5 cohesion, tutorial T0 rule set, WP 4.5, 4.3c, 4.3a, 3.6e, 3.6h, 3.6g, 3.6f; 4.1, 4.0, 4.2; 2026-11-17: 3.6d, 3.6c2, 3.6c, 3.6b, 3.6s, validation references)
 
 Plan doc: https://claude.ai/artifact/DTT6kSikz9ZUTBkUxY6Grr
 
 ## Current phase
 
-Phase 2 (the C++ Eulerian solver: 2.1 to 2.5c and 2.4b done; 2.6 waits for Phase 5) and Phase 3 (silo discharge, Sia's primary target, decision 0016) in parallel.
+Phase 2 (the C++ Eulerian solver: 2.1 to 2.5c, 2.4b and 2.6 done) and Phase 3 (silo discharge, Sia's primary target, decision 0016) in parallel.
 
 ## Work packages
 
@@ -71,6 +71,7 @@ Phase 2 (the C++ Eulerian solver: 2.1 to 2.5c and 2.4b done; 2.6 waits for Phase
 | 3.8a | Axisymmetric wedge without the free surface | Done | Decision 0061: OpenFOAM `wedge` patches (axis prisms from blockMesh, no axis patch needed). Wedge faces carry the rotated predicted cell state, no flux; wall stress extrapolated on wedge meshes (else O(1) hoop error at the wall); time step from the in-plane length combined with the radius (axis prisms were unstable at maxCo 0.4). `tests/test_wedge.sh` passes (about 1.5 min): Lamé 0.9 % at 2.5 mm beyond two wall cells (wall cells 9 %, first order); K0 lake with axis cells at rest to 5e-16 m/s; cylindrical Janssen tank settles, K 0.43, within 2.0 %; 2 processors 3e-17. Not yet with `freeSurface` (3.8b) |
 | 3.8b | Free surface on the wedge | Done | Decision 0061 addendum: wedge sides pass the Cartesian check (hoop length); the u/r part of the radial flux moves to the hoop axis in the void closure and the slab lengths. `tests/test_wedge_void.sh` passes (about 8 min): lake at rest 3e-16 m/s; elastic plug falls at g (0.000 %), lands, mass 7e-14; T0 void-top tank 2.9 % from circular Janssen, holds undamped; 2 processors 1e-11 (plain MC). Void-top tanks need the T0 rule set: with plain MC, void round-off makes cells that never settle (Cartesian too, see known issues) |
 | 3.8c | Cylindrical silo on the wedge against a 3D quarter model | Done | Decision 0062. R 0.1 m, fill 0.2 m, central outlet D 0.06 m, 10 mm cells, T0 rule set. `tests/test_wedge_silo.sh` passes (about 3.5 min): 3D Beverloo C 0.678 (wedge) and 0.635 (quarter, STL tube, symmetry planes), 6.8 % apart; closed outlet holds, mass 1e-14. Wedge 33 s, quarter 164 s. With 2 cells across the outlet (D 0.04) the quarter reads 28 % low: quarter models need 3 cells across the outlet half-width |
+| 2.6 | Taylor bar on the Eulerian wedge | Done | Decision 0063. Copper rod 32.4 mm at 227 m/s, von Mises 314 MPa, wedge with void around the rod. `tests/test_taylor_wedge.sh` passes (about 7.5 min): 0.2 mm cells shortening 13.02 mm (-0.7 %), widening 5.02 mm (-16 %, tolerance 20 %) against the axisymmetric Abaqus benchmark 13.11 / 6.006; 0.4 mm 12.47 / 3.67; mass 1e-14. The thin lip at the face edge is smeared over a cell or two |
 | 4.3d | Free bodies (motion from the material force and gravity) | Done | Decision 0058. `mass`, optional `inertia` in `constant/rigidBodies`; celCoupling `moveBodies` (central difference). `tests/test_free_body.sh` passes (about 1 min): thrown block to 1e-14 of the scheme; steel block dropped onto T0 comes to rest carrying its weight (1.0000), momentum to 1e-5. With rotation free the dropped block is kicked to 0.5 rad/s at impact and squeezes a corner cell to 1.038 rho0 (known issue). Also fixed an overflow in the eigen solver |
 
 ## Validation references
@@ -101,8 +102,8 @@ anything that cannot be undone outside this repository.
 
 Sia's two Abaqus gaps (2026-11-18, thread "Add solid inflow inlet and axisymmetric
 wedge"): WP 3.7a (inlet), 3.7b (fed silo, tutorial `siloFed`), 3.8a, 3.8b (wedge, with
-the free surface, decision 0061) and 3.8c (cylindrical silo, decision 0062) done; next the
-Taylor-bar benchmark on the wedge (coordinator, 2026-11-18), then 3.8d
+the free surface, decision 0061) and 3.8c (cylindrical silo, decision 0062) done; the Taylor
+bar on the wedge (WP 2.6, decision 0063) done; next 3.8d
 (`docs/work-packages.md`).
 
 The C++ Eulerian cycle is done and checked against the prototypes: WP 2.3 (Lagrange
