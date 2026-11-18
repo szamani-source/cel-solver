@@ -266,6 +266,11 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
        *Foam::cos(degToRad(materialProperties_.get<scalar>("phi")))
       : 0
     ),
+    flowImpedance_
+    (
+        materialProperties_.getOrDefault<Switch>("flowImpedance", false)
+    ),
+    flowLaw_(Zero),
     spreadLayers_
     (
         materialProperties_.getOrDefault<Switch>("spreadLayers", false)
@@ -311,6 +316,35 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
     if (normalCap_)
     {
         Info<< "Normal jump cap at Mohr-Coulomb yield (rule 12)" << nl;
+    }
+    if (flowImpedance_)
+    {
+        const dictionary& d = materialProperties_;
+        if (d.get<word>("type") != "mohrCoulomb" || !d.found("mu2"))
+        {
+            FatalIOErrorInFunction(d)
+                << "flowImpedance needs type mohrCoulomb with mu(I) (mu2)"
+                << exit(FatalIOError);
+        }
+        flowLaw_[0] = Foam::tan(degToRad(d.get<scalar>("phi")));
+        flowLaw_[1] = d.get<scalar>("mu2");
+        flowLaw_[2] = d.get<scalar>("I0");
+        flowLaw_[3] = d.get<scalar>("d");
+        flowLaw_[4] = d.get<scalar>("rhoS");
+        if (flowLaw_[1] <= flowLaw_[0])
+        {
+            FatalIOErrorInFunction(d)
+                << "flowImpedance needs mu2 > tan(phi)" << exit(FatalIOError);
+        }
+        if (capSinPhi_ == 0)
+        {
+            capSinPhi_ = Foam::sin(degToRad(d.get<scalar>("phi")));
+            capCCos_ =
+                d.getOrDefault<scalar>("c", 0)
+               *Foam::cos(degToRad(d.get<scalar>("phi")));
+        }
+        Info<< "Flow impedance (WP 3.6c): mu(I) tangent viscosity at faces "
+            << "between flowing cells, plastic Hancock predictor" << nl;
     }
     if (spreadLayers_)
     {

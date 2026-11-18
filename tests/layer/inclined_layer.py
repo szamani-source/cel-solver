@@ -28,9 +28,16 @@ and 10 MPa (the error against E measures the numerical viscosity), 2.5 mm
 at 0.1 MPa (mesh), and the effective numerical viscosity
 eta_num = (tau_exact - s_xy) / gamma_dot in the lower half of the layer.
 
+WP 3.6c (decision 0040): every layer runs with flowImpedance yes (mu(I)
+tangent viscosity at faces between flowing cells, plastic Hancock predictor,
+shear cap with phi_m); --noflow runs the WP 3.6b code path for comparison.
+With --ci the 0.1 MPa, 5 mm layer is also checked against a regression
+guard: surface speed within 10 % of exact and mean speed at least 0.85 of
+exact (WP 3.6b code: 0.14 and 0.15).
+
 Run by tests/test_inclined_layer.sh after celVoidCheck is built:
 
-    python3 inclined_layer.py WORKDIR [E_MPa:cell_mm ...]
+    python3 inclined_layer.py WORKDIR [--ci] [--noflow] [E_MPa:cell_mm[:lid] ...]
 """
 
 import math
@@ -50,6 +57,8 @@ MU2, I0, D, RHOS = 0.961813, 0.279, 1.0e-3, 2650.0    # decision 0037
 THETA, H, T_END = 31.0, 0.05, 4.0
 WRITE = [1.0, 2.0, 3.0]
 TOL, STEADY = 0.05, 0.01
+CI_TOL, CI_MEAN = 0.10, 0.85        # WP 3.6c regression guard (--ci)
+FLOW = True                         # flowImpedance yes (WP 3.6c)
 K = (2.0 + 2.0 * NU) / 3.0
 
 
@@ -82,7 +91,8 @@ def setup(work, E_MPa, cell, shear_cap=True, lid=False, name=None):
     _, a = exact()
     material = (f"type mohrCoulomb;\nE {E_MPa * 1e6!r};\nnu {NU!r};\nphi {PHI!r};\nc 0;\n"
                 f"psi 0;\nsigmaT 0;\nmu2 {MU2!r};\nI0 {I0!r};\nd {D!r};\nrhoS {RHOS!r};\n"
-                + ("shearCap yes;\n" if shear_cap else ""))
+                + ("shearCap yes;\n" if shear_cap else "")
+                + ("flowImpedance yes;\n" if FLOW else ""))
     check = dict(fill=[-1.0, -1.0, 1.0, H], U0=[0.0, 0.0, 0.0], tEnd=T_END,
                  maxCo=0.4, writeTimes=WRITE)
     old = vc.CELL
@@ -195,8 +205,10 @@ def at_rest(work):
 
 def main():
     work = sys.argv[1]
+    global FLOW
     ci = "--ci" in sys.argv[2:]
-    args = [a for a in sys.argv[2:] if a != "--ci"]
+    FLOW = "--noflow" not in sys.argv[2:]
+    args = [a for a in sys.argv[2:] if a not in ("--ci", "--noflow")]
     # (E MPa, cell mm, lid): free surface (void above) or a smooth lid on top
     cases = [(0.1, 5.0, False), (1.0, 5.0, False), (10.0, 5.0, False), (0.1, 2.5, False),
              (0.1, 5.0, True), (1.0, 5.0, True), (10.0, 5.0, True), (0.1, 2.5, True)]
@@ -208,6 +220,7 @@ def main():
     I, a = exact()
     t_all = time.perf_counter()
     print("Steady inclined layer (Bagnold), T0 Mohr-Coulomb with mu(I) (Jop, placeholders),")
+    print("flow impedance " + ("on (WP 3.6c)" if FLOW else "off (--noflow, WP 3.6b code)"))
     print(f"theta {THETA:g} deg, h {H:g} m, x periodic, sticking floor, shear cap on, from the")
     print(f"exact steady state to t = {T_END:g} s. Exact: I = {I:.4f}, surface speed "
           f"{(2 / 3) * a * H ** 1.5:.4f} m/s")
@@ -218,6 +231,9 @@ def main():
         checked = E == 0.1 and mm == 5.0 and not lid and not ci
         good = basic and (not checked or (abs(r["err_s"]) <= TOL and r["err_prof"] <= TOL
                                           and r["drift"] <= STEADY))
+        guard = ci and FLOW
+        if guard:
+            good = good and abs(r["err_s"]) <= CI_TOL and r["umean"] >= CI_MEAN
         ok &= good
         print(f"\n  E = {E:g} MPa, {mm:g} mm cells ({int(round(H / (mm * 1e-3)))} across), "
               f"{'smooth lid' if lid else 'free surface'}: {r['steps']} steps "
@@ -234,7 +250,10 @@ def main():
         print("    u / u_exact by cell, bottom up: "
               + " ".join(f"{u / e:.3f}" for u, e in zip(r["ux"], r["ue"])))
         print(f"    mass change {r['dm']:.0e}; largest stress in empty cells "
-              f"{r['s_empty']:.0e} Pa: {'checked' if checked else 'recorded'}: "
+              f"{r['s_empty']:.0e} Pa"
+              + (f"; guard (WP 3.6c): surface within {100 * CI_TOL:g} %, mean speed "
+                 f">= {CI_MEAN:g}" if guard else "")
+              + f": {'checked' if checked or guard else 'recorded'}: "
               f"{'PASS' if good else 'FAIL'}")
     print(f"\nInclined layer checks: {'ALL PASS' if ok else 'FAILED'} "
           f"({time.perf_counter() - t_all:.0f} s)")

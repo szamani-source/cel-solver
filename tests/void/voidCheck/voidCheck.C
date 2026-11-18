@@ -234,7 +234,7 @@ int main(int argc, char *argv[])
             os << C[celli].x() << ' ' << C[celli].y() << ' ' << a[celli] << ' '
                 << r[celli] << ' ' << u[celli].x() << ' ' << u[celli].y()
                 << ' ' << sg[celli].xx() << ' ' << sg[celli].yy() << ' '
-                << sg[celli].xy() << nl;
+                << sg[celli].xy() << ' ' << sg[celli].zz() << nl;
         }
     };
 
