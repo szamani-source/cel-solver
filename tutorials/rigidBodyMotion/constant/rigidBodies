@@ -45,6 +45,7 @@ FoamFile
 //               material { type linearElastic; E 2e11; nu 0.3; }
 //               drive (0.09 0.249 -1) (0.21 0.251 1); }
 //               velocity constant (0 -0.25 0); friction 20; }
+//     Without drive the body is free and starts with its velocity at t = 0.
 //     A soft body (stiffness of the order of the material's) needs
 //     hourglass 0.3; in the deformable entry (decision 0073). Keep its
 //     elements about the cell size.

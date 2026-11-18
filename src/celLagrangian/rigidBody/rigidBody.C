@@ -289,6 +289,11 @@ Foam::rigidBody::rigidBody
                 hex_->fix(i, vector::one, v0);
             }
         }
+        else
+        {
+            // Free (WP 5.4): starts with the body's velocity at t = 0
+            hex_->setVelocity(vectorField(p.size(), velocity_->value(0)));
+        }
         surfU_ = vectorField(hex_->velocity(), surfNode_);
         if (mass_ > 0 || dict.found("inertia"))
         {

@@ -73,6 +73,7 @@ Phase 2 (the C++ Eulerian solver: 2.1 to 2.5c and 2.4b done; 2.6 waits for Phase
 | 5.2 | Lagrangian-only Taylor bar | Done | Decision 0071. 3D quarter model (6 x 6 x 45 hex8) of the Abaqus Benchmarks copper rod (227 m/s, perfectly plastic 314 MPa): shortening 13.14 mm against 13.10 (+0.3 %), widening 5.76 against 5.528 (+4.2 %). Needs `hourglassType viscous`: the stiffness form locks the impact face in large plastic flow. `tests/test_taylor_bar.sh` (about 1.5 min) |
 | 5.3a | Two-way coupling of a deformable body (split from 5.3) | Done | Decision 0072. `deformable { min; max; cells; density; material; planeStrain; damping; drive; }` in a body entry: hex8 elements inside rigidBody, wall-cell forces to the nearest surface triangle nodes, elements one coupling step ahead (subcycled), `damping`. `tests/test_deformable_push.sh` passes (about 3.5 min): steel footing as hex8 follows the rigid one (mean force -3 %), density 1.013 rho0, mass 1e-14 |
 | 5.3b | Soft deformable bodies | Done | Decision 0073. Material loads go to the element face's 4 nodes (bilinear), spread over 2 x 2 points of each cell's wall face; the material sees the mean surface velocity there. Soft bodies use `hourglass 0.3`. `tests/test_soft_push.sh` passes (about 1.5 min): soft footing (E 20 MPa) density 1.0155 rho0 (was 1.62), shortening 0.90 of the elastic column. Steel footing now -0.5 % of rigid (was -3 %) |
+| 5.4 | Projectile benchmark (target problem T3) | Done | Decision 0074. Free slug (1.83 kg in the slab, 1.07 m/s) into Tresca clay: steel hex8 23.75 mm against the rigid reference run 23.84 mm (-0.3 %), both 26 % short of the Prandtl energy estimate (band 30 %, known issue). A free deformable body starts with its `velocity`. `tests/test_projectile.sh` (about 2.5 min) |
 
 ## Validation references
 
@@ -204,10 +205,14 @@ mesh, as Abaqus CEL). Order:
 13. WP 5.2: Lagrangian Taylor bar. Done (decision 0071).
 14. WP 5.3a: two-way deformable coupling (stiff bodies). Done (decision 0072).
 15. WP 5.3b: soft deformable bodies. Done (decision 0073).
-16. Next: WP 5.4 projectile benchmark. The Eulerian Taylor bar (2.6) waits for the axisymmetric wedge (WP 3.8a, 3.8b). Sand footing accuracy (0057) waits until the solver is fully functional (Sia: features first).
+16. WP 5.4: projectile benchmark. Done (decision 0074).
+17. Next: Phase 5 is done to its plan. The Eulerian Taylor bar (2.6) waits for the axisymmetric wedge (WP 3.8a, 3.8b). Sand footing accuracy (0057) waits until the solver is fully functional (Sia: features first).
 
 ## Known issues
 
+- Projectile penetration (WP 5.4, decision 0074): a slug into Tresca clay stops 26 %
+  short of the Prandtl energy estimate at 1 m/s (-33 % at 0.5 m/s, -21 % at 2 m/s);
+  the static footing reads 8 % low. Not isolated.
 - Deformable bodies much finer than the cells (decision 0073): a 20 x 20 footing on
   1 cm cells packs the material to 1.039 rho0 with the default hourglass 0.05. Keep
   body elements near the cell size; soft bodies use `hourglass 0.3`.
