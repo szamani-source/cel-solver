@@ -29,12 +29,16 @@ Description
                                     //   (fill top = surface, floor y = 0)
     \endverbatim
 
-    STL walls (WP 4.3c): fixed bodies in constant/rigidBodies, if present,
-    are cut-cell walls (decision 0047, 0051). alpha is then the material
+    STL walls (WP 4.3c): bodies in constant/rigidBodies, if present,
+    are cut-cell walls (decision 0047, 0051); moving bodies push the
+    material (WP 4.3b, decision 0053). alpha is then the material
     fraction of each cell's open volume; mass and momentum are summed over
     open volumes, and history.dat gets three more columns: the force of the
     bodies on the material (x, y) and the mass in cells whose centre lies
-    below y = belowY (voidCheckDict, default -GREAT: none).
+    below y = belowY (voidCheckDict, default -GREAT: none); then (WP 4.3b)
+    the force of the mesh walls on the material (x, y: all non-coupled
+    patches), the mass covered cells could not hand over, and the largest
+    material density rho/alpha over rho0 (cells with alpha > 1e-3).
 
     Output (master unless noted):
         history.dat  step t mass px py cx cy max|s| max|s|_empty max|U|
@@ -160,7 +164,16 @@ int main(int argc, char *argv[])
         cut.reset(new bodyCells(mesh, bodies));
         setImmersedWalls(solid, cut.ref(), bodies);
     }
-    const scalarField Vopen(solid.openVolume());
+    auto cycle = [&](const scalar dtk)
+    {
+        solid.lagrangeStep(dtk);
+        bodies.move();
+        solid.remap(dtk);
+        if (cut)
+        {
+            moveImmersedWalls(solid, cut.ref(), bodies);
+        }
+    };
     const scalar belowY = dict.getOrDefault<scalar>("belowY", -GREAT);
 
     const scalar dt0 = solid.stableDeltaT();
@@ -187,7 +200,8 @@ int main(int argc, char *argv[])
         hist.reset(new OFstream("history.dat"));
         hist().precision(17);
         hist() << "# step t mass px py cx cy smax smaxEmpty Umax FyBottom snMax"
-            << " KE nCapped discharged FxBodies FyBodies massBelow" << nl;
+            << " KE nCapped discharged FxBodies FyBodies massBelow"
+            << " FxWalls FyWalls lostMass maxRhoRatio" << nl;
     }
 
     auto record = [&](const label step)
@@ -196,6 +210,7 @@ int main(int argc, char *argv[])
         const scalarField& a = solid.alpha().primitiveField();
         const vectorField& u = solid.U().primitiveField();
         const symmTensorField& sg = solid.sigma().primitiveField();
+        const scalarField Vopen(solid.openVolume());
         const scalarField m(r*Vopen);
         const scalar mass = gSum(m);
         const vector p = gSum(m*u);
@@ -236,13 +251,32 @@ int main(int argc, char *argv[])
             if (C[celli].y() < belowY) mBelow += m[celli];
         }
         reduce(mBelow, sumOp<scalar>());
+        vector fw(Zero);
+        forAll(mesh.boundary(), patchi)
+        {
+            if (mesh.boundary()[patchi].coupled()) continue;
+            fw += sum(solid.Fstar().boundaryField()[patchi]);
+        }
+        reduce(fw, sumOp<vector>());
+        const scalar lost = solid.lostMass();
+        scalar rhoMax = 0;
+        forAll(m, celli)
+        {
+            if (a[celli] > 1e-3)
+            {
+                rhoMax = max(rhoMax, r[celli]/a[celli]);
+            }
+        }
+        reduce(rhoMax, maxOp<scalar>());
         if (Pstream::master())
         {
             hist() << step << ' ' << runTime.value() << ' ' << mass << ' '
                 << p.x() << ' ' << p.y() << ' ' << mc.x()/mass << ' '
                 << mc.y()/mass << ' ' << smax << ' ' << sEmpty << ' ' << umax
                 << ' ' << fy << ' ' << snMax << ' ' << ke << ' ' << nCap << ' ' << out
-                << ' ' << fb.x() << ' ' << fb.y() << ' ' << mBelow << nl;
+                << ' ' << fb.x() << ' ' << fb.y() << ' ' << mBelow
+                << ' ' << fw.x() << ' ' << fw.y() << ' ' << lost << ' '
+                << rhoMax/solid.rho0() << nl;
         }
     };
 
@@ -293,8 +327,7 @@ int main(int argc, char *argv[])
             dtk = min(dtk, target - runTime.value());
             runTime.setDeltaT(dtk);
             ++runTime;
-            solid.lagrangeStep(dtk);
-            solid.remap(dtk);
+            cycle(dtk);
             record(++step);
             if (next < wt.size() && runTime.value() >= wt[next] - 1e-12)
             {
@@ -310,8 +343,7 @@ int main(int argc, char *argv[])
         {
             runTime.setDeltaT(dt);
             ++runTime;
-            solid.lagrangeStep(dt);
-            solid.remap(dt);
+            cycle(dt);
             record(step);
         }
     }

@@ -303,6 +303,21 @@ class eulerianSolid
         //  across that axis (hCell_ for uncut cells)
         vectorField openLen_;
 
+        //- Moving bodies (WP 4.3b, decision 0053): the remap maps onto the
+        //  open volume the bodies leave (vTarget_: old open volume plus the
+        //  wall's swept volume dt wallU.A), then moveImmersedWalls() carries
+        //  the material onto the cut cells at the new pose
+        bool movingWalls_;
+        scalarField vTarget_;
+
+        //- Wall friction angles [deg] per body, as given
+        scalarList bodyFrictionDeg_;
+
+        //- Mass a covered cell could not hand to an open neighbour, summed
+        //  over the run (this processor) [kg]; and hand-overs done
+        scalar lostMass_;
+        label nHandOver_;
+
 
     // Private Member Functions
 
@@ -412,8 +427,8 @@ public:
         //- Rigid bodies cutting the mesh at their current pose: body
         //  fraction per cell, open fraction per face, body velocity per
         //  cell and body per cell (from bodyCells), names and wall
-        //  friction angles [deg] per body. Call again after the bodies
-        //  move. Not with freeSurface (yet).
+        //  friction angles [deg] per body. Moving bodies: see
+        //  moveImmersedWalls().
         void setImmersedWalls
         (
             const volScalarField& alphaBody,
@@ -421,8 +436,35 @@ public:
             const volVectorField& wallVelocity,
             const labelList& cellBody,
             const wordList& bodyNames,
-            const scalarList& frictionDeg
+            const scalarList& frictionDeg,
+            const bool report = true
         );
+
+        //- Moving bodies (WP 4.3b, decision 0053, freeSurface only): mark
+        //  the walls as moving, so remap() maps onto the open volume the
+        //  bodies leave and leaves mixing to moveImmersedWalls()
+        void setMovingWalls(const bool moving);
+
+        bool movingWalls() const noexcept { return movingWalls_; }
+
+        //- After remap(), with the bodies at their new pose (bodyCells
+        //  updated): new cut cells; per cell mass, material volume and
+        //  momentum kept, a newly covered cell hands its content to an open
+        //  neighbour, a newly uncovered cell starts empty; then small cells
+        //  are mixed
+        void moveImmersedWalls
+        (
+            const volScalarField& alphaBody,
+            const surfaceScalarField& faceOpen,
+            const volVectorField& wallVelocity,
+            const labelList& cellBody
+        );
+
+        //- Mass that covered cells could not hand over, all processors [kg]
+        scalar lostMass() const;
+
+        //- Hand-overs from newly covered cells so far, all processors
+        label nHandOver() const;
 
         bool immersed() const noexcept { return immersed_; }
 
