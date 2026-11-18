@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-11-18 (WP 4.3b, 4.5, 4.3c, 4.3a, 3.6e, 3.6h, 3.6g, 3.6f; 4.1, 4.0, 4.2; 2026-11-17: 3.6d, 3.6c2, 3.6c, 3.6b, 3.6s, validation references)
+Last updated: 2026-11-18 (WP 4.3b, tutorial T0 rule set, WP 4.5, 4.3c, 4.3a, 3.6e, 3.6h, 3.6g, 3.6f; 4.1, 4.0, 4.2; 2026-11-17: 3.6d, 3.6c2, 3.6c, 3.6b, 3.6s, validation references)
 
 Plan doc: https://claude.ai/artifact/DTT6kSikz9ZUTBkUxY6Grr
 
@@ -156,8 +156,9 @@ Silo track (decision 0016), one thread each:
    2026-11-18; to confirm with Sia).
 25. WP 3.6e: collapse with mu(I). Done at 10 mm (decision 0050). T0 rule set:
    mu(I) + flowImpedance + normalCap.
-26. Next: switch `tutorials/siloDischarge` to the T0 rule set (small), then WP 3.5
-   (cohesion).
+26. `tutorials/siloDischarge` uses the T0 rule set (normalCap added, 2026-11-18): 64.4
+   kg/s/m at 10 MPa (C 0.78), pictures and rate plot refreshed.
+27. Next: WP 3.5 (cohesion), in its own thread.
    Keep runs coarse and short: Sia asked to be frugal with Claude usage (2026-11-15).
 
 Then the C++ counterparts 3.1 to 3.4 (2.4b is done; briefs not written yet) and 3.5
