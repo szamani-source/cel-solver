@@ -1,0 +1,79 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  2512                                  |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+FoamFile
+{
+    version         2;
+    format          ascii;
+    class           dictionary;
+    object          materialProperties;
+}
+
+rho             1800;
+
+freeSurface     yes;
+
+type            mohrCoulomb;
+
+E               1e+07;
+
+nu              0.3;
+
+phi             35;
+
+c               0;
+
+psi             0;
+
+sigmaT          0;
+
+mu2             0.961813;
+
+I0              0.279;
+
+d               0.001;
+
+rhoS            2650;
+
+shearCap        yes;
+
+spreadLayers    yes;
+
+flowImpedance   yes;
+
+walls
+{
+    left
+    {
+        friction        20;
+    }
+    right
+    {
+        friction        20;
+    }
+    bottom
+    {
+        friction        20;
+    }
+    top
+    {
+        friction        0;
+    }
+}
+
+outlets
+{
+    outlet
+    {
+        friction        20;
+        openTime        0.3;
+    }
+}
+
+
+// ************************************************************************* //
