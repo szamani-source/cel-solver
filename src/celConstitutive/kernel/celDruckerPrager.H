@@ -72,6 +72,7 @@ private:
     (
         double eta,
         double xi,
+        double etaBar,
         const Voigt deps,
         const Voigt sigOld,
         const History& hOld,

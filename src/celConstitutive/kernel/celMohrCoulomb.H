@@ -31,7 +31,9 @@ Description
 
     Optional mu(I) friction (WP 3.6a, celMuI.H): parameters mu2, I0, d, rhoS,
     muIAlpha. The return then uses phi_m = atan(mu(I)) for phi; sigmaT is
-    lowered to c cot(phi_m) where it would lie above that apex.
+    lowered to c cot(phi_m) where it would lie above that apex. With the
+    mu(I) dilatancy entries (phi0, phiC, bPhi, KDil; WP 3.6g) psi follows
+    the state (FrictionLaw::tanPsi) in every return, also at mu_s.
 \*---------------------------------------------------------------------------*/
 
 #ifndef celMohrCoulomb_H
@@ -87,6 +89,7 @@ private:
         double sinPhi;
         double cosPhi;
         double sigmaT;
+        double sinPsi;
     };
 
     //- Return mapping with the given friction constants

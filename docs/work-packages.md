@@ -48,6 +48,8 @@ Constitutive models for bulk solids are tracked in `docs/constitutive-models.md`
 | 3.6c2 | Inclined layer at 10 MPa and the top cell (split from 3.6c, decision 0040): floor cell stuck and slow body at 10 MPa; top cell next to void slides (stress-free at 10 MPa). Done 2026-11-17 (decision 0044) | 3.6b profile within 5 % at all three E, 5 mm, `tests/test_collapse.sh` still passes |
 | 3.6d | Silo discharge with mu(I) and the new impedance. Closed 2026-11-17 without its done-when (1 MPa about 20 % slow; decision 0045) | `tests/manual/test_discharge_stiffness.sh` passes at 10 mm and 5 mm (the 3.4b done-when), C within decision 0019 |
 | 3.6f | Why the silo drains about 20 % slower at 1 MPa (split from 3.6d). Closed 2026-11-18, finding recorded (decision 0046) | Each E as a band of three runs; the cause named with runs that switch it on and off |
+| 3.6g | Dilatancy in the mu(I) law (compressible mu(I)/phi(I), decision 0046 proposal). Closed 2026-11-18 without its done-when (decision 0048) | Silo bands at 1 and 10 MPa within 10 % of 0.1 MPa at 10 mm, inclined layer still passes; kernel `tests/test_dilatancy.sh` |
+| 3.6h | Smooth blend of the full and partly filled rules over void 1e-4 to 1e-2 (proposed in decision 0048, not started) | Silo bands within 10 % at 10 mm, inclined layer still passes |
 | 3.6e | Column collapse with mu(I) against experiments (Lube 2005, Lajeunesse 2005) | Run-out and final height within the decision 0019 bands at a = 0.5 and 2, at T0's real E |
 | 3.5 | Cohesion in the silo (arching, flow or no flow) | Flow stops below a critical outlet width |
 | 3B.1 | N-material volume fractions with isoAdvector | Pure advection keeps interfaces sharp |

@@ -29,6 +29,20 @@ Description
         mu2 [-], I0 [-], d [m], rhoS [kg/m^3], optional muIAlpha [-] in (0, 2)
     mu2 absent or equal to tan(phi): the rate-independent model, unchanged.
 
+    Optional dilatancy (WP 3.6g, decision 0048), a compressible mu(I)/phi(I)
+    law: the dilation angle follows the state instead of the fixed psi,
+
+        tan(psi) = KDil (phiS - phiEq(I)),  phiEq(I) = phiC - bPhi I,
+        phiS = phi0 exp(-tr(epsP)),
+
+    clipped to |psi| <= phi_m (Roux and Radjai 1998; Pailha and Pouliquen
+    2009). phiS is the solid fraction, phi0 its value where the plastic
+    volumetric strain tr(epsP) is zero (the fill, rho/rhoS). Dense material
+    dilates while it flows, loose material contracts, and both tend to the
+    critical solid fraction phiEq(I). In the return at friction mu, I is the
+    Jop law's own I(mu), so psi and mu agree at the root.
+        phi0 [-], phiC [-], bPhi [-], KDil [-]   (all four, or none)
+
 SourceFiles
     celMuI.C
 \*---------------------------------------------------------------------------*/
@@ -57,6 +71,12 @@ class FrictionLaw
     double I1N_;
     double A_;
 
+    // Dilatancy (KDil_ = 0: off)
+    double phi0_;
+    double phiC_;
+    double bPhi_;
+    double KDil_;
+
 public:
 
     FrictionLaw
@@ -80,6 +100,24 @@ public:
     double I1N() const { return I1N_; }
 
     double muJop(double I) const;
+
+    //- Read the optional dilatancy entries (all four or none)
+    void setDilatancy(const Parameters& p);
+
+    //- True if the dilation angle follows the state
+    bool dilatant() const { return KDil_ > 0; }
+
+    double phi0() const { return phi0_; }
+
+    //- Solid fraction phi0 exp(-tr(epsP)) of a history
+    double solidFraction(const History& h) const;
+
+    //- I of the Jop law at friction mu (0 at or below mu_s, infinity at or
+    //  above mu_2)
+    double inverseJop(double mu) const;
+
+    //- tan(psi) for the history h at friction mu, clipped to [-mu, mu]
+    double tanPsi(const History& h, double mu) const;
 
     //- C(I) of Barker and Gray (2017) eq. 3.9 for the Jop law (> 0: ill posed)
     double wellPosedness(double I) const;
