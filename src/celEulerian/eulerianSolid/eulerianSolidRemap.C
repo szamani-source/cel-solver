@@ -1160,7 +1160,7 @@ void Foam::eulerianSolid::remapFreeSurface(const scalar dt)
              && inletOpen_[inletOfPatch_[patchi]]
             )
             {
-                // Open inlet (WP 3.7a, decision 0056): the swept volume is
+                // Open inlet (WP 3.7a, decision 0057): the swept volume is
                 // all fresh material
                 vp[i] = dt*mag(pPhi[i]);
             }

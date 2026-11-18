@@ -1461,7 +1461,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
         }
     }
 
-    // Inlets open and close at the start of a step (WP 3.7a, decision 0056)
+    // Inlets open and close at the start of a step (WP 3.7a, decision 0057)
     updateInlets(mesh.time().value() - dt, dt);
 
     // Immersed walls (WP 4.3a, decision 0047): covered cells hold ghost
@@ -1540,7 +1540,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
             gAxis = label(faceAxis(g_));
         }
         // Open inlets count as empty for the slab side, as traction-free
-        // patches (WP 3.7a, decision 0056): counted as full, the stream
+        // patches (WP 3.7a, decision 0057): counted as full, the stream
         // under an inlet leaned towards it and fell in place
         slabSides
         (
@@ -2205,7 +2205,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
             vector v, t;
             if (ink >= 0 && inletOpen_[ink])
             {
-                // Open inlet (WP 3.7a, decision 0056): the face moves into
+                // Open inlet (WP 3.7a, decision 0057): the face moves into
                 // the domain at the inlet speed; the remap fills the volume
                 // it sweeps with fresh material. Traction from the interior
                 // characteristic where the cell's material is at the face

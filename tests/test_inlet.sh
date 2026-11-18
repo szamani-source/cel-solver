@@ -1,5 +1,5 @@
 #!/bin/bash
-# WP 3.7a: a solid inlet (materialProperties inlets, decision 0056) feeds
+# WP 3.7a: a solid inlet (materialProperties inlets, decision 0057) feeds
 # fresh material into an empty box: closed before its start time, exact mass
 # rate while open, the material lands and comes to rest at the inlet density.
 #
