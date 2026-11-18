@@ -672,6 +672,28 @@ Foam::vector Foam::eulerianSolid::bodyForce(const label b) const
 }
 
 
+Foam::vector Foam::eulerianSolid::bodyMoment
+(
+    const label b,
+    const point& c
+) const
+{
+    vector M(Zero);
+    if (wallForce_.size() == wallBody_.size())
+    {
+        const vectorField& C = mesh_.C().primitiveField();
+        forAll(wallForce_, celli)
+        {
+            if (wallBody_[celli] == b)
+            {
+                M += (C[celli] - c) ^ wallForce_[celli];
+            }
+        }
+    }
+    return returnReduce(M, sumOp<vector>());
+}
+
+
 Foam::scalar Foam::eulerianSolid::bodyMassIn(const label b) const
 {
     return returnReduce(bodyMassIn_[b], sumOp<scalar>());

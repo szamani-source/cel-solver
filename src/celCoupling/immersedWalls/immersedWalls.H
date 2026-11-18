@@ -13,8 +13,13 @@ Description
     step, with the bodies moved to the new time, recompute the cut cells and
     carry the material onto them. Does nothing if no body moves.
 
+    moveBodies (WP 4.3d, decision 0058): move the bodies to the current
+    time, then change each free body's velocity by the force and moment of
+    the material in the Lagrange step just taken (at the old pose) plus
+    gravity. Prescribed bodies just move.
+
     The cycle with moving bodies:
-        solid.lagrangeStep(dt); bodies.move(); solid.remap(dt);
+        solid.lagrangeStep(dt); moveBodies(solid, bodies); solid.remap(dt);
         moveImmersedWalls(solid, cells, bodies);
 
 SourceFiles
@@ -46,6 +51,8 @@ void moveImmersedWalls
     bodyCells& cells,
     const rigidBodies& bodies
 );
+
+void moveBodies(const eulerianSolid& solid, rigidBodies& bodies);
 
 } // End namespace Foam
 

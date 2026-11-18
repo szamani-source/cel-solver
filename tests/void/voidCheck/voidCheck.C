@@ -177,7 +177,7 @@ int main(int argc, char *argv[])
     auto cycle = [&](const scalar dtk)
     {
         solid.lagrangeStep(dtk);
-        bodies.move();
+        moveBodies(solid, bodies);
         solid.remap(dtk);
         if (cut)
         {
@@ -211,7 +211,8 @@ int main(int argc, char *argv[])
         hist().precision(17);
         hist() << "# step t mass px py cx cy smax smaxEmpty Umax FyBottom snMax"
             << " KE nCapped discharged FxBodies FyBodies massBelow"
-            << " FxWalls FyWalls lostMass maxRhoRatio charged" << nl;
+            << " FxWalls FyWalls lostMass maxRhoRatio charged"
+            << " body0: cx cy vx vy omegaz" << nl;
     }
 
     auto record = [&](const label step)
@@ -288,7 +289,17 @@ int main(int argc, char *argv[])
                 << ' ' << fy << ' ' << snMax << ' ' << ke << ' ' << nCap << ' ' << out
                 << ' ' << fb.x() << ' ' << fb.y() << ' ' << mBelow
                 << ' ' << fw.x() << ' ' << fw.y() << ' ' << lost << ' '
-                << rhoMax/solid.rho0() << ' ' << fed << nl;
+                << rhoMax/solid.rho0() << ' ' << fed;
+            if (bodies.size())
+            {
+                // First body's pose and velocity (WP 4.3d)
+                const rigidBody& b0 = bodies[0];
+                const vector v0(b0.velocity(runTime.value()));
+                hist() << ' ' << b0.centre().x() << ' ' << b0.centre().y()
+                    << ' ' << v0.x() << ' ' << v0.y() << ' '
+                    << b0.omega(runTime.value()).z();
+            }
+            hist() << nl;
         }
     };
 

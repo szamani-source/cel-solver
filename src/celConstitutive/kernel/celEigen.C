@@ -39,8 +39,16 @@ void symmetricEigen(const double A[3][3], double w[3], double V[3][3])
             for (int q = p + 1; q < 3; ++q)
             {
                 const double apq = a[p][q];
-                if (apq == 0)
+                if
+                (
+                    std::abs(apq)
+                 <= 1e-22*(std::abs(a[p][p]) + std::abs(a[q][q]))
+                )
                 {
+                    // Negligible: drop it. Rotating would divide by it, and
+                    // a tiny apq overflows theta, which traps with
+                    // FOAM_SIGFPE (WP 4.3d: a K0 cell with zx 1e-20)
+                    a[p][q] = a[q][p] = 0;
                     continue;
                 }
 
