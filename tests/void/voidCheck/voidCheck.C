@@ -38,7 +38,8 @@ Description
     below y = belowY (voidCheckDict, default -GREAT: none); then (WP 4.3b)
     the force of the mesh walls on the material (x, y: all non-coupled
     patches), the mass covered cells could not hand over, and the largest
-    material density rho/alpha over rho0 (cells with alpha > 1e-3).
+    material density rho/alpha over rho0 (cells with alpha > 1e-3); then
+    (WP 3.7a) the mass fed in through inlets.
 
     Output (master unless noted):
         history.dat  step t mass px py cx cy max|s| max|s|_empty max|U|
@@ -201,7 +202,7 @@ int main(int argc, char *argv[])
         hist().precision(17);
         hist() << "# step t mass px py cx cy smax smaxEmpty Umax FyBottom snMax"
             << " KE nCapped discharged FxBodies FyBodies massBelow"
-            << " FxWalls FyWalls lostMass maxRhoRatio" << nl;
+            << " FxWalls FyWalls lostMass maxRhoRatio charged" << nl;
     }
 
     auto record = [&](const label step)
@@ -218,6 +219,7 @@ int main(int argc, char *argv[])
         const scalar ke = 0.5*gSum(m*magSqr(u));
         const label nCap = returnReduce(solid.nCapped(), sumOp<label>());
         const scalar out = solid.discharged();
+        const scalar fed = solid.charged();
         scalar smax = 0, sEmpty = 0, umax = 0, snMax = -GREAT;
         forAll(m, celli)
         {
@@ -271,12 +273,13 @@ int main(int argc, char *argv[])
         if (Pstream::master())
         {
             hist() << step << ' ' << runTime.value() << ' ' << mass << ' '
-                << p.x() << ' ' << p.y() << ' ' << mc.x()/mass << ' '
-                << mc.y()/mass << ' ' << smax << ' ' << sEmpty << ' ' << umax
+                << p.x() << ' ' << p.y() << ' '
+                << (mass > 0 ? mc.x()/mass : 0) << ' '
+                << (mass > 0 ? mc.y()/mass : 0) << ' ' << smax << ' ' << sEmpty << ' ' << umax
                 << ' ' << fy << ' ' << snMax << ' ' << ke << ' ' << nCap << ' ' << out
                 << ' ' << fb.x() << ' ' << fb.y() << ' ' << mBelow
                 << ' ' << fw.x() << ' ' << fw.y() << ' ' << lost << ' '
-                << rhoMax/solid.rho0() << nl;
+                << rhoMax/solid.rho0() << ' ' << fed << nl;
         }
     };
 

@@ -29,6 +29,12 @@ static void printDiagnostics(const Foam::eulerianSolid& solid)
 
     Info<< "Total mass      = " << solid.totalMass() << nl
         << "Total momentum  = " << solid.totalMomentum() << endl;
+    if (solid.freeSurface())
+    {
+        // WP 3.3 and 3.7a: mass out through outlets, in through inlets
+        Info<< "Discharged mass = " << solid.discharged() << nl
+            << "Fed mass        = " << solid.charged() << endl;
+    }
 
     Info().precision(oldPrecision);
 }

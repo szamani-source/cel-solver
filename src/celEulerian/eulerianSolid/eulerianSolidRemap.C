@@ -611,7 +611,8 @@ static void remapMassWeighted
     const scalarField& mNew,
     const limiterType lim,
     scalarField& q,
-    const scalarField* smooth = nullptr
+    const scalarField* smooth = nullptr,
+    const List<scalarField>* qIn = nullptr
 )
 {
     scalarField qfInt;
@@ -633,13 +634,17 @@ static void remapMassWeighted
     }
     forAll(bm, patchi)
     {
-        if (!bm[patchi].coupled()) continue;
+        // Inflow through an open inlet brings the inlet's value (WP 3.7a)
+        const bool inlet =
+            !bm[patchi].coupled() && qIn && (*qIn)[patchi].size();
+        if (!bm[patchi].coupled() && !inlet) continue;
+        const scalarField& qf = inlet ? (*qIn)[patchi] : qfPatch[patchi];
         const labelUList& fc = bm[patchi].faceCells();
         forAll(fc, i)
         {
             const scalar dm = dmPatch[patchi][i];
             if (dm == 0) continue;
-            sumF[fc[i]] += dm*(qfPatch[patchi][i] - q[fc[i]]);
+            sumF[fc[i]] += dm*(qf[i] - q[fc[i]]);
         }
     }
 
@@ -669,16 +674,27 @@ static void remapField
     const scalarField& mNew,
     const limiterType lim,
     GeometricField<Type, fvPatchField, volMesh>& f,
-    const scalarField* smooth = nullptr
+    const scalarField* smooth = nullptr,
+    const List<Field<Type>>* fIn = nullptr
 )
 {
     Field<Type>& fi = f.primitiveFieldRef();
     for (direction cmpt = 0; cmpt < pTraits<Type>::nComponents; ++cmpt)
     {
         scalarField q(fi.component(cmpt));
+        List<scalarField> qIn;
+        if (fIn)
+        {
+            qIn.setSize(fIn->size());
+            forAll(qIn, patchi)
+            {
+                qIn[patchi] = (*fIn)[patchi].component(cmpt);
+            }
+        }
         remapMassWeighted
         (
-            mesh, geo, phi, dmInt, dmPatch, mNew, lim, q, smooth
+            mesh, geo, phi, dmInt, dmPatch, mNew, lim, q, smooth,
+            fIn ? &qIn : nullptr
         );
         fi.replace(cmpt, q);
     }
@@ -1138,6 +1154,16 @@ void Foam::eulerianSolid::remapFreeSurface(const scalar dt)
                         sideOf(leanNbr[patchi][i], Sout)
                     )*pmS[i];
             }
+            else if
+            (
+                inletOfPatch_[patchi] >= 0
+             && inletOpen_[inletOfPatch_[patchi]]
+            )
+            {
+                // Open inlet (WP 3.7a, decision 0056): the swept volume is
+                // all fresh material
+                vp[i] = dt*mag(pPhi[i]);
+            }
             // inflow through other boundary faces: nothing outside
         }
     }
@@ -1198,10 +1224,25 @@ void Foam::eulerianSolid::remapFreeSurface(const scalar dt)
         const scalarField& pmS = p.magSf();
         const scalarField pdc(p.deltaCoeffs());
         dmPatch[patchi].setSize(fc.size(), Zero);
+        const label ink = inletOfPatch_[patchi];
         forAll(fc, i)
         {
             if (pPhi[i] == 0) continue;
             const bool local = pPhi[i] > 0;
+            if (!local && ink >= 0 && inletOpen_[ink])
+            {
+                // Fed in through an open inlet (WP 3.7a): fresh material at
+                // the inlet density; the other fields get the inlet values
+                // in remapField
+                const scalar v = vfPatch[patchi][i];
+                if (v <= 0) continue;
+                const scalar dm = v*inletRho_[ink];
+                charged_ += dm;
+                dmPatch[patchi][i] = -dm;
+                dmOut[fc[i]] -= dm;
+                vOut[fc[i]] -= v;
+                continue;
+            }
             const scalar v =
                 vfPatch[patchi][i]
                *(local ? scale[fc[i]] : (p.coupled() ? scaleNbr[patchi][i] : 0));
@@ -1296,14 +1337,43 @@ void Foam::eulerianSolid::remapFreeSurface(const scalar dt)
     rho_.correctBoundaryConditions();
     alpha_.correctBoundaryConditions();
 
-    // dmPatch for non-coupled patches stays zero: remapMassWeighted skips
-    // them, and the boundary donor value is the cell's own (first order)
-    remapField(mesh, geo, phi, dmInt, dmPatch, mNew, lim("U"), U_, &smooth_);
-    remapField(mesh, geo, phi, dmInt, dmPatch, mNew, lim("sigma"), sigma_, &smooth_);
-    remapField(mesh, geo, phi, dmInt, dmPatch, mNew, lim("epsP"), epsP_, &smooth_);
+    // dmPatch for non-coupled patches stays zero except at open inlets
+    // (WP 3.7a): remapMassWeighted skips them, and the boundary donor value
+    // is the cell's own (first order); inlet faces bring the inlet values:
+    // velocity -speed n, stress -p I, no plastic history
+    List<vectorField> UIn(bm.size());
+    List<symmTensorField> sIn(bm.size()), eIn(bm.size());
+    List<scalarField> qIn(bm.size());
+    forAll(inletPatch_, k)
+    {
+        if (!inletOpen_[k]) continue;
+        const label patchi = inletPatch_[k];
+        const vectorField n(bm[patchi].nf());
+        UIn[patchi] = -inletNow_[k]*n;
+        sIn[patchi] = symmTensorField(n.size(), -inletP_[k]*symmTensor::I);
+        eIn[patchi] = symmTensorField(n.size(), Zero);
+        qIn[patchi] = scalarField(n.size(), Zero);
+    }
+    const bool anyIn = inletPatch_.size() > 0;
     remapField
     (
-        mesh, geo, phi, dmInt, dmPatch, mNew, lim("epsPEq"), epsPEq_, &smooth_
+        mesh, geo, phi, dmInt, dmPatch, mNew, lim("U"), U_, &smooth_,
+        anyIn ? &UIn : nullptr
+    );
+    remapField
+    (
+        mesh, geo, phi, dmInt, dmPatch, mNew, lim("sigma"), sigma_, &smooth_,
+        anyIn ? &sIn : nullptr
+    );
+    remapField
+    (
+        mesh, geo, phi, dmInt, dmPatch, mNew, lim("epsP"), epsP_, &smooth_,
+        anyIn ? &eIn : nullptr
+    );
+    remapField
+    (
+        mesh, geo, phi, dmInt, dmPatch, mNew, lim("epsPEq"), epsPEq_, &smooth_,
+        anyIn ? &qIn : nullptr
     );
 
     vectorField& U = U_.primitiveFieldRef();
