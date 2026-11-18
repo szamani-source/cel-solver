@@ -1,0 +1,17 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      decomposeParDict;
+}
+
+// Two subdomains split in x (tests/test_rigid_body.sh)
+numberOfSubdomains 2;
+
+method          simple;
+
+coeffs
+{
+    n           (2 1 1);
+}
