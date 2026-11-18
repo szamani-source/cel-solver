@@ -573,7 +573,8 @@ inline void wallFace
     const vector& vL, const symmTensor& sL,
     const scalar zp, const scalar zs, const scalar mu,
     vector& v, vector& t,
-    const scalar kj = -1
+    const scalar kj = -1,
+    const scalar adh = 0
 )
 {
     const vector tL(sL & n);
@@ -590,7 +591,8 @@ inline void wallFace
         return;
     }
     vector tt(ttL - (kj < 0 ? zs : kj)*vtL);
-    const scalar limit = -tn*mu;
+    // Coulomb with adhesion (rough walls, WP 4.3e): |tt| <= adh - tn mu
+    const scalar limit = adh - tn*mu;
     const scalar magTt = mag(tt);
     v = Zero;
     if (magTt > limit)
@@ -1811,7 +1813,8 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                     wallFace
                     (
                         A/mA, U_[celli] - wallU_[celli], sref[celli],
-                        zp[celli], zs[celli], bodyMu_[wallBody_[celli]], v, t
+                        zp[celli], zs[celli], bodyMu_[wallBody_[celli]], v, t,
+                        -1, bodyAdhesion(wallBody_[celli])
                     );
                     v += wallU_[celli];
                 }
@@ -2434,7 +2437,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
             wallFace
             (
                 A/mA, Uwall[celli] - wallU_[celli], Swall[celli],
-                zp[celli], zs[celli], bodyMu_[b], v, t
+                zp[celli], zs[celli], bodyMu_[b], v, t, -1, bodyAdhesion(b)
             );
             v += wallU_[celli];
             force[celli] += t*mA;

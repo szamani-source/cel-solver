@@ -94,6 +94,7 @@ Foam::rigidBody::rigidBody
     velocity_(functionOrZero("velocity", dict)),
     omega_(functionOrZero("omega", dict)),
     friction_(dict.getOrDefault<scalar>("friction", 0)),
+    adhesion_(dict.getOrDefault<scalar>("adhesion", 0)),
     moving_(dict.found("velocity") || dict.found("omega")),
     mass_(dict.getOrDefault<scalar>("mass", 0)),
     inertia0_(dict.getOrDefault<symmTensor>("inertia", symmTensor::zero)),
@@ -114,6 +115,12 @@ Foam::rigidBody::rigidBody
         FatalIOErrorInFunction(dict)
             << "Body " << name_ << ": friction " << friction_
             << " deg must be in [0, 90)" << exit(FatalIOError);
+    }
+    if (adhesion_ < 0)
+    {
+        FatalIOErrorInFunction(dict)
+            << "Body " << name_ << ": adhesion " << adhesion_
+            << " Pa must not be negative" << exit(FatalIOError);
     }
     if (mass_ < 0)
     {

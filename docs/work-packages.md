@@ -69,6 +69,7 @@ Constitutive models for bulk solids are tracked in `docs/constitutive-models.md`
 | 4.3c | STL walls with the free surface and outlets (split from 4.3a) | Void and slab rules at cut cells; a block falling onto a tilted STL floor stops without leaking; silo settle with STL walls and void top |
 | 4.3b | Moving bodies: coupling forces both ways and reaction output (decision 0042) | No leakage in a push test |
 | 4.3d | Free bodies: motion from the material force and gravity (split from 4.3b) | Dropped block comes to rest carrying its weight, momentum kept |
+| 4.3e | Rough walls: wall adhesion (split from 4.4b) | Rough pile within 15 % of 11.94 at 10 mm |
 | 4.5 | Silo and hopper discharge with STL walls | Flat tank rate within 5 % of mesh-boundary walls; hopper runs and its rate is recorded |
 | 4.4 | Strip footing benchmark (split 2026-11-18: pile to 4.4b) | Bearing capacity factor near 5.14 |
 | 4.4b | Pile section moving sideways through clay (Randolph and Houlsby 1984) | Smooth limit 9.14 cu D within 10 % |

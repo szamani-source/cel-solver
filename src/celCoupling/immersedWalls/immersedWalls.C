@@ -29,6 +29,12 @@ void Foam::setImmersedWalls
         friction
     );
     solid.setMovingWalls(anyMoving(bodies));
+    scalarList adhesion(bodies.size());
+    forAll(bodies, b)
+    {
+        adhesion[b] = bodies[b].adhesion();
+    }
+    solid.setBodyAdhesion(adhesion);
 }
 
 

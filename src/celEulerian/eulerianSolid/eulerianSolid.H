@@ -323,6 +323,9 @@ class eulerianSolid
         wordList bodyNames_;
         scalarList bodyMu_;
 
+        //- Wall adhesion per body [Pa] (WP 4.3e, decision 0059); empty: 0
+        scalarList bodyAdhesion_;
+
         //- Small cut cell -> the cell it is mixed with (-1: none)
         labelList mixTo_;
 
@@ -549,6 +552,20 @@ public:
         const labelList& wallBody() const noexcept { return wallBody_; }
 
         const wordList& bodyNames() const noexcept { return bodyNames_; }
+
+        //- Set the wall adhesion of each body [Pa] (WP 4.3e, decision
+        //  0059): the wall shear limit is adhesion + friction x pressure;
+        //  the material still separates at zero normal stress
+        void setBodyAdhesion(const scalarList& adhesion)
+        {
+            bodyAdhesion_ = adhesion;
+        }
+
+        //- Wall adhesion of body b [Pa]
+        scalar bodyAdhesion(const label b) const
+        {
+            return b < bodyAdhesion_.size() ? bodyAdhesion_[b] : 0;
+        }
 
         //- Force of body b on the material in the last step, all
         //  processors [N]

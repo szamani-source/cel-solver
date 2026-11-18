@@ -35,6 +35,11 @@ Description
                                               // wall friction angle of the
                                               // material on this body
                                               // (WP 4.3a, decision 0047)
+            adhesion    10e3;                 // optional, Pa, default 0:
+                                              // wall shear strength at zero
+                                              // pressure, added to friction
+                                              // (rough wall, WP 4.3e,
+                                              // decision 0059)
         }
 
     Bodies act on the material as cut-cell walls (WP 4.3a, decision 0047);
@@ -104,6 +109,9 @@ class rigidBody
         //- Wall friction angle [deg]
         scalar friction_;
 
+        //- Wall adhesion [Pa]
+        scalar adhesion_;
+
         //- Velocity or omega given, or free (a moving body)
         bool moving_;
 
@@ -164,6 +172,9 @@ public:
 
         //- Wall friction angle [deg] of the material on this body
         scalar friction() const noexcept { return friction_; }
+
+        //- Wall adhesion [Pa] of the material on this body
+        scalar adhesion() const noexcept { return adhesion_; }
 
         //- Does the body move (prescribed motion, or free)?
         bool moving() const noexcept { return moving_; }
