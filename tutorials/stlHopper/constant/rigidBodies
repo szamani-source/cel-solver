@@ -1,0 +1,41 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  celFoam tutorial stlHopper (WP 4.5)
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      rigidBodies;
+}
+// The tank as fixed STL bodies (closed surfaces, outward normals, in
+// constant/triSurface), acting on the material as cut-cell walls (decisions
+// 0047, 0051). friction: wall friction angle of the material on the body
+// [deg]. The two hopper walls, 60 deg to the horizontal, leave a 0.06 m gap
+// at the bottom over the mesh patch
+// outlet (constant/materialProperties outlets: closed until 0.3 s).
+bodies
+{
+    leftWall
+    {
+        surface leftWall.stl;
+        friction 20;
+    }
+    rightWall
+    {
+        surface rightWall.stl;
+        friction 20;
+    }
+    leftHopper
+    {
+        surface leftHopper.stl;
+        friction 20;
+    }
+    rightHopper
+    {
+        surface rightHopper.stl;
+        friction 20;
+    }
+}
+
+// ************************************************************************* //

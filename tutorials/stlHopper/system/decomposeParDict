@@ -1,0 +1,13 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  celFoam tutorial stlHopper (WP 4.5)
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      decomposeParDict;
+}
+numberOfSubdomains 2;
+method          simple;
+coeffs { n (2 1 1); }

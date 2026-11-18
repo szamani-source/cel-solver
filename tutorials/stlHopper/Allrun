@@ -1,0 +1,15 @@
+#!/bin/sh
+# Hopper discharge with STL walls (WP 4.5): the stlSilo tank with two STL
+# hopper walls at 60 deg to the horizontal down to the 0.06 m outlet gap.
+#   ./Allrun            # E = 0.1 MPa, runs to empty (5.8 s), about 2 minutes
+#   ./Allrun 10         # T0 stiffness, about 25 minutes (rate within the
+#                       #   round-off scatter of 0.1 MPa, decision 0045)
+# Then: python3 plot.py   (needs numpy and matplotlib)
+cd "${0%/*}" || exit
+. ${WM_PROJECT_DIR:?}/bin/tools/RunFunctions
+E_MPa="${1:-0.1}"
+foamDictionary -entry E -set "${E_MPa}e6" constant/materialProperties > /dev/null
+restore0Dir
+runApplication blockMesh
+runApplication setFields
+runApplication celFoam

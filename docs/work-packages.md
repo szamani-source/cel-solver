@@ -133,3 +133,6 @@ STL walls with void and outlets, which 4.5 needs. Order: 4.3c, 4.5, 4.3b, 4.4.
 Note (2026-11-18): WP 4.3c done (decision 0051, tutorial `stlSilo`). Its tank check
 compares with the mesh-wall tank with void (not the lid version): the free-surface tank
 itself is up to 17 % off the no-void one (STATUS known issues). Next: 4.5, 4.3b, 4.4.
+
+Note (2026-11-18): WP 4.5 done (decision 0052, tutorial `stlHopper`): STL tank +4.4 % against
+mesh walls (bands of three runs at 0.1 MPa); hopper rate recorded. Next: 4.3b, 4.4.
