@@ -1093,7 +1093,10 @@ inline scalar flowViscosity
     const scalar s3 = cmptMin(ev);
     const scalar pm = cCot - 0.5*(s1 + s3);
     const scalar P = -tr(s)/3;
-    if (pm <= 0 || P <= 0)
+    // P so small that rhoS/P would overflow (a floating-point trap; the
+    // stress-free silo fill at its first step, WP 3.6d): no flow viscosity,
+    // as at P <= 0 (same guard as FrictionLaw::inertialNumber)
+    if (pm <= 0 || !(P > 1e-300*law[4]))
     {
         return 0;
     }

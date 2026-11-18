@@ -64,6 +64,15 @@ static const scalar fluxTol = 1e-10;
 // order, no flow viscosity, leaning slab) and back, which kicks its stress
 static const scalar nearlyFull = 1e-4;
 
+// ... but only while the snap keeps the material within this fraction of
+// the density its stress implies, rho0 (1 + p/K) (WP 3.6d, decision 0045).
+// Each snap adds up to nearlyFull of material volume. Above an open outlet
+// the converging flow opens about 1e-6 of void per step; snapped every
+// step, that material stayed full and stressed instead of loosening: the
+// 1 MPa discharge slowed by a fifth and at 10 MPa the stream inflated to
+// half its density
+static const scalar nearlyFullRho = 1e-3;
+
 //- Limiter types, see the file header
 enum class limiterType { upwind, minmod, MC, superbee };
 
@@ -1127,6 +1136,8 @@ void Foam::eulerianSolid::remapFreeSurface(const scalar dt)
     // mass) gets its volume from its mass and no velocity or stress
     scalarField& alpha = alpha_.primitiveFieldRef();
     scalarField mNew(mL - dmOut);
+    const scalar Kbulk =
+        material().waveModulus() - 4.0*material().shearModulus()/3.0;
     boolList dust(nCells, false);
     forAll(mNew, celli)
     {
@@ -1139,7 +1150,17 @@ void Foam::eulerianSolid::remapFreeSurface(const scalar dt)
         }
         scalar a = (AL[celli] - vOut[celli])/V[celli];
         a = min(max(a, scalar(0)), scalar(1));
-        if (a >= 1 - (flowImpedance_ ? nearlyFull : 1e-12))
+        if
+        (
+            a >= 1 - 1e-12
+         || (
+                flowImpedance_
+             && a >= 1 - nearlyFull
+             && mNew[celli]
+             >= (1 - nearlyFullRho)*rho0_*V[celli]
+               *(1 + max(-tr(sigma_[celli])/3, scalar(0))/Kbulk)
+            )
+        )
         {
             a = 1;
         }

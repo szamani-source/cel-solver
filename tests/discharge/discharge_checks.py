@@ -23,6 +23,12 @@ Run after celVoidCheck is built:
 
     python3 discharge_checks.py WORKDIR                 # checks 1 and 3 (CI, ~50 s)
     python3 discharge_checks.py WORKDIR --sweep [--cell 0.005] [--procs 4] [E_MPa ...]
+
+WP 3.6d: --mui adds the T0 mu(I) law (placeholders of decision 0037) and
+flowImpedance yes (decisions 0040, 0044, 0045) to the material; --write
+t1,t2,... also writes cells_<t>.dat snapshots (for plots). The done-when of
+WP 3.6d is check 2 with --mui at 10 mm and at 5 mm
+(tests/manual/test_discharge_stiffness.sh).
 """
 
 import math
@@ -42,6 +48,8 @@ TOL_E = 0.10
 TOL_PAR = 0.02
 # prototype without rules 12 and 13 (decision 0027, 10 mm): 81 / 73 / 54 kg/s/m
 PROTO = {0.1: 81.35, 1.0: 73.0, 10.0: 54.0}
+# T0 mu(I) (decision 0037 placeholders) with the flow impedance (WP 3.6c, 3.6c2)
+MUI = "mu2 0.961813;\nI0 0.279;\nd 0.001;\nrhoS 2650.0;\nflowImpedance yes;\n"
 
 
 def case(work, E_mpa, nProcs=1):
@@ -76,13 +84,19 @@ def main():
     if "--cell" in args:
         cell = float(args[args.index("--cell") + 1])
         oc.CELL = oc.vc.CELL = cell
+    mui = "--mui" in args
+    if mui:
+        os.environ["CEL_EXTRA_MATERIAL"] = MUI + os.environ.get("CEL_EXTRA_MATERIAL", "")
+    if "--write" in args:
+        oc.WRITE_TIMES = [float(x) for x in args[args.index("--write") + 1].split(",")]
     nums = [a for i, a in enumerate(args) if not a.startswith("--")
-            and (i == 0 or args[i - 1] not in ("--procs", "--cell"))]
+            and (i == 0 or args[i - 1] not in ("--procs", "--cell", "--write"))]
     elist = ([float(a) for a in nums] or E_LIST) if sweep else [0.1]
     t_all = time.perf_counter()
     print(f"T0 tank W = {oc.W} m, H = {oc.H} m, outlet D = {oc.D} m, "
           f"{1000 * cell:g} mm cells, Mohr-Coulomb c = 0, phi {oc.PHI:g}; walls {oc.DELTA_W:g} deg; opens at "
-          f"{oc.T_OPEN} s;\nshear cap and rule 9 on, neither rule 12 nor 13\n")
+          f"{oc.T_OPEN} s;\nshear cap and rule 9 on, neither rule 12 nor 13"
+          + ("; mu(I) and flow impedance (WP 3.6d)" if mui else "") + "\n")
     res, runs = [], {}
 
     def report(name, good, detail):
