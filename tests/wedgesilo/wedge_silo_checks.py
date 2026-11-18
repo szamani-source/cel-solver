@@ -3,7 +3,7 @@ circular outlet, run as an axisymmetric wedge (decision 0058), against the
 3D Beverloo correlation and against the same tank as a coarse 3D quarter
 model.
 
-Tank R = 0.1 m (D_t = 0.2 m), filled to H = 0.2 m, central outlet D = 0.04
+Tank R = 0.1 m (D_t = 0.2 m), filled to H = 0.2 m, central outlet D = 0.06
 m, 10 mm cells. T0 Mohr-Coulomb with the T0 rule set (decision 0050) at
 E = 0.1 MPa, wall and floor 20 deg. Stress-free fill, gravity ramp 0.1 s,
 damping 250 1/s; the outlet opens at 0.3 s (damping off).
@@ -18,8 +18,9 @@ Checks:
    Nedderman 1992: 0.55 to 0.65; widened by the 20 % rate uncertainty
    accepted for the 2D silo, decision 0045).
 3. Quarter model: the same tank as a 3D quarter (symmetry planes x = 0 and
-   z = 0, STL cylinder wall, 10 mm cells, square quarter outlet of the same
-   area as nearly as the mesh allows): C of the wedge within 10 % of C of
+   z = 0, STL cylinder wall, 10 mm cells, square quarter outlet 0.03 x 0.03 m,
+   so 3 cells across like the wedge's outlet radius; with 2 cells, 0.02 m,
+   the quarter reads C 0.50 against the wedge's 0.69, decision 0062): C of the wedge within 10 % of C of
    the quarter model, both from their own outlet area.
 
 Run by tests/test_wedge_silo.sh after celVoidCheck is built:
@@ -43,7 +44,7 @@ import void_checks as vc  # noqa: E402
 RHO, NU, PHI, E = 1800.0, 0.3, 35.0, 1.0e5
 G_ACC = 9.81
 CELL = float(os.environ.get("CEL_CELL", "0.01"))
-R, H, R_OUT = 0.10, 0.20, 0.02
+R, H, R_OUT = 0.10, 0.20, 0.03
 HEADROOM = 2
 DELTA_W = 20.0
 T_RAMP, DAMPING, T_OPEN, T_DIS = 0.1, 250.0, 0.3, 3.5
@@ -114,7 +115,7 @@ def wedge_case(work, name="wedge"):
     return p
 
 
-Q_OUT = 0.02                 # quarter model: square outlet side (quarter)
+Q_OUT = 0.03                 # quarter model: square outlet side (quarter)
 Q_BOX = 0.12                 # quarter model: mesh extent in x and z
 
 
@@ -231,23 +232,39 @@ def analyse(path, scale):
 def main():
     work = sys.argv[1]
     t0 = time.perf_counter()
+    fails = []
+
+    def check(ok, text):
+        print(("PASS " if ok else "FAIL ") + text)
+        if not ok:
+            fails.append(text)
+
     p = wedge_case(work)
     sec = vc.run(p)
     a = analyse(p, 180.0 / THETA)          # 2 pi / (2 theta)
     C = beverloo_C(a["W"], 2 * R_OUT)
-    print(f"Wedge: {sec:.0f} s; full tank {a['m0']:.3f} kg; leak {a['leak']:.1e}; "
-          f"balance {a['cons']:.1e}; W = {a['W']:.4f} kg/s over {a['win']}; C = {C:.3f}; "
-          f"tank at the end {a['end']:.3f} of the mass at opening")
+    print(f"Wedge: {sec:.0f} s; full tank {a['m0']:.3f} kg; W = {a['W']:.4f} kg/s "
+          f"over t {a['win'][0]:.2f} to {a['win'][1]:.2f} s; tank at the end "
+          f"{a['end']:.3f} of the mass at opening")
     q = quarter_case(work)
     sec = vc.run(q)
     b = analyse(q, 4.0)
     Deq = 2 * (2 * Q_OUT) / math.sqrt(math.pi)    # circle of the square's area
     Cq = beverloo_C(b["W"], Deq)
-    print(f"Quarter: {sec:.0f} s; full tank {b['m0']:.3f} kg; leak {b['leak']:.1e}; "
-          f"balance {b['cons']:.1e}; W = {b['W']:.4f} kg/s over {b['win']}; C = {Cq:.3f} "
-          f"(D_eq {Deq:.4f}); end {b['end']:.3f}")
-    print(f"({time.perf_counter() - t0:.0f} s)")
-    return 0
+    print(f"Quarter: {sec:.0f} s; full tank {b['m0']:.3f} kg; W = {b['W']:.4f} kg/s "
+          f"over t {b['win'][0]:.2f} to {b['win'][1]:.2f} s (D_eq {Deq:.4f}); end "
+          f"{b['end']:.3f}")
+
+    for name, r in (("wedge", a), ("quarter", b)):
+        check(r["leak"] == 0.0, f"{name}: nothing leaves before opening ({r['leak']:.1e} kg)")
+        check(r["cons"] < 1e-10, f"{name}: tank plus discharged constant ({r['cons']:.1e})")
+    check(C_BAND[0] <= C <= C_BAND[1], f"wedge Beverloo C = {C:.3f} in {C_BAND}")
+    check(C_BAND[0] <= Cq <= C_BAND[1], f"quarter Beverloo C = {Cq:.3f} in {C_BAND}")
+    gap = abs(C - Cq) / Cq
+    check(gap <= 0.10, f"wedge C within 10 % of the quarter's ({100 * gap:+.1f} %)")
+    print(f"WP 3.8c checks: {'ALL PASS' if not fails else 'FAILED'} "
+          f"({time.perf_counter() - t0:.0f} s)")
+    return 1 if fails else 0
 
 
 if __name__ == "__main__":
