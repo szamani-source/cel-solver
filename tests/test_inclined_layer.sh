@@ -2,11 +2,11 @@
 # WP 3.6b (decision 0039), CI part: an inclined layer under gravity not along
 # a mesh axis stays at rest below the stopping angle (the face reconstruction
 # fix), and the mu(I) layer at E = 0.1 MPa, 5 mm runs with mass kept (its
-# speeds are recorded, not checked). About 10 s.
+# speeds are checked against the WP 3.6c guard: surface within 10 %, mean
+# speed at least 0.85 of exact, with flowImpedance yes). About 10 s.
 #
-# The done-when (Bagnold profile within 5 % at 0.1 MPa, E = 1 and 10 MPa
-# recorded) is tests/manual/test_inclined_layer.sh; it fails on the current
-# code (numerical viscosity, decision 0039).
+# The WP 3.6b/3.6c done-when (Bagnold profile within 5 %) is
+# tests/manual/test_inclined_layer.sh; it still fails at 5 mm (decision 0040).
 set -eu
 root="$(cd "$(dirname "$0")/.." && pwd)"
 work="$(mktemp -d)"
