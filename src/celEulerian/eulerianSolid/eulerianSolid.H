@@ -208,6 +208,16 @@ class eulerianSolid
         //  between two flowing cells and uses phi_m elsewhere
         Switch flowImpedance_;
 
+        //- WP 3.6h (decision 0049): materialProperties fullBlend yes (with
+        //  freeSurface). Instead of the nearly-full snap (decisions 0044,
+        //  0045), cells with void between 1e-4 and 1e-2 blend the full and
+        //  partly filled rules with a weight that falls from 1 to 0 in
+        //  log(void): face states, stress predictor and flow viscosity
+        Switch fullBlend_;
+
+        //- Void range of the blend, fullBlendVoid (v1 v2), default (1e-4 1e-2)
+        FixedList<scalar, 2> blendVoid_;
+
         //- mu_s, mu_2, I0, d, rho_s of the flow impedance
         FixedList<scalar, 5> flowLaw_;
 

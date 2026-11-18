@@ -243,14 +243,29 @@ void MohrCoulomb::updateRate
         *law_, el_, trial, dt,
         [&](double mu, Voigt s, History& h)
         {
-            if (mu == law_->muS())
+            if (mu == law_->muS() && !law_->dilatant())
             {
                 update(deps, sigOld, hOld, s, h);
                 return;
             }
             // phi_m in degrees and back, as mu_i.py, so both sides round alike
             const double phi = std::atan(mu)*180.0/pi*pi/180.0;
-            Friction fr{std::sin(phi), std::cos(phi), sigmaT_};
+            Friction fr{std::sin(phi), std::cos(phi), sigmaT_, sinPsi_};
+            if (law_->dilatant())
+            {
+                const double t = law_->tanPsi(hOld, mu);
+                fr.sinPsi = t/std::sqrt(1 + t*t);
+                // Contraction is bounded so that the plane return's
+                // a_f.D.a_g = 4G + 4 sin(phi) sin(psi) (lambda + G) stays
+                // at least 2G (positive plastic multiplier)
+                const double lambda = el_.K - 2.0*el_.G/3.0;
+                fr.sinPsi =
+                    std::max
+                    (
+                        fr.sinPsi,
+                        -0.5*el_.G/((lambda + el_.G)*fr.sinPhi)
+                    );
+            }
             if (tension_)
             {
                 fr.sigmaT = std::min(sigmaT_, c_*fr.cosPhi/fr.sinPhi);
@@ -273,7 +288,7 @@ MohrCoulomb::Return MohrCoulomb::updateReturn
 {
     return returnAt
     (
-        Friction{sinPhi_, cosPhi_, sigmaT_}, deps, sigOld, hOld, sigNew, hNew
+        Friction{sinPhi_, cosPhi_, sigmaT_, sinPsi_}, deps, sigOld, hOld, sigNew, hNew
     );
 }
 
@@ -302,7 +317,7 @@ MohrCoulomb::Return MohrCoulomb::returnAt
     symmetricEigen(A, w, V);
 
     const double sphi = fr.sinPhi;
-    const double spsi = sinPsi_;
+    const double spsi = fr.sinPsi;
     const double k = 2.0*c_*cphi;
     const double scale =
         std::max({std::abs(w[0]), std::abs(w[1]), std::abs(w[2]), c_, 1.0});
@@ -407,7 +422,7 @@ MohrCoulomb::Return MohrCoulomb::tensionReturn
 {
     const double sigT = fr.sigmaT;
     const double sphi = fr.sinPhi;
-    const double spsi = sinPsi_;
+    const double spsi = fr.sinPsi;
     const double k = 2.0*c_*fr.cosPhi;
 
     // Planes in the order of _MC_T_SETS in models.py: main, s1 = s2 edge
