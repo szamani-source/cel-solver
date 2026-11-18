@@ -37,8 +37,10 @@ Description
                                               // (WP 4.3a, decision 0047)
         }
 
-    Fixed bodies act on the material as cut-cell walls (WP 4.3a, decision
-    0047); forces on moving bodies are WP 4.3b.
+    Bodies act on the material as cut-cell walls (WP 4.3a, decision 0047);
+    moving bodies push it and the cut cells follow them (WP 4.3b, decision
+    0053, freeSurface yes). The motion is prescribed: the force of the
+    material on the body is reported, not applied to it.
 
 SourceFiles
     rigidBody.C

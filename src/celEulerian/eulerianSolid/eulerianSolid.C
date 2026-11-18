@@ -292,7 +292,10 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
     outletOpenTime_(readOutlets(mesh, materialProperties_, wallFriction_)),
     discharged_(0),
     immersed_(false),
-    nUnmixed_(0)
+    nUnmixed_(0),
+    movingWalls_(false),
+    lostMass_(0),
+    nHandOver_(0)
 {
     if (outletOpenTime_.size() && !freeSurface_)
     {

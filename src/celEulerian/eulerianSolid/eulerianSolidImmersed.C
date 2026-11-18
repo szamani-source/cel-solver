@@ -65,7 +65,8 @@ void Foam::eulerianSolid::setImmersedWalls
     const volVectorField& wallVelocity,
     const labelList& cellBody,
     const wordList& bodyNames,
-    const scalarList& frictionDeg
+    const scalarList& frictionDeg,
+    const bool report
 )
 {
     using namespace immersedDetail;
@@ -85,6 +86,7 @@ void Foam::eulerianSolid::setImmersedWalls
 
     immersed_ = bodyNames.size() > 0;
     bodyNames_ = bodyNames;
+    bodyFrictionDeg_ = frictionDeg;
     bodyMu_.setSize(bodyNames.size());
     forAll(bodyMu_, b)
     {
@@ -179,6 +181,7 @@ void Foam::eulerianSolid::setImmersedWalls
         mask[d] = geomD[d] < 0 ? 0 : 1;
     }
 
+    wallU_ = wallVelocity.primitiveField();
     wallBody_.setSize(nCells);
     wallBody_ = -1;
     label nWall = 0, nCovered = 0, nOrphan = 0;
@@ -212,6 +215,8 @@ void Foam::eulerianSolid::setImmersedWalls
                 {
                     best = closed;
                     b = cellBody[other];
+                    // body velocity from that neighbour (WP 4.3b)
+                    wallU_[celli] = wallVelocity[other];
                 }
             }
         }
@@ -222,8 +227,6 @@ void Foam::eulerianSolid::setImmersedWalls
         }
         wallBody_[celli] = b;
     }
-
-    wallU_ = wallVelocity.primitiveField();
 
     if (freeSurface_)
     {
@@ -348,11 +351,17 @@ void Foam::eulerianSolid::setImmersedWalls
         }
     }
 
+    reduce(nOrphan, sumOp<label>());
+    if (!report)
+    {
+        fillCovered();
+        return;
+    }
+
     Info<< "Immersed walls: " << returnReduce(nCovered, sumOp<label>())
         << " covered cells, " << returnReduce(nWall, sumOp<label>())
         << " wall cells, " << returnReduce(nSmall, sumOp<label>())
         << " small cut cells (" << nUnmixed() << " unmixed)";
-    reduce(nOrphan, sumOp<label>());
     if (nOrphan)
     {
         Info<< ", " << nOrphan << " wall cells without a body (body 0)";
@@ -686,6 +695,218 @@ Foam::label Foam::eulerianSolid::nSmallCells() const
 Foam::label Foam::eulerianSolid::nUnmixed() const
 {
     return returnReduce(nUnmixed_, sumOp<label>());
+}
+
+
+
+void Foam::eulerianSolid::setMovingWalls(const bool moving)
+{
+    if (moving && !freeSurface_)
+    {
+        FatalErrorInFunction
+            << "moving rigid bodies need freeSurface yes in "
+            << "materialProperties: a cell a body uncovers starts empty "
+            << "(WP 4.3b, decision 0053)" << exit(FatalError);
+    }
+    movingWalls_ = moving;
+}
+
+
+void Foam::eulerianSolid::moveImmersedWalls
+(
+    const volScalarField& alphaBody,
+    const surfaceScalarField& faceOpen,
+    const volVectorField& wallVelocity,
+    const labelList& cellBody
+)
+{
+    if (!movingWalls_ || !immersed_)
+    {
+        FatalErrorInFunction
+            << "call setImmersedWalls and setMovingWalls(true) first"
+            << exit(FatalError);
+    }
+
+    const fvMesh& mesh = mesh_;
+    const labelUList& own = mesh.owner();
+    const labelUList& nei = mesh.neighbour();
+    const label nCells = mesh.nCells();
+
+    // Content of each cell after the remap, which mapped onto the open
+    // volume the bodies leave (vTarget_; the old open volume if no remap
+    // ran since the last update)
+    const scalarField Vold
+    (
+        vTarget_.size() == nCells ? vTarget_ : openVolume()()
+    );
+    const scalarField m(rho_.primitiveField()*Vold);
+    const scalarField mV(alpha_.primitiveField()*Vold);
+    const vectorField p(m*U_.primitiveField());
+    const symmTensorField sig(sigma_.primitiveField());
+    const symmTensorField eP(epsP_.primitiveField());
+    const scalarField eQ(epsPEq_.primitiveField());
+    const labelList oldMix(mixTo_);
+    vTarget_.clear();
+
+    // Cut cells at the new pose (covered cells: no material, ghosts)
+    setImmersedWalls
+    (
+        alphaBody, faceOpen, wallVelocity, cellBody, bodyNames_,
+        bodyFrictionDeg_, false
+    );
+    const scalarField Vo(openVolume());
+
+    scalarField& rho = rho_.primitiveFieldRef();
+    scalarField& alpha = alpha_.primitiveFieldRef();
+    vectorField& U = U_.primitiveFieldRef();
+    symmTensorField& sigma = sigma_.primitiveFieldRef();
+    symmTensorField& epsP = epsP_.primitiveFieldRef();
+    scalarField& epsPEq = epsPEq_.primitiveFieldRef();
+
+    // Open cells keep their content; a cell the body leaves starts empty
+    scalarField gm(m), gmV(mV);
+    vectorField gp(p);
+    symmTensorField gs(m*sig), ge(m*eP);
+    scalarField gq(m*eQ);
+    forAll(Vo, celli)
+    {
+        if (Vo[celli] > 0) continue;
+        gm[celli] = 0;
+        gmV[celli] = 0;
+        gp[celli] = Zero;
+        gs[celli] = Zero;
+        ge[celli] = Zero;
+        gq[celli] = 0;
+    }
+
+    // A cell the body now covers hands its content to an open neighbour:
+    // the cell it was mixed with, else the face neighbour with the largest
+    // open volume, stepping through covered cells (up to 3 steps)
+    const cellList& cells = mesh.cells();
+    forAll(Vo, celli)
+    {
+        // (a member of a mixing group may hold a small negative amount,
+        // overdrawn in the remap: handed over all the same)
+        if (Vo[celli] > 0 || m[celli] == 0) continue;
+        label r = oldMix[celli] >= 0 && Vo[oldMix[celli]] > 0 ? oldMix[celli] : -1;
+        label cur = celli, prev = -1;
+        for (label hop = 0; hop < 4 && r < 0; ++hop)
+        {
+            scalar best = 0;
+            label next = -1;
+            for (const label facei : cells[cur])
+            {
+                if (facei >= mesh.nInternalFaces()) continue;
+                const label other = own[facei] == cur ? nei[facei] : own[facei];
+                if (other == prev || other == celli) continue;
+                if (Vo[other] > best)
+                {
+                    best = Vo[other];
+                    r = other;
+                }
+                else if (Vo[other] <= 0 && next < 0)
+                {
+                    next = other;
+                }
+            }
+            if (r < 0)
+            {
+                if (next < 0) break;
+                prev = cur;
+                cur = next;
+            }
+        }
+        if (r < 0)
+        {
+            lostMass_ += m[celli];
+            continue;
+        }
+        ++nHandOver_;
+        gm[r] += m[celli];
+        gmV[r] += mV[celli];
+        gp[r] += p[celli];
+        gs[r] += m[celli]*sig[celli];
+        ge[r] += m[celli]*eP[celli];
+        gq[r] += m[celli]*eQ[celli];
+    }
+
+    // Members of a mixing group are clipped only after mixing
+    boolList grouped(Vo.size(), false);
+    forAll(mixTo_, celli)
+    {
+        if (mixTo_[celli] >= 0)
+        {
+            grouped[celli] = grouped[mixTo_[celli]] = true;
+        }
+    }
+    forAll(Vo, celli)
+    {
+        if (Vo[celli] <= 0) continue;    // covered: set by setImmersedWalls
+        const scalar mk = gm[celli];
+        if (grouped[celli])
+        {
+            // mixed next: kept as they are, overdrawn or overfilled
+            rho[celli] = mk/Vo[celli];
+            alpha[celli] = gmV[celli]/Vo[celli];
+            if (mk != 0)
+            {
+                U[celli] = gp[celli]/mk;
+                sigma[celli] = gs[celli]/mk;
+                epsP[celli] = ge[celli]/mk;
+                epsPEq[celli] = gq[celli]/mk;
+            }
+            else
+            {
+                U[celli] = wallU_[celli];
+                sigma[celli] = Zero;
+                epsP[celli] = Zero;
+                epsPEq[celli] = 0;
+            }
+            continue;
+        }
+        if (mk <= 0 || gmV[celli] <= 0)
+        {
+            rho[celli] = 0;
+            alpha[celli] = 0;
+            U[celli] = wallU_[celli];
+            sigma[celli] = Zero;
+            epsP[celli] = Zero;
+            epsPEq[celli] = 0;
+            continue;
+        }
+        rho[celli] = mk/Vo[celli];
+        // material volume kept; more than the open volume: clipped (its
+        // mass stays, compressed)
+        const scalar a = gmV[celli]/Vo[celli];
+        alpha[celli] = a >= 1 - 1e-12 ? 1 : a;
+        U[celli] = gp[celli]/mk;
+        sigma[celli] = gs[celli]/mk;
+        epsP[celli] = ge[celli]/mk;
+        epsPEq[celli] = gq[celli]/mk;
+    }
+    alphaL_ = alpha;
+
+    rho_.correctBoundaryConditions();
+    alpha_.correctBoundaryConditions();
+    U_.correctBoundaryConditions();
+    sigma_.correctBoundaryConditions();
+    epsP_.correctBoundaryConditions();
+    epsPEq_.correctBoundaryConditions();
+
+    mixSmallCells();
+    fillCovered();
+}
+
+
+Foam::scalar Foam::eulerianSolid::lostMass() const
+{
+    return returnReduce(lostMass_, sumOp<scalar>());
+}
+
+
+Foam::label Foam::eulerianSolid::nHandOver() const
+{
+    return returnReduce(nHandOver_, sumOp<label>());
 }
 
 

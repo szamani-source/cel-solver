@@ -938,6 +938,27 @@ void Foam::eulerianSolid::remapFreeSurface(const scalar dt)
     const scalarField& Ao = tAo().primitiveField();
     const vectorField& hOpen = imm ? openLen_ : hCell_;
 
+    // Moving bodies (WP 4.3b, decision 0053): the cells' new content fills
+    // the open volume the bodies leave, the old open volume plus the wall's
+    // swept volume dt wallU.A (A into the body); moveImmersedWalls() then
+    // carries it onto the cut cells at the bodies' new pose
+    scalarField Vt(Vo);
+    if (imm && movingWalls_)
+    {
+        forAll(Vt, celli)
+        {
+            if (Vo[celli] > 0 && wallA_[celli] != vector::zero)
+            {
+                Vt[celli] = max
+                (
+                    Vo[celli] + dt*(wallU_[celli] & wallA_[celli]),
+                    1e-6*Vo[celli]
+                );
+            }
+        }
+        vTarget_ = Vt;
+    }
+
     const remapGeometry geo(makeGeometry(mesh, tphiV(), dt));
 
     // Lagrangian volume and lengths H_a = h_a + dt sum_{faces along a} phi/A_a
@@ -1235,18 +1256,18 @@ void Foam::eulerianSolid::remapFreeSurface(const scalar dt)
         {
             // Mixed next (mixSmallCells): a member may be overdrawn or
             // overfilled on its own; no clipping, the group conserves
-            alpha[celli] = (AL[celli] - vOut[celli])/Vo[celli];
-            rho[celli] = mNew[celli]/Vo[celli];
+            alpha[celli] = (AL[celli] - vOut[celli])/Vt[celli];
+            rho[celli] = mNew[celli]/Vt[celli];
             continue;
         }
-        if (mNew[celli] <= 0 || Vo[celli] <= 0)
+        if (mNew[celli] <= 0 || Vt[celli] <= 0)
         {
             mNew[celli] = 0;
             alpha[celli] = 0;
             rho[celli] = 0;
             continue;
         }
-        scalar a = (AL[celli] - vOut[celli])/Vo[celli];
+        scalar a = (AL[celli] - vOut[celli])/Vt[celli];
         a = min(max(a, scalar(0)), scalar(1));
         if
         (
@@ -1256,7 +1277,7 @@ void Foam::eulerianSolid::remapFreeSurface(const scalar dt)
              && !fullBlend_
              && a >= 1 - nearlyFull
              && mNew[celli]
-             >= (1 - nearlyFullRho)*rho0_*Vo[celli]
+             >= (1 - nearlyFullRho)*rho0_*Vt[celli]
                *(1 + max(-tr(sigma_[celli])/3, scalar(0))/Kbulk)
                *(dilatant ? Foam::exp(-tr(epsP_[celli])) : scalar(1))
             )
@@ -1266,11 +1287,11 @@ void Foam::eulerianSolid::remapFreeSurface(const scalar dt)
         }
         if (a < 1e-9)
         {
-            a = mNew[celli]/(rho0_*Vo[celli]);
+            a = mNew[celli]/(rho0_*Vt[celli]);
             dust[celli] = true;
         }
         alpha[celli] = a;
-        rho[celli] = mNew[celli]/Vo[celli];
+        rho[celli] = mNew[celli]/Vt[celli];
     }
     rho_.correctBoundaryConditions();
     alpha_.correctBoundaryConditions();
@@ -1298,7 +1319,7 @@ void Foam::eulerianSolid::remapFreeSurface(const scalar dt)
     U_.correctBoundaryConditions();
     sigma_.correctBoundaryConditions();
 
-    if (imm)
+    if (imm && !movingWalls_)
     {
         mixSmallCells();
         fillCovered();

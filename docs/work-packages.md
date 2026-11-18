@@ -136,3 +136,6 @@ itself is up to 17 % off the no-void one (STATUS known issues). Next: 4.5, 4.3b,
 
 Note (2026-11-18): WP 4.5 done (decision 0052, tutorial `stlHopper`): STL tank +4.4 % against
 mesh walls (bands of three runs at 0.1 MPa); hopper rate recorded. Next: 4.3b, 4.4.
+
+Note (2026-11-18): WP 4.3b done (decision 0053): prescribed-motion bodies push the material;
+free bodies (motion from the force) are left for when a case needs them. Next: 4.4.

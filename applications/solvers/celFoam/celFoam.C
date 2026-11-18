@@ -49,23 +49,38 @@ int main(int argc, char *argv[])
     // Rigid bodies from constant/rigidBodies (WP 4.1); none if absent
     rigidBodies bodies(runTime);
 
-    // Fixed bodies act on the material as cut-cell walls (WP 4.3a,
-    // decision 0047). Moving bodies are not coupled yet (WP 4.3b).
+    // Bodies act on the material as cut-cell walls (WP 4.3a, decision
+    // 0047); moving bodies push it and the cut cells follow them each step
+    // (WP 4.3b, decision 0053). Moving bodies need freeSurface yes; without
+    // it they only move (kinematics, as in WP 4.1)
     autoPtr<bodyCells> cut;
-    bool anyMoving = false;
-    forAll(bodies, b)
+    if (bodies.size() && anyMoving(bodies) && !solid.freeSurface())
     {
-        anyMoving = anyMoving || bodies[b].moving();
+        Info<< "Moving rigid bodies without freeSurface yes: not coupled to "
+            << "the material (decision 0053)" << nl << endl;
     }
-    if (bodies.size() && !anyMoving)
+    else if (bodies.size())
     {
         cut.reset(new bodyCells(mesh, bodies));
         setImmersedWalls(solid, cut.ref(), bodies);
     }
-    else if (anyMoving)
+
+    // Reaction output: force of the material on each body, every step
+    autoPtr<OFstream> forceFile;
+    if (cut && Pstream::master())
     {
-        Info<< "Moving rigid bodies: not coupled to the material yet "
-            << "(WP 4.3b)" << nl << endl;
+        mkDir(runTime.globalPath()/"postProcessing");
+        forceFile.reset
+        (
+            new OFstream(runTime.globalPath()/"postProcessing"/"bodyForces.dat")
+        );
+        forceFile() << "# t";
+        forAll(bodies, b)
+        {
+            forceFile() << ' ' << bodies[b].name() << "_Fx "
+                << bodies[b].name() << "_Fy " << bodies[b].name() << "_Fz";
+        }
+        forceFile() << "  (force of the material on the body, N)" << nl;
     }
 
     // Stable time step at the start, printed once. Recomputed every cycle
@@ -100,13 +115,46 @@ int main(int argc, char *argv[])
 
         bodies.move();              // WP 4.1: prescribed motion to t
 
-
         solid.remap(dt);            // WP 2.4
+
+        if (cut)
+        {
+            // WP 4.3b: cut cells at the new pose (moving bodies only)
+            moveImmersedWalls(solid, cut.ref(), bodies);
+
+            if (forceFile)
+            {
+                forceFile() << runTime.value();
+            }
+            forAll(bodies, b)
+            {
+                const vector f(-solid.bodyForce(b));
+                if (forceFile)
+                {
+                    forceFile() << ' ' << f.x() << ' ' << f.y() << ' ' << f.z();
+                }
+            }
+            if (forceFile)
+            {
+                forceFile() << nl;
+            }
+        }
 
         if (runTime.write())
         {
             printDiagnostics(solid);
             bodies.write();
+            forAll(solid.bodyNames(), b)
+            {
+                Info<< "Force on body " << bodies[b].name() << " = "
+                    << -solid.bodyForce(b) << " N" << nl;
+            }
+            if (solid.movingWalls())
+            {
+                Info<< "Moving bodies: " << solid.nHandOver()
+                    << " hand-overs from covered cells, mass lost "
+                    << solid.lostMass() << " kg" << nl;
+            }
             if (cut)
             {
                 cut->write();       // alphaBody, bodyFaceOpen, ... (WP 4.2)

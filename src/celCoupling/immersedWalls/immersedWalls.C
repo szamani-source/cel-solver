@@ -28,4 +28,40 @@ void Foam::setImmersedWalls
         names,
         friction
     );
+    solid.setMovingWalls(anyMoving(bodies));
+}
+
+
+bool Foam::anyMoving(const rigidBodies& bodies)
+{
+    forAll(bodies, b)
+    {
+        if (bodies[b].moving())
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+
+void Foam::moveImmersedWalls
+(
+    eulerianSolid& solid,
+    bodyCells& cells,
+    const rigidBodies& bodies
+)
+{
+    if (!solid.movingWalls())
+    {
+        return;
+    }
+    cells.update();
+    solid.moveImmersedWalls
+    (
+        cells.alphaBody(),
+        cells.faceOpen(),
+        cells.wallVelocity(),
+        cells.cellBody()
+    );
 }
