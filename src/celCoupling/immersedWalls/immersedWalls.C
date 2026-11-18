@@ -104,9 +104,11 @@ void Foam::moveBodies(const eulerianSolid& solid, rigidBodies& bodies)
     }
 
     // Deformable bodies (WP 5.3, decision 0072): the force of the material
-    // on each wall cell to the nodes of the nearest surface triangle, summed
-    // over processors, then the elements stepped to t
+    // on each wall cell to the nodes of the nearest element face, summed
+    // over processors, then the elements stepped to t. Each cell's force
+    // is spread over four points of its wall face (decision 0073)
     const vectorField& wf = solid.wallForce();
+    const vectorField& wA = solid.wallArea();
     const labelList& wb = solid.wallBody();
     const vectorField& C = solid.mesh().C().primitiveField();
     forAll(bodies, b)
@@ -120,9 +122,31 @@ void Foam::moveBodies(const eulerianSolid& solid, rigidBodies& bodies)
         {
             forAll(wf, celli)
             {
-                if (wb[celli] == b && magSqr(wf[celli]) > 0)
+                if
+                (
+                    wb[celli] != b
+                 || magSqr(wf[celli]) == 0
+                 || magSqr(wA[celli]) == 0
+                )
                 {
-                    body.addSurfaceForce(C[celli], -wf[celli]);
+                    continue;
+                }
+                const vector n(normalised(wA[celli]));
+                const vector span
+                (
+                    treeBoundBox
+                    (
+                        solid.mesh().points(),
+                        solid.mesh().cellPoints()[celli]
+                    ).span()
+                );
+                for
+                (
+                    const point& p
+                  : rigidBody::faceSamples(C[celli], span, n)
+                )
+                {
+                    body.addSurfaceForce(p, -0.25*wf[celli]);
                 }
             }
         }

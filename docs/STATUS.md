@@ -72,7 +72,7 @@ Phase 2 (the C++ Eulerian solver: 2.1 to 2.5c and 2.4b done; 2.6 waits for Phase
 | 5.1 | Hex8 element with hourglass control | Done | Decision 0070. `hex8Body` in celLagrangian: one-point Flanagan-Belytschko hexahedron (exact mean gradients), stiffness hourglass control, central difference, celConstitutive models. `tests/test_hex8.sh` passes (seconds): MacNeal-Harder patch test to 1e-15, 1D strain wave in steel within 0.3 %, energy of a free cube with hourglass modes to 1.4e-7 |
 | 5.2 | Lagrangian-only Taylor bar | Done | Decision 0071. 3D quarter model (6 x 6 x 45 hex8) of the Abaqus Benchmarks copper rod (227 m/s, perfectly plastic 314 MPa): shortening 13.14 mm against 13.10 (+0.3 %), widening 5.76 against 5.528 (+4.2 %). Needs `hourglassType viscous`: the stiffness form locks the impact face in large plastic flow. `tests/test_taylor_bar.sh` (about 1.5 min) |
 | 5.3a | Two-way coupling of a deformable body (split from 5.3) | Done | Decision 0072. `deformable { min; max; cells; density; material; planeStrain; damping; drive; }` in a body entry: hex8 elements inside rigidBody, wall-cell forces to the nearest surface triangle nodes, elements one coupling step ahead (subcycled), `damping`. `tests/test_deformable_push.sh` passes (about 3.5 min): steel footing as hex8 follows the rigid one (mean force -3 %), density 1.013 rho0, mass 1e-14 |
-| 5.3b | Soft deformable bodies | Not started | A soft footing (E 20 MPa) packs the material under it to 1.62 rho0 and shortens 1.44 times the elastic column (`tests/manual/test_soft_push.sh`, fails) |
+| 5.3b | Soft deformable bodies | Done | Decision 0073. Material loads go to the element face's 4 nodes (bilinear), spread over 2 x 2 points of each cell's wall face; the material sees the mean surface velocity there. Soft bodies use `hourglass 0.3`. `tests/test_soft_push.sh` passes (about 1.5 min): soft footing (E 20 MPa) density 1.0155 rho0 (was 1.62), shortening 0.90 of the elastic column. Steel footing now -0.5 % of rigid (was -3 %) |
 
 ## Validation references
 
@@ -203,12 +203,14 @@ mesh, as Abaqus CEL). Order:
 12. WP 5.1: hex8 element. Done (decision 0070).
 13. WP 5.2: Lagrangian Taylor bar. Done (decision 0071).
 14. WP 5.3a: two-way deformable coupling (stiff bodies). Done (decision 0072).
-15. Next: WP 5.3b soft deformable bodies (material packs under a soft footing), then WP 5.4 projectile. The Eulerian Taylor bar (2.6) waits for the axisymmetric wedge (WP 3.8a, 3.8b). Sand footing accuracy (0057) waits until the solver is fully functional (Sia: features first).
+15. WP 5.3b: soft deformable bodies. Done (decision 0073).
+16. Next: WP 5.4 projectile benchmark. The Eulerian Taylor bar (2.6) waits for the axisymmetric wedge (WP 3.8a, 3.8b). Sand footing accuracy (0057) waits until the solver is fully functional (Sia: features first).
 
 ## Known issues
 
-- Soft deformable bodies (WP 5.3b, decision 0072): a footing of E 20 MPa packs the
-  material under it to 1.62 rho0. Use stiff deformable bodies (steel) for now.
+- Deformable bodies much finer than the cells (decision 0073): a 20 x 20 footing on
+  1 cm cells packs the material to 1.039 rho0 with the default hourglass 0.05. Keep
+  body elements near the cell size; soft bodies use `hourglass 0.3`.
 - Free body rotating in contact (WP 4.3d, decision 0058): a symmetric block dropped
   onto T0 with inertia is kicked to 0.5 rad/s at impact (reaction a few % asymmetric)
   and its corner squeezes a cut cell to 1.038 rho0. The drop test runs without inertia.
