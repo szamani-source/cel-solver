@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-11-18 (WP 4.3c, 4.3a, 3.6e, 3.6h, 3.6g, 3.6f; 4.1, 4.0, 4.2; 2026-11-17: 3.6d, 3.6c2, 3.6c, 3.6b, 3.6s, validation references)
+Last updated: 2026-11-18 (WP 4.5, 4.3c, 4.3a, 3.6e, 3.6h, 3.6g, 3.6f; 4.1, 4.0, 4.2; 2026-11-17: 3.6d, 3.6c2, 3.6c, 3.6b, 3.6s, validation references)
 
 Plan doc: https://claude.ai/artifact/DTT6kSikz9ZUTBkUxY6Grr
 
@@ -60,6 +60,7 @@ Phase 2 (the C++ Eulerian solver: 2.1 to 2.5c and 2.4b done; 2.6 waits for Phase
 | 4.2 | Cut cells near each body | Done | Decision 0043: exact edge, face and cell coverage from the STL triangles (no sampling), body-frame octree, utility `celBodyCells`. `tests/test_body_cells.sh` passes in about 6 s: faceted sphere volume to 4e-16, plane at 30 deg to 2e-7 (single-precision STL), moving and turning cube exact, 2 processors 9e-16. Search 6e-5 s per searched cell |
 | 4.3a | Fixed STL walls with friction | Done | Decision 0047: cut-cell walls in `eulerianSolid` (open areas and volumes, wall face with the body's friction, ghosts in covered cells, small cells one cell with a neighbour in the Lagrange step), `friction <deg>` per body in `constant/rigidBodies`, per-body wall force and leak report; celFoam couples fixed bodies (tutorial `stlTank`). `tests/test_stl_walls.sh` passes (about 3 min): STL side walls 0.24 % from the mesh-wall Janssen tank, tank turned 10 deg 2.1 %, leak 1e-11, force balance 0.06 %. Not with `freeSurface` (4.3c); no mixing across processors |
 | 4.3c | STL walls with the free surface and outlets (split from 4.3a) | Done | Decision 0051: alpha per open volume, closed faces mirror in the slab rules, wall face only where the material touches it (its volume flux on its main axis), slab remap on open areas and open lengths, mixing groups share their volume ratio (fixed material-volume loss), empty is not covered. Tutorial `stlSilo` (first case for Sia with STL walls): T0 tank of STL walls and floor, outlet = mesh patch under the floor gap; no mass lost while closed, 72 kg/s/m at 10 MPa. `tests/test_stl_void.sh` passes (about 7 min): lake at rest in an STL tank 4e-17 m/s; block on a 10 deg STL floor stops, nothing through it; tilted tank with void top 1.9 % from the mesh-wall void-top tank. Brief's 2 % against the lid (no void) version not met: the free-surface tank itself is up to 17 % off the no-void one (known issues) |
+| 4.5 | Silo and hopper discharge with STL walls | Done | Decision 0052. `tests/test_stl_silo.sh` passes (about 6 min, in CI): T0 tank (0.1 MPa, mu(I)) with STL walls and floor against mesh walls, bands of three runs (maxCo 0.40/0.38/0.36): 68.8 vs 65.8 kg/s/m, +4.4 % (limit 5 %; all STL runs above all mesh runs, cause not isolated); no leak while closed (4e-14). 60 deg STL hopper (tutorial `stlHopper`): mass flow, empty 5.0 s after opening, 66.2 kg/s/m, 1.01 times the flat tank (Rose-Tanaka 1.21; no pass band until Sia agrees one) |
 
 ## Validation references
 
@@ -172,8 +173,8 @@ mesh, as Abaqus CEL). Order:
 4. WP 4.3a: fixed STL walls with friction. Done (decision 0047; tutorial `stlTank`).
 5. WP 4.3c: STL walls with the free surface and outlets. Done (decision 0051; tutorial
    `stlSilo`).
-6. WP 4.5: silo and hopper with STL walls (`docs/wp/WP-4.5.md`). Next.
-7. WP 4.3b: moving bodies, forces both ways; then 4.4 benchmarks.
+6. WP 4.5: silo and hopper with STL walls. Done (decision 0052; tutorial `stlHopper`).
+7. WP 4.3b: moving bodies, forces both ways; then 4.4 benchmarks. Next.
 
 ## Known issues
 
