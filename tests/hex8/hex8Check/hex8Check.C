@@ -21,12 +21,25 @@ Description
         start (kinetic, elastic strain energy from the stresses, and the
         hourglass energy), momentum kept to 1e-12.
 
+    With -taylor (WP 5.2, tests/test_taylor_bar.sh): the Taylor bar of the
+    Abaqus Benchmarks ("Impact of a copper rod", after Ferencz 1989), a 3D
+    quarter model: rod 32.4 mm long, radius 3.2 mm, 227 m/s onto a rigid
+    frictionless wall, copper E 110 GPa, nu 0.3, rho 8970, von Mises
+    perfectly plastic at 314 MPa, 80 microseconds, viscous hourglass control
+    0.05 (decision 0071). Reference: the Abaqus 3D quarter model (2700
+    C3D8R): shortening 13.10 mm, widening (radial displacement at the
+    impact face edge) 5.528 mm; its axisymmetric CAX4R run 13.11 / 6.006,
+    other elements 12.71 to 13.18 / 5.52 to 6.06. Checks shortening within
+    5 %, widening within 10 %, volume kept within 1 % (plastic flow is
+    isochoric), no element inverted.
+
     Prints each check with PASS / FAIL; exit code 1 on any failure.
 \*---------------------------------------------------------------------------*/
 
 #include "argList.H"
 #include "IStringStream.H"
 #include "hex8Body.H"
+#include "mathematicalConstants.H"
 
 using namespace Foam;
 
@@ -283,6 +296,105 @@ bool energyTest()
     );
 }
 
+
+
+bool taylorTest(const label nq, const label nz, const scalar hg, const word& hgType)
+{
+    const scalar L0 = 0.0324, R0 = 0.0032, v0 = 227;
+    // Quarter disc by the elliptical square-to-disc map, nq x nq cells,
+    // nz along the rod (z), impact face at z = 0
+    auto id = [&](label i, label j, label k)
+    {
+        return i + (nq + 1)*(j + (nq + 1)*k);
+    };
+    pointField p((nq + 1)*(nq + 1)*(nz + 1));
+    for (label k = 0; k <= nz; ++k)
+        for (label j = 0; j <= nq; ++j)
+            for (label i = 0; i <= nq; ++i)
+            {
+                const scalar u = scalar(i)/nq, w = scalar(j)/nq;
+                p[id(i, j, k)] = point
+                (
+                    R0*u*Foam::sqrt(1 - 0.5*w*w),
+                    R0*w*Foam::sqrt(1 - 0.5*u*u),
+                    L0*k/nz
+                );
+            }
+    List<hex8Body::hexElement> e(nq*nq*nz);
+    label n = 0;
+    for (label k = 0; k < nz; ++k)
+        for (label j = 0; j < nq; ++j)
+            for (label i = 0; i < nq; ++i)
+            {
+                hex8Body::hexElement& c = e[n++];
+                c[0] = id(i, j, k);         c[1] = id(i + 1, j, k);
+                c[2] = id(i + 1, j + 1, k); c[3] = id(i, j + 1, k);
+                c[4] = id(i, j, k + 1);     c[5] = id(i + 1, j, k + 1);
+                c[6] = id(i + 1, j + 1, k + 1); c[7] = id(i, j + 1, k + 1);
+            }
+    hex8Body body
+    (
+        "rod", p, e,
+        dictOf
+        (
+            "density 8970; hourglass " + Foam::name(hg) + "; hourglassType "
+          + hgType + "; material {"
+            " type vonMises; E 1.1e11; nu 0.3; sigma_y 3.14e8; }"
+        )
+    );
+    vectorField v(p.size(), vector(0, 0, -v0));
+    forAll(p, i)
+    {
+        vector mask(Zero);
+        if (p[i].x() < 1e-12) mask.x() = 1;
+        if (p[i].y() < 1e-12) mask.y() = 1;
+        if (p[i].z() < 1e-12) mask.z() = 1;
+        if (mag(mask) > 0)
+        {
+            body.fix(i, mask, Zero);
+        }
+    }
+    body.setVelocity(v);
+    const scalar KE0 = body.kineticEnergy();
+    const scalar tEnd = 80e-6;
+    scalar t = 0;
+    label steps = 0;
+    while (t < tEnd - 1e-15)
+    {
+        const scalar dt = min(0.5*body.stableDeltaT(), tEnd - t);
+        body.step(dt);
+        t += dt;
+        ++steps;
+    }
+    const pointField& x = body.points();
+    const scalar shorten = L0 - x[id(0, 0, nz)].z();
+    const scalar widen = mag(x[id(nq, 0, 0)]) - R0;
+    scalar epsMax = 0;
+    forAll(body.history(), ei)
+    {
+        epsMax = max(epsMax, body.history()[ei].epsPEq);
+    }
+    const scalar V0 = 0.25*constant::mathematical::pi*R0*R0*L0;
+    const scalar minV = min(body.volumes());
+    const scalar Vtot = sum(body.volumes());
+    const scalar eS = shorten/0.01310 - 1, eW = widen/0.005528 - 1;
+    const bool ok =
+        mag(eS) <= 0.05 && mag(eW) <= 0.10 && minV > 0 && mag(Vtot/V0 - 1) < 0.01;
+    return report
+    (
+        "Taylor bar, copper rod at 227 m/s (" + Foam::name(nq) + " x "
+      + Foam::name(nq) + " x " + Foam::name(nz) + " quarter model)", ok,
+        "shortening " + Foam::name(1e3*shorten) + " mm against 13.10 ("
+      + Foam::name(100*eS) + " %, 5 %), widening " + Foam::name(1e3*widen)
+      + " mm against 5.528 (" + Foam::name(100*eW) + " %, 10 %), largest"
+      + " plastic strain " + Foam::name(epsMax) + ", smallest element volume "
+      + Foam::name(minV) + " m3, volume / initial " + Foam::name(Vtot/V0)
+      + " (within 1 %)"
+      + ", kinetic energy left " + Foam::name(body.kineticEnergy()/KE0)
+      + ", " + Foam::name(steps) + " steps"
+    );
+}
+
 } // End anonymous namespace
 
 
@@ -291,7 +403,24 @@ int main(int argc, char *argv[])
     argList::noParallel();
     argList::noBanner();
     argList::noCheckProcessorDirectories();
+    argList::addBoolOption("taylor", "the Taylor bar (WP 5.2) only");
+    argList::addOption("nq", "label", "Taylor bar: cells across the quarter");
+    argList::addOption("nz", "label", "Taylor bar: cells along the rod");
+    argList::addOption("hourglass", "scalar", "Taylor bar: hourglass coefficient");
+    argList::addOption("hourglassType", "word", "Taylor bar: stiffness | viscous");
     argList args(argc, argv, false, false, false);
+
+    if (args.found("taylor"))
+    {
+        const bool ok = taylorTest
+        (
+            args.getOrDefault<label>("nq", 6), args.getOrDefault<label>("nz", 45),
+            args.getOrDefault<scalar>("hourglass", 0.05),
+            args.getOrDefault<word>("hourglassType", "viscous")
+        );
+        Info<< nl << "WP 5.2 checks: " << (ok ? "ALL PASS" : "FAILED") << nl;
+        return ok ? 0 : 1;
+    }
 
     bool ok = patchTest();
     ok = waveTest() && ok;

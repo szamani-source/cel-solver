@@ -123,8 +123,11 @@ void Foam::hex8Body::internalForces(vectorField& f) const
             f[e[i]] -= V*(sigma_[ei] & B[i]);
         }
 
-        // Hourglass forces: gamma_aI = h_aI - (sum_J h_aJ x_J) . B_I
-        const FixedList<vector, 4>& Q = Qhg_[ei];
+        // Hourglass forces: gamma_aI = h_aI - (sum_J h_aJ x_J) . B_I;
+        // stiffness: Q held per element; viscous: Q = c q from the current
+        // velocities, c = hourglass rho c_wave V^(2/3) / 4 (LS-DYNA type 1)
+        const scalar cv =
+            viscousHg_ ? hourglass_*rho_*cWave_*Foam::pow(V, 2.0/3.0)/4 : 0;
         for (label a = 0; a < 4; ++a)
         {
             vector hx(Zero);
@@ -132,10 +135,17 @@ void Foam::hex8Body::internalForces(vectorField& f) const
             {
                 hx += hgBase[a][j]*x_[e[j]];
             }
+            scalar gamma[8];
+            vector q(Zero);
             for (label i = 0; i < 8; ++i)
             {
-                const scalar gamma = hgBase[a][i] - (hx & B[i]);
-                f[e[i]] -= gamma*Q[a];
+                gamma[i] = hgBase[a][i] - (hx & B[i]);
+                q += gamma[i]*v_[e[i]];
+            }
+            const vector Q(viscousHg_ ? cv*q : Qhg_[ei][a]);
+            for (label i = 0; i < 8; ++i)
+            {
+                f[e[i]] -= gamma[i]*Q;
             }
         }
     }
@@ -157,6 +167,8 @@ Foam::hex8Body::hex8Body
     rho_(dict.get<scalar>("density")),
     hourglass_(dict.getOrDefault<scalar>("hourglass", 0.05)),
     planeStrain_(dict.getOrDefault<bool>("planeStrain", false)),
+    viscousHg_(false),
+    cWave_(0),
     elems_(elems),
     x_(points),
     v_(points.size(), Zero),
@@ -197,6 +209,18 @@ Foam::hex8Body::hex8Body
         {
             m_[elems_[ei][i]] += rho_*V/8;
         }
+    }
+    cWave_ = Foam::sqrt(model_->waveModulus()/rho_);
+    const word hgType(dict.getOrDefault<word>("hourglassType", "stiffness"));
+    if (hgType == "viscous")
+    {
+        viscousHg_ = true;
+    }
+    else if (hgType != "stiffness")
+    {
+        FatalIOErrorInFunction(dict)
+            << "hourglassType " << hgType << ": stiffness or viscous"
+            << exit(FatalIOError);
     }
     if (planeStrain_)
     {
@@ -364,7 +388,10 @@ void Foam::hex8Body::step(const scalar dt)
             {
                 q += (hgBase[a][i] - (hx & B[i]))*v_[e[i]];
             }
-            Qhg_[ei][a] += dt*k*q;
+            if (!viscousHg_)
+            {
+                Qhg_[ei][a] += dt*k*q;
+            }
         }
     }
 }

@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-11-18 (WP 5.1, 4.3e, 4.3d, WP 3.7a solid inlet; WP 4.4c, 4.4b, 4.4, 4.3b, WP 3.5 cohesion, tutorial T0 rule set, WP 4.5, 4.3c, 4.3a, 3.6e, 3.6h, 3.6g, 3.6f; 4.1, 4.0, 4.2; 2026-11-17: 3.6d, 3.6c2, 3.6c, 3.6b, 3.6s, validation references)
+Last updated: 2026-11-18 (WP 5.2, 5.1, 4.3e, 4.3d, WP 3.7a solid inlet; WP 4.4c, 4.4b, 4.4, 4.3b, WP 3.5 cohesion, tutorial T0 rule set, WP 4.5, 4.3c, 4.3a, 3.6e, 3.6h, 3.6g, 3.6f; 4.1, 4.0, 4.2; 2026-11-17: 3.6d, 3.6c2, 3.6c, 3.6b, 3.6s, validation references)
 
 Plan doc: https://claude.ai/artifact/DTT6kSikz9ZUTBkUxY6Grr
 
@@ -70,6 +70,7 @@ Phase 2 (the C++ Eulerian solver: 2.1 to 2.5c and 2.4b done; 2.6 waits for Phase
 | 4.3d | Free bodies (motion from the material force and gravity) | Done | Decision 0058. `mass`, optional `inertia` in `constant/rigidBodies`; celCoupling `moveBodies` (central difference). `tests/test_free_body.sh` passes (about 1 min): thrown block to 1e-14 of the scheme; steel block dropped onto T0 comes to rest carrying its weight (1.0000), momentum to 1e-5. With rotation free the dropped block is kicked to 0.5 rad/s at impact and squeezes a corner cell to 1.038 rho0 (known issue). Also fixed an overflow in the eigen solver |
 | 4.3e | Rough walls: wall adhesion | Done | Decision 0059. `adhesion <Pa>` per body adds to the wall friction. `tests/test_rough_pile.sh` passes (about 3 min): rough pile P / (cu D) 10.47 against Randolph and Houlsby 11.94 at 10 mm (-12 %, band 15 %), 11.26 at 5 mm (-5.7 %, manual) |
 | 5.1 | Hex8 element with hourglass control | Done | Decision 0070. `hex8Body` in celLagrangian: one-point Flanagan-Belytschko hexahedron (exact mean gradients), stiffness hourglass control, central difference, celConstitutive models. `tests/test_hex8.sh` passes (seconds): MacNeal-Harder patch test to 1e-15, 1D strain wave in steel within 0.3 %, energy of a free cube with hourglass modes to 1.4e-7 |
+| 5.2 | Lagrangian-only Taylor bar | Done | Decision 0071. 3D quarter model (6 x 6 x 45 hex8) of the Abaqus Benchmarks copper rod (227 m/s, perfectly plastic 314 MPa): shortening 13.14 mm against 13.10 (+0.3 %), widening 5.76 against 5.528 (+4.2 %). Needs `hourglassType viscous`: the stiffness form locks the impact face in large plastic flow. `tests/test_taylor_bar.sh` (about 1.5 min) |
 
 ## Validation references
 
@@ -198,7 +199,8 @@ mesh, as Abaqus CEL). Order:
 10. WP 4.3d: free bodies. Done (decision 0058).
 11. WP 4.3e: rough walls (adhesion). Done (decision 0059).
 12. WP 5.1: hex8 element. Done (decision 0070).
-13. Next: WP 5.2, the Lagrangian Taylor bar as a 3D quarter model (Abaqus Benchmarks copper rod, which has a 3D C3D8R run), then WP 5.3 two-way deformable coupling. The Eulerian Taylor bar (2.6) waits for the axisymmetric wedge (WP 3.8a, 3.8b). Sand footing accuracy (0057) waits until the solver is fully functional (Sia: features first).
+13. WP 5.2: Lagrangian Taylor bar. Done (decision 0071).
+14. Next: WP 5.3 two-way deformable coupling. The Eulerian Taylor bar (2.6) waits for the axisymmetric wedge (WP 3.8a, 3.8b). Sand footing accuracy (0057) waits until the solver is fully functional (Sia: features first).
 
 ## Known issues
 

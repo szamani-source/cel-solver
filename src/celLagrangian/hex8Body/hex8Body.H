@@ -36,6 +36,10 @@ Description
         density     7800;               // kg/m^3
         material    { type vonMises; E 2e11; nu 0.3; sigma_y 4e8; }
         hourglass   0.05;               // optional
+        hourglassType stiffness;        // optional: stiffness (default,
+                                        // conserves energy; elastic bodies)
+                                        // or viscous (LS-DYNA type 1: large
+                                        // plastic flow, decision 0071)
         planeStrain yes;                // optional: no z velocity (2D runs,
                                         // one element thick)
 
@@ -74,6 +78,10 @@ private:
         scalar rho_;
         scalar hourglass_;
         bool planeStrain_;
+
+        //- Viscous hourglass control (else stiffness) and the wave speed
+        bool viscousHg_;
+        scalar cWave_;
 
         //- Elements (OpenFOAM hex node order)
         List<hexElement> elems_;
