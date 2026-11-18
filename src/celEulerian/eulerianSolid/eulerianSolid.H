@@ -571,6 +571,10 @@ public:
         //  processors [N]
         vector bodyForce(const label b) const;
 
+        //- Force of the body on the material through each wall cell's
+        //  wall face, last step (zero elsewhere; WP 5.3)
+        const vectorField& wallForce() const noexcept { return wallForce_; }
+
         //- Moment of body b on the material about the point c in the last
         //  step, all processors [N m] (WP 4.3d; forces act at the cut
         //  cells' centres)

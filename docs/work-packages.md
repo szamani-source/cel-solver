@@ -76,7 +76,8 @@ Constitutive models for bulk solids are tracked in `docs/constitutive-models.md`
 | 4.4c | Strip footing on sand (Martin 2005 N_gamma, phi 30) | Smooth N_gamma 7.653 within 15 % (closed without it, decision 0057) |
 | 5.1 | Hex8 element with hourglass control | Patch test passes |
 | 5.2 | Lagrangian-only Taylor bar | Matches published result |
-| 5.3 | Two-way deformable coupling | Deformable push test stable |
+| 5.3a | Two-way deformable coupling (split 2026-11-18) | Steel footing push follows the rigid one within 5 %, density within 2 % |
+| 5.3b | Soft deformable bodies | Soft footing shortens as an elastic column within 20 %, density within 2 % |
 | 5.4 | Projectile benchmark | Matches reference run |
 | 6.1 | MPI with Lagrangian bodies | 1 and N cores agree |
 | 6.2 | Restart and mass scaling | Restarted run matches continuous run |

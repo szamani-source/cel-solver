@@ -36,6 +36,16 @@ FoamFile
 //     block { surface block.stl; mass 0.75; inertia (1e-3 0 0 1e-3 0 1e-3);
 //             velocity (0 0 0); }
 //
+// Deformable bodies (WP 5.3a, decision 0072): a box of hex8 elements in
+// place of the STL; nodes in the drive box follow velocity, the rest move
+// under gravity and the material (needs freeSurface yes to couple):
+//
+//     footing { deformable { min (0.1 0.15 -0.01); max (0.2 0.25 0.02);
+//               cells (10 10 1); density 7800; planeStrain yes; damping 0.2;
+//               material { type linearElastic; E 2e11; nu 0.3; }
+//               drive (0.09 0.249 -1) (0.21 0.251 1); }
+//               velocity constant (0 -0.25 0); friction 20; }
+//
 // Output: postProcessing/rigidBodies/<name>.dat (t, centre, rotation, v,
 // omega at write times) and postProcessing/rigidBodies/<time>/<name>.stl.
 

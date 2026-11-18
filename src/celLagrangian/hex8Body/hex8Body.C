@@ -120,7 +120,7 @@ void Foam::hex8Body::internalForces(vectorField& f) const
         const scalar V = gradients(e, x_, B);
         for (label i = 0; i < 8; ++i)
         {
-            f[e[i]] -= V*(sigma_[ei] & B[i]);
+            f[e[i]] -= V*((sigma_[ei] + sigmaV_[ei]) & B[i]);
         }
 
         // Hourglass forces: gamma_aI = h_aI - (sum_J h_aJ x_J) . B_I;
@@ -169,6 +169,8 @@ Foam::hex8Body::hex8Body
     planeStrain_(dict.getOrDefault<bool>("planeStrain", false)),
     viscousHg_(false),
     cWave_(0),
+    damping_(dict.getOrDefault<scalar>("damping", 0)),
+    sigmaV_(elems.size(), Zero),
     elems_(elems),
     x_(points),
     v_(points.size(), Zero),
@@ -354,6 +356,23 @@ void Foam::hex8Body::step(const scalar dt)
         // L_ij = dv_i/dx_j (v (x) B)
         const symmTensor deps(dt*symm(L));
         const tensor dW(dt*skew(L));
+
+        if (damping_ > 0)
+        {
+            // Viscous stress 2 damping rho c Le D, Le = V / largest face area
+            // (as the stable step): critical damping fraction 'damping' for
+            // the shortest mode
+            scalar Amax = 0;
+            for (label f = 0; f < 6; ++f)
+            {
+                const point& a = xMid[e[hexFaces[f][0]]];
+                const point& b = xMid[e[hexFaces[f][1]]];
+                const point& cc = xMid[e[hexFaces[f][2]]];
+                const point& d = xMid[e[hexFaces[f][3]]];
+                Amax = max(Amax, 0.5*mag((cc - a) ^ (d - b)));
+            }
+            sigmaV_[ei] = 2*damping_*rho_*cWave_*(V/Amax)*symm(L);
+        }
 
         const symmTensor sRot(transform(hughesWinget(dW), sigma_[ei]));
         symmTensor sNew;
