@@ -1461,6 +1461,9 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
         }
     }
 
+    // Inlets open and close at the start of a step (WP 3.7a, decision 0060)
+    updateInlets(mesh.time().value() - dt, dt);
+
     // Immersed walls (WP 4.3a, decision 0047): covered cells hold ghost
     // values for the reconstruction; the material fills the open volume Vo
     // of each cell and crosses only the open part of each face
@@ -1536,6 +1539,9 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
         {
             gAxis = label(faceAxis(g_));
         }
+        // Open inlets count as empty for the slab side, as traction-free
+        // patches (WP 3.7a, decision 0060): counted as full, the stream
+        // under an inlet leaned towards it and fell in place
         slabSides
         (
             mesh, alpha_, kinds, lean_, smooth_, gAxis,
@@ -2184,6 +2190,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
             continue;
         }
 
+        const label ink = inletOfPatch_[patchi];
         forAll(fc, i)
         {
             const label P = fc[i];
@@ -2196,7 +2203,28 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
             const vector ttL(tL - tnL*n);
 
             vector v, t;
-            if (fs && !touches(alpha_[P], lean_[P], pS[i]))
+            if (ink >= 0 && inletOpen_[ink])
+            {
+                // Open inlet (WP 3.7a, decision 0060): the face moves into
+                // the domain at the inlet speed; the remap fills the volume
+                // it sweeps with fresh material. Traction from the interior
+                // characteristic where the cell's material is at the face
+                // and pressed against the fed material; else (no material
+                // at the face, or it pulls away: no tension across the
+                // feed) the fed material's own traction -p n
+                v = -inletNow_[ink]*n;
+                t = -inletP_[ink]*n;
+                if (touches(alpha_[P], lean_[P], pS[i]))
+                {
+                    const scalar vn = v & n;
+                    const scalar tn = tnL + zp[P]*(vn - vnL);
+                    if (tn < -inletP_[ink])
+                    {
+                        t = tn*n + ttL - zs[P]*vtL;
+                    }
+                }
+            }
+            else if (fs && !touches(alpha_[P], lean_[P], pS[i]))
             {
                 // Material not at the face (decision 0021 rule 3). An open
                 // outlet takes the free one-sided velocity anyway, so the

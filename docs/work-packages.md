@@ -52,6 +52,12 @@ Constitutive models for bulk solids are tracked in `docs/constitutive-models.md`
 | 3.6h | Smooth blend of the full and partly filled rules (proposed in decision 0048). Closed 2026-11-18 without its done-when (decision 0049) | Silo bands within 10 % at 10 mm, inclined layer still passes |
 | 3.6e | Column collapse with mu(I) against experiments (Lube 2005, Lajeunesse 2005). Done 2026-11-18 at 10 mm (decision 0050: T0 rule set mu(I) + flowImpedance + normalCap) | Run-out and final height within the decision 0019 bands at a = 0.5 and 2, at T0's real E |
 | 3.5 | Cohesion in the silo (arching, flow or no flow) | Flow stops below a critical outlet width |
+| 3.7a | Solid inlet: a patch that feeds fresh material (speed over time, density, stress), decision 0060. Done 2026-11-18 | `tests/test_inlet.sh`: nothing in while closed, fed mass exact, mass balance 1e-12, the fed material lands and comes to rest, 2 processors match serial |
+| 3.7b | Silo fed from the top while it discharges (tutorial, first with `inlets`) | Fed T0 tank reaches a steady level when the feed matches the discharge; level falls when the feed is below it; mass in = mass out + change, 1e-10 |
+| 3.8a | Axisymmetric wedge: wedge patches in the Lagrange step and remap, time step from the in-plane cell size (no free surface) | Lamé thick cylinder under pressure within 1 %; cylindrical Janssen tank (lid) within 2 % of Janssen for a circular bin; 2 processors match serial |
+| 3.8b | Free surface on the wedge: radius-weighted slab rules, the triangle cells at the axis | Lake at rest, falling block and void-top settle on a wedge, as `tests/test_void.sh`; mass 1e-12 |
+| 3.8c | Cylindrical silo discharge on the wedge, central circular outlet | Rate within the 3D Beverloo band (published C, k); same tank as a coarse 3D quarter model within 10 % |
+| 3.8d | STL walls on a wedge (conical hopper), later | Conical hopper discharges; rate recorded against Rose-Tanaka |
 | 3B.1 | N-material volume fractions with isoAdvector | Pure advection keeps interfaces sharp |
 | 3B.2 | Mixed-cell closure | Two-material impact conserves mass and momentum |
 | 3B.3 | Per-material history remap | Plastic strain stays with its material |
@@ -145,3 +151,13 @@ free bodies (motion from the force) are left for when a case needs them. Next: 4
 
 Note (2026-11-18): WP 4.4 split: the strip footing is 4.4 (done, decision 0055, Prandtl
 within 8 % at 10 mm and 1.9 % at 5 mm); the pile is 4.4b: the lateral limit of Randolph and Houlsby (1984), done (decision 0056).
+
+Note (2026-11-18): Sia asked for two things Abaqus CEL cannot do and asked for both
+("Please make these two possible in the solver"): a solid inlet (3.7a, 3.7b) and
+axisymmetric runs on a wedge so a cylindrical silo needs no quarter model (3.8a to 3.8d).
+A wedge mesh keeps every internal face along r or z, so the Cartesian rule of decision
+0031 holds inside the mesh; only the two wedge sides are tilted and no material crosses
+them. The work is in the wedge faces (rotated cell state, hoop terms), the time step
+(cbrt(V) collapses at the axis), the slab rules (cells widen with r, triangles at the
+axis) and the outlet on the axis. Order: 3.7a, 3.7b, 3.8a, 3.8b, 3.8c; 3.8d later.
+

@@ -291,6 +291,8 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
     nNormalCapped_(0),
     outletOpenTime_(readOutlets(mesh, materialProperties_, wallFriction_)),
     discharged_(0),
+    inletOfPatch_(mesh.boundary().size(), -1),
+    charged_(0),
     immersed_(false),
     nUnmixed_(0),
     movingWalls_(false),
@@ -320,6 +322,7 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
             << wallFriction_[iter.key()] << "), opens at t = "
             << iter.val() << " s" << nl;
     }
+    readInlets();
     if (spreadLayers_ && !freeSurface_)
     {
         FatalIOErrorInFunction(materialProperties_)
@@ -478,6 +481,137 @@ void Foam::eulerianSolid::openOutlets()
 Foam::scalar Foam::eulerianSolid::discharged() const
 {
     return returnReduce(discharged_, sumOp<scalar>());
+}
+
+
+Foam::scalar Foam::eulerianSolid::charged() const
+{
+    return returnReduce(charged_, sumOp<scalar>());
+}
+
+
+void Foam::eulerianSolid::readInlets()
+{
+    const dictionary* id = materialProperties_.findDict("inlets");
+    if (!id)
+    {
+        return;
+    }
+    if (!freeSurface_)
+    {
+        FatalIOErrorInFunction(materialProperties_)
+            << "inlets need freeSurface yes" << exit(FatalIOError);
+    }
+    for (const entry& e : *id)
+    {
+        const word& name = e.keyword();
+        if (!e.isDict())
+        {
+            FatalIOErrorInFunction(*id)
+                << "inlets: " << name << " must be a dictionary"
+                << exit(FatalIOError);
+        }
+        const dictionary& d = e.dict();
+        const label patchi = mesh_.boundaryMesh().findPatchID(name);
+        if (patchi < 0)
+        {
+            FatalIOErrorInFunction(*id)
+                << "inlets: no patch " << name << exit(FatalIOError);
+        }
+        const fvPatch& p = mesh_.boundary()[patchi];
+        if
+        (
+            p.coupled() || isA<emptyFvPatch>(p)
+         || U_.boundaryField()[patchi].fixesValue()
+        )
+        {
+            FatalErrorInFunction
+                << "Inlet " << name << " must be a plain patch without a "
+                << "fixed velocity" << exit(FatalError);
+        }
+        if (wallFriction_.found(name) || outletOpenTime_.found(name))
+        {
+            FatalIOErrorInFunction(*id)
+                << "inlets: " << name << " is also a wall or an outlet"
+                << exit(FatalIOError);
+        }
+        const scalar deg = d.getOrDefault<scalar>("friction", 0);
+        if (deg < 0 || deg >= 90)
+        {
+            FatalIOErrorInFunction(d)
+                << "inlets: friction of " << name
+                << " must be in [0, 90) degrees, got " << deg
+                << exit(FatalIOError);
+        }
+        const scalar rhoIn = d.getOrDefault<scalar>("density", rho0_);
+        if (rhoIn <= 0)
+        {
+            FatalIOErrorInFunction(d)
+                << "inlets: density of " << name << " must be positive"
+                << exit(FatalIOError);
+        }
+        const label k = inletName_.size();
+        inletName_.append(name);
+        inletPatch_.append(patchi);
+        inletSpeed_.append(Function1<scalar>::New("speed", d, &mesh_));
+        inletStart_.append(d.getOrDefault<scalar>("startTime", 0));
+        inletEnd_.append(d.getOrDefault<scalar>("endTime", VGREAT));
+        inletFriction_.append(Foam::tan(degToRad(deg)));
+        inletRho_.append(rhoIn);
+        inletP_.append(d.getOrDefault<scalar>("pressure", 0));
+        inletOpen_.append(false);
+        inletNow_.append(0);
+        inletOfPatch_[patchi] = k;
+
+        // Closed until its start time
+        wallFriction_.set(name, inletFriction_[k]);
+        Info<< "Inlet " << name << ": feeds material at " << rhoIn
+            << " kg/m^3, pressure " << inletP_[k] << " Pa, from t = "
+            << inletStart_[k] << " to " << inletEnd_[k]
+            << " s; closed wall otherwise (friction coefficient "
+            << inletFriction_[k] << ")" << nl;
+    }
+}
+
+
+void Foam::eulerianSolid::updateInlets(const scalar t0, const scalar dt)
+{
+    // An inlet is open for the steps that start in [startTime, endTime)
+    // (WP 3.7a, decision 0060); its speed is taken at mid-step
+    forAll(inletName_, k)
+    {
+        const word& name = inletName_[k];
+        const bool open =
+            t0 >= inletStart_[k] - 1e-9*dt && t0 < inletEnd_[k] - 1e-9*dt;
+        if (open)
+        {
+            const scalar s = inletSpeed_[k].value(t0 + 0.5*dt);
+            if (s < 0)
+            {
+                FatalErrorInFunction
+                    << "Inlet " << name << ": negative speed " << s
+                    << " at t = " << t0 + 0.5*dt << " s (material only flows "
+                    << "in; use an outlet to let it out)" << exit(FatalError);
+            }
+            inletNow_[k] = s;
+            if (wallFriction_.erase(name))
+            {
+                Info<< "Inlet " << name << " opened at t = " << t0 << " s"
+                    << endl;
+            }
+        }
+        else
+        {
+            inletNow_[k] = 0;
+            if (inletOpen_[k])
+            {
+                Info<< "Inlet " << name << " closed at t = " << t0 << " s"
+                    << endl;
+            }
+            wallFriction_.set(name, inletFriction_[k]);
+        }
+        inletOpen_[k] = open;
+    }
 }
 
 

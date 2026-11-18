@@ -44,7 +44,7 @@ DEPTH = 0.15
 X0, X1 = 0.1025, 0.1975
 Y0, HEIGHT = 0.1575, 0.1
 RHO_B = 7850.0
-CX, CY, VX, VY, WZ = 22, 23, 24, 25, 26
+CX, CY, VX, VY, WZ = 23, 24, 25, 26, 27
 
 
 def add_free_body(path, name, lo, hi, mass, inertia, v0, w0, fr):
