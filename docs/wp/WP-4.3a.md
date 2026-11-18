@@ -1,6 +1,6 @@
 # WP 4.3a: Fixed STL walls with friction
 
-State: not started. Needs WP 4.0 (scheme, shown to Sia) and WP 4.2.
+State: done (2026-11-18). Needs WP 4.0 (scheme, shown to Sia) and WP 4.2.
 Branch: the thread's `claude/project-thread-*` branch
 
 ## Goal
@@ -37,4 +37,16 @@ weight to 1 %.
 
 ## Log
 
-(none yet)
+- 2026-11-18: Done in one session (decision 0047). Cut-cell walls in `eulerianSolid`
+  (`setImmersedWalls`, `eulerianSolidImmersed.C`; open areas and volumes in the Lagrange
+  step and remap), `friction <deg>` per body in `constant/rigidBodies`, glue
+  `src/celCoupling/immersedWalls`, celFoam and celSiloCheck couple fixed bodies, per-body
+  wall force and leak report, thin-wall and coarse-facet warnings in `bodyCells`.
+  `tests/test_stl_walls.sh` passes (about 3 min): aligned STL walls (cells cut at 1/4 and
+  3/4) 0.24 % from the mesh-wall tank; tank turned 10 deg with gravity 2.1 %; leak 1e-11;
+  force balance 0.06 %. Learned: mixing small cells only after the remap left sliver
+  cells (wall close to a mesh face) straining wildly and the tilted tank never settled
+  (28 %); small cells now act as one cell with their partner in the Lagrange step.
+  Not done: free surface with STL walls (split to WP 4.3c, needed by 4.5), mixing
+  across processors, parallel run of the test. Tutorial `tutorials/stlTank`. Next:
+  WP 4.3c.

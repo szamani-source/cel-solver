@@ -1,0 +1,77 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      blockMeshDict;
+}
+// 10 mm cells, 46 x 65. The tank (STL bodies in constant/triSurface) is
+// 0.40 m wide from x = 0 to 0.40 with its floor at y = 0.0125, so its walls
+// cut cells at a quarter and three quarters of a cell. The outlet is the
+// mesh patch under the floor gap (x 0.1625 to 0.2325); the STL floor closes
+// it down to 0.17 to 0.23 (0.06 m), cutting its two end faces.
+
+scale 1;
+
+vertices
+(
+    (-0.0275 0 0)
+    (0.1625 0 0)
+    (0.2325 0 0)
+    (0.4325 0 0)
+    (-0.0275 0.65 0)
+    (0.1625 0.65 0)
+    (0.2325 0.65 0)
+    (0.4325 0.65 0)
+    (-0.0275 0 0.01)
+    (0.1625 0 0.01)
+    (0.2325 0 0.01)
+    (0.4325 0 0.01)
+    (-0.0275 0.65 0.01)
+    (0.1625 0.65 0.01)
+    (0.2325 0.65 0.01)
+    (0.4325 0.65 0.01)
+);
+
+blocks
+(
+    hex (0 1 5 4 8 9 13 12) (19 65 1) simpleGrading (1 1 1)
+    hex (1 2 6 5 9 10 14 13) (7 65 1) simpleGrading (1 1 1)
+    hex (2 3 7 6 10 11 15 14) (20 65 1) simpleGrading (1 1 1)
+);
+
+boundary
+(
+    left
+    {
+        type patch;
+        faces ((0 8 12 4));
+    }
+    right
+    {
+        type patch;
+        faces ((3 7 15 11));
+    }
+    bottom
+    {
+        type patch;
+        faces ((0 1 9 8) (2 3 11 10));
+    }
+    outlet
+    {
+        type patch;
+        faces ((1 2 10 9));
+    }
+    top
+    {
+        type patch;
+        faces ((4 12 13 5) (5 13 14 6) (6 14 15 7));
+    }
+    frontAndBack
+    {
+        type empty;
+        faces ((0 4 5 1) (8 9 13 12) (1 5 6 2) (9 10 14 13) (2 6 7 3) (10 11 15 14));
+    }
+);
+
+// ************************************************************************* //

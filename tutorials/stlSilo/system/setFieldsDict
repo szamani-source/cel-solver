@@ -1,0 +1,29 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  celFoam tutorial stlSilo (WP 4.3c)
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      setFieldsDict;
+}
+// Stress-free fill of the tank to H = 0.6 m (whole cells at 10 and 5 mm);
+// the 2 cells above it are void.
+defaultFieldValues
+(
+    volScalarFieldValue alpha 0
+    volScalarFieldValue rho 0
+);
+regions
+(
+    boxToCell
+    {
+        box (-1 -1 -1) (1 0.6125 1);   // cell centres below: filled to 0.61 m, about 0.6 m above the STL floor
+        fieldValues
+        (
+            volScalarFieldValue alpha 1
+            volScalarFieldValue rho 1800
+        );
+    }
+);

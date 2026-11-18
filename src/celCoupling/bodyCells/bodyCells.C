@@ -7,6 +7,7 @@
 #include "indexedOctree.H"
 #include "treeDataTriSurface.H"
 #include "fvc.H"
+#include "mathematicalConstants.H"
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -41,6 +42,8 @@ Foam::bodyCells::bodyCells(const fvMesh& mesh, const rigidBodies& bodies)
         mesh, dimensionedVector(dimVelocity, Zero)
     ),
     mixNbr_(mesh.nCells(), -1),
+    cellBody_(mesh.nCells(), -1),
+    nThin_(0),
     nSearched_(0),
     nCut_(0)
 {
@@ -49,9 +52,49 @@ Foam::bodyCells::bodyCells(const fvMesh& mesh, const rigidBodies& bodies)
         search_.set(i, new triSurfaceSearch(bodies_[i].surface0()));
     }
     const pointField& pts = mesh_.points();
+    scalar hSum = 0;
     forAll(cellBb_, celli)
     {
         cellBb_[celli] = treeBoundBox(pts, mesh_.cellPoints()[celli]);
+        hSum += cmptMin(cellBb_[celli].span());
+    }
+    const scalar h =
+        returnReduce(hSum, sumOp<scalar>())
+       /max(returnReduce(mesh_.nCells(), sumOp<label>()), label(1));
+
+    // Coarse facets on curved parts: neighbouring triangles longer than 4
+    // cells along their shared edge meeting at 10 to 45 deg
+    forAll(bodies_, i)
+    {
+        const triSurface& s = bodies_[i].surface0();
+        const vectorField nf(s.faceNormals());
+        const edgeList& edges = s.edges();
+        const labelListList& ef = s.edgeFaces();
+        const pointField& lp = s.localPoints();
+        label nCoarse = 0;
+        scalar longest = 0;
+        forAll(edges, e)
+        {
+            if (ef[e].size() != 2) continue;
+            const scalar len = edges[e].mag(lp);
+            const scalar c = nf[ef[e][0]] & nf[ef[e][1]];
+            const scalar ang =
+                180/constant::mathematical::pi
+               *Foam::acos(min(max(c, scalar(-1)), scalar(1)));
+            if (len > 4*h && ang > 10 && ang < 45)
+            {
+                ++nCoarse;
+                longest = max(longest, len);
+            }
+        }
+        if (nCoarse)
+        {
+            WarningInFunction
+                << "Body " << bodies_[i].name() << ": " << nCoarse
+                << " facet edges up to " << longest/h << " cells long join "
+                << "facets at 10 to 45 deg: a curved surface faceted at the "
+                << "mesh scale; refine the STL" << endl;
+        }
     }
 }
 
@@ -344,9 +387,46 @@ void Foam::bodyCells::update()
             }
         }
     }
+    cellBody_ = bestBody;
+
+    // Thin parts: a cut cell with no face neighbour deeper in a body (on
+    // this processor): the body ends within the cell on every side
+    nThin_ = 0;
+    forAll(a, celli)
+    {
+        if (a[celli] <= 1e-12 || a[celli] >= 1 - 1e-12) continue;
+        bool backed = false;
+        for (const label facei : cells[celli])
+        {
+            if (facei >= mesh_.nInternalFaces()) continue;
+            const label other =
+                own[facei] == celli ? nei[facei] : own[facei];
+            if (a[other] > a[celli] + 1e-9)
+            {
+                backed = true;
+                break;
+            }
+        }
+        if (!backed) ++nThin_;
+    }
+    if (nThin() > 0)
+    {
+        WarningInFunction
+            << nThin() << " cut cells have no neighbour deeper in a body: a body "
+            << "is thinner than about two cells there (decision 0042); "
+            << "material may pass through. Thicken it to at least two cells"
+            << endl;
+    }
+
     alpha_.correctBoundaryConditions();
     wallArea_.correctBoundaryConditions();
     wallVelocity_.correctBoundaryConditions();
+}
+
+
+Foam::label Foam::bodyCells::nThin() const
+{
+    return returnReduce(nThin_, sumOp<label>());
 }
 
 

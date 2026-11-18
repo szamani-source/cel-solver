@@ -1,4 +1,5 @@
 bodyCells/cutGeometry.C
 bodyCells/bodyCells.C
+immersedWalls/immersedWalls.C
 
 LIB = $(FOAM_USER_LIBBIN)/libcelCoupling

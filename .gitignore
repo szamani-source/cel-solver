@@ -10,3 +10,4 @@ tutorials/**/0.[0-9]*/
 __pycache__/
 tutorials/**/0/
 tutorials/**/processor*/
+__pycache__/

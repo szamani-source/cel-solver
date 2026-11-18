@@ -22,6 +22,9 @@ Description
                                 //   along -y, free top at the highest y):
                                 //   s_yy from the weight above, s_xx = s_zz
                                 //   = initK0 s_yy
+        fillBelow   (0 1 0 1.2);// optional (freeSurface, WP 4.3c): material
+                                //   where n.x <= d (n, d), void elsewhere;
+                                //   alpha from 20 x 20 points per cell
     \endverbatim
 
     Output (master unless noted):
@@ -36,7 +39,11 @@ Description
 
 #include "fvCFD.H"
 #include "eulerianSolid.H"
+#include "rigidBodies.H"
+#include "bodyCells.H"
+#include "immersedWalls.H"
 #include "OFstream.H"
+#include "boundBox.H"
 #include <cmath>
 
 using namespace Foam;
@@ -63,8 +70,53 @@ int main(int argc, char *argv[])
         )
     );
 
+    // Partly filled domain (freeSurface, WP 4.3c): alpha and rho = rho0
+    // alpha below the plane n.x = d (before the bodies cut the mesh)
+    if (dict.found("fillBelow"))
+    {
+        const scalarList pl(dict.get<scalarList>("fillBelow"));
+        const vector n(pl[0], pl[1], pl[2]);
+        const label ns = 20;
+        scalarField& a = solid.alphaRef().primitiveFieldRef();
+        scalarField& r = solid.rhoRef().primitiveFieldRef();
+        const labelListList& cp = mesh.cellPoints();
+        forAll(a, celli)
+        {
+            const boundBox bb(mesh.points(), cp[celli], false);
+            const vector lo(bb.min()), span(bb.span());
+            label in = 0;
+            for (label i = 0; i < ns; ++i)
+            {
+                for (label j = 0; j < ns; ++j)
+                {
+                    const vector x
+                    (
+                        lo.x() + (i + 0.5)*span.x()/ns,
+                        lo.y() + (j + 0.5)*span.y()/ns,
+                        lo.z() + 0.5*span.z()
+                    );
+                    if ((n & x) <= pl[3]) ++in;
+                }
+            }
+            a[celli] = scalar(in)/scalar(ns*ns);
+            r[celli] = solid.rho0()*a[celli];
+        }
+        solid.alphaRef().correctBoundaryConditions();
+        solid.rhoRef().correctBoundaryConditions();
+    }
+
+    // STL walls (WP 4.3a): fixed rigid bodies from constant/rigidBodies,
+    // if present, as cut-cell walls
+    rigidBodies bodies(runTime);
+    autoPtr<bodyCells> cut;
+    if (bodies.size())
+    {
+        cut.reset(new bodyCells(mesh, bodies));
+        setImmersedWalls(solid, cut.ref(), bodies);
+    }
+    const scalarField Vopen(solid.openVolume());
+
     const word mode(dict.get<word>("mode"));
-    const scalarField& V = mesh.V().field();
     const vectorField& C = mesh.C().primitiveField();
     const scalar G = solid.material().shearModulus();
     const scalar K = solid.material().waveModulus() - 4.0*G/3.0;
@@ -104,7 +156,7 @@ int main(int argc, char *argv[])
     {
         return gSum
         (
-            0.5*solid.rho().primitiveField()*V
+            0.5*solid.rho().primitiveField()*Vopen
            *magSqr(solid.U().primitiveField())
         );
     };
@@ -115,14 +167,20 @@ int main(int argc, char *argv[])
         forAll(s, celli)
         {
             const symmTensor d(dev(s[celli]));
-            u += V[celli]
+            u += Vopen[celli]
                *((d && d)/(4*G) + sqr(tr(s[celli]))/(18*K));
         }
         return returnReduce(u, sumOp<scalar>());
     };
     auto maxSpeed = [&]()
     {
-        return gMax(mag(solid.U().primitiveField())());
+        const vectorField& U = solid.U().primitiveField();
+        scalar v = 0;
+        forAll(U, celli)
+        {
+            if (Vopen[celli] > 0) v = max(v, mag(U[celli]));
+        }
+        return returnReduce(v, maxOp<scalar>());
     };
 
     autoPtr<OFstream> hist;
@@ -185,7 +243,8 @@ int main(int argc, char *argv[])
         {
             OFstream os(procName("cells.dat"));
             os.precision(17);
-            os  << "# x y Ux Uy s_xx s_yy s_zz s_xy rho epsPEq" << nl;
+            os  << "# x y Ux Uy s_xx s_yy s_zz s_xy rho epsPEq open alpha" << nl;
+            const scalarField open(solid.cellOpen());
             forAll(C, celli)
             {
                 const vector& u = solid.U()[celli];
@@ -194,7 +253,8 @@ int main(int argc, char *argv[])
                     << u.x() << ' ' << u.y() << ' '
                     << s.xx() << ' ' << s.yy() << ' ' << s.zz() << ' '
                     << s.xy() << ' ' << solid.rho()[celli] << ' '
-                    << solid.epsPEq()[celli] << nl;
+                    << solid.epsPEq()[celli] << ' ' << open[celli] << ' '
+                    << solid.alpha()[celli] << nl;
             }
         }
         OFstream os(procName("walls.dat"));
@@ -237,6 +297,27 @@ int main(int argc, char *argv[])
         if (Pstream::master())
         {
             os() << prefix << "weight " << weight << nl;
+        }
+        // STL walls: force of each body on the material per unit depth,
+        // and the mass that entered through its wall faces (leak report)
+        forAll(solid.bodyNames(), b)
+        {
+            const vector f(solid.bodyForce(b)/depth);
+            const scalar mIn = solid.bodyMassIn(b);
+            if (Pstream::master())
+            {
+                const word& n = solid.bodyNames()[b];
+                os() << prefix << "bforce_" << n << "_x " << f.x() << nl
+                    << prefix << "bforce_" << n << "_y " << f.y() << nl
+                    << prefix << "massIn_" << n << ' ' << mIn << nl;
+            }
+        }
+        const scalar mass = solid.totalMass();
+        if (Pstream::master())
+        {
+            os() << prefix << "mass " << mass << nl
+                << prefix << "gx " << solid.g().x() << nl
+                << prefix << "gy " << solid.g().y() << nl;
         }
     };
 

@@ -9,13 +9,16 @@ Description
     cycle live in library celEulerian (class eulerianSolid). Each cycle:
     stable time step, Lagrange step (WP 2.3), remap (WP 2.4), write. The
     two together are checked by tests/test_eulerian_cycle.sh (WP 2.4b);
-    rigid bodies from STL move on prescribed paths (WP 4.1, no forces yet);
-    contact comes in WP 4.2, 4.3 (see docs/work-packages.md).
+    rigid bodies from STL move on prescribed paths (WP 4.1); fixed bodies
+    are cut-cell walls with friction (WP 4.3a, decision 0047); moving
+    bodies are coupled in WP 4.3b (see docs/work-packages.md).
 \*---------------------------------------------------------------------------*/
 
 #include "fvCFD.H"
 #include "eulerianSolid.H"
 #include "rigidBodies.H"
+#include "bodyCells.H"
+#include "immersedWalls.H"
 
 // Print total mass and momentum with enough digits to compare runs
 static void printDiagnostics(const Foam::eulerianSolid& solid)
@@ -45,6 +48,25 @@ int main(int argc, char *argv[])
 
     // Rigid bodies from constant/rigidBodies (WP 4.1); none if absent
     rigidBodies bodies(runTime);
+
+    // Fixed bodies act on the material as cut-cell walls (WP 4.3a,
+    // decision 0047). Moving bodies are not coupled yet (WP 4.3b).
+    autoPtr<bodyCells> cut;
+    bool anyMoving = false;
+    forAll(bodies, b)
+    {
+        anyMoving = anyMoving || bodies[b].moving();
+    }
+    if (bodies.size() && !anyMoving)
+    {
+        cut.reset(new bodyCells(mesh, bodies));
+        setImmersedWalls(solid, cut.ref(), bodies);
+    }
+    else if (anyMoving)
+    {
+        Info<< "Moving rigid bodies: not coupled to the material yet "
+            << "(WP 4.3b)" << nl << endl;
+    }
 
     // Stable time step at the start, printed once. Recomputed every cycle
     // below because density and stress will change once the physics is in.
@@ -78,7 +100,6 @@ int main(int argc, char *argv[])
 
         bodies.move();              // WP 4.1: prescribed motion to t
 
-        // WP 4.2, 4.3: Eulerian-Lagrangian contact forces
 
         solid.remap(dt);            // WP 2.4
 
@@ -86,6 +107,10 @@ int main(int argc, char *argv[])
         {
             printDiagnostics(solid);
             bodies.write();
+            if (cut)
+            {
+                cut->write();       // alphaBody, bodyFaceOpen, ... (WP 4.2)
+            }
         }
 
         runTime.printExecutionTime(Info);
