@@ -69,6 +69,7 @@ Phase 2 (the C++ Eulerian solver: 2.1 to 2.5c and 2.4b done; 2.6 waits for Phase
 | 4.4b | Pile section moving through clay (Randolph and Houlsby 1984) | Done | Decision 0056. Smooth 64-sided pile D = 0.1 m moved sideways through weightless Tresca clay confined at 10 cu, `fullBlend yes`. `tests/test_pile.sh` passes (about 3.5 min): P / (cu D) 9.29 against 9.14 (+1.7 %). Plain void rules shake and read 1 to 5: use `fullBlend yes` with moving bodies in materials without mu(I) |
 | 4.4c | Strip footing on sand (Martin 2005 N_gamma) | Closed without done-when | Decision 0057. Smooth footing on phi 30 sand against exact N_gamma 7.653: psi 0 reads about 11 at 10 mm and 9.7 at 5 mm (+27 %); psi 30 blows up. Manual `tests/manual/test_sand_footing.sh` (fails, not in CI). Treat sand bearing results as upper estimates |
 | 3.8a | Axisymmetric wedge without the free surface | Done | Decision 0061: OpenFOAM `wedge` patches (axis prisms from blockMesh, no axis patch needed). Wedge faces carry the rotated predicted cell state, no flux; wall stress extrapolated on wedge meshes (else O(1) hoop error at the wall); time step from the in-plane length combined with the radius (axis prisms were unstable at maxCo 0.4). `tests/test_wedge.sh` passes (about 1.5 min): Lamé 0.9 % at 2.5 mm beyond two wall cells (wall cells 9 %, first order); K0 lake with axis cells at rest to 5e-16 m/s; cylindrical Janssen tank settles, K 0.43, within 2.0 %; 2 processors 3e-17. Not yet with `freeSurface` (3.8b) |
+| 3.8b | Free surface on the wedge | Done | Decision 0061 addendum: wedge sides pass the Cartesian check (hoop length); the u/r part of the radial flux moves to the hoop axis in the void closure and the slab lengths. `tests/test_wedge_void.sh` passes (about 8 min): lake at rest 3e-16 m/s; elastic plug falls at g (0.000 %), lands, mass 7e-14; T0 void-top tank 2.9 % from circular Janssen, holds undamped; 2 processors 1e-11 (plain MC). Void-top tanks need the T0 rule set: with plain MC, void round-off makes cells that never settle (Cartesian too, see known issues) |
 
 ## Validation references
 
@@ -97,9 +98,9 @@ anything that cannot be undone outside this repository.
 ## Next
 
 Sia's two Abaqus gaps (2026-11-18, thread "Add solid inflow inlet and axisymmetric
-wedge"): WP 3.7a (inlet), 3.7b (fed silo, tutorial `siloFed`) and 3.8a (wedge without the
-free surface, decision 0061) done; next WP 3.8b (free surface on the wedge), then 3.8c
-(`docs/work-packages.md`).
+wedge"): WP 3.7a (inlet), 3.7b (fed silo, tutorial `siloFed`), 3.8a and 3.8b (wedge, with
+the free surface, decision 0061) done; next WP 3.8c (cylindrical silo discharge on the
+wedge, central outlet on the axis), then 3.8d (`docs/work-packages.md`).
 
 The C++ Eulerian cycle is done and checked against the prototypes: WP 2.3 (Lagrange
 step, decision 0018), WP 2.4 (remap, decision 0017), WP 2.4b (both together, decision

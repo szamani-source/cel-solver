@@ -53,3 +53,24 @@ only the two wedge sides are tilted.
   faces is not supported.
 - Not yet: `freeSurface` on a wedge (slabs are Cartesian, WP 3.8b), outlets and inlets
   on a wedge (3.8c), STL walls on a wedge (3.8d).
+
+## Addendum: free surface on the wedge (WP 3.8b)
+
+1. `freeSurface yes` runs on a wedge mesh. The wedge sides are let through the
+   Cartesian check; they give the hoop length (V over half their summed area) and
+   carry no flux.
+2. The radial faces' flux holds (r u)'/r = u' + u/r. The u/r part is hoop strain:
+   the Lagrange step sums v.S over each cell's two wedge sides (`hoopRate_`) and moves
+   it from the radial to the hoop axis, both in the per-axis void closure (which now
+   also closes void along the hoop axis) and in the slab lengths of the remap.
+3. Inside the wedge the slab rules are unchanged: radial slabs use the face area of
+   the side they leave through, which is exact for full cells and keeps mass exact.
+4. A void-top tank needs the T0 rule set (decision 0050). With plain Mohr-Coulomb,
+   void round-off (about 1e-9) in a full region makes partly filled cells that oscillate
+   and never settle; the Cartesian void-top tank does the same (tried 2026-11-18).
+
+`tests/test_wedge_void.sh` (about 8 min): lake at rest with the axis cells to 3e-16
+m/s; an elastic plug falls at g (0.000 %) and lands, mass 7e-14; T0 void-top tank
+(R 0.2 m, 1.2 m) within 2.9 % of circular Janssen, K 0.43, stress change 0.27 % when
+undamped; 2 processors 1e-11 (plain MC: the normal cap's bisection is not
+bit-for-bit across processors, WP 3.4b).

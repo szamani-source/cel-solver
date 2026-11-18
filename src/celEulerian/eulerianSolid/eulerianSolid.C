@@ -10,6 +10,7 @@
 #include "mathematicalConstants.H"
 #include "emptyFvPatch.H"
 #include "wedgeFvPatch.H"
+#include "wedgePolyPatch.H"
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -295,6 +296,8 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
     inletOfPatch_(mesh.boundary().size(), -1),
     charged_(0),
     wedge_(false),
+    wedgeR_(-1),
+    wedgeH_(-1),
     immersed_(false),
     nUnmixed_(0),
     movingWalls_(false),
@@ -330,7 +333,21 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
         if (isA<wedgeFvPatch>(mesh.boundary()[patchi]))
         {
             wedge_ = true;
+            const wedgePolyPatch& wp =
+                refCast<const wedgePolyPatch>(mesh.boundaryMesh()[patchi]);
+            auto axisOf = [](const vector& v) -> label
+            {
+                const vector a(cmptMag(v));
+                return a.x() >= a.y() && a.x() >= a.z()
+                    ? 0 : (a.y() >= a.z() ? 1 : 2);
+            };
+            wedgeH_ = axisOf(wp.n());
+            wedgeR_ = 3 - wedgeH_ - axisOf(wp.axis());
         }
+    }
+    if (wedge_)
+    {
+        hoopRate_.setSize(mesh.nCells(), Zero);
     }
     if (wedge_)
     {
@@ -668,14 +685,27 @@ void Foam::eulerianSolid::setCartesianGeometry()
         A[own[facei]] += 0.5*cmptMag(Sf[facei]);
         A[nei[facei]] += 0.5*cmptMag(Sf[facei]);
     }
-    // Poly patches: empty patches (2D front and back) count here too
+    // Poly patches: empty patches (2D front and back) count here too.
+    // Wedge sides (WP 3.8b, decision 0061) are tilted by half the wedge
+    // angle; they carry no flux, and only give the hoop length (the
+    // geometric direction they face, V over half their summed area)
     forAll(mesh_.boundaryMesh(), patchi)
     {
         const polyPatch& p = mesh_.boundaryMesh()[patchi];
         const labelUList& fc = p.faceCells();
         const vectorField pS(p.faceAreas());
+        const bool wedgeSide = isA<wedgePolyPatch>(p);
         forAll(fc, i)
         {
+            if (wedgeSide)
+            {
+                const vector a(cmptMag(pS[i]));
+                const direction d =
+                    a.x() >= a.y() && a.x() >= a.z()
+                  ? 0 : (a.y() >= a.z() ? 1 : 2);
+                A[fc[i]][d] += 0.5*mag(pS[i]);
+                continue;
+            }
             check(pS[i], mag(pS[i]));
             A[fc[i]] += 0.5*cmptMag(pS[i]);
         }

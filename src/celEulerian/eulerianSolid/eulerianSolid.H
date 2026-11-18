@@ -289,6 +289,15 @@ class eulerianSolid
         //- Axisymmetric wedge mesh: has wedge patches (WP 3.8a)
         bool wedge_;
 
+        //- Wedge mesh: radial and hoop axes (-1 otherwise), and each
+        //  cell's hoop volume rate sum(v.S) over its two wedge sides from
+        //  the last Lagrange step [m^3/s] (WP 3.8b, decision 0061): the
+        //  radial faces' flux holds it too, the per-axis void closure and
+        //  slab lengths move it to the hoop axis
+        label wedgeR_;
+        label wedgeH_;
+        scalarField hoopRate_;
+
         //- Cell lengths along x, y, z (Cartesian hex cells, freeSurface)
         vectorField hCell_;
 

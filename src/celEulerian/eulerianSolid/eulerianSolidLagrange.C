@@ -2519,6 +2519,33 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
             }
         }
     }
+    if (wedge_)
+    {
+        // Hoop volume rate from the wedge sides' face velocities (decision
+        // 0061): the radial faces' flux (r u)' holds both u' and u/r; the
+        // u/r part belongs to the hoop axis
+        hoopRate_ = 0;
+        forAll(mesh.boundary(), patchi)
+        {
+            const fvPatch& p = mesh.boundary()[patchi];
+            if (!isA<wedgeFvPatch>(p)) continue;
+            const labelUList& fc = p.faceCells();
+            const vectorField& pS = Sfo.boundaryField()[patchi];
+            const vectorField& pvS = vS.boundaryField()[patchi];
+            forAll(fc, i)
+            {
+                hoopRate_[fc[i]] += pvS[i] & pS[i];
+            }
+        }
+        if (fs)
+        {
+            forAll(dVa, celli)
+            {
+                dVa[celli][wedgeR_] -= hoopRate_[celli];
+                dVa[celli][wedgeH_] += hoopRate_[celli];
+            }
+        }
+    }
 
     forAll(own, facei)
     {
@@ -2743,7 +2770,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
             symmTensor dE(dEps);
             for (direction d = 0; d < vector::nComponents; ++d)
             {
-                if (geomD[d] < 0)
+                if (geomD[d] < 0 && label(d) != wedgeH_)
                 {
                     continue;
                 }
