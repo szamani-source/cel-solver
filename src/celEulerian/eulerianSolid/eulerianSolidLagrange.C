@@ -1539,9 +1539,38 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
         "sN", IOobject::NO_REGISTER, mesh, dimensionedSymmTensor(dimPressure, Zero)
     );
 
+    // Wall ghost of a flowing cell (WP 3.6c2, decision 0044): the velocity
+    // reconstruction mirrors about the wall's last face velocity (0 where it
+    // sticks) instead of the cell value, so a flowing cell's face state at
+    // the wall is its extrapolated wall velocity and the face shear jump
+    // (eta/distance) does not act on the whole cell velocity a second time
+    tmp<volVectorField> tUw;
+    if (fi)
+    {
+        tUw.reset(new volVectorField("Uwall", U_));
+        volVectorField& Uw = tUw.ref();
+        forAll(mesh.boundary(), patchi)
+        {
+            if (kinds[patchi] != boundaryKind::wall)
+            {
+                continue;
+            }
+            const labelUList& fc = mesh.boundary()[patchi].faceCells();
+            fvPatchVectorField& pU = Uw.boundaryFieldRef()[patchi];
+            const vectorField& pv = vStar_.boundaryField()[patchi];
+            forAll(fc, i)
+            {
+                if (teta()[fc[i]] > 0)
+                {
+                    pU[i] = pv[i];
+                }
+            }
+        }
+    }
     faceStates
     (
-        U_, secondOrder_, UO.ref(), UN.ref(), nullptr, Zero, smoothPtr
+        tUw.valid() ? tUw() : U_, secondOrder_, UO.ref(), UN.ref(), nullptr, Zero,
+        smoothPtr
     );
     faceStates
     (

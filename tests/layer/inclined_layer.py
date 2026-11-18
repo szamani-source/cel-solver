@@ -20,18 +20,19 @@ u(y) = (2/3) (I/d) sqrt(k rho g cos(theta) / rho_s) (h^1.5 - (h - y)^1.5),
 k = (2 + 2 nu)/3.  Theta = 31 deg: I = 0.068, surface speed 1.133 m/s.
 
 Checks: mass to 1e-10 and no stress in empty cells for every run. At
-E = 0.1 MPa, 5 mm cells (10 across the layer): cell-average surface speed
+E = 0.1, 1 and 10 MPa (WP 3.6c2; 3.6b/3.6c checked 0.1 MPa only), 5 mm
+cells (10 across the layer), free surface: cell-average surface speed
 (top cell) and the whole profile (largest cell error over the surface speed)
 within 5 % of the exact cell averages at T_END, and steady (surface speed
-changed by at most 1 % over the last 0.5 s). Recorded, not checked: E = 1
-and 10 MPa (the error against E measures the numerical viscosity), 2.5 mm
+changed by at most 1 % over the last 1 s). Recorded, not checked: 2.5 mm
 at 0.1 MPa (mesh), and the effective numerical viscosity
 eta_num = (tau_exact - s_xy) / gamma_dot in the lower half of the layer.
 
 WP 3.6c (decision 0040): every layer runs with flowImpedance yes (mu(I)
 tangent viscosity at faces between flowing cells, plastic Hancock predictor,
 shear cap with phi_m); --noflow runs the WP 3.6b code path for comparison.
-With --ci the 0.1 MPa, 5 mm layer is also checked against a regression
+With --ci only the 0.1 and 10 MPa, 5 mm layers run (WP 3.6c2), with the
+done-when checks; the 0.1 MPa one is also checked against a regression
 guard: surface speed within 10 % of exact and mean speed at least 0.85 of
 exact (WP 3.6b code: 0.14 and 0.15).
 
@@ -213,7 +214,7 @@ def main():
     cases = [(0.1, 5.0, False), (1.0, 5.0, False), (10.0, 5.0, False), (0.1, 2.5, False),
              (0.1, 5.0, True), (1.0, 5.0, True), (10.0, 5.0, True), (0.1, 2.5, True)]
     if ci:
-        cases = [(0.1, 5.0, False)]
+        cases = [(0.1, 5.0, False), (10.0, 5.0, False)]     # WP 3.6c2
     if args:
         cases = [(float(s.split(":")[0]), float(s.split(":")[1]), s.endswith(":lid"))
                  for s in args]
@@ -228,7 +229,7 @@ def main():
     for E, mm, lid in cases:
         r = layer(work, E, mm * 1e-3, lid=lid)
         basic = r["dm"] <= 1e-10 and r["s_empty"] == 0.0 and np.isfinite(r["us"])
-        checked = E == 0.1 and mm == 5.0 and not lid and not ci
+        checked = mm == 5.0 and not lid      # WP 3.6c2: all three E
         good = basic and (not checked or (abs(r["err_s"]) <= TOL and r["err_prof"] <= TOL
                                           and r["drift"] <= STEADY))
         guard = ci and FLOW

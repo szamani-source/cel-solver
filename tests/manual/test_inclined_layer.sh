@@ -1,10 +1,9 @@
 #!/bin/bash
-# WP 3.6b/3.6c done-when (decisions 0039, 0040): steady inclined layer
+# WP 3.6c2 done-when (decisions 0039, 0040): steady inclined layer
 # (Bagnold profile) with mu(I) and flowImpedance yes: surface speed and
-# profile within 5 % of the exact solution at E = 0.1 MPa, 5 mm cells
-# (checked); E = 1 and 10 MPa, 2.5 mm, and a smooth lid recorded. WP 3.6c2
-# needs all three E within 5 % at 5 mm. FAILS now (0.1 MPa, 5 mm: 7.8 %,
-# floor cells). --noflow runs the WP 3.6b code path. About 6 minutes.
+# profile within 5 % of the exact solution at E = 0.1, 1 and 10 MPa, 5 mm
+# cells, free surface (checked); 2.5 mm and a smooth lid recorded.
+# --noflow runs the WP 3.6b code path. About 6 minutes.
 #
 #   tests/manual/test_inclined_layer.sh               # all cases
 #   tests/manual/test_inclined_layer.sh 0.1:5 1:5:lid # E_MPa:cell_mm[:lid]
