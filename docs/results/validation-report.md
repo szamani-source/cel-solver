@@ -70,12 +70,15 @@ These check the numerics against exact or independent answers and run in CI:
    about 9.7 at 5 mm against 7.653 (and a psi 0 answer should be lower still, about 4.4
    by the Davis reduction). Cause found in part: a rigid body within a cell of the free
    surface disturbs the material at rest (edge cells at 0.1 to 0.2 m/s and 20 kPa for
-   psi 0; associated flow blows up before contact). Failing test
-   `tests/manual/test_body_above_surface.sh`; fixing it is the next package. Treat
+   psi 0; associated flow blows up before contact; cause: small-cell mixing into empty
+   slivers, decision 0092). Fixing that leaves psi 0 unchanged, so the excess has
+   another cause too. Failing test `tests/manual/test_body_above_surface.sh` (A.3). Treat
    bearing results on sand as upper estimates until then.
 3. **Projectile 26 % short** (decision 0074). The slug stops short of the quasi-static
    Prandtl estimate, more so at low speed (-33 % at 0.5 m/s, -21 % at 2 m/s), so not
-   inertia of the clay. Related to the clay footing reading 8 % low at 10 mm.
+   inertia of the clay. Related to the clay footing reading 8 % low at 10 mm. About
+   40 % of it is early contact from small-cell mixing (-15 % with the parked fix,
+   decision 0092).
 4. **Wedge Taylor bar widening short** (decision 0063). 5.02 against 6.006 mm (-16 %) at
    0.2 mm cells: the thin lip at the impact face is smeared over a cell or two; first
    order in the cell size. Use the Lagrangian body for thin flanges and lips.
