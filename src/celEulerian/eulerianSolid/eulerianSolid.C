@@ -299,6 +299,7 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
     inletOfPatch_(mesh.boundary().size(), -1),
     charged_(0),
     wedge_(false),
+    angled_(false),
     wedgeR_(-1),
     wedgeH_(-1),
     immersed_(false),
@@ -379,6 +380,12 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
     if (wedge_)
     {
         hoopRate_.setSize(mesh.nCells(), Zero);
+    }
+    angled_ = meshHasAngledFaces();
+    if (angled_)
+    {
+        Info<< "Angled cells (WP G.1): stable step from the height between "
+            << "opposite faces, V over the largest face area" << nl;
     }
     if (wedge_)
     {
@@ -787,8 +794,78 @@ void Foam::eulerianSolid::setCartesianGeometry()
 }
 
 
+bool Foam::eulerianSolid::meshHasAngledFaces() const
+{
+    auto off = [](const vector& S)
+    {
+        return cmptMax(cmptMag(S)) < (1 - 1e-6)*mag(S);
+    };
+    bool angled = false;
+    const vectorField& Sf = mesh_.Sf().primitiveField();
+    forAll(Sf, facei)
+    {
+        if (off(Sf[facei]))
+        {
+            angled = true;
+            break;
+        }
+    }
+    forAll(mesh_.boundary(), patchi)
+    {
+        const fvPatch& p = mesh_.boundary()[patchi];
+        if (angled || isA<emptyFvPatch>(p) || isA<wedgeFvPatch>(p)) continue;
+        for (const vector& S : p.Sf())
+        {
+            if (off(S))
+            {
+                angled = true;
+                break;
+            }
+        }
+    }
+    return returnReduceOr(angled);
+}
+
+
+Foam::tmp<Foam::scalarField> Foam::eulerianSolid::angledCellSize() const
+{
+    // Angled cells (WP G.1, decision 0103): the stable length is the
+    // perpendicular height between a cell's opposite faces. For a hex,
+    // V/|S| of a face is that height for its face pair (exact for a
+    // parallelepiped), so the smallest is V over the largest face area.
+    // Empty sides (2D) and wedge sides (hoop) are left out. On an
+    // axis-aligned mesh this is not used, so those runs are unchanged
+    const fvMesh& mesh = mesh_;
+    const scalarField& magSf = mesh.magSf().primitiveField();
+    const labelUList& own = mesh.owner();
+    const labelUList& nei = mesh.neighbour();
+    scalarField Smax(mesh.nCells(), Zero);
+    forAll(own, facei)
+    {
+        Smax[own[facei]] = max(Smax[own[facei]], magSf[facei]);
+        Smax[nei[facei]] = max(Smax[nei[facei]], magSf[facei]);
+    }
+    forAll(mesh.boundary(), patchi)
+    {
+        const fvPatch& p = mesh.boundary()[patchi];
+        if (isA<emptyFvPatch>(p) || isA<wedgeFvPatch>(p)) continue;
+        const labelUList& fc = p.faceCells();
+        const scalarField& pS = p.magSf();
+        forAll(fc, i)
+        {
+            Smax[fc[i]] = max(Smax[fc[i]], pS[i]);
+        }
+    }
+    return mesh.V().field()/max(Smax, VSMALL);
+}
+
+
 Foam::tmp<Foam::scalarField> Foam::eulerianSolid::cellSize() const
 {
+    if (angled_ && !wedge_)
+    {
+        return angledCellSize();
+    }
     if (!wedge_)
     {
         return cbrt(mesh_.V().field());
@@ -832,9 +909,13 @@ Foam::tmp<Foam::scalarField> Foam::eulerianSolid::cellSize() const
     const scalarField& V = mesh.V().field();
     auto td = tmp<scalarField>::New(mesh.nCells(), GREAT);
     scalarField& d = td.ref();
+    if (angled_)
+    {
+        d = angledCellSize();
+    }
     forAll(d, celli)
     {
-        for (direction a = 0; a < vector::nComponents; ++a)
+        for (direction a = 0; a < vector::nComponents && !angled_; ++a)
         {
             if (geomD[a] >= 0 && A[celli][a] > VSMALL)
             {

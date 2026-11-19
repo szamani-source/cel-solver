@@ -289,6 +289,10 @@ class eulerianSolid
         //- Axisymmetric wedge mesh: has wedge patches (WP 3.8a)
         bool wedge_;
 
+        //- Mesh has angled cells: a face (other than empty and wedge
+        //  sides) whose normal is not along x, y or z (WP G.1, decision 0103)
+        bool angled_;
+
         //- Wedge mesh: radial and hoop axes (-1 otherwise), and each
         //  cell's hoop volume rate sum(v.S) over its two wedge sides from
         //  the last Lagrange step [m^3/s] (WP 3.8b, decision 0061): the
@@ -390,6 +394,13 @@ class eulerianSolid
         //- Cell size for the stable time step: cbrt(V), or on a wedge
         //  mesh the smallest in-plane length (WP 3.8a)
         tmp<scalarField> cellSize() const;
+
+        //- True if any face (empty and wedge sides excepted) has a normal
+        //  off the x, y and z axes, on any processor (WP G.1)
+        bool meshHasAngledFaces() const;
+
+        //- Angled meshes: V over the cell's largest face area (WP G.1)
+        tmp<scalarField> angledCellSize() const;
 
         //- Read materialProperties inlets (WP 3.7a)
         void readInlets();

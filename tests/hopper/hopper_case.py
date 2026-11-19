@@ -171,6 +171,42 @@ def couto_case(work, name, model="mc", cell=0.025, check=None, c=None, nProcs=1)
     return p, c
 
 
+def aligned_mesh(path, c, cell, top_rows=0):
+    """Wall-aligned (body-fitted) wedge mesh (Sia, 2026-11-19): the hopper is
+    one trapezoid block whose column lines fan from vertical at the axis to
+    the wall slope (rows horizontal); the cylinder block above has square
+    cells joined cell to cell. Patches: outlet, hopperWall, right, top,
+    front/back (wedge). top_rows adds rows of headroom above the fill."""
+    b, ht = hopper_geometry(c)
+    t = math.radians(THETA)
+    co, si = math.cos(t), math.sin(t)
+    R, Ro = c["R"], c["Rout"]
+    n = int(round(R / cell))
+    nh = max(1, int(round(ht / cell)))
+    nc = int(round(c["Hc"] / cell)) + top_rows
+    Hm = ht + nc * c["Hc"] / int(round(c["Hc"] / cell))
+
+    def P(r, y, sg):
+        return (r * co, y, sg * r * si)
+    v = [P(0, 0, 0), P(Ro, 0, -1), P(R, ht, -1), P(0, ht, 0), P(Ro, 0, 1),
+         P(R, ht, 1), P(R, Hm, -1), P(0, Hm, 0), P(R, Hm, 1)]
+    vs = "\n".join(f"    ({x!r} {y!r} {z!r})" for x, y, z in v)
+    cs.write(f"{path}/system/blockMeshDict",
+             cs.HEADER.format(cls="dictionary", obj="blockMeshDict")
+             + f"scale 1;\nvertices\n(\n{vs}\n);\nblocks\n(\n"
+             f"    hex (0 1 2 3 0 4 5 3) ({n} {nh} 1) simpleGrading (1 1 1)\n"
+             f"    hex (3 2 6 7 3 5 8 7) ({n} {nc} 1) simpleGrading (1 1 1)\n);\n"
+             "boundary\n(\n"
+             "    outlet { type patch; faces ((0 1 4 0)); }\n"
+             "    hopperWall { type patch; faces ((1 2 5 4)); }\n"
+             "    right { type patch; faces ((2 6 8 5)); }\n"
+             "    top { type patch; faces ((7 8 6 7)); }\n"
+             "    front { type wedge; faces ((0 3 2 1) (3 7 6 2)); }\n"
+             "    back { type wedge; faces ((0 4 5 3) (3 5 8 7)); }\n"
+             "    axis { type empty; faces ((0 3 3 0) (3 7 7 3)); }\n);\n")
+    return Hm
+
+
 def wall_pressures(path, c, cell):
     """Normal wall pressure (kPa) against height: cylinder from the wall column's
     -s_xx; hopper from n.s.n of the material cells whose centre lies within

@@ -194,3 +194,18 @@ series are numbered from 0100. Packages:
 | H.5 | Flat-bottomed silo Beverloo sweep | Case C: C within 20 % of 0.59 at D0 0.1, 0.2, 0.3 m |
 | H.6 | Mesh and shear band check | Cases A and B at 5 mm cells: results within the bands and within 10 % of 10 mm; report added to `docs/results/validation-report.md` |
 
+Note (2026-11-19, angled cells): Sia wants wall-aligned (body-fitted) hopper meshes and
+said it is very important that the solver handles angled hex cells of varying shape.
+Audit in `docs/spec/angled-cells-audit.md`, decision 0103. Every package keeps Cartesian
+meshes bit-for-bit. Packages:
+
+| WP | Title | Done when |
+| --- | --- | --- |
+| G.1 | Time step on angled cells, skewed-mesh CI test | `tests/test_angled_cells.sh` passes: sheared-mesh P-wave as accurate as Cartesian, leaning-cell column at the solver's own step on the closed-form stress |
+| G.2 | Free surface, void closure and remap along mesh lines | A free-surface column and dam-break settle on a leaning-cell mesh as on the Cartesian one (mass exact, surface flat, stress within 3 %) |
+| G.3 | Walls, friction, outlet, inlet and surface layers on angled faces | Block sliding down a frictional angled wall at the closed-form speed; outlet discharge on an aligned hopper mesh |
+| G.4 | Wedge with fanned trapezoid blocks | Couto silo at rest on the aligned wedge mesh with free surface: Janssen within 5 % |
+| G.5 | STL walls on angled meshes | STL wall on a sheared mesh holds material like the Cartesian case, or a clear error |
+| G.6 | MPI and restart on angled meshes | 4-processor and restarted runs of the G.2 case match serial to round-off |
+| H.7 | Couto comparison on the aligned mesh | `tests/manual/test_hopper_pressure.sh` on the aligned mesh, compared with the cut-cell results |
+
