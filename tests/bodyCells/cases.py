@@ -47,6 +47,39 @@ def box_tris(lo, hi, R=np.eye(3), shift=np.zeros(3)):
     return t
 
 
+def seam_box_tris(lo, hi, xs):
+    """Closed box [lo, hi] whose faces normal to y and z are split into strips
+    at the x values xs (a structured surface, as a hex8 body's): the strip
+    edges are triangle edges along z and y at each x in xs."""
+    X = [lo[0]] + list(xs) + [hi[0]]
+    t = []
+    for a, b in zip(X[:-1], X[1:]):
+        for y, sy in ((lo[1], -1), (hi[1], 1)):        # faces normal to y
+            q = [np.array(v, float) for v in ((a, y, lo[2]), (b, y, lo[2]),
+                                              (b, y, hi[2]), (a, y, hi[2]))]
+            if sy > 0:
+                q = q[::-1]
+            t += [(q[0], q[1], q[2]), (q[0], q[2], q[3])]
+        for z, sz in ((lo[2], -1), (hi[2], 1)):        # faces normal to z
+            q = [np.array(v, float) for v in ((a, lo[1], z), (b, lo[1], z),
+                                              (b, hi[1], z), (a, hi[1], z))]
+            if sz < 0:
+                q = q[::-1]
+            t += [(q[0], q[1], q[2]), (q[0], q[2], q[3])]
+    for x, sx in ((lo[0], -1), (hi[0], 1)):            # the two ends
+        q = [np.array(v, float) for v in ((x, lo[1], lo[2]), (x, hi[1], lo[2]),
+                                          (x, hi[1], hi[2]), (x, lo[1], hi[2]))]
+        if sx < 0:
+            q = q[::-1]
+        t += [(q[0], q[1], q[2]), (q[0], q[2], q[3])]
+    for tri in t:                                      # outward normals
+        c = np.mean(tri, axis=0)
+        n = np.cross(tri[1] - tri[0], tri[2] - tri[0])
+        mid = (np.array(lo) + np.array(hi)) / 2
+        assert np.dot(n, c - mid) > 0
+    return t
+
+
 def icosphere(r, levels, centre):
     p = (1 + 5 ** 0.5) / 2
     V = [(-1, p, 0), (1, p, 0), (-1, -p, 0), (1, -p, 0), (0, -1, p), (0, 1, p),
@@ -140,6 +173,11 @@ def make(root):
          [("cube", box_tris((0.2117, 0.3089, 0.1043), (0.4617, 0.5589, 0.3543)),
            "centre (0.3367 0.4339 0.2293); omega constant (0 0 0.7);")],
          times="0 1")
+    # seam (decision 0093): a box whose surface strips meet on the mesh face
+    # x = 0.5, as the nodes of a hex8 body can
+    case(f"{root}/seam", (10, 10, 4), 1.0,
+         [("seam", seam_box_tris((0.2117, 0.3089, 0.1043), (0.7883, 0.5589, 0.3543),
+                                 [0.35, 0.5, 0.65]), "")])
 
 
 # ---- reading OpenFOAM ascii fields ------------------------------------------------
@@ -242,6 +280,15 @@ def checks(root):
     a1 = read_internal(f"{d}/1/alphaBody")
     check("turning cube: covered volume at t = 1", abs(a1.sum() * 0.1 * 0.1 * 0.25 / Vc - 1),
           1e-10)
+
+    # seam: cells 3 to 6 along x see the same body; the strip edges on the
+    # mesh face x = 0.5 must not change their fractions (decision 0093)
+    d = f"{root}/seam"
+    a = read_internal(f"{d}/0/alphaBody").reshape(4, 10, 10)
+    check("seam: fractions either side of the strip edge on a mesh face",
+          float(np.abs(a[:, :, 3:7] - a[:, :, 3:4]).max()), 1e-12)
+    Vs = stl_volume(f"{d}/constant/triSurface/seam.stl")
+    check("seam: covered volume", abs(a.sum() * 0.1 * 0.1 * 0.25 / Vs - 1), 1e-10)
 
     if fails:
         print("FAILED:", ", ".join(fails))

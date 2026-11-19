@@ -2,6 +2,7 @@
 
 Date: 2026-11-19 (accuracy package A.2, thread "Fix accuracy issues before packaging")
 Status: finding recorded; code change parked in `docs/patches/A2-empty-sliver-mixing.patch`.
+The steel packing is explained and fixed in decision 0093; the patch stays parked (A.3b).
 
 ## Context
 

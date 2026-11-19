@@ -192,18 +192,30 @@ scalar faceCovered
         {
             h[k] = (P[f[k]] - pts[0]) & e;
         }
+        // A vertex on the plane counts as above it (h >= 0), the same for
+        // every triangle that shares it (decision 0093): a triangle edge in
+        // the plane is then the cut line of exactly one of its two
+        // triangles, the one below the plane, and is never lost
         point q[2];
         label nq = 0;
         for (label k = 0; k < 3 && nq < 2; ++k)
         {
             const label k1 = (k + 1) % 3;
-            if ((h[k] < 0 && h[k1] > 0) || (h[k] > 0 && h[k1] < 0))
+            if ((h[k] >= 0) == (h[k1] >= 0))
             {
-                q[nq++] = P[f[k]] + (h[k]/(h[k] - h[k1]))*(P[f[k1]] - P[f[k]]);
+                continue;
             }
-            else if (h[k] == 0 && h[k1] != 0)
+            if (h[k] == 0)
             {
                 q[nq++] = P[f[k]];
+            }
+            else if (h[k1] == 0)
+            {
+                q[nq++] = P[f[k1]];
+            }
+            else
+            {
+                q[nq++] = P[f[k]] + (h[k]/(h[k] - h[k1]))*(P[f[k1]] - P[f[k]]);
             }
         }
         if (nq < 2)
