@@ -2,7 +2,10 @@
 (decisions 0047, 0051). Run by tests/test_stl_silo.sh after celVoidCheck is
 built:
 
-    python3 stl_silo_checks.py WORKDIR [tank] [hopper]
+    python3 stl_silo_checks.py WORKDIR [tank] [flatstl] [hopper]
+
+flatstl runs one STL flat tank at maxCo 0.40 for the hopper to compare with
+(decision 0091); CEL_CELL=0.005 runs everything at 5 mm cells.
 
 The T0 tank of WP 3.3/3.6d (tests/outlet/outlet_checks.py): W 0.4 m, fill
 0.6 m, outlet D 0.06 m, Mohr-Coulomb c 0, phi 35 with the T0 mu(I) law and
@@ -89,11 +92,13 @@ def stl_mesh(path, ny):
     """Box mesh x X0 .. X0 + NX cells, y 0 .. ny cells, three blocks so that
     the cells under the floor gap (x 0.1625 to 0.2325) are the outlet."""
     c = oc.CELL
-    xs = [X0, X0 + 19 * c, X0 + 26 * c, X0 + NX * c]
+    k = int(round(0.01 / c))           # cells per 10 mm (CEL_CELL 0.005: 2)
+    n1, n2, nx = 19 * k, 26 * k, NX * k
+    xs = [X0, X0 + n1 * c, X0 + n2 * c, X0 + nx * c]
     Hd = ny * c
     verts = ([f"({x!r} 0 0)" for x in xs] + [f"({x!r} {Hd!r} 0)" for x in xs]
              + [f"({x!r} 0 {c!r})" for x in xs] + [f"({x!r} {Hd!r} {c!r})" for x in xs])
-    ncell = [19, 7, NX - 26]
+    ncell = [n1, n2 - n1, nx - n2]
     blocks = [f"    hex ({b} {b + 1} {5 + b} {4 + b} {8 + b} {9 + b} {13 + b} {12 + b}) "
               f"({ncell[b]} {ny} 1) simpleGrading (1 1 1)" for b in range(3)]
 
@@ -235,6 +240,8 @@ def check_hopper(work, flat):
 
 def main():
     work = sys.argv[1]
+    if os.environ.get("CEL_CELL"):         # finer cells, e.g. CEL_CELL=0.005
+        oc.CELL = oc.vc.CELL = float(os.environ["CEL_CELL"])
     which = sys.argv[2:] or ["tank", "hopper"]
     t0 = time.perf_counter()
     ok, flat = True, float("nan")
@@ -242,6 +249,13 @@ def main():
         good, mean = check_tank(work)
         ok &= good
         flat = mean["mesh"]
+    if "flatstl" in which:            # one STL flat tank at maxCo 0.40, the
+        p = make(work, "stl0.4", "stl", CO[0])   # hopper's twin (decision 0091)
+        sec = oc.vc.run(p)
+        r = result(p)
+        flat = r["rate"]
+        print(f"[1b] Flat STL tank, maxCo {CO[0]:g}: rate {flat:.1f} kg/s/m "
+              f"(C {r['C']:.2f}), {sec:.0f} s")
     if "hopper" in which:
         ok &= check_hopper(work, flat)
     print(f"\nWP 4.5 checks: {'ALL PASS' if ok else 'FAILED'} "

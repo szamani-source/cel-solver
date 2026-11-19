@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-11-19 (phase 6: WP 6.1 MPI with bodies, 6.2a restart, 6.3a scaling, 6.3b validation report; 2026-11-18: WP 2.6 Taylor bar on the wedge, WP 3.8c wedge silo, 3.8b, 3.8a wedge, WP 3.7b fed silo, WP 5.3a, 5.2, 5.1, 4.3e, 4.3d, WP 3.7a solid inlet; WP 4.4c, 4.4b, 4.4, 4.3b, WP 3.5 cohesion, tutorial T0 rule set, WP 4.5, 4.3c, 4.3a, 3.6e, 3.6h, 3.6g, 3.6f; 4.1, 4.0, 4.2; 2026-11-17: 3.6d, 3.6c2, 3.6c, 3.6b, 3.6s, validation references)
+Last updated: 2026-11-19 (accuracy pass A.1: decisions 0090, 0091; phase 6: WP 6.1 MPI with bodies, 6.2a restart, 6.3a scaling, 6.3b validation report; 2026-11-18: WP 2.6 Taylor bar on the wedge, WP 3.8c wedge silo, 3.8b, 3.8a wedge, WP 3.7b fed silo, WP 5.3a, 5.2, 5.1, 4.3e, 4.3d, WP 3.7a solid inlet; WP 4.4c, 4.4b, 4.4, 4.3b, WP 3.5 cohesion, tutorial T0 rule set, WP 4.5, 4.3c, 4.3a, 3.6e, 3.6h, 3.6g, 3.6f; 4.1, 4.0, 4.2; 2026-11-17: 3.6d, 3.6c2, 3.6c, 3.6b, 3.6s, validation references)
 
 Plan doc: https://claude.ai/artifact/DTT6kSikz9ZUTBkUxY6Grr
 
@@ -84,6 +84,8 @@ Phase 2 (the C++ Eulerian solver: 2.1 to 2.5c, 2.4b and 2.6 done) and Phase 3 (s
 | 6.2b | Mass scaling (split from 6.2) | Later, on request | Deformable bodies are subcycled (decision 0072), so the material's step sets the cost; mass scaling would only help quasi-static Lagrangian-only runs |
 | 6.3a | Parallel scaling (split from 6.3) | Done | `docs/results/scaling.md`, `tests/manual/test_scaling.sh` (1.5 min): T0 tank, 4 us per cell per step serial; 4 processors 2.6 times serial at 10 mm (620 cells each), 3.3 at 5 mm. Keep a few thousand cells per processor |
 | 6.3b | Validation report (split from 6.3) | Done | `docs/results/validation-report.md`: 19 benchmarks with reference, result, tolerance, test; verification checks; nine known issues. Add a row for each new benchmark |
+| A.1 | Accuracy pass before packaging (Sia, 2026-11-19) | Done | Wedge against quarter gap was the comparison: by hydraulic diameter 0.2 % (decision 0090). Sand footing: a body within a cell of the free surface disturbs the material at rest and blows up associated flow (failing `tests/manual/test_body_above_surface.sh`); hopper 1.07 at 5 mm (1.01 at 10 mm); psi 0.5 to 1 deg narrows the stiffness gap to 12 to 15 % (decision 0091) |
+| A.2 | Body near a free surface | Next | Done when `tests/manual/test_body_above_surface.sh` passes; then re-run the sand footing with psi 30 against Martin (2005), and the projectile (0074) |
 
 ## Validation references
 
@@ -112,6 +114,11 @@ anything that cannot be undone outside this repository.
 - Abaqus or LS-DYNA access for reference runs? Not needed for the silo problem.
 
 ## Next
+
+Accuracy pass (Sia, 2026-11-19, before packaging): A.1 done (decisions 0090, 0091).
+Sia: mass flow and mesh dependence are secondary until Sia's validation case; find
+where errors come from. Next: A.2, a body near a free surface
+(`tests/manual/test_body_above_surface.sh`), then the sand footing with psi 30.
 
 Phase 6 (2026-11-19) done: WP 6.1 (MPI with bodies), 6.2a (restart), 6.3a (scaling,
 `docs/results/scaling.md`), 6.3b (validation report, `docs/results/validation-report.md`);
@@ -229,6 +236,9 @@ mesh, as Abaqus CEL). Order:
 
 ## Known issues
 
+- Body near a free surface (decision 0091): a rigid footing held 2.5 mm above sand at
+  rest sets the edge cells moving (0.1 to 0.2 m/s, 20 kPa) and, with psi = phi, blows
+  up before contact. Likely the main part of the sand footing excess (0057). Package A.2.
 - Parallel runs (WP 6.1, decision 0080): with bodies, caps and void rules, a run on N
   processors matches serial to round-off only until a switch flips, then parts like a
   serial run with a 1e-12 perturbation (footing force 2 to 4 %, tank rate 0 %). Small
