@@ -187,7 +187,7 @@ series are numbered from 0100. Packages:
 | WP | Title | Done when |
 | --- | --- | --- |
 | H.1 | Case spec and reference data | `tests/test_hopper_spec.sh` passes (data consistent with the geometry and the papers' closed forms) |
-| H.2 | Conical hopper walls on the wedge (was 3.8d) | Couto silo filled at rest on the wedge with a cut-cell hopper wall: mass held, cylinder pressure on Janssen within 10 %, closed outlet holds |
+| H.2 | Conical hopper walls on the wedge (was 3.8d) | Couto silo filled at rest on the wedge with a cut-cell hopper wall: mass held, cylinder pressure on Janssen (K = nu/(1-nu), decision 0101) within 10 %, closed outlet holds |
 | H.3 | Couto silo wall pressure, MC and DP | Case A pass bands met by both models (at rest and at 0.5 s of discharge) |
 | H.4 | P1 basic hopper discharge, MC and DP | Case B: outlet-centre plateau within 20 % of 1.37 m/s, mass flow, both models, psi 1 deg; psi 5 deg reported |
 | H.5 | Flat-bottomed silo Beverloo sweep | Case C: C within 20 % of 0.59 at D0 0.1, 0.2, 0.3 m |
