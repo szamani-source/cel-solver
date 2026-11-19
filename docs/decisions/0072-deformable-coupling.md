@@ -42,5 +42,6 @@ material) and its nodes move with many velocities within one coupling step.
 - Known issue (WP 5.3b): a soft body (E 20 MPa, the order of the material's own
   stiffness) packs the material under it to 1.62 rho0 and shortens 1.44 times the
   elastic column. Likely the remap target Vo + dt wallU.A with wallU from the cell
-  centre is not the volume a bending surface sweeps; not isolated.
+  centre is not the volume a bending surface sweeps; not isolated. Solved in decision
+  0073: the loads stirred the hourglass modes.
 - The force lag of one coupling step is in the elements' dynamics, not in the geometry.

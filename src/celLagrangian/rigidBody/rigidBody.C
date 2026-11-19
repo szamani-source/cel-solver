@@ -289,6 +289,11 @@ Foam::rigidBody::rigidBody
                 hex_->fix(i, vector::one, v0);
             }
         }
+        else
+        {
+            // Free (WP 5.4): starts with the body's velocity at t = 0
+            hex_->setVelocity(vectorField(p.size(), velocity_->value(0)));
+        }
         surfU_ = vectorField(hex_->velocity(), surfNode_);
         if (mass_ > 0 || dict.found("inertia"))
         {
@@ -355,6 +360,7 @@ Foam::vector Foam::rigidBody::velocityAt(const point& x) const
     if (hex_)
     {
         // Nearest surface triangle, its points' velocities over the step
+        // (the surface the material sees is made of these triangles)
         const pointField& sp = surface0_.points();
         const vectorField& v = surfU_;
         scalar best = GREAT;
@@ -396,7 +402,37 @@ Foam::triSurface Foam::rigidBody::surface() const
 }
 
 
-void Foam::rigidBody::addSurfaceForce(const point& x, const vector& f)
+Foam::FixedList<Foam::point, 4> Foam::rigidBody::faceSamples
+(
+    const point& c,
+    const vector& span,
+    const vector& n
+)
+{
+    const vector a(mag(n.x()) < 0.9 ? vector(1, 0, 0) : vector(0, 1, 0));
+    const vector t1(normalised(a - (a & n)*n));
+    const vector t2(n ^ t1);
+    auto half = [&span](const vector& t)
+    {
+        return 0.5*(mag(t.x())*span.x() + mag(t.y())*span.y()
+          + mag(t.z())*span.z());
+    };
+    const scalar g = 1/Foam::sqrt(3.0);
+    const scalar e1 = g*half(t1), e2 = g*half(t2);
+    return FixedList<point, 4>
+    ({
+        c - e1*t1 - e2*t2, c + e1*t1 - e2*t2,
+        c - e1*t1 + e2*t2, c + e1*t1 + e2*t2
+    });
+}
+
+
+bool Foam::rigidBody::nearestFace
+(
+    const point& x,
+    FixedList<label, 4>& q,
+    FixedList<scalar, 4>& N
+) const
 {
     const pointField& sp = surface0_.points();
     scalar best = GREAT;
@@ -414,12 +450,79 @@ void Foam::rigidBody::addSurfaceForce(const point& x, const vector& f)
             wBest = w;
         }
     }
-    if (tBest >= 0)
+    if (tBest < 0)
     {
-        const labelledTri& t = surface0_[tBest];
-        for (label k = 0; k < 3; ++k)
+        return false;
+    }
+
+    // The element face of that triangle (the triangles come in pairs,
+    // (q0 q1 q2) and (q0 q2 q3), boundarySurface) and the face coordinates
+    // of the nearest point
+    const label k0 = 2*(tBest/2);
+    const labelledTri& ta = surface0_[k0];
+    q = FixedList<label, 4>({ta[0], ta[1], ta[2], surface0_[k0 + 1][2]});
+    scalar xi, eta;
+    if (tBest == k0)
+    {
+        xi = wBest[1] + wBest[2];
+        eta = wBest[2];
+    }
+    else
+    {
+        xi = wBest[1];
+        eta = wBest[1] + wBest[2];
+    }
+    // Gauss-Newton on |X(xi, eta) - x|, kept inside the face
+    for (label it = 0; it < 4; ++it)
+    {
+        const point X
+        (
+            (1 - xi)*(1 - eta)*sp[q[0]] + xi*(1 - eta)*sp[q[1]]
+          + xi*eta*sp[q[2]] + (1 - xi)*eta*sp[q[3]]
+        );
+        const vector a
+        (
+            (1 - eta)*(sp[q[1]] - sp[q[0]]) + eta*(sp[q[2]] - sp[q[3]])
+        );
+        const vector b
+        (
+            (1 - xi)*(sp[q[3]] - sp[q[0]]) + xi*(sp[q[2]] - sp[q[1]])
+        );
+        const vector r(x - X);
+        const scalar aa = a & a, ab = a & b, bb = b & b;
+        const scalar det = aa*bb - ab*ab;
+        if (det <= VSMALL)
         {
-            nodeForce_[surfNode_[t[k]]] += wBest[k]*f;
+            break;
+        }
+        const scalar ra = r & a, rb = r & b;
+        xi = min(max(xi + (bb*ra - ab*rb)/det, scalar(0)), scalar(1));
+        eta = min(max(eta + (aa*rb - ab*ra)/det, scalar(0)), scalar(1));
+    }
+    N = FixedList<scalar, 4>
+    ({
+        (1 - xi)*(1 - eta), xi*(1 - eta), xi*eta, (1 - xi)*eta
+    });
+    return true;
+}
+
+
+void Foam::rigidBody::addSurfaceForce
+(
+    const point& x,
+    const vector& f
+)
+{
+    // To the four nodes of the nearest element face with its bilinear shape
+    // functions, as the elements see a load: the barycentric weights of one
+    // triangle load the face's hourglass mode (decision 0073)
+    FixedList<label, 4> q;
+    FixedList<scalar, 4> N;
+    if (nearestFace(x, q, N))
+    {
+        for (label k = 0; k < 4; ++k)
+        {
+            nodeForce_[surfNode_[q[k]]] += N[k]*f;
         }
     }
 }

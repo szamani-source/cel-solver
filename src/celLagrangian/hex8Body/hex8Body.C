@@ -306,7 +306,9 @@ Foam::scalar Foam::hex8Body::stableDeltaT() const
         }
         dt = min(dt, V/Amax/c);
     }
-    return dt;
+    // Viscous damping, critical fraction z of the shortest mode: central
+    // difference stable to omega dt = 2 (sqrt(1 + z^2) - z) (decision 0073)
+    return dt*(Foam::sqrt(1 + sqr(damping_)) - damping_);
 }
 
 

@@ -173,6 +173,18 @@ class rigidBody
         scalar tHex_;
 
 
+    // Private Member Functions
+
+        //- Deformable: the element face (its four surface points) nearest
+        //  x, and the face's shape functions at the nearest point
+        bool nearestFace
+        (
+            const point& x,
+            FixedList<label, 4>& q,
+            FixedList<scalar, 4>& N
+        ) const;
+
+
 public:
 
     //- Runtime type information
@@ -226,8 +238,22 @@ public:
         const hex8Body& hex() const { return *hex_; }
 
         //- Deformable: add the force f of the material at the point x to
-        //  the nodes of the nearest surface triangle (this processor)
+        //  the nodes of the nearest element face, with the face's bilinear
+        //  shape functions (this processor; decision 0073)
         void addSurfaceForce(const point& x, const vector& f);
+
+        //- Deformable: four sample points over the wall face of a cut
+        //  cell (centre c, bounding box span, unit normal n into the
+        //  body): 2 x 2 Gauss points across the cell. Material loads and
+        //  the wall velocity are taken over these, not at the centre: a
+        //  surface finer than the cells is loaded and seen as a whole
+        //  (decision 0073)
+        static FixedList<point, 4> faceSamples
+        (
+            const point& c,
+            const vector& span,
+            const vector& n
+        );
 
         //- Deformable: forces on the nodes gathered this step
         vectorField& nodeForce() noexcept { return nodeForce_; }

@@ -41,3 +41,5 @@ hand-over loss and leak as serial.
   stress-free fill differs from step 2 in the cap counts with any perturbation, hence
   the relative exact-phase bound. Lesson: after changing a class layout, rebuild the
   test drivers (celVoidCheck ran with an old eulerianSolid layout and smashed its stack).
+- 2026-11-19: After merging WP 5.3b (element-face loads, decision 0073) the footing reads
+  40.24 serial, 40.14 on 2 processors, 40.57 perturbed; restart test unchanged (pass).

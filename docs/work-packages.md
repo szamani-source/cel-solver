@@ -78,7 +78,7 @@ Constitutive models for bulk solids are tracked in `docs/constitutive-models.md`
 | 5.2 | Lagrangian-only Taylor bar | Matches published result |
 | 5.3a | Two-way deformable coupling (split 2026-11-18) | Steel footing push follows the rigid one within 5 %, density within 2 % |
 | 5.3b | Soft deformable bodies | Soft footing shortens as an elastic column within 20 %, density within 2 % |
-| 5.4 | Projectile benchmark | Matches reference run |
+| 5.4 | Projectile benchmark | Steel slug into clay within 5 % of the rigid reference run; both within 30 % of the Prandtl energy estimate |
 | 6.1 | MPI with Lagrangian bodies | 1 and N cores agree (decision 0080: exact phase, then outcomes within the round-off band) |
 | 6.2a | Restart (split 2026-11-18) | Restarted run matches continuous run, bit for bit |
 | 6.2b | Mass scaling of deformable bodies (split from 6.2; later, on request) | Quasi-static push with scaled elements gives the unscaled force within 5 % |
