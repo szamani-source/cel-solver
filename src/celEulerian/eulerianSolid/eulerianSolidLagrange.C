@@ -1608,6 +1608,25 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
     // Cell mass, constant in the step
     const scalarField m(rho_.primitiveField()*Vo);
 
+    // Inertia of each cell (decision 0094): its mass; but a residue (with free
+    // surface, less than 1e-6 of a full cell's mass) gets at least half the
+    // rest density times its material volume alpha Vo, as the impedances use
+    // the material density rho/alpha bounded to 0.5 to 2 rho0. A trace whose
+    // mass and fill disagree (1e-18 kg at alpha 1e-6) cannot then be driven
+    // to runaway speeds by its own face forces. Other cells are unchanged.
+    scalarField mI(m);
+    if (freeSurface_)
+    {
+        const scalarField& a = alpha_.primitiveField();
+        forAll(mI, celli)
+        {
+            if (a[celli] > alphaEmpty && m[celli] < 1e-6*rho0_*Vo[celli])
+            {
+                mI[celli] = max(m[celli], 0.5*rho0_*a[celli]*Vo[celli]);
+            }
+        }
+    }
+
     // Gravity at mid-step (the driver advances the time before the step)
     const vector g(gravityAt(mesh.time().value() - 0.5*dt));
 
@@ -1973,7 +1992,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
 
         // Small cut cells move and strain with the cell they are mixed
         // with (one cell for the predictor)
-        scalarField mP(m), VoP(Vo);
+        scalarField mP(mI), VoP(Vo);
         if (imm)
         {
             groupSum(mixTo_, divS);
@@ -2663,7 +2682,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
     // Small cut cells: one cell with the cell they are mixed with for the
     // momentum and the strain (decision 0047); each keeps its own volume
     // change for its density
-    scalarField mG(m), VoG(Vo), dVG(dV);
+    scalarField mG(mI), VoG(Vo), dVG(dV);
     tensorField TG(T);
     vectorField dVaG(dVa);
     if (imm)

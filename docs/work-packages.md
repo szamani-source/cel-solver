@@ -175,5 +175,6 @@ Note (2026-11-19, accuracy pass before packaging): Sia asked to fix accuracy iss
 before the install package. A.1 (ranking and the first fixes, decisions 0090, 0091)
 done; A.2 (body near a free surface) done when `tests/manual/test_body_above_surface.sh`
 passes. A.3 split (decision 0093): A.3a the steel packing (a geometry bug) done; A.3b
-robust free-surface small cells, then merge the parked sliver fix. Mass flow and mesh dependence wait for Sia's validation case. Decisions for
+robust free-surface small cells and the sliver fix merged (decision 0094); A.4 the
+sand footing with psi 30. Mass flow and mesh dependence wait for Sia's validation case. Decisions for
 this pass are numbered from 0090.

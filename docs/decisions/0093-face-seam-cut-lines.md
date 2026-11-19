@@ -1,7 +1,7 @@
 # 0093: A surface seam on a mesh face keeps its cut line; the sliver fix stays parked
 
 Date: 2026-11-19 (accuracy package A.3, thread "Fix body contact above surface")
-Status: geometry fix accepted (A.3a); the sliver fix of decision 0092 stays parked (A.3b).
+Status: geometry fix accepted (A.3a); the sliver fix was merged in A.3b (decision 0094).
 
 ## Context
 
