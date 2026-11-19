@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-11-19 (WP 6.1 MPI with bodies, 6.2a restart; 2026-11-18: WP 5.3a, 5.2, 5.1, 4.3e, 4.3d, WP 3.7a solid inlet; WP 4.4c, 4.4b, 4.4, 4.3b, WP 3.5 cohesion, tutorial T0 rule set, WP 4.5, 4.3c, 4.3a, 3.6e, 3.6h, 3.6g, 3.6f; 4.1, 4.0, 4.2; 2026-11-17: 3.6d, 3.6c2, 3.6c, 3.6b, 3.6s, validation references)
+Last updated: 2026-11-19 (phase 6: WP 6.1 MPI with bodies, 6.2a restart, 6.3a scaling, 6.3b validation report; 2026-11-18: WP 5.3a, 5.2, 5.1, 4.3e, 4.3d, WP 3.7a solid inlet; WP 4.4c, 4.4b, 4.4, 4.3b, WP 3.5 cohesion, tutorial T0 rule set, WP 4.5, 4.3c, 4.3a, 3.6e, 3.6h, 3.6g, 3.6f; 4.1, 4.0, 4.2; 2026-11-17: 3.6d, 3.6c2, 3.6c, 3.6b, 3.6s, validation references)
 
 Plan doc: https://claude.ai/artifact/DTT6kSikz9ZUTBkUxY6Grr
 
@@ -76,5 +76,280 @@ Phase 2 (the C++ Eulerian solver: 2.1 to 2.5c and 2.4b done; 2.6 waits for Phase
 | 6.1 | MPI with Lagrangian bodies | Done | Decision 0080. No solver change needed. `tests/test_mpi_bodies.sh` (about 5.5 min): free block drop and hex8 footing on 2 processors (split through the body), STL tank with outlet on 4 (2 x 2). First 100 steps match serial to 5e-15 (bodies); outcomes: force at rest 1.0000 both, footing 39.3 against 37.8 N (perturbed serial 38.7: round-off band about 2.5 %), tank rate 68.26 both. Parallel runs with switches part from serial like round-off-perturbed serial runs: compare bands |
 | 6.2a | Restart (split from 6.2) | Done | Decision 0081. `<time>/uniform/eulerianSolid` (mass counters, wall face velocities) and `<time>/uniform/rigidBodies` (pose, free-body velocity, hex8 element state) written at each write time and read on start; free bodies can now restart. celFoam computes its own step with adjustableRunTime (lands on write times counted from zero, never longer than stable). `tests/test_restart.sh` (40 s): silo restarted while discharging, free block and hex8 footing in contact, serial and 2 processors: identical bit for bit. Use `writeFormat binary` for exact restarts |
 | 6.2b | Mass scaling (split from 6.2) | Later, on request | Deformable bodies are subcycled (decision 0072), so the material's step sets the cost; mass scaling would only help quasi-static Lagrangian-only runs |
-| 6.3a | Parallel scaling (split from 6.3) | Next | `tests/manual/test_scaling.sh` |
-| 6.3b | Validation report (split from 6.3) | Next | Every benchmark with reference, result, tolerance, test and known issues |
+| 6.3a | Parallel scaling (split from 6.3) | Done | `docs/results/scaling.md`, `tests/manual/test_scaling.sh` (1.5 min): T0 tank, 4 us per cell per step serial; 4 processors 2.6 times serial at 10 mm (620 cells each), 3.3 at 5 mm. Keep a few thousand cells per processor |
+| 6.3b | Validation report (split from 6.3) | Done | `docs/results/validation-report.md`: 19 benchmarks with reference, result, tolerance, test; verification checks; nine known issues. Add a row for each new benchmark |
+
+## Validation references
+
+Validation report (WP 6.3b): `docs/results/validation-report.md`.
+
+`docs/spec/validation-references.md` (2026-11-17): six papers with field data (silo
+velocity and pressure fields, collapse profiles, inclined-plane mu(I) data) for later
+comparison packages, after WP 3.6b to 3.6e. Some DOIs still to resolve.
+
+## Standing instruction from Sia (2026-11-14)
+
+Proceed without asking for permission, and merge each pull request automatically once
+CI is green. Sia is away; report results, do not wait for review. Still ask before
+anything that cannot be undone outside this repository.
+
+## Waiting on Sia
+
+- mu(I) constants (mu_2, I0) and grain size and density for the T0 material, if
+  measured (decisions 0036, 0037). Placeholders now: mu_s = tan 35 deg, mu_2 - mu_s =
+  0.26 and I0 = 0.279 from Jop et al. (2005) glass beads, d = 1 mm, rho_s = 2650 kg/m^3.
+- Optional: real tank dimensions and material data for the silo problem (placeholders
+  are in `docs/spec/target-problems.md`).
+- Optional: paste the setup line from `docs/wp/WP-0.4.md` into the cloud environment's
+  setup script so every session starts with OpenFOAM installed.
+- Confirm GPL-3.0 (decision 0003). Needed before the code is shared with anyone.
+- Abaqus or LS-DYNA access for reference runs? Not needed for the silo problem.
+
+## Next
+
+Phase 6 (2026-11-19) done: WP 6.1 (MPI with bodies), 6.2a (restart), 6.3a (scaling,
+`docs/results/scaling.md`), 6.3b (validation report, `docs/results/validation-report.md`);
+6.2b (mass scaling) kept for later. Then the last items (Sia, 2026-11-18): install on
+Sia's laptop, then a Linux install package.
+
+Sia's two Abaqus gaps (2026-11-18, thread "Add solid inflow inlet and axisymmetric
+wedge"): WP 3.7a (inlet) done; next WP 3.7b (fed silo tutorial), then the wedge,
+WP 3.8a to 3.8c (`docs/work-packages.md`).
+
+The C++ Eulerian cycle is done and checked against the prototypes: WP 2.3 (Lagrange
+step, decision 0018), WP 2.4 (remap, decision 0017), WP 2.4b (both together, decision
+0022). The C++ silo packages 3.1 to 3.4 can start once their prototype counterparts
+are done (briefs not written yet).
+
+Silo track (decision 0016), one thread each:
+
+1. WP 3.0: reference values. Done (`docs/spec/silo-reference.md`).
+2. WP 3.1p: prototype gravity, walls, settling. Done (decision 0020).
+3. WP 3.2p: prototype free surface. Done (decision 0021). WP 3.2q fixed the collapse
+   run-out (decision 0023), WP 3.2r the deposit staircase (decision 0024); WP 3.2s
+   closed the collapse with a fitted flank angle (decision 0025); the collapse test is in CI.
+4. WP 3.3p: prototype silo discharge. Done (decision 0026): the tank fills, settles,
+   opens and empties (`docs/results/silo-prototype.md`).
+5. WP 3.3q: discharge rate. Done (decision 0027): an outlet bug held the rate at a third
+   of Beverloo; fixed, the rate follows D^1.5 with C about 1.0 at E = 0.1 MPa.
+6. WP 3.3r: the rate at T0's stiffness. Done (decision 0028): rules 12 and 13 make the
+   rate independent of E (within 9 percent from 0.1 to 10 MPa) and of the mesh (3
+   percent between 5 and 2.5 mm).
+7. WP 3.2t: one rule set for the collapse and the discharge. Closed without one
+   (decision 0029): in the split prototype every cap that lets the 10 MPa collapse stop
+   also slows the discharge.
+8. WP 3.1: C++ gravity and walls. Done (decision 0030).
+9. WP 3.2a: C++ void and free surface. Done (decision 0031).
+10. WP 3.2b: C++ column collapse. Done (decision 0032): shear cap and rule 9 behind
+   `shearCap` / `spreadLayers`; run-outs 0.55 / 0.35 / 0.20 at 0.1 / 1 / 10 MPa, close to
+   the prototype.
+11. WP 3.3: C++ outlet. Done (decision 0033): closed while settling, then open (rule
+   10b); 74.1 kg/s/m at E = 0.1 MPa, 9 percent below the prototype.
+12. WP 3.4: C++ discharge across E. Closed without its done-when (decision 0034): with
+   the collapse code the rate falls with E (5 mm: 78 at 0.1 MPa, 55 at 1 MPa; 10 mm
+   hides most of it); two processors give the serial rate.
+13. WP 3.4b: rule 12 in C++. Closed without its done-when (decision 0035): the collapse
+   is fine with it and 10 mm passes, but at 5 mm the rate still falls 16 % from 0.1 to
+   1 MPa.
+14. Sia chose rate-dependent friction over a soft E (2026-11-16: parameters must be
+   measurable). Survey `docs/rate-dependent-friction-survey.md`, plan decision 0036:
+   mu(I) with the Barker-Gray regularisation in the return mapping, plus an impedance
+   from the plastic tangent at flowing faces (mu(I) alone is estimated to be ~100 times
+   too weak against the numerical viscosity at 5 mm).
+15. WP 3.6a: mu(I) in the constitutive library. Done (decision 0037). The Barker-Gray
+   regularisation does not exist for mu_s = tan 35 deg; T0 uses the plain Jop law.
+16. WP 3.6s: shear bands. Done (decision 0038): the collapse band is set by the cell
+   (1 to 4 cells at 10, 5, 2.5 mm) and run-out does not converge; mu(I) does not change
+   that. The cure (compressible mu(I)/phi(I), or non-local) is a later package.
+17. WP 3.6b: inclined layer. Closed without its done-when (decision 0039): the
+   numerical viscosity is about 0.06 rho c_s h, 3 to 35 times the mu(I) tangent
+   viscosity from 0.1 to 10 MPa; the flow is 5 to 100 times too slow.
+18. WP 3.6c: flow impedance. Closed without its done-when (decision 0040): the layer
+   now flows at 0.65 to 0.97 of exact at 0.1 MPa (was 0.14 to 0.20) and within 5 % at
+   2.5 mm for 0.1 and 1 MPa; 10 MPa and the top cell remain.
+19. WP 3.6c2: stiff layer. Done (decision 0044): wall ghost for flowing cells and a 1e-4
+   void tolerance; the layer is within 5 % of Bagnold at 0.1, 1 and 10 MPa (5 mm).
+20. WP 3.6d: silo with mu(I). Closed without its done-when (decision 0045): 10 MPa now
+   matches 0.1 MPa, 1 MPa is about 20 % slow; the case is `tutorials/siloDischarge`,
+   shown to Sia (2026-11-17).
+21. WP 3.6f: the 1 MPa dip. Finding recorded (decision 0046): the nearly-full rule sets
+   it; the void closure, not the friction law, decides the silo rate. Compare bands of
+   three runs.
+22. WP 3.6g: dilatancy (Sia's go-ahead 2026-11-18). Closed without its done-when
+   (decision 0048): it makes the tank slower and more E dependent; kept as an option.
+23. WP 3.6h: blend of the full and partly filled rules. Closed without its done-when
+   (decision 0049): less scatter, same E dependence. Stop tuning void rules for it.
+24. About 20 % rate uncertainty across artificial E accepted for now (coordinator,
+   2026-11-18; to confirm with Sia).
+25. WP 3.6e: collapse with mu(I). Done at 10 mm (decision 0050). T0 rule set:
+   mu(I) + flowImpedance + normalCap.
+26. `tutorials/siloDischarge` uses the T0 rule set (normalCap added, 2026-11-18): 64.4
+   kg/s/m at 10 MPa (C 0.78), pictures and rate plot refreshed.
+27. WP 3.5: cohesion. Done at 10 mm (decision 0054): the flow stops below a critical
+   outlet width close to Jenike's; tutorial `tutorials/siloCohesion`.
+28. Next on the silo track, if wanted: the cohesion bracket at 5 mm; the creep of a
+   stopped tank (known issues).
+   Keep runs coarse and short: Sia asked to be frugal with Claude usage (2026-11-15).
+
+Then the C++ counterparts 3.1 to 3.4 (2.4b is done; briefs not written yet) and 3.5
+(cohesion).
+
+Phase 4 (Lagrangian bodies and STL walls). Sia asked on 2026-11-17 for wall
+interactions defined by STL (decision 0041: immersed rigid surfaces on the Cartesian
+mesh, as Abaqus CEL). Order:
+
+1. WP 4.1: STL input and kinematics. Done.
+2. WP 4.0: contact scheme investigation. Done (decision 0042: cut-cell moving walls,
+   not penalty). Shown to Sia 2026-11-17.
+3. WP 4.2: cut cells near each body. Done (decision 0043).
+4. WP 4.3a: fixed STL walls with friction. Done (decision 0047; tutorial `stlTank`).
+5. WP 4.3c: STL walls with the free surface and outlets. Done (decision 0051; tutorial
+   `stlSilo`).
+6. WP 4.5: silo and hopper with STL walls. Done (decision 0052; tutorial `stlHopper`).
+7. WP 4.3b: moving bodies. Done (decision 0053; push test; prescribed motion only).
+8. WP 4.4: strip footing. Done (decision 0055; Prandtl within 8 % at 10 mm, 1.9 % at 5 mm).
+9. WP 4.4b: pile section (Randolph and Houlsby). Done (decision 0056; 9.29 against 9.14).
+   WP 4.4c: sand footing (N_gamma). Closed without its done-when (decision 0057; +27 % at 5 mm).
+10. WP 4.3d: free bodies. Done (decision 0058).
+11. WP 4.3e: rough walls (adhesion). Done (decision 0059).
+12. WP 5.1: hex8 element. Done (decision 0070).
+13. WP 5.2: Lagrangian Taylor bar. Done (decision 0071).
+14. WP 5.3a: two-way deformable coupling (stiff bodies). Done (decision 0072).
+15. Next: WP 5.3b soft deformable bodies (material packs under a soft footing), then WP 5.4 projectile. The Eulerian Taylor bar (2.6) waits for the axisymmetric wedge (WP 3.8a, 3.8b). Sand footing accuracy (0057) waits until the solver is fully functional (Sia: features first).
+
+## Known issues
+
+- Parallel runs (WP 6.1, decision 0080): with bodies, caps and void rules, a run on N
+  processors matches serial to round-off only until a switch flips, then parts like a
+  serial run with a 1e-12 perturbation (footing force 2 to 4 %, tank rate 0 %). Small
+  cut cells do not mix across processor boundaries (reported as unmixed if it happens).
+- Restart (WP 6.2a, decision 0081) is exact only with `writeFormat binary` or
+  `writePrecision 17`; tutorials write ASCII with 8 digits.
+- Soft deformable bodies (WP 5.3b, decision 0072): a footing of E 20 MPa packs the
+  material under it to 1.62 rho0. Use stiff deformable bodies (steel) for now.
+- Free body rotating in contact (WP 4.3d, decision 0058): a symmetric block dropped
+  onto T0 with inertia is kicked to 0.5 rad/s at impact (reaction a few % asymmetric)
+  and its corner squeezes a cut cell to 1.038 rho0. The drop test runs without inertia.
+- Free-surface tank without mu(I) (found in WP 4.3c, decision 0051): the WP 3.1 Janssen
+  tank run with `freeSurface yes` (mesh walls, plain Mohr-Coulomb) does not reach the
+  settle criterion by 1 s and its bottom stress is 17 % above the no-void tank (16.4
+  against 14.0 kPa). About 100 cells inside the column end with alpha just below 1 (from
+  1e-10 noise to 0.1) and take the partly-filled rules; the nearly-full snap (decision
+  0044) that cures noise void runs only with `flowImpedance`. Silo runs use it; plain
+  free-surface tanks do not. Not fixed here.
+- STL corners (decision 0051): a cell closed on two sides (STL floor meeting an STL wall)
+  has one oblique wall face, not in discrete equilibrium; a lake in an all-STL tank
+  moves up to 0.3 m/s at the floor corners without damping.
+
+- Silo with mu(I) (WP 3.6d/3.6f, decisions 0045, 0046): rate at 1 MPa about 20 % below
+  0.1 and 10 MPa (bands of three runs: 65.8 / 52.0 / 60.8 kg/s/m at 10 mm). Caused by the
+  nearly-full rule; removing it fixes the silo but fails the inclined layer. The silo
+  rate depends on how loosened cells count (full or partly filled). Dilatancy in the
+  material law (WP 3.6g, decision 0048) did not cure it (it made it worse), nor did a
+  gradual blend of the rules (WP 3.6h, decision 0049). 10 MPa rates scatter 18 % with
+  the rule.
+- Cohesive tank creep (WP 3.5, decision 0054): a tank that has stopped behind a
+  cohesive arch keeps creeping out at 0.5 to 2 kg/s/m (under 1 % of Beverloo at
+  c = 500 Pa; 4.5 % at c = 250 Pa and a 40 mm outlet), steady over 1 s. Likely the same
+  family as the inclined layer's creep. The cohesion bracket is checked at 10 mm only.
+- Meshes (decision 0041): `freeSurface yes` (the silo physics) needs a Cartesian hex
+  mesh (every face normal to an axis; grading allowed). Without void the code runs on
+  any mesh but is untested there: face states assume the face midway between centres,
+  and the time step uses cbrt(V). General meshes are WP 3B.4, not planned.
+
+- Shear bands (WP 3.6s, decision 0038): the C++ column collapse localises into bands 1 to
+  4 cells wide on every mesh; run-out grows with refinement (0.30 / 0.33 / 0.43 at 10 / 5 /
+  2.5 mm, a = 0.5, E = 1 MPa). mu(I) as in T0 does not regularise it. Collapse run-outs
+  are mesh-bound until a regularisation package is done.
+
+- mu(I) (WP 3.6a, decision 0037): for mu_s = tan 35 deg the Jop law is ill posed (in
+  Barker and Gray's incompressible sense) at every I, and their regularisation cannot be
+  built. Whether our compressible elastic model is affected is not known (WP 3.6b).
+  The cost of the per-point mu(I) solve in celFoam is not measured.
+- Inclined layer (WP 3.6b, decision 0039): the face Riemann solver's numerical
+  viscosity (about 0.06 rho c_s h) swamps mu(I) even at 0.1 MPa; the steady layer runs
+  at 0.14 to 0.20 of the exact speed (5 mm). The top cell of a layer under tilted
+  gravity slides over the body (2.6 times the exact speed at 10 MPa); likely the shear
+  cap at the static phi. WP 3.6c (decision 0040) found three sources (elastic Hancock
+  predictor, elastic shear jump, static-phi cap) and fixed most of it behind
+  `flowImpedance yes`; WP 3.6c2 (decision 0044) fixed the 10 MPa floor cell and the
+  sliding top cell. Left: at 0.1 MPa the layer creeps faster over time (+0.7 % of the
+  surface speed per second at 5 mm, +1.05 % at 2.5 mm; cells 3 to 11 % fast at 4 s).
+  `flowImpedance` counts void below 1e-4 as full and cells within 3 % of the static
+  surface as flowing: watch static regions in the silo (WP 3.6d).
+
+- C++ silo (decisions 0034, 0035): with the collapse code the discharge rate falls with E
+  (-29 % from 0.1 to 1 MPa at 5 mm; -16 % with `normalCap yes`). Fix planned as WP 3.6
+  (decision 0036); Sia rejected a soft E as unmeasurable.
+
+- C++ silo (WP 3.1, decision 0030): the free top of a full tank lets material in through
+  the remap as the column settles (mass +6e-4); WP 3.2 replaces it with void. Velocity,
+  symmetry and traction boundaries still give the Hancock predictor the cell value
+  (walls use their Riemann solution).
+- C++ cycle (WP 2.4b): a 45 degree S step overshoots 0.9 percent after start-up in
+  streaming material (test limit 1 percent, thin margin) and 1.3 to 1.4 percent
+  without streaming. Cause: the Lagrange step limits primitive components (decision
+  0018 item 1); characteristic limiting would fix it if contact or the silo needs it.
+- C++ cycle (WP 2.4b): over many crossings a 45 degree P step's overshoot creeps up and
+  levels off (0.5 percent first crossing, 2.7 percent after 16, 5.7 percent after 40;
+  2D, maxCo 0.4), with or without streaming (decision 0022).
+- C++ remap costs about 1.4e-6 s per cell per step, the Lagrange step 8e-7 (2D, serial).
+- Void prototype (decisions 0021, 0023): the face shear cap (WP 3.2q) removed most of
+  the over-damping of slow granular flow, but the normal jump term of the Riemann
+  solver is not capped (capping it was unstable), so run-out still falls with E: 0.45,
+  0.40, 0.25 at 0.1, 1, 10 MPa (a = 0.5). Stiff material under-predicts flow. The silo
+  discharge numbers of WP 3.3p (decision 0026) were mostly an outlet bug (decision
+  0027); with it fixed the rate still fell with E, fixed for the discharge in WP 3.3r by
+  capping the normal jump term too (rule 12, with per-side strain; decision 0028) and
+  dispersing interior void (rule 13). With both rules the collapse runs too far (a = 0.5
+  run-out 0.8 / 1.05 / 1.2 at 0.1 / 1 / 10 MPa), so they are off there; WP 3.2t found
+  no variant that serves both (decision 0029), and the discharge's E independence leans
+  partly on capping faces of cells that are still elastic (softening near the outlet). Surfaces were staircases of whole cells (fixed in
+  WP 3.2r); fronts are still blunt (WP 3.2s). The C++ Lagrange step has the same face solver and
+  needs the shear cap before the silo runs in celFoam.
+- Void prototype (decisions 0024, 0025): partly filled cells carry no stress (void-first
+  closure). The a = 0.5 collapse still creeps at about 1 cm/s at t = 2 s with 10 cells
+  (stops at 0.5 s with 20): full cells near the front are at yield in their normal
+  stresses (active state), so the shear cap lets their faces slip with no resistance.
+  A rate-dependent friction (mu(I)) is the physical cure. The toe is a 1 to 2 cell step
+  (the stopped nose of the flowing layer).
+
+- WP 3.1p prototype: the free top of a full tank is a zero-traction face with no mass
+  flux, so top cells lose density as the column settles (7 % in the top cell for 1.2 m).
+  WP 3.2p replaces it. After settling the frictional tank creeps slowly (3e-4 m/s, 1.5 %
+  of rho g H over a further 10 % of the run undamped) because the walls sit at the limit.
+  A fast ramp (0.05 s) with light damping lets the column rebound and unload the upper
+  wall (ratio 10 to 25 % below tan delta_w): use the 0.1 s ramp (decision 0020).
+
+- Silo reference (WP 3.0): every published continuum discharge constant used mu(I)
+  with friction 0.32 to 0.38; T0 is Mohr-Coulomb with tan 35 = 0.70. The test band for C
+  is therefore wide (1.0 to 1.9); the exponent is the real check. Lube et al. 2005 and
+  Lajeunesse et al. 2005 prefactors were not read in the original papers (decision 0019).
+
+- WP 1.1 prototype: smooth-wave order is limiter-bound at about 1.8. It passes at the test
+  setting (0.25 c streaming) but gives 1.78 at 0.5 c. Only matters if later packages need
+  a sharper order; an extremum-preserving limiter would fix it.
+- WP 1.2 prototype: an impulsive start (velocity jump at a face) overshoots by 2.7
+  percent of the jump at the impact plane for the first 5 to 10 cells of wave travel
+  (1.7 percent elastic). Matters for contact (WP 4.x); revisit in WP 1.3 (decision 0008).
+- WP 1.2 prototype: history is remapped with superbee, stress with MC (decision 0008).
+- Mohr-Coulomb tension cut-off (WP 2.5c) is optional: without `sigmaT` cohesive
+  material still carries tension up to c cot(phi). The vectorised 2D prototype
+  (`prototype/constitutive/batch.py`) and Drucker-Prager have no cut-off.
+- 2D prototype: a step at 45 degrees overshoots 2.7 percent during its first cell of
+  travel, then below 0.3 percent (decision 0013; the 13 percent in decision 0012 was a
+  jagged test step). Like the 1D impact start-up, accepted; contact (WP 4.3) re-measures.
+- C++ remap (WP 2.4) has no corner transport: stable up to a summed outflow material
+  Courant number of about 0.9 (2D 0.45 and 3D 0.30 per direction on a diagonal), far
+  above what the acoustic step gives except for near-sonic material speeds. Density
+  is not returned to uniform exactly by a compress-then-reverse flux (1e-3 at Courant
+  0.2); velocity, stress and history are (decision 0017).
+- C++ Lagrange step (WP 2.3): stable Courant number 0.65 in 2D, 0.45 to 0.50 in 3D
+  on uniform meshes (default maxCo 0.4); not measured on graded or distorted meshes.
+  WP 2.4b found that measure too strict: the full cycle is stable to 0.8 (2D) and at
+  least 0.7 (3D); above about 0.6 in 3D the start-up overshoot grows past 5 percent
+  (decision 0022). The disc check passed in WP 2.4b.
+- `stableDeltaT` uses cbrt(V): 2D one-cell-thick meshes must be as thick as their
+  in-plane cells (decision 0018, consequences).
+- WP 1.3a test takes about 5 minutes (400 x 400 meshes for the 45 degree convergence runs);
+  WP 1.3b test about 1.5 minutes.

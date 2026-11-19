@@ -69,7 +69,7 @@ def case(work, mm, n):
     log = open(f"{path}/log.celFoam").read()
     steps = len(re.findall(r"^Time = ", log, flags=re.M))
     mass = re.findall(r"^Total mass\s*=\s*(\S+)", log, flags=re.M)[-1]
-    ncell = int(re.search(r"cells:\s+(\d+)", open(f"{path}/log.blockMesh").read()).group(1))
+    ncell = 40 * 62 * f * f
     return dict(wall=wall, steps=steps, mass=mass, cells=ncell)
 
 
