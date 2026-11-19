@@ -89,6 +89,8 @@ Phase 2 (the C++ Eulerian solver: 2.1 to 2.5c, 2.4b and 2.6 done) and Phase 3 (s
 | A.3a | Steel packing with the sliver fix | Done | Decision 0093. A geometry bug: a hex8 node line exactly on a mesh face lost its cut line in `cutGeometry::faceCovered`; fixed, `seam` case in `test_body_cells.sh`. With it the parked sliver fix passes the hover test, the projectile (-14.9 % rigid, -14.6 % steel, 1.015 rho0) and the deformable push, but the full suite showed two tests on a round-off knife edge, so the fix stays parked |
 | A.3b | Robust free-surface small cells; sliver fix merged | Done | Decision 0094. The silo blow-up was round-off dust (1e-18 kg at alpha 1e-6) taking ordinary face forces; a cell's inertia is now at least 0.5 rho0 alpha Vo. Sliver fix merged; `tests/test_body_above_surface.sh` in CI; projectile -14.9 % / -14.6 % (was -26 %); wedge silo and steel push pass at maxCo 0.399, 0.4, 0.401 |
 | A.4 | Sand footing with psi 30 | Next | Contact is reached cleanly now; the associated push blows up at about 0.6 s (decision 0092). Then the psi 0 excess |
+| H.1 | Conical hopper case spec (Sia's validation case) | Done | Decision 0100. `docs/spec/conical-hopper.md` and `docs/spec/hopper-data/`: Couto et al. (2013) wheat silo (Table 1 copied) and Zheng and Yu (2015) Abaqus CEL (Figs. 3, 10, 11 digitised); cases A (wall pressure), B (hopper discharge), C (flat-bottom Beverloo); pass bands set. `tests/test_hopper_spec.sh` passes |
+| H.2 | Conical hopper walls on the wedge (was 3.8d) | Next | Then H.3 to H.6 (`work-packages.md`) |
 
 ## Validation references
 
@@ -117,6 +119,10 @@ anything that cannot be undone outside this repository.
 - Abaqus or LS-DYNA access for reference runs? Not needed for the silo problem.
 
 ## Next
+
+Conical hopper validation (Sia, 2026-11-19; the last item before the Linux install
+package): H.1 (case spec, decision 0100) done. Next: H.2, cut-cell hopper walls on the
+wedge, then the Couto silo pressures (H.3) and the hopper discharge (H.4) with MC and DP.
 
 Accuracy pass (Sia, 2026-11-19, before packaging): A.1 done (decisions 0090, 0091).
 Sia: mass flow and mesh dependence are secondary until Sia's validation case; find
