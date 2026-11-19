@@ -1,0 +1,31 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  celFoam tutorial siloDischarge (WP 3.6d)
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      controlDict;
+}
+application     celFoam;
+startFrom       startTime;
+startTime       0;
+stopAt          endTime;
+endTime         2.3;       // settle 0.3 s, then 2 s of discharge
+deltaT          1e-5;      // overwritten every step by celFoam (stable step)
+writeControl    adjustableRunTime;
+writeInterval   0.05;
+purgeWrite      0;
+writeFormat     ascii;
+writePrecision  8;
+timeFormat      general;
+timePrecision   6;
+runTimeModifiable false;
+maxCo           0.4;       // fraction of the CFL limit used for deltaT
+
+// Settling (decision 0020): gravity ramps in over 0.1 s (half cosine) and
+// the velocity is damped at 250 1/s until the outlet opens (damping is
+// switched off automatically then).
+gravityRamp     0.1;
+damping         250;

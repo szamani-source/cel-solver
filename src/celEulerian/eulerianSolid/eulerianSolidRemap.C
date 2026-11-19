@@ -999,6 +999,16 @@ void Foam::eulerianSolid::remapFreeSurface(const scalar dt)
             dVa[fc[i]][axisOf(pS[i])] += dt*pPhi[i];
         }
     }
+    if (wedge_)
+    {
+        // Wedge (decision 0061): the u/r part of the radial faces' flux is
+        // hoop strain, the hoop axis gets it (Lagrange step's hoopRate_)
+        forAll(dVa, celli)
+        {
+            dVa[celli][wedgeR_] -= dt*hoopRate_[celli];
+            dVa[celli][wedgeH_] += dt*hoopRate_[celli];
+        }
+    }
     if (imm)
     {
         forAll(wallPhi_, celli)
