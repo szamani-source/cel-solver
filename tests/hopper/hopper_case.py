@@ -44,7 +44,7 @@ def material(c, model):
     if m == "mc":
         txt += "sigmaT 0;\n"
     else:
-        txt += "fit compression;\n"
+        txt += "fit " + os.environ.get("CEL_DP_FIT", "compression") + ";\n"
     return txt + os.environ.get("CEL_HOPPER_RULES",
                                 "shearCap yes;\nspreadLayers yes;\n"
                                 "normalCap yes;\n")
@@ -142,7 +142,7 @@ def hopper_stl(c, ext=6.0, seg=0.01):
     return "\n".join(out) + "\n"
 
 
-def couto_case(work, name, model="mc", cell=0.025, check=None, c=None):
+def couto_case(work, name, model="mc", cell=0.025, check=None, c=None, nProcs=1):
     c = dict(COUTO, **(c or {}))
     b, ht = hopper_geometry(c)
     H = ht + c["Hc"]
@@ -150,7 +150,8 @@ def couto_case(work, name, model="mc", cell=0.025, check=None, c=None):
     check = dict(check or {})
     check.setdefault("fill", [-1.0, 0.0, 1.0, H])
     check.setdefault("U0", [0.0, 0.0, 0.0])
-    p = vc.make_case(f"{work}/{name}", 1, 1, material(c, model), check)
+    p = vc.make_case(f"{work}/{name}", 1, 1, material(c, model), check,
+                     nProcs=nProcs)
     wedge_mesh(p, c, cell, ny)
     cs.write(f"{p}/constant/triSurface/hopper.stl", hopper_stl(c))
     dw = math.degrees(math.atan(c["mu"]))

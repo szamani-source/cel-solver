@@ -91,7 +91,8 @@ Phase 2 (the C++ Eulerian solver: 2.1 to 2.5c, 2.4b and 2.6 done) and Phase 3 (s
 | A.4 | Sand footing with psi 30 | Next | Contact is reached cleanly now; the associated push blows up at about 0.6 s (decision 0092). Then the psi 0 excess |
 | H.1 | Conical hopper case spec (Sia's validation case) | Done | Decision 0100. `docs/spec/conical-hopper.md` and `docs/spec/hopper-data/`: Couto et al. (2013) wheat silo (Table 1 copied) and Zheng and Yu (2015) Abaqus CEL (Figs. 3, 10, 11 digitised); cases A (wall pressure), B (hopper discharge), C (flat-bottom Beverloo); pass bands set. `tests/test_hopper_spec.sh` passes |
 | H.2 | Conical hopper walls on the wedge (was 3.8d) | Done | Decision 0101. Hopper wall = STL body extruded in the wedge's face planes (`tests/hopper/hopper_case.py`). `tests/test_hopper_wedge.sh` passes (about 4 min, 25 mm): Couto silo at rest, mass exact, closed outlet holds, cylinder pressure on Janssen with K = nu/(1-nu) within -4.7 to +6.0 %, transition stress 12.6 kPa (experiment 11.7 to 13.4). Hopper wall at rest 11.4 kPa against GA0 8.6 to 9.6 (H.3) |
-| H.3 | Couto silo wall pressure, MC and DP | Next | |
+| H.3 | Couto silo wall pressure, MC and DP | Done (done-when partly met) | Decision 0102. T0 rule set for both models (flowImpedance now accepts druckerPrager; wheat mu(I) d 4 mm). `tests/manual/test_hopper_pressure.sh` (12 min per model, 25 mm): at rest GA1-GA5, GA7 in the experiment's range, GA6 -14 %, hopper GA0 +21 %; discharge GA0 peak 20.1 (MC) / 21.5 (DP) kPa inside 18.7-24.8, GA1 within band, GA2 MC -12 %, DP -29 %. Plain MC/DP unusable in discharge. Rate 46 kg/s at 25 mm, 69 at 12.5 mm, against Beverloo about 110 |
+| H.3b | Drucker-Prager robustness in discharge | Next | DP spikes (to 680 kPa, 8-40 m/s) start at partly filled cells near the outlet and at hopper cut cells; round-off decides whether a run survives (decision 0102) |
 
 ## Validation references
 
@@ -122,8 +123,9 @@ anything that cannot be undone outside this repository.
 ## Next
 
 Conical hopper validation (Sia, 2026-11-19; the last item before the Linux install
-package): H.1 (case spec, decision 0100) and H.2 (hopper wall on the wedge, decision 0101) done.
-Next: the Couto silo pressures (H.3), then the hopper discharge (H.4) with MC and DP.
+package): H.1 (case spec, decision 0100), H.2 (hopper wall on the wedge, decision 0101) and H.3
+(Couto pressures, decision 0102: most cells match the experiment; DP fragile) done.
+Next: H.4, the hopper discharge rate and velocity (rate 2x below Beverloo at 25 mm), and H.3b.
 
 Accuracy pass (Sia, 2026-11-19, before packaging): A.1 done (decisions 0090, 0091).
 Sia: mass flow and mesh dependence are secondary until Sia's validation case; find

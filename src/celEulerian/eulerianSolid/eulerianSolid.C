@@ -413,11 +413,18 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
     if (flowImpedance_)
     {
         const dictionary& d = materialProperties_;
-        if (d.get<word>("type") != "mohrCoulomb" || !d.found("mu2"))
+        // Mohr-Coulomb or Drucker-Prager (WP H.3, decision 0102): the face
+        // rules cap jumps at the Mohr-Coulomb yield of phi for both
+        const word type(d.get<word>("type"));
+        if
+        (
+            (type != "mohrCoulomb" && type != "druckerPrager")
+         || !d.found("mu2")
+        )
         {
             FatalIOErrorInFunction(d)
-                << "flowImpedance needs type mohrCoulomb with mu(I) (mu2)"
-                << exit(FatalIOError);
+                << "flowImpedance needs type mohrCoulomb or druckerPrager "
+                << "with mu(I) (mu2)" << exit(FatalIOError);
         }
         flowLaw_[0] = Foam::tan(degToRad(d.get<scalar>("phi")));
         flowLaw_[1] = d.get<scalar>("mu2");
