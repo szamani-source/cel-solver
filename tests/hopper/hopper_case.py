@@ -171,18 +171,30 @@ def couto_case(work, name, model="mc", cell=0.025, check=None, c=None, nProcs=1)
     return p, c
 
 
-def aligned_mesh(path, c, cell, top_rows=0):
+def aligned_mesh(path, c, cell, top_rows=0, wall_ratio=1.0, outlet_ratio=1.0):
     """Wall-aligned (body-fitted) wedge mesh (Sia, 2026-11-19): the hopper is
     one trapezoid block whose column lines fan from vertical at the axis to
     the wall slope (rows horizontal); the cylinder block above has square
     cells joined cell to cell. Patches: outlet, hopperWall, right, top,
-    front/back (wedge). top_rows adds rows of headroom above the fill."""
+    front/back (wedge). top_rows adds rows of headroom above the fill.
+    Grading (Sia, 2026-11-19): wall_ratio is the wall column's width over
+    the axis column's (both blocks, so fine along both walls); outlet_ratio
+    is the outlet row's height over the hopper's top row, whose height stays
+    about `cell` (the rows above stay uniform)."""
     b, ht = hopper_geometry(c)
     t = math.radians(THETA)
     co, si = math.cos(t), math.sin(t)
     R, Ro = c["R"], c["Rout"]
     n = int(round(R / cell))
     nh = max(1, int(round(ht / cell)))
+    if outlet_ratio != 1.0:
+        # rows growing from the outlet by a fixed ratio: the smallest count
+        # whose top row is at most `cell`
+        def top(m):
+            q = (1 / outlet_ratio) ** (1 / max(m - 1, 1))
+            return ht * (q - 1) / (q ** m - 1) * q ** (m - 1)
+        nh = next(m for m in range(2, 400) if top(m) <= cell * 1.0001)
+    gy = 1 / outlet_ratio
     nc = int(round(c["Hc"] / cell)) + top_rows
     Hm = ht + nc * c["Hc"] / int(round(c["Hc"] / cell))
 
@@ -194,8 +206,8 @@ def aligned_mesh(path, c, cell, top_rows=0):
     cs.write(f"{path}/system/blockMeshDict",
              cs.HEADER.format(cls="dictionary", obj="blockMeshDict")
              + f"scale 1;\nvertices\n(\n{vs}\n);\nblocks\n(\n"
-             f"    hex (0 1 2 3 0 4 5 3) ({n} {nh} 1) simpleGrading (1 1 1)\n"
-             f"    hex (3 2 6 7 3 5 8 7) ({n} {nc} 1) simpleGrading (1 1 1)\n);\n"
+             f"    hex (0 1 2 3 0 4 5 3) ({n} {nh} 1) simpleGrading ({wall_ratio!r} {gy!r} 1)\n"
+             f"    hex (3 2 6 7 3 5 8 7) ({n} {nc} 1) simpleGrading ({wall_ratio!r} 1 1)\n);\n"
              "boundary\n(\n"
              "    outlet { type patch; faces ((0 1 4 0)); }\n"
              "    hopperWall { type patch; faces ((1 2 5 4)); }\n"

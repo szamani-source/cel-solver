@@ -47,3 +47,8 @@ with an error on any face off the axes. Sia's wall-aligned hopper meshes
   blocks; smoother meshes (graded blocks) should do better.
 - Walls, outlet, inlet on angled faces (G.3) and the wedge axis prisms (G.4)
   come next.
+- Tried: the void closure's normal stress and strain along the unit mesh line
+  (t.s.t, adding the strain difference times t t) instead of the x, y, z
+  components. The leaning-left collapse grew its tongue again (front 0.44 m)
+  and the lake's largest stress error rose to 6.3 %, so the closure stays on
+  the x, y, z components.
