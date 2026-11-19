@@ -1,0 +1,13 @@
+# Load-cell heights above the outlet plane (m). Cylinder cells: centres 250 mm apart
+# (Couto et al. 2013, Fig. 3); absolute heights read from Zheng and Yu (2015) Fig. 11,
+# where the Table 1 discharge values are plotted. GA0 sits on the hopper wall just
+# below the transition (z = 0.48 m); its height is read from the figures to about 0.02 m.
+cell,z_m,wall
+GA7,2.075,cylinder
+GA6,1.825,cylinder
+GA5,1.575,cylinder
+GA4,1.325,cylinder
+GA3,1.075,cylinder
+GA2,0.825,cylinder
+GA1,0.575,cylinder
+GA0,0.41,hopper

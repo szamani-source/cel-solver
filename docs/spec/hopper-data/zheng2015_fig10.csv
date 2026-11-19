@@ -1,0 +1,14 @@
+# Zheng and Yu (2015), Chem. Eng. Sci. 129, 49-57, Fig. 10: flat-bottomed silo (alpha = 90 deg),
+# Abaqus Eulerian FEM mass discharge rate W against orifice diameter D0. Digitised by eye
+# from the figure (about +-2 kg/s); the paper's fit is Beverloo C = 0.59, z = 0, rho = 856, g = 9.8.
+D0_m,W_kgs
+0.05,1.0
+0.10,5.0
+0.15,14.0
+0.20,28.5
+0.25,50.0
+0.30,78.0
+0.35,115.0
+0.40,160.0
+0.45,215.0
+0.50,280.0

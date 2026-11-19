@@ -180,3 +180,18 @@ sand footing with psi 30 (decision 0095: surface cells dilate, excess is a rate 
 A.5 split from A.4: rate-free Mohr-Coulomb flow impedance, done when the sand footing
 reads within 15 % of N_gamma at two push speeds. Mass flow and mesh dependence wait for Sia's validation case. Decisions for
 this pass are numbered from 0090.
+
+Note (2026-11-19, conical hopper validation, Sia's validation case and the last item
+before the Linux install package): Sia supplied two papers (Zheng and Yu 2015; Couto et
+al. 2013). Case spec in `docs/spec/conical-hopper.md`, decision 0100; decisions for this
+series are numbered from 0100. Packages:
+
+| WP | Title | Done when |
+| --- | --- | --- |
+| H.1 | Case spec and reference data | `tests/test_hopper_spec.sh` passes (data consistent with the geometry and the papers' closed forms) |
+| H.2 | Conical hopper walls on the wedge (was 3.8d) | Couto silo filled at rest on the wedge with a cut-cell hopper wall: mass held, cylinder pressure on Janssen within 10 %, closed outlet holds |
+| H.3 | Couto silo wall pressure, MC and DP | Case A pass bands met by both models (at rest and at 0.5 s of discharge) |
+| H.4 | P1 basic hopper discharge, MC and DP | Case B: outlet-centre plateau within 20 % of 1.37 m/s, mass flow, both models, psi 1 deg; psi 5 deg reported |
+| H.5 | Flat-bottomed silo Beverloo sweep | Case C: C within 20 % of 0.59 at D0 0.1, 0.2, 0.3 m |
+| H.6 | Mesh and shear band check | Cases A and B at 5 mm cells: results within the bands and within 10 % of 10 mm; report added to `docs/results/validation-report.md` |
+
