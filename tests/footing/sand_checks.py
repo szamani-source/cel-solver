@@ -6,9 +6,13 @@ verification "Bearing capacity" (strip footing on sand): phi 30 deg, smooth
 footing, N_gamma = 7.653 (rough 14.754). Run by tests/manual/test_sand_footing.sh
 after celVoidCheck is built:
 
-    python3 sand_checks.py WORKDIR [--fine] [--psi DEG]
+    python3 sand_checks.py WORKDIR [--fine] [--psi DEG] [--friction DEG]
+        [--noblend] [--maxco CO] [--x0 X] [--gap G]
 
---fine runs 5 mm cells; --psi sets the dilation angle (default 30, associated).
+--fine runs 5 mm cells; --psi sets the dilation angle (default 30, associated);
+--friction the footing's base friction (0, smooth); --noblend drops fullBlend;
+--maxco, --x0 (left edge) and --gap (base above the surface) as named
+(decision 0091).
 Not yet passing (decision 0057): see tests/manual/test_sand_footing.sh.
 
 Sand: cohesionless Mohr-Coulomb, phi 30, psi 30 (associated, as the exact
@@ -54,6 +58,9 @@ NGAMMA = 7.653          # Martin (2005), phi 30, smooth
 NQ = math.exp(math.pi * math.tan(math.radians(PHI))) * math.tan(math.radians(45 + PHI / 2)) ** 2
 TOL = 0.15
 PSI = PHI
+NOBLEND = False
+MAXCO = 0.4
+FRICTION = 0.0         # footing base friction angle [deg]; 0 = smooth
 
 
 def travel(t):
@@ -67,15 +74,15 @@ def check_sand(work):
     print("    gamma 17.7 kN/m3, E 10 MPa, pushed to a settlement of 0.06 B")
     tEnd = T_RAMP + (GAP + S_MAX) / SPEED - 0.5 * T_RAMP
     mat = (f"type mohrCoulomb;\nE {E_SAND!r};\nnu {NU!r};\nphi {PHI!r};\nc 0;\n"
-           f"psi {PSI!r};\nfullBlend yes;\n")
+           f"psi {PSI!r};\n" + ("" if NOBLEND else "fullBlend yes;\n"))
     k0 = 1 - math.sin(math.radians(PHI))
     p = vc.make_case(f"{work}/sand", NX, NY, mat,
                      {"fill": [-1.0, -1.0, 1.0, DEPTH], "U0": [0, 0, 0],
-                      "initK0": k0, "tEnd": tEnd, "maxCo": 0.4})
+                      "initK0": k0, "tEnd": tEnd, "maxCo": MAXCO})
     v = SPEED
     table = f"table ((0 (0 0 0)) ({T_RAMP!r} (0 {-v!r} 0)) ({tEnd + 1!r} (0 {-v!r} 0)))"
     y0 = DEPTH + GAP
-    sp.add_moving_body(p, "footing", (X0, y0, -0.01), (X0 + B, y0 + 0.1, 0.02), table, 0.0)
+    sp.add_moving_body(p, "footing", (X0, y0, -0.01), (X0 + B, y0 + 0.1, 0.02), table, FRICTION)
     sec = vc.run(p)
     h = np.loadtxt(f"{p}/history.dat")
     gamma = RHO * vc.G_ACC
@@ -104,13 +111,22 @@ def check_sand(work):
 
 
 def main():
-    global CELL, NX, NY, PSI
+    global CELL, NX, NY, PSI, FRICTION, NOBLEND, MAXCO, X0, GAP
     work = sys.argv[1]
     if "--fine" in sys.argv[2:]:
         vc.CELL = CELL = 0.005
         NX, NY = 120, 68
     if "--psi" in sys.argv[2:]:
         PSI = float(sys.argv[sys.argv.index("--psi") + 1])
+    if "--friction" in sys.argv[2:]:
+        FRICTION = float(sys.argv[sys.argv.index("--friction") + 1])
+    NOBLEND = "--noblend" in sys.argv[2:]
+    if "--x0" in sys.argv[2:]:
+        X0 = float(sys.argv[sys.argv.index("--x0") + 1])
+    if "--gap" in sys.argv[2:]:
+        GAP = float(sys.argv[sys.argv.index("--gap") + 1])
+    if "--maxco" in sys.argv[2:]:
+        MAXCO = float(sys.argv[sys.argv.index("--maxco") + 1])
     t0 = time.perf_counter()
     ok = check_sand(work)
     print(f"\nWP 4.4c checks: {'ALL PASS' if ok else 'FAILED'} "

@@ -170,3 +170,9 @@ Note (2026-11-18, phase 6): 6.2 split into 6.2a (restart) and 6.2b (mass scaling
 for later: the material's step, not the elements', sets the cost of the coupled runs,
 since deformable bodies are subcycled, decision 0072), and 6.3 into 6.3a (scaling) and
 6.3b (validation report). Phase 6 decisions are numbered from 0080.
+
+Note (2026-11-19, accuracy pass before packaging): Sia asked to fix accuracy issues
+before the install package. A.1 (ranking and the first fixes, decisions 0090, 0091)
+done; A.2 (body near a free surface) done when `tests/manual/test_body_above_surface.sh`
+passes. Mass flow and mesh dependence wait for Sia's validation case. Decisions for
+this pass are numbered from 0090.

@@ -22,6 +22,12 @@ Checks:
    so 3 cells across like the wedge's outlet radius; with 2 cells, 0.02 m,
    the quarter reads C 0.50 against the wedge's 0.69, decision 0062): C of the wedge within 10 % of C of
    the quarter model, both from their own outlet area.
+4. Quarter model by the hydraulic diameter (decision 0090): Beverloo for a
+   non-circular outlet is W = C rho (4/pi) A_k sqrt(g D_h,k), A and D_h = 4A/P
+   taken after the empty annulus k d (Zhao et al., arXiv 2610.02543, eq. 15).
+   For the square, side a: C = pi W / (4 rho sqrt(g)
+   (a - k d)^2.5). The equal-area circle of check 3 reads the square 6 to 7 %
+   low by construction; with D_h the wedge and the quarter agree within 3 %.
 
 Run by tests/test_wedge_silo.sh after celVoidCheck is built:
 
@@ -219,6 +225,11 @@ def beverloo_C(W, D):
     return W / (RHO * math.sqrt(G_ACC) * (D - K_BEV * D_GRAIN) ** 2.5)
 
 
+def beverloo_C_square(W, a):
+    """Beverloo C for a square outlet of side a by the hydraulic diameter."""
+    return math.pi * W / (4 * RHO * math.sqrt(G_ACC) * (a - K_BEV * D_GRAIN) ** 2.5)
+
+
 def analyse(path, scale):
     h = np.loadtxt(f"{path}/history.dat")
     t, m, out = h[:, T], h[:, MASS] * scale, h[:, OUT] * scale
@@ -251,6 +262,7 @@ def main():
     b = analyse(q, 4.0)
     Deq = 2 * (2 * Q_OUT) / math.sqrt(math.pi)    # circle of the square's area
     Cq = beverloo_C(b["W"], Deq)
+    Cqh = beverloo_C_square(b["W"], 2 * Q_OUT)   # full square side 2 Q_OUT
     print(f"Quarter: {sec:.0f} s; full tank {b['m0']:.3f} kg; W = {b['W']:.4f} kg/s "
           f"over t {b['win'][0]:.2f} to {b['win'][1]:.2f} s (D_eq {Deq:.4f}); end "
           f"{b['end']:.3f}")
@@ -262,6 +274,9 @@ def main():
     check(C_BAND[0] <= Cq <= C_BAND[1], f"quarter Beverloo C = {Cq:.3f} in {C_BAND}")
     gap = abs(C - Cq) / Cq
     check(gap <= 0.10, f"wedge C within 10 % of the quarter's ({100 * gap:+.1f} %)")
+    gaph = abs(C - Cqh) / Cqh
+    check(gaph <= 0.03, f"wedge C within 3 % of the quarter's by D_h "
+          f"(C_q = {Cqh:.3f}, {100 * gaph:+.1f} %)")
     print(f"WP 3.8c checks: {'ALL PASS' if not fails else 'FAILED'} "
           f"({time.perf_counter() - t0:.0f} s)")
     return 1 if fails else 0
