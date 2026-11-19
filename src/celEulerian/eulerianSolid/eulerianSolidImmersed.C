@@ -588,8 +588,6 @@ void Foam::eulerianSolid::mixSmallCells()
     scalarField& alpha = alpha_.primitiveFieldRef();
     scalarField gm(nCells, Zero), gV(nCells, Zero), gq(nCells, Zero);
     scalarField ga(nCells, Zero);       // material volume (freeSurface)
-    scalarField gas(nCells, Zero);      // of it, in the small cells
-    boolList full(nCells, false);       // target full before mixing
     vectorField gp(nCells, Zero);
     symmTensorField gs(nCells, Zero), ge(nCells, Zero);
     boolList isTarget(nCells, false);
@@ -602,14 +600,6 @@ void Foam::eulerianSolid::mixSmallCells()
         if (fs)
         {
             ga[t] += alpha[k]*V[k]*cellOpen_[k];
-            if (k != t)
-            {
-                gas[t] += alpha[k]*V[k]*cellOpen_[k];
-            }
-            else
-            {
-                full[t] = alpha[k] >= 1 - 1e-9;
-            }
         }
         gp[t] += mk*U[k];
         gs[t] += mk*(sigma[k] - equilibriumJump<symmTensor>(rho[k], C[k] - C[t], g));
@@ -642,31 +632,7 @@ void Foam::eulerianSolid::mixSmallCells()
             epsPEq[k] = 0;
             return;
         }
-        scalar r = gm[t]/gV[t];
-        if
-        (
-            fs && full[t] && wallBody_[t] < 0 && gas[t] <= 1e-9*gV[t]
-         && ga[t] < gV[t]*(1 - 1e-12)
-        )
-        {
-            // Empty slivers (decisions 0092, 0093): small cells that hold
-            // no material (a body just above the surface) stay empty and a
-            // full target the body does not cut stays full, so a full cell
-            // below a sliver does not turn partly filled and contact starts
-            // when the body reaches the material, not a quarter cell early.
-            // All the mass stays in the target (exact conservation).
-            if (k != t)
-            {
-                rho[k] = 0;
-                alpha[k] = 0;
-                U[k] = gp[t]/gm[t];
-                sigma[k] = Zero;
-                epsP[k] = Zero;
-                epsPEq[k] = 0;
-                return;
-            }
-            r = gm[t]/(V[t]*cellOpen_[t]);
-        }
+        const scalar r = gm[t]/gV[t];
         rho[k] = r;
         U[k] = gp[t]/gm[t];
         sigma[k] =
@@ -675,10 +641,11 @@ void Foam::eulerianSolid::mixSmallCells()
         epsPEq[k] = gq[t]/gm[t];
         if (fs)
         {
-            const scalar a = r*ga[t]/gm[t];
+            const scalar a = ga[t]/gV[t];
             // more material than open volume: clipped (its mass stays,
             // compressed)
             alpha[k] = a >= 1 - 1e-12 ? 1 : max(a, scalar(0));
+
         }
     };
     forAll(mixTo_, celli)

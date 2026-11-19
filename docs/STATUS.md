@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-11-19 (accuracy pass A.3: decision 0093; A.2: 0092; A.1: decisions 0090, 0091; phase 6: WP 6.1 MPI with bodies, 6.2a restart, 6.3a scaling, 6.3b validation report; 2026-11-18: WP 2.6 Taylor bar on the wedge, WP 3.8c wedge silo, 3.8b, 3.8a wedge, WP 3.7b fed silo, WP 5.3a, 5.2, 5.1, 4.3e, 4.3d, WP 3.7a solid inlet; WP 4.4c, 4.4b, 4.4, 4.3b, WP 3.5 cohesion, tutorial T0 rule set, WP 4.5, 4.3c, 4.3a, 3.6e, 3.6h, 3.6g, 3.6f; 4.1, 4.0, 4.2; 2026-11-17: 3.6d, 3.6c2, 3.6c, 3.6b, 3.6s, validation references)
+Last updated: 2026-11-19 (accuracy pass A.3a: decision 0093; A.2: 0092; A.1: decisions 0090, 0091; phase 6: WP 6.1 MPI with bodies, 6.2a restart, 6.3a scaling, 6.3b validation report; 2026-11-18: WP 2.6 Taylor bar on the wedge, WP 3.8c wedge silo, 3.8b, 3.8a wedge, WP 3.7b fed silo, WP 5.3a, 5.2, 5.1, 4.3e, 4.3d, WP 3.7a solid inlet; WP 4.4c, 4.4b, 4.4, 4.3b, WP 3.5 cohesion, tutorial T0 rule set, WP 4.5, 4.3c, 4.3a, 3.6e, 3.6h, 3.6g, 3.6f; 4.1, 4.0, 4.2; 2026-11-17: 3.6d, 3.6c2, 3.6c, 3.6b, 3.6s, validation references)
 
 Plan doc: https://claude.ai/artifact/DTT6kSikz9ZUTBkUxY6Grr
 
@@ -78,16 +78,16 @@ Phase 2 (the C++ Eulerian solver: 2.1 to 2.5c, 2.4b and 2.6 done) and Phase 3 (s
 | 5.2 | Lagrangian-only Taylor bar | Done | Decision 0071. 3D quarter model (6 x 6 x 45 hex8) of the Abaqus Benchmarks copper rod (227 m/s, perfectly plastic 314 MPa): shortening 13.14 mm against 13.10 (+0.3 %), widening 5.76 against 5.528 (+4.2 %). Needs `hourglassType viscous`: the stiffness form locks the impact face in large plastic flow. `tests/test_taylor_bar.sh` (about 1.5 min) |
 | 5.3a | Two-way coupling of a deformable body (split from 5.3) | Done | Decision 0072. `deformable { min; max; cells; density; material; planeStrain; damping; drive; }` in a body entry: hex8 elements inside rigidBody, wall-cell forces to the nearest surface triangle nodes, elements one coupling step ahead (subcycled), `damping`. `tests/test_deformable_push.sh` passes (about 3.5 min): steel footing as hex8 follows the rigid one (mean force -3 %), density 1.013 rho0, mass 1e-14 |
 | 5.3b | Soft deformable bodies | Done | Decision 0073. Material loads go to the element face's 4 nodes (bilinear), spread over 2 x 2 points of each cell's wall face; the material sees the mean surface velocity there. Soft bodies use `hourglass 0.3`. `tests/test_soft_push.sh` passes (about 1.5 min): soft footing (E 20 MPa) density 1.0155 rho0 (was 1.62), shortening 0.90 of the elastic column. Steel footing now -0.5 % of rigid (was -3 %) |
-| 5.4 | Projectile benchmark (target problem T3) | Done | Decision 0074. Free slug (1.83 kg in the slab, 1.07 m/s) into Tresca clay: steel hex8 23.75 mm against the rigid reference run 23.84 mm (-0.3 %), both 26 % short of the Prandtl energy estimate (band 30 %, known issue); since A.3 (decision 0093) 27.60 / 27.52 mm, 15 % short, band 20 %. A free deformable body starts with its `velocity`. `tests/test_projectile.sh` (about 2.5 min) |
+| 5.4 | Projectile benchmark (target problem T3) | Done | Decision 0074. Free slug (1.83 kg in the slab, 1.07 m/s) into Tresca clay: steel hex8 23.75 mm against the rigid reference run 23.84 mm (-0.3 %), both 26 % short of the Prandtl energy estimate (band 30 %, known issue). A free deformable body starts with its `velocity`. `tests/test_projectile.sh` (about 2.5 min) |
 | 6.1 | MPI with Lagrangian bodies | Done | Decision 0080. No solver change needed. `tests/test_mpi_bodies.sh` (about 5.5 min): free block drop and hex8 footing on 2 processors (split through the body), STL tank with outlet on 4 (2 x 2). First 100 steps match serial to 5e-15 (bodies); outcomes: force at rest 1.0000 both, footing 39.3 against 37.8 N (perturbed serial 38.7: round-off band about 2.5 %), tank rate 68.26 both. Parallel runs with switches part from serial like round-off-perturbed serial runs: compare bands |
 | 6.2a | Restart (split from 6.2) | Done | Decision 0081. `<time>/uniform/eulerianSolid` (mass counters, wall face velocities) and `<time>/uniform/rigidBodies` (pose, free-body velocity, hex8 element state) written at each write time and read on start; free bodies can now restart. celFoam computes its own step with adjustableRunTime (lands on write times counted from zero, never longer than stable). `tests/test_restart.sh` (40 s): silo restarted while discharging, free block and hex8 footing in contact, serial and 2 processors: identical bit for bit. Use `writeFormat binary` for exact restarts |
 | 6.2b | Mass scaling (split from 6.2) | Later, on request | Deformable bodies are subcycled (decision 0072), so the material's step sets the cost; mass scaling would only help quasi-static Lagrangian-only runs |
 | 6.3a | Parallel scaling (split from 6.3) | Done | `docs/results/scaling.md`, `tests/manual/test_scaling.sh` (1.5 min): T0 tank, 4 us per cell per step serial; 4 processors 2.6 times serial at 10 mm (620 cells each), 3.3 at 5 mm. Keep a few thousand cells per processor |
 | 6.3b | Validation report (split from 6.3) | Done | `docs/results/validation-report.md`: 19 benchmarks with reference, result, tolerance, test; verification checks; nine known issues. Add a row for each new benchmark |
-| A.1 | Accuracy pass before packaging (Sia, 2026-11-19) | Done | Wedge against quarter gap was the comparison: by hydraulic diameter 0.2 % (decision 0090). Sand footing: a body within a cell of the free surface disturbs the material at rest and blows up associated flow (`tests/test_body_above_surface.sh`, passing since A.3); hopper 1.07 at 5 mm (1.01 at 10 mm); psi 0.5 to 1 deg narrows the stiffness gap to 12 to 15 % (decision 0091) |
-| A.2 | Body near a free surface | Done (cause found, fix parked) | Cause: small-cell mixing spreads the material into empty slivers under a body (decision 0092). A fix passes the hover test and cuts the projectile gap from -26 % to -15 %, but packed material at steel bodies (1.05 rho0); merged in A.3 |
-| A.3 | Sliver contact onset | Done | Decision 0093. The steel packing was a geometry bug: a hex8 node line exactly on a mesh face lost its cut line in `faceCovered`; fixed, and the empty-sliver rule merged. `tests/test_body_above_surface.sh` now in CI; projectile -14.9 % (rigid) / -14.6 % (steel), steel 1.015 rho0; deformable push 1.007 rho0; `seam` case in `test_body_cells.sh` |
-| A.4 | Sand footing with psi 30 | Next | The associated blow-up during the push (decision 0092: contact now reached, blows up at 0.6 s); psi 0 excess not explained by the hover effect |
+| A.1 | Accuracy pass before packaging (Sia, 2026-11-19) | Done | Wedge against quarter gap was the comparison: by hydraulic diameter 0.2 % (decision 0090). Sand footing: a body within a cell of the free surface disturbs the material at rest and blows up associated flow (failing `tests/manual/test_body_above_surface.sh`); hopper 1.07 at 5 mm (1.01 at 10 mm); psi 0.5 to 1 deg narrows the stiffness gap to 12 to 15 % (decision 0091) |
+| A.2 | Body near a free surface | Done (cause found, fix parked) | Cause: small-cell mixing spreads the material into empty slivers under a body (decision 0092). A fix (`docs/patches/A2-empty-sliver-mixing.patch`) passes the hover test and cuts the projectile gap from -26 % to -15 %, but packs material at steel bodies (1.05 rho0), so it is not merged |
+| A.3a | Steel packing with the sliver fix | Done | Decision 0093. A geometry bug: a hex8 node line exactly on a mesh face lost its cut line in `cutGeometry::faceCovered`; fixed, `seam` case in `test_body_cells.sh`. With it the parked sliver fix passes the hover test, the projectile (-14.9 % rigid, -14.6 % steel, 1.015 rho0) and the deformable push, but the full suite showed two tests on a round-off knife edge, so the fix stays parked |
+| A.3b | Robust free-surface small cells | Next | Make `test_wedge_silo.sh` (quarter: wall slivers at the free surface blow up to 1e8 m/s) and the steel push (corner cell at alpha 0.9999 spikes to 1.03 rho0) insensitive to round-off, then merge `docs/patches/A2-empty-sliver-mixing.patch`. Done when the patch passes the full suite and `tests/manual/test_body_above_surface.sh`, and both tests pass at maxCo 0.399, 0.4 and 0.401 |
 
 ## Validation references
 
@@ -119,9 +119,10 @@ anything that cannot be undone outside this repository.
 
 Accuracy pass (Sia, 2026-11-19, before packaging): A.1 done (decisions 0090, 0091).
 Sia: mass flow and mesh dependence are secondary until Sia's validation case; find
-where errors come from. A.2 found the cause (decision 0092); A.3 fixed it (decision 0093:
-empty slivers stay empty, and a surface seam on a mesh face keeps its cut line). Next:
-A.4, the sand footing with psi 30 (blow-up during the push).
+where errors come from. A.2 found the cause (decision 0092). A.3a fixed the steel packing
+(a geometry bug, decision 0093). Next: A.3b, make the free-surface small cells robust to
+round-off so the parked sliver fix can merge (the wedge silo and the steel push flip
+pass/fail with round-off-level changes, decision 0093).
 
 Phase 6 (2026-11-19) done: WP 6.1 (MPI with bodies), 6.2a (restart), 6.3a (scaling,
 `docs/results/scaling.md`), 6.3b (validation report, `docs/results/validation-report.md`);
@@ -239,18 +240,22 @@ mesh, as Abaqus CEL). Order:
 
 ## Known issues
 
-- Sand footing with psi = phi (decision 0092): contact is now reached cleanly (A.3,
-  decision 0093) but the push blows up at about 0.6 s. Package A.4.
+- Body near a free surface (decision 0091): a rigid footing held 2.5 mm above sand at
+  rest sets the edge cells moving (0.1 to 0.2 m/s, 20 kPa) and, with psi = phi, blows
+  up before contact. Cause: small-cell mixing into empty slivers (decision 0092); not the
+  sand footing excess (psi 0 unchanged). Package A.3.
+- Round-off knife edge (decision 0093): `test_wedge_silo.sh` (quarter: wall slivers at
+  the free surface) and the steel push in `test_deformable_push.sh` (corner cell) flip
+  between pass and blow-up or 1.03 rho0 on round-off-level changes. Package A.3b.
 - Parallel runs (WP 6.1, decision 0080): with bodies, caps and void rules, a run on N
   processors matches serial to round-off only until a switch flips, then parts like a
   serial run with a 1e-12 perturbation (footing force 2 to 4 %, tank rate 0 %). Small
   cut cells do not mix across processor boundaries (reported as unmixed if it happens).
 - Restart (WP 6.2a, decision 0081) is exact only with `writeFormat binary` or
   `writePrecision 17`; tutorials write ASCII with 8 digits.
-- Projectile penetration (WP 5.4, decision 0074): a slug into Tresca clay stops 15 %
-  short of the Prandtl energy estimate at 1 m/s (26 % before A.3: contact started a
-  quarter cell early, decision 0093); the static footing reads 8 % low. The rest not
-  isolated.
+- Projectile penetration (WP 5.4, decision 0074): a slug into Tresca clay stops 26 %
+  short of the Prandtl energy estimate at 1 m/s (-33 % at 0.5 m/s, -21 % at 2 m/s);
+  the static footing reads 8 % low. Not isolated.
 - Deformable bodies much finer than the cells (decision 0073): a 20 x 20 footing on
   1 cm cells packs the material to 1.039 rho0 with the default hourglass 0.05. Keep
   body elements near the cell size; soft bodies use `hourglass 0.3`.
