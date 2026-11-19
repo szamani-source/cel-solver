@@ -9,6 +9,9 @@
 #include "uniformDimensionedFields.H"
 #include "mathematicalConstants.H"
 #include "emptyFvPatch.H"
+#include "IFstream.H"
+#include "OFstream.H"
+#include "OSspecific.H"
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -297,7 +300,8 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
     nUnmixed_(0),
     movingWalls_(false),
     lostMass_(0),
-    nHandOver_(0)
+    nHandOver_(0),
+    restartState_()
 {
     if (outletOpenTime_.size() && !freeSurface_)
     {
@@ -323,6 +327,33 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
             << iter.val() << " s" << nl;
     }
     readInlets();
+
+    // Restart (WP 6.2, decision 0081): counters and wall face velocities
+    // written with the fields of the start time
+    {
+        const fileName f(mesh.time().timePath()/"uniform"/"eulerianSolid");
+        if (isFile(f))
+        {
+            IFstream is(f);
+            restartState_ = dictionary(is);
+            discharged_ = restartState_.get<scalar>("discharged");
+            charged_ = restartState_.get<scalar>("charged");
+            lostMass_ = restartState_.get<scalar>("lostMass");
+            nHandOver_ = restartState_.get<label>("nHandOver");
+            const dictionary& vd = restartState_.subDict("vStar");
+            forAll(mesh.boundary(), patchi)
+            {
+                const word& pn = mesh.boundary()[patchi].name();
+                if (vd.found(pn))
+                {
+                    vStar_.boundaryFieldRef()[patchi] ==
+                        vd.get<vectorField>(pn);
+                }
+            }
+            Info<< "Eulerian solid: restart state read from "
+                << mesh.time().timeName() << "/uniform/eulerianSolid" << nl;
+        }
+    }
     if (spreadLayers_ && !freeSurface_)
     {
         FatalIOErrorInFunction(materialProperties_)
@@ -475,6 +506,33 @@ void Foam::eulerianSolid::openOutlets()
             damping_ = 0;
         }
     }
+}
+
+
+void Foam::eulerianSolid::writeState() const
+{
+    dictionary state;
+    state.set("discharged", discharged_);
+    state.set("charged", charged_);
+    state.set("lostMass", lostMass_);
+    state.set("nHandOver", nHandOver_);
+    state.set("bodyMassIn", bodyMassIn_);
+    dictionary vd;
+    forAll(mesh_.boundary(), patchi)
+    {
+        const fvsPatchVectorField& pv = vStar_.boundaryField()[patchi];
+        if (pv.size() && !isA<emptyFvPatch>(mesh_.boundary()[patchi]))
+        {
+            vd.set(mesh_.boundary()[patchi].name(), vectorField(pv));
+        }
+    }
+    state.set("vStar", vd);
+
+    const fileName dir(mesh_.time().timePath()/"uniform");
+    mkDir(dir);
+    OFstream os(dir/"eulerianSolid");
+    os.precision(17);
+    state.write(os, false);
 }
 
 

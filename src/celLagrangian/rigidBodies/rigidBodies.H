@@ -19,6 +19,8 @@ Description
       postProcessing/rigidBodies/<name>.dat   one line per write time:
           t  centre (3)  rotation tensor (9, row by row)  v (3)  omega (3)
       postProcessing/rigidBodies/<time>/<name>.stl   the moved surface
+    Restart state (every processor): <time>/uniform/rigidBodies, read when
+    a run starts from <time> (WP 6.2); the .dat files are then appended to.
 
 SourceFiles
     rigidBodies.C
@@ -60,8 +62,14 @@ public:
         //- Move every body to the current time
         void move();
 
-        //- Write the pose of every body and its moved surface
+        //- Write the pose of every body and its moved surface, and the
+        //  restart state (writeState)
         void write();
+
+        //- Write the state of every body to <time>/uniform/rigidBodies
+        //  (each processor its own), read back by the constructor when a
+        //  run starts from that time (WP 6.2, decision 0081)
+        void writeState() const;
 };
 
 

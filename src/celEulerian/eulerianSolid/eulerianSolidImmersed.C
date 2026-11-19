@@ -96,6 +96,15 @@ void Foam::eulerianSolid::setImmersedWalls
     {
         bodyForce_.setSize(bodyNames.size(), Zero);
         bodyMassIn_.setSize(bodyNames.size(), 0);
+        // Restart (WP 6.2): the mass that went into each body so far
+        if (restartState_.found("bodyMassIn"))
+        {
+            const scalarList mi(restartState_.get<scalarList>("bodyMassIn"));
+            if (mi.size() == bodyMassIn_.size())
+            {
+                bodyMassIn_ = mi;
+            }
+        }
     }
 
     // Cell open fractions; covered cells hold no material

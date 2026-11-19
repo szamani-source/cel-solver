@@ -368,6 +368,10 @@ class eulerianSolid
         scalar lostMass_;
         label nHandOver_;
 
+        //- Restart state read at the start time (WP 6.2, decision 0081);
+        //  empty when the run starts fresh
+        dictionary restartState_;
+
 
     // Private Member Functions
 
@@ -517,6 +521,12 @@ public:
         void setMovingWalls(const bool moving);
 
         bool movingWalls() const noexcept { return movingWalls_; }
+
+        //- Write what a restart needs besides the fields (WP 6.2, decision
+        //  0081) to <time>/uniform/eulerianSolid (each processor): mass
+        //  counters (discharged, fed, per-body mass in, hand-over loss) and
+        //  the wall face velocities of the last step (flow impedance)
+        void writeState() const;
 
         //- After remap(), with the bodies at their new pose (bodyCells
         //  updated): new cut cells; per cell mass, material volume and

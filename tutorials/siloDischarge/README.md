@@ -73,3 +73,14 @@ All in `constant/materialProperties` (commented there): `freeSurface`, the mu(I)
 entries `mu2`, `I0`, `d`, `rhoS`, the switches `shearCap`, `spreadLayers`,
 `flowImpedance`, `normalCap`, the `walls` friction list and `outlets` (friction, `openTime`). In
 `system/controlDict`: `gravityRamp` (s) and `damping` (1/s, until the outlet opens).
+
+## Restarting a run (WP 6.2a)
+
+celFoam writes, with the fields of each write time, `<time>/uniform/eulerianSolid`
+(discharged and fed mass, wall face velocities) and, when there are bodies,
+`<time>/uniform/rigidBodies` (pose, velocities, element state). To continue a run, set
+`startFrom latestTime;` in `system/controlDict` (and a later `endTime`) and run celFoam
+again; in parallel, run it on the processor directories as before. The restarted run
+matches the continuous one bit for bit when the fields are written exactly: use
+`writeFormat binary;` (this tutorial writes ASCII with 8 digits, which restarts
+correctly but parts from the continuous run in the last digits).

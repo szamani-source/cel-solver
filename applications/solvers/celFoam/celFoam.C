@@ -19,6 +19,7 @@ Description
 #include "rigidBodies.H"
 #include "bodyCells.H"
 #include "immersedWalls.H"
+#include <cmath>
 
 // Print total mass and momentum with enough digits to compare runs
 static void printDiagnostics(const Foam::eulerianSolid& solid)
@@ -76,17 +77,28 @@ int main(int argc, char *argv[])
     if (cut && Pstream::master())
     {
         mkDir(runTime.globalPath()/"postProcessing");
+        // A restarted run (WP 6.2) appends to the file of the first run
+        const bool restart = runTime.value() > 0;
         forceFile.reset
         (
-            new OFstream(runTime.globalPath()/"postProcessing"/"bodyForces.dat")
+            new OFstream
+            (
+                runTime.globalPath()/"postProcessing"/"bodyForces.dat",
+                IOstreamOption(),
+                restart ? IOstreamOption::APPEND_APP : IOstreamOption::NO_APPEND
+            )
         );
-        forceFile() << "# t";
-        forAll(bodies, b)
+        forceFile().precision(10);
+        if (!restart)
         {
-            forceFile() << ' ' << bodies[b].name() << "_Fx "
-                << bodies[b].name() << "_Fy " << bodies[b].name() << "_Fz";
+            forceFile() << "# t";
+            forAll(bodies, b)
+            {
+                forceFile() << ' ' << bodies[b].name() << "_Fx "
+                    << bodies[b].name() << "_Fy " << bodies[b].name() << "_Fz";
+            }
+            forceFile() << "  (force of the material on the body, N)" << nl;
         }
-        forceFile() << "  (force of the material on the body, N)" << nl;
     }
 
     // Stable time step at the start, printed once. Recomputed every cycle
@@ -107,9 +119,37 @@ int main(int argc, char *argv[])
 
     Info<< nl << "Starting time loop" << nl << endl;
 
+    // Time step (decision 0081): the stable step; with adjustableRunTime
+    // shortened so that steps land on the write times and on endTime. The write
+    // times are counted from time zero, not from the start time, so a run
+    // restarted from a write time takes the same steps as the run that wrote
+    // it (OpenFOAM's own adjustment counts from the start time, which
+    // changes the step in the last digits and lets restarts part). Never
+    // longer than the stable step (OpenFOAM rounds the number of steps to
+    // the nearest, which can lengthen it by up to half).
+    const bool adjustWrite =
+        runTime.controlDict().get<word>("writeControl") == "adjustableRunTime";
+    const scalar writeInterval =
+        runTime.controlDict().get<scalar>("writeInterval");
+    const scalar endTime = runTime.endTime().value();
+
     while (runTime.run())
     {
-        runTime.setDeltaT(solid.stableDeltaT());
+        const scalar t = runTime.value();
+        scalar dtStep = solid.stableDeltaT();
+        scalar span = -1;
+        if (adjustWrite && writeInterval > 0)
+        {
+            const scalar k =
+                std::floor(t/writeInterval*(1 + 1e-12) + 1e-9) + 1;
+            span = min(endTime, k*writeInterval) - t;
+        }
+        if (span > 0)
+        {
+            const scalar n = std::ceil(span/dtStep*(1 - 1e-12));
+            dtStep = span/max(n, scalar(1));
+        }
+        runTime.setDeltaT(dtStep, false);
         ++runTime;
 
         Info<< "Time = " << runTime.timeName()
@@ -149,6 +189,7 @@ int main(int argc, char *argv[])
         if (runTime.write())
         {
             printDiagnostics(solid);
+            solid.writeState();     // WP 6.2: restart state (decision 0081)
             bodies.write();
             forAll(solid.bodyNames(), b)
             {

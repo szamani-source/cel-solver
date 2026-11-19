@@ -269,6 +269,14 @@ public:
 
         //- Move the pose from time() to time t
         void moveTo(const scalar t);
+
+        //- Write the state a restart needs (WP 6.2, decision 0081): pose,
+        //  time, free-body velocities; deformable bodies also their
+        //  surface, surface velocity, element time and element state
+        void writeState(dictionary& dict) const;
+
+        //- Read the state written by writeState
+        void readState(const dictionary& dict);
 };
 
 

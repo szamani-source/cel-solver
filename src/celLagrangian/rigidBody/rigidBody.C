@@ -309,13 +309,8 @@ Foam::rigidBody::rigidBody
         moving_ = true;
         v_ = velocity_->value(0);
         w_ = omega_->value(0);
-        if (runTime.value() > 0)
-        {
-            FatalIOErrorInFunction(dict)
-                << "Body " << name_ << ": a free body (mass) cannot restart"
-                << " from t = " << runTime.value() << " yet"
-                << exit(FatalIOError);
-        }
+        // A start time after zero needs the state written then (WP 6.2):
+        // rigidBodies reads it, or stops
     }
 }
 
@@ -501,6 +496,50 @@ void Foam::rigidBody::moveTo(const scalar t)
         R_ = rodrigues(omega_->integrate(time_, t)) & R_;
     }
     time_ = t;
+}
+
+
+void Foam::rigidBody::writeState(dictionary& dict) const
+{
+    dict.set("time", time_);
+    dict.set("centre", c_);
+    dict.set("rotation", R_);
+    dict.set("v", v_);
+    dict.set("omega", w_);
+    if (hex_)
+    {
+        dict.set("surfacePoints", surface0_.points());
+        dict.set("surfU", surfU_);
+        dict.set("tHex", tHex_);
+        dictionary hd;
+        hex_->writeState(hd);
+        dict.set("elements", hd);
+    }
+}
+
+
+void Foam::rigidBody::readState(const dictionary& dict)
+{
+    time_ = dict.get<scalar>("time");
+    c_ = dict.get<point>("centre");
+    R_ = dict.get<tensor>("rotation");
+    v_ = dict.get<vector>("v");
+    w_ = dict.get<vector>("omega");
+    if (hex_)
+    {
+        const pointField sp(dict.get<pointField>("surfacePoints"));
+        if (sp.size() != surface0_.nPoints())
+        {
+            FatalIOErrorInFunction(dict)
+                << "Body " << name_ << ": restart state has " << sp.size()
+                << " surface points, the body has " << surface0_.nPoints()
+                << exit(FatalIOError);
+        }
+        surface0_.movePoints(sp);
+        surfU_ = dict.get<vectorField>("surfU");
+        tHex_ = dict.get<scalar>("tHex");
+        hex_->readState(dict.subDict("elements"));
+    }
 }
 
 
