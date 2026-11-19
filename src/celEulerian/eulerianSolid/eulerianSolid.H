@@ -286,6 +286,18 @@ class eulerianSolid
         //- Mass fed in through inlets (this processor) [kg]
         scalar charged_;
 
+        //- Axisymmetric wedge mesh: has wedge patches (WP 3.8a)
+        bool wedge_;
+
+        //- Wedge mesh: radial and hoop axes (-1 otherwise), and each
+        //  cell's hoop volume rate sum(v.S) over its two wedge sides from
+        //  the last Lagrange step [m^3/s] (WP 3.8b, decision 0061): the
+        //  radial faces' flux holds it too, the per-axis void closure and
+        //  slab lengths move it to the hoop axis
+        label wedgeR_;
+        label wedgeH_;
+        scalarField hoopRate_;
+
         //- Cell lengths along x, y, z (Cartesian hex cells, freeSurface)
         vectorField hCell_;
 
@@ -370,6 +382,10 @@ class eulerianSolid
 
 
     // Private Member Functions
+
+        //- Cell size for the stable time step: cbrt(V), or on a wedge
+        //  mesh the smallest in-plane length (WP 3.8a)
+        tmp<scalarField> cellSize() const;
 
         //- Read materialProperties inlets (WP 3.7a)
         void readInlets();
