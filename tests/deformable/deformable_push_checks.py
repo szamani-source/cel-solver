@@ -16,12 +16,13 @@ plane strain, damping 0.2) driven at its top nodes. Checks:
   both, from about 20 to 64 N);
 - after pulling out, the force below 1 % of its peak (both).
 
---soft (WP 5.3b, not passing yet, tests/manual/test_soft_push.sh): a soft
-body (E 20 MPa, nu 0.3, rho 1100), drive ramped over 0.02 s: shortening
-against the elastic column in plane strain, dh = F h (1 - nu^2) / (E A), A
-its width times its depth (0.03 m), within 20 % over 0.15 to 0.2 s, and the
-material density within 2 %. On 2026-11-18: ratio 1.44, density 1.62 rho0
-(decision 0072).
+--soft (WP 5.3b, tests/test_soft_push.sh, decision 0073): a soft body
+(E 20 MPa, nu 0.3, rho 1100, hourglass 0.3), drive ramped over 0.02 s:
+shortening against the elastic column in plane strain,
+dh = F h (1 - nu^2) / (E A), A its width times its depth (0.03 m), within
+20 % over 0.15 to 0.2 s, and the material density within 2 %. On
+2026-11-18: ratio 0.90, density 1.016 rho0 (before decision 0073: 1.44 and
+1.62 rho0).
 
 Prints PASS/FAIL, exits non-zero on failure.
 """
@@ -54,7 +55,7 @@ def table(tEnd, ramp=0.0):
             f"({sp.T_PUSH + 1e-4!r} (0 {v!r} 0)) ({tEnd + 1!r} (0 {v!r} 0)))")
 
 
-def add_deformable(path, E, nu, rho, tbl):
+def add_deformable(path, E, nu, rho, tbl, hourglass=None):
     lo = (sp.X0, sp.Y0, -0.01)
     hi = (sp.X1, sp.Y0 + sp.HEIGHT, 0.02)
     top = sp.Y0 + sp.HEIGHT
@@ -64,6 +65,7 @@ def add_deformable(path, E, nu, rho, tbl):
             f"            cells (10 10 1);\n            density {rho!r};\n"
             f"            material {{ type linearElastic; E {E!r}; nu {nu!r}; }}\n"
             f"            planeStrain yes;\n            damping 0.2;\n"
+            + (f"            hourglass {hourglass!r};\n" if hourglass else "") +
             f"            drive ({sp.X0 - 0.01!r} {top - 1e-6!r} -1) "
             f"({sp.X1 + 0.01!r} {top + 1e-6!r} 1);\n        }}\n"
             f"        velocity {tbl};\n        friction {sp.FRICTION!r};\n"
@@ -73,7 +75,7 @@ def add_deformable(path, E, nu, rho, tbl):
              + "bodies\n{\n" + body + "}\n")
 
 
-def run_case(work, name, kind, ramp=0.0):
+def run_case(work, name, kind, ramp=0.0, hourglass=None):
     tEnd = 2 * sp.T_PUSH
     p = vc.make_case(f"{work}/{name}", 30, 30, vc.MC + sp.T0_RULES,
                      {"fill": [-1.0, -1.0, 1.0, sp.DEPTH], "U0": [0, 0, 0],
@@ -83,7 +85,7 @@ def run_case(work, name, kind, ramp=0.0):
                            (sp.X1, sp.Y0 + sp.HEIGHT, 0.02), table(tEnd), sp.FRICTION)
     else:
         E, nu, rho = kind
-        add_deformable(p, E, nu, rho, table(tEnd, ramp))
+        add_deformable(p, E, nu, rho, table(tEnd, ramp), hourglass)
     sec = vc.run(p)
     return np.loadtxt(f"{p}/history.dat"), sec
 
@@ -130,7 +132,7 @@ def check_steel(work):
 def check_soft(work):
     print("[2] Soft footing (hex8, E 20 MPa), drive ramped over 0.02 s")
     E, nu = 2e7, 0.3
-    h, s = run_case(work, "soft", (E, nu, 1100.0), ramp=0.02)
+    h, s = run_case(work, "soft", (E, nu, 1100.0), ramp=0.02, hourglass=0.3)
     good, line = basic("soft", h, s)
     w = (h[:, sp.T] >= 0.15) & (h[:, sp.T] <= 0.2)
     F = -h[w, sp.FYB]

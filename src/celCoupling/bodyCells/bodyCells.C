@@ -373,13 +373,33 @@ void Foam::bodyCells::update()
         {
             W[celli] = Zero;     // round-off of a closed cell
         }
+        const scalar mW = mag(W[celli]);
         if (bestBody[celli] >= 0)
         {
-            U[celli] = bodies_[bestBody[celli]].velocityAt(Cc[celli]);
+            const rigidBody& body = bodies_[bestBody[celli]];
+            if (cut && body.deformable() && mW >= VSMALL)
+            {
+                // Mean over the wall face (decision 0073)
+                U[celli] = Zero;
+                for
+                (
+                    const point& p
+                  : rigidBody::faceSamples
+                    (
+                        Cc[celli], cellBb_[celli].span(), W[celli]/mW
+                    )
+                )
+                {
+                    U[celli] += 0.25*body.velocityAt(p);
+                }
+            }
+            else
+            {
+                U[celli] = body.velocityAt(Cc[celli]);
+            }
         }
         if (!cut) continue;
         ++nCut_;
-        const scalar mW = mag(W[celli]);
         if (mW < VSMALL) continue;
         const vector nb(W[celli]/mW);
         scalar best = 0;
