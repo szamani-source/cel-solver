@@ -2728,8 +2728,18 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
     scalarField& epsPEq = epsPEq_.primitiveFieldRef();
     scalarField& rho = rho_.primitiveFieldRef();
 
+    // Axes of a partly filled cell open to plastic flow into its void
+    // (voidPlasticFlow, decision 0095)
+    static const direction diag3[3] =
+        {symmTensor::XX, symmTensor::YY, symmTensor::ZZ};
+    label nVoidAxes = 0;
+    direction voidAxis[3];
+    scalar voidDm[3], voidDm0[3], voidDmMax[3];
+    scalar voidA = 1, voidMatV = 0;
+
     forAll(sigma, celli)
     {
+        nVoidAxes = 0;
         if (imm && cellOpen_[celli] <= 0)
         {
             continue;       // covered by a body: ghost values stay
@@ -2793,6 +2803,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
             bool same = full;
             scalar matV = full ? 1 : a;     // material volume / V
             symmTensor dE(dEps);
+            nVoidAxes = 0;
             for (direction d = 0; d < vector::nComponents; ++d)
             {
                 if (geomD[d] < 0 && label(d) != wedgeH_)
@@ -2827,9 +2838,21 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                 {
                     same = false;
                 }
+                if (voidPlasticFlow_ && !full)
+                {
+                    // the material may take more normal strain on this
+                    // axis, up to closing the void left after r
+                    voidAxis[nVoidAxes] = d;
+                    voidDm[nVoidAxes] = dm;
+                    voidDm0[nVoidAxes] = dm;
+                    voidDmMax[nVoidAxes] = max(dm, r + (1 - a));
+                    ++nVoidAxes;
+                }
                 matV += dm;
                 dE.component(diag[d]) = dm/(a + 0.5*dm);
             }
+            voidA = a;
+            voidMatV = matV - (full ? 1 : a);
             if (!same)
             {
                 dEps = dE;
@@ -2859,6 +2882,81 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
 
             symmTensor sNew;
             material_->update(dEps, dt, sigma[celli], hOld, sNew, hNew);
+
+            // A.4 (decision 0095): a partly filled cell lets the plastic
+            // normal strain of its material go into the void (the elastic
+            // rules above only see unloading). A few fixed-point passes:
+            // each adds the plastic extension of the last trial on the
+            // cell's axes, within the void the cell has.
+            if (nVoidAxes > 0)
+            {
+                const symmTensor eOld(constitutiveModel::fromVoigt(hOld.epsP));
+                for (label pass = 0; pass < 3; ++pass)
+                {
+                    const symmTensor dP
+                    (
+                        constitutiveModel::fromVoigt(hNew.epsP) - eOld
+                    );
+                    bool changed = false;
+                    for (label k = 0; k < nVoidAxes; ++k)
+                    {
+                        const direction d = voidAxis[k];
+                        const scalar ext = dP.component(diag3[d]);
+                        if (ext <= 0)
+                        {
+                            continue;
+                        }
+                        const scalar dm = min
+                        (
+                            voidDmMax[k],
+                            voidDm[k] + voidA*ext
+                        );
+                        if (dm > voidDm[k])
+                        {
+                            voidDm[k] = dm;
+                            dEps.component(diag3[d]) = dm/(voidA + 0.5*dm);
+                            changed = true;
+                        }
+                    }
+                    if (!changed)
+                    {
+                        break;
+                    }
+                    // the axes share the cell's void: the material volume
+                    // stays within the Lagrangian cell volume
+                    scalar extra = 0, room = VL/Vo[celli] - voidA;
+                    for (label k = 0; k < nVoidAxes; ++k)
+                    {
+                        extra += voidDm[k] - voidDm0[k];
+                        room -= voidDm0[k];
+                    }
+                    if (extra > max(room, scalar(0)))
+                    {
+                        const scalar f = max(room, scalar(0))/extra;
+                        for (label k = 0; k < nVoidAxes; ++k)
+                        {
+                            voidDm[k] =
+                                voidDm0[k] + f*(voidDm[k] - voidDm0[k]);
+                            dEps.component(diag3[voidAxis[k]]) =
+                                voidDm[k]/(voidA + 0.5*voidDm[k]);
+                        }
+                    }
+                    material_->update
+                    (
+                        dEps, dt, sigma[celli], hOld, sNew, hNew
+                    );
+                }
+                scalar matV = voidA;
+                for (label k = 0; k < nVoidAxes; ++k)
+                {
+                    matV += voidDm[k];
+                }
+                if (matV != voidA + voidMatV)
+                {
+                    alphaL_[celli] =
+                        min(max(matV*Vo[celli]/VL, scalar(0)), scalar(1));
+                }
+            }
 
             sigma[celli] = sNew;
             symmTensor e(constitutiveModel::fromVoigt(hNew.epsP));
