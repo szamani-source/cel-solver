@@ -6,6 +6,7 @@
 #include "Time.H"
 #include "IOdictionary.H"
 #include "OSspecific.H"
+#include "IFstream.H"
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -54,6 +55,36 @@ Foam::rigidBodies::rigidBodies(const Time& runTime)
 
     move();
 
+    // Restart (WP 6.2, decision 0081): the state written at the start time
+    const fileName stateFile(runTime.timePath()/"uniform"/"rigidBodies");
+    const bool restart = isFile(stateFile);
+    if (restart)
+    {
+        IFstream is(stateFile);
+        const dictionary state(is);
+        for (rigidBody& b : *this)
+        {
+            b.readState(state.subDict(b.name()));
+        }
+        Info<< "Rigid bodies: state read from " << runTime.timeName()
+            << "/uniform/rigidBodies" << endl;
+    }
+    else if (runTime.value() > 0)
+    {
+        for (const rigidBody& b : *this)
+        {
+            if (b.free() || b.deformable())
+            {
+                FatalErrorInFunction
+                    << "Body " << b.name() << " (free or deformable) cannot "
+                    << "start at t = " << runTime.value() << " without its "
+                    << "state: " << stateFile << " not found" << nl
+                    << "Restart from a time that celFoam wrote (WP 6.2)"
+                    << exit(FatalError);
+            }
+        }
+    }
+
     const label oldPrecision = Info().precision(16);
     for (const rigidBody& b : *this)
     {
@@ -71,10 +102,23 @@ Foam::rigidBodies::rigidBodies(const Time& runTime)
         files_.setSize(size());
         forAll(*this, i)
         {
-            files_.set(i, new OFstream(dir/(operator[](i).name() + ".dat")));
+            // A restarted run appends to the history of the first run
+            files_.set
+            (
+                i,
+                new OFstream
+                (
+                    dir/(operator[](i).name() + ".dat"),
+                    IOstreamOption(),
+                    restart ? IOstreamOption::APPEND_APP : IOstreamOption::NO_APPEND
+                )
+            );
             OFstream& os = files_[i];
             os.precision(17);
-            os  << "# t  centre(3)  R(9, row by row)  v(3)  omega(3)" << nl;
+            if (!restart)
+            {
+                os  << "# t  centre(3)  R(9, row by row)  v(3)  omega(3)" << nl;
+            }
         }
     }
 }
@@ -92,8 +136,32 @@ void Foam::rigidBodies::move()
 }
 
 
+void Foam::rigidBodies::writeState() const
+{
+    if (empty())
+    {
+        return;
+    }
+    // Every processor writes its own copy (the bodies are whole on each)
+    const fileName dir(runTime_.timePath()/"uniform");
+    mkDir(dir);
+    dictionary state;
+    for (const rigidBody& b : *this)
+    {
+        dictionary bd;
+        b.writeState(bd);
+        state.set(b.name(), bd);
+    }
+    OFstream os(dir/"rigidBodies");
+    os.precision(17);
+    state.write(os, false);
+}
+
+
 void Foam::rigidBodies::write()
 {
+    writeState();
+
     if (!Pstream::master() || empty())
     {
         return;

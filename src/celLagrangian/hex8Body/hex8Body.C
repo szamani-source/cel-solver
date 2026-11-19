@@ -447,4 +447,61 @@ Foam::scalar Foam::hex8Body::kineticEnergy() const
 }
 
 
+void Foam::hex8Body::writeState(dictionary& dict) const
+{
+    dict.set("x", x_);
+    dict.set("v", v_);
+    dict.set("sigma", sigma_);
+    dict.set("sigmaV", sigmaV_);
+    dict.set("Qhg", Qhg_);
+
+    // History: plastic strain (6), equivalent plastic strain, apex flag
+    List<FixedList<scalar, 8>> h(hist_.size());
+    forAll(hist_, ei)
+    {
+        for (label k = 0; k < 6; ++k)
+        {
+            h[ei][k] = hist_[ei].epsP[k];
+        }
+        h[ei][6] = hist_[ei].epsPEq;
+        h[ei][7] = hist_[ei].apex ? 1 : 0;
+    }
+    dict.set("history", h);
+    dict.set("workInt", workInt_);
+    dict.set("workExt", workExt_);
+}
+
+
+void Foam::hex8Body::readState(const dictionary& dict)
+{
+    const pointField x(dict.get<pointField>("x"));
+    if (x.size() != x_.size())
+    {
+        FatalIOErrorInFunction(dict)
+            << "Body " << name_ << ": restart state has " << x.size()
+            << " nodes, the body has " << x_.size() << exit(FatalIOError);
+    }
+    x_ = x;
+    v_ = dict.get<vectorField>("v");
+    sigma_ = dict.get<symmTensorField>("sigma");
+    sigmaV_ = dict.get<symmTensorField>("sigmaV");
+    Qhg_ = dict.get<List<FixedList<vector, 4>>>("Qhg");
+    const List<FixedList<scalar, 8>> h
+    (
+        dict.get<List<FixedList<scalar, 8>>>("history")
+    );
+    forAll(hist_, ei)
+    {
+        for (label k = 0; k < 6; ++k)
+        {
+            hist_[ei].epsP[k] = h[ei][k];
+        }
+        hist_[ei].epsPEq = h[ei][6];
+        hist_[ei].apex = h[ei][7] > 0.5;
+    }
+    workInt_ = dict.get<scalar>("workInt");
+    workExt_ = dict.get<scalar>("workExt");
+}
+
+
 // ************************************************************************* //

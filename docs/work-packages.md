@@ -79,9 +79,11 @@ Constitutive models for bulk solids are tracked in `docs/constitutive-models.md`
 | 5.3a | Two-way deformable coupling (split 2026-11-18) | Steel footing push follows the rigid one within 5 %, density within 2 % |
 | 5.3b | Soft deformable bodies | Soft footing shortens as an elastic column within 20 %, density within 2 % |
 | 5.4 | Projectile benchmark | Steel slug into clay within 5 % of the rigid reference run; both within 30 % of the Prandtl energy estimate |
-| 6.1 | MPI with Lagrangian bodies | 1 and N cores agree |
-| 6.2 | Restart and mass scaling | Restarted run matches continuous run |
-| 6.3 | Scaling tests and validation report | Report published |
+| 6.1 | MPI with Lagrangian bodies | 1 and N cores agree (decision 0080: exact phase, then outcomes within the round-off band) |
+| 6.2a | Restart (split 2026-11-18) | Restarted run matches continuous run, bit for bit |
+| 6.2b | Mass scaling of deformable bodies (split from 6.2; later, on request) | Quasi-static push with scaled elements gives the unscaled force within 5 % |
+| 6.3a | Parallel scaling (split 2026-11-18) | Speed-up on 1, 2, 4 processors recorded for the T0 tank at 10 and 5 mm |
+| 6.3b | Validation report (split 2026-11-18) | Report published: every benchmark with reference, result, tolerance, test, known issues |
 
 Note: the skeleton written in 0.1 already covers part of 2.1 (explicit loop and CFL step).
 
@@ -163,3 +165,8 @@ them. The work is in the wedge faces (rotated cell state, hoop terms), the time 
 (cbrt(V) collapses at the axis), the slab rules (cells widen with r, triangles at the
 axis) and the outlet on the axis. Order: 3.7a, 3.7b, 3.8a, 3.8b, 3.8c; 3.8d later.
 
+
+Note (2026-11-18, phase 6): 6.2 split into 6.2a (restart) and 6.2b (mass scaling, kept
+for later: the material's step, not the elements', sets the cost of the coupled runs,
+since deformable bodies are subcycled, decision 0072), and 6.3 into 6.3a (scaling) and
+6.3b (validation report). Phase 6 decisions are numbered from 0080.

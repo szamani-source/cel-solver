@@ -60,6 +60,7 @@ SourceFiles
 #include "symmTensorField.H"
 #include "FixedList.H"
 #include "List.H"
+#include "dictionary.H"
 
 namespace Foam
 {
@@ -208,6 +209,14 @@ public:
         //- Work done by external forces, gravity and prescribed velocities
         //  since the start [J]
         scalar externalWork() const noexcept { return workExt_; }
+
+        //- Write the state a restart needs (WP 6.2, decision 0081): nodal
+        //  positions and velocities, element stresses, history, hourglass
+        //  forces and damping stresses, work sums
+        void writeState(dictionary& dict) const;
+
+        //- Read the state written by writeState
+        void readState(const dictionary& dict);
 };
 
 

@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-11-18 (WP 2.6 Taylor bar on the wedge, WP 3.8c wedge silo, 3.8b, 3.8a wedge, WP 3.7b fed silo, WP 5.3a, 5.2, 5.1, 4.3e, 4.3d, WP 3.7a solid inlet; WP 4.4c, 4.4b, 4.4, 4.3b, WP 3.5 cohesion, tutorial T0 rule set, WP 4.5, 4.3c, 4.3a, 3.6e, 3.6h, 3.6g, 3.6f; 4.1, 4.0, 4.2; 2026-11-17: 3.6d, 3.6c2, 3.6c, 3.6b, 3.6s, validation references)
+Last updated: 2026-11-19 (phase 6: WP 6.1 MPI with bodies, 6.2a restart, 6.3a scaling, 6.3b validation report; 2026-11-18: WP 2.6 Taylor bar on the wedge, WP 3.8c wedge silo, 3.8b, 3.8a wedge, WP 3.7b fed silo, WP 5.3a, 5.2, 5.1, 4.3e, 4.3d, WP 3.7a solid inlet; WP 4.4c, 4.4b, 4.4, 4.3b, WP 3.5 cohesion, tutorial T0 rule set, WP 4.5, 4.3c, 4.3a, 3.6e, 3.6h, 3.6g, 3.6f; 4.1, 4.0, 4.2; 2026-11-17: 3.6d, 3.6c2, 3.6c, 3.6b, 3.6s, validation references)
 
 Plan doc: https://claude.ai/artifact/DTT6kSikz9ZUTBkUxY6Grr
 
@@ -79,8 +79,15 @@ Phase 2 (the C++ Eulerian solver: 2.1 to 2.5c, 2.4b and 2.6 done) and Phase 3 (s
 | 5.3a | Two-way coupling of a deformable body (split from 5.3) | Done | Decision 0072. `deformable { min; max; cells; density; material; planeStrain; damping; drive; }` in a body entry: hex8 elements inside rigidBody, wall-cell forces to the nearest surface triangle nodes, elements one coupling step ahead (subcycled), `damping`. `tests/test_deformable_push.sh` passes (about 3.5 min): steel footing as hex8 follows the rigid one (mean force -3 %), density 1.013 rho0, mass 1e-14 |
 | 5.3b | Soft deformable bodies | Done | Decision 0073. Material loads go to the element face's 4 nodes (bilinear), spread over 2 x 2 points of each cell's wall face; the material sees the mean surface velocity there. Soft bodies use `hourglass 0.3`. `tests/test_soft_push.sh` passes (about 1.5 min): soft footing (E 20 MPa) density 1.0155 rho0 (was 1.62), shortening 0.90 of the elastic column. Steel footing now -0.5 % of rigid (was -3 %) |
 | 5.4 | Projectile benchmark (target problem T3) | Done | Decision 0074. Free slug (1.83 kg in the slab, 1.07 m/s) into Tresca clay: steel hex8 23.75 mm against the rigid reference run 23.84 mm (-0.3 %), both 26 % short of the Prandtl energy estimate (band 30 %, known issue). A free deformable body starts with its `velocity`. `tests/test_projectile.sh` (about 2.5 min) |
+| 6.1 | MPI with Lagrangian bodies | Done | Decision 0080. No solver change needed. `tests/test_mpi_bodies.sh` (about 5.5 min): free block drop and hex8 footing on 2 processors (split through the body), STL tank with outlet on 4 (2 x 2). First 100 steps match serial to 5e-15 (bodies); outcomes: force at rest 1.0000 both, footing 39.3 against 37.8 N (perturbed serial 38.7: round-off band about 2.5 %), tank rate 68.26 both. Parallel runs with switches part from serial like round-off-perturbed serial runs: compare bands |
+| 6.2a | Restart (split from 6.2) | Done | Decision 0081. `<time>/uniform/eulerianSolid` (mass counters, wall face velocities) and `<time>/uniform/rigidBodies` (pose, free-body velocity, hex8 element state) written at each write time and read on start; free bodies can now restart. celFoam computes its own step with adjustableRunTime (lands on write times counted from zero, never longer than stable). `tests/test_restart.sh` (40 s): silo restarted while discharging, free block and hex8 footing in contact, serial and 2 processors: identical bit for bit. Use `writeFormat binary` for exact restarts |
+| 6.2b | Mass scaling (split from 6.2) | Later, on request | Deformable bodies are subcycled (decision 0072), so the material's step sets the cost; mass scaling would only help quasi-static Lagrangian-only runs |
+| 6.3a | Parallel scaling (split from 6.3) | Done | `docs/results/scaling.md`, `tests/manual/test_scaling.sh` (1.5 min): T0 tank, 4 us per cell per step serial; 4 processors 2.6 times serial at 10 mm (620 cells each), 3.3 at 5 mm. Keep a few thousand cells per processor |
+| 6.3b | Validation report (split from 6.3) | Done | `docs/results/validation-report.md`: 19 benchmarks with reference, result, tolerance, test; verification checks; nine known issues. Add a row for each new benchmark |
 
 ## Validation references
+
+Validation report (WP 6.3b): `docs/results/validation-report.md`.
 
 `docs/spec/validation-references.md` (2026-11-17): six papers with field data (silo
 velocity and pressure fields, collapse profiles, inclined-plane mu(I) data) for later
@@ -105,6 +112,11 @@ anything that cannot be undone outside this repository.
 - Abaqus or LS-DYNA access for reference runs? Not needed for the silo problem.
 
 ## Next
+
+Phase 6 (2026-11-19) done: WP 6.1 (MPI with bodies), 6.2a (restart), 6.3a (scaling,
+`docs/results/scaling.md`), 6.3b (validation report, `docs/results/validation-report.md`);
+6.2b (mass scaling) kept for later. Then the last items (Sia, 2026-11-18): install on
+Sia's laptop, then a Linux install package.
 
 Sia's two Abaqus gaps (2026-11-18, thread "Add solid inflow inlet and axisymmetric
 wedge"): WP 3.7a (inlet), 3.7b (fed silo, tutorial `siloFed`), 3.8a, 3.8b (wedge, with
@@ -217,6 +229,12 @@ mesh, as Abaqus CEL). Order:
 
 ## Known issues
 
+- Parallel runs (WP 6.1, decision 0080): with bodies, caps and void rules, a run on N
+  processors matches serial to round-off only until a switch flips, then parts like a
+  serial run with a 1e-12 perturbation (footing force 2 to 4 %, tank rate 0 %). Small
+  cut cells do not mix across processor boundaries (reported as unmixed if it happens).
+- Restart (WP 6.2a, decision 0081) is exact only with `writeFormat binary` or
+  `writePrecision 17`; tutorials write ASCII with 8 digits.
 - Projectile penetration (WP 5.4, decision 0074): a slug into Tresca clay stops 26 %
   short of the Prandtl energy estimate at 1 m/s (-33 % at 0.5 m/s, -21 % at 2 m/s);
   the static footing reads 8 % low. Not isolated.
