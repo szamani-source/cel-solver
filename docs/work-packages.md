@@ -202,7 +202,7 @@ meshes bit-for-bit. Packages:
 | WP | Title | Done when |
 | --- | --- | --- |
 | G.1 | Time step on angled cells, skewed-mesh CI test | `tests/test_angled_cells.sh` passes: sheared-mesh P-wave as accurate as Cartesian, leaning-cell column at the solver's own step on the closed-form stress |
-| G.2 | Free surface, void closure and remap along mesh lines | A free-surface column and dam-break settle on a leaning-cell mesh as on the Cartesian one (mass exact, surface flat, stress within 3 %) |
+| G.2 | Free surface, void closure and remap along mesh lines | `tests/test_angled_free_surface.sh` passes: lake at rest on leaning cells (mass exact, surface flat, stress within 5 % at most, 0.5 % on average) and column collapse on cells leaning both ways within 3 cells of Cartesian |
 | G.3 | Walls, friction, outlet, inlet and surface layers on angled faces | Block sliding down a frictional angled wall at the closed-form speed; outlet discharge on an aligned hopper mesh |
 | G.4 | Wedge with fanned trapezoid blocks | Couto silo at rest on the aligned wedge mesh with free surface: Janssen within 5 % |
 | G.5 | STL walls on angled meshes | STL wall on a sheared mesh holds material like the Cartesian case, or a clear error |

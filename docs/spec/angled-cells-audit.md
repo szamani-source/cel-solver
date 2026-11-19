@@ -33,3 +33,10 @@ the walls (blockMesh trapezoid blocks). The solver must handle angled cells.
 Every change keeps Cartesian meshes bit-for-bit (all existing tests unchanged).
 Directions come from each cell's opposite face pairs (mesh lines), which reduce
 to the x/y/z axes on a Cartesian mesh.
+
+## Progress
+
+- G.1 done (decision 0103): stable step from V over the largest face.
+- G.2 done (decision 0104): mesh-line frames per cell; `cellSize`,
+  `setCartesianGeometry`, `slabSides`, `touches`, void closure, remap and
+  rule 9 use them.

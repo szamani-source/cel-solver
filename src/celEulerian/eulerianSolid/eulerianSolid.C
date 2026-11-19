@@ -20,6 +20,13 @@
 namespace Foam
 {
 
+//- Largest component of a vector (a face's main axis)
+static inline direction mainAxis(const vector& S)
+{
+    const vector a(cmptMag(S));
+    return a.x() >= a.y() && a.x() >= a.z() ? 0 : (a.y() >= a.z() ? 1 : 2);
+}
+
 //- IOobject for a field read if present and written at output times
 static IOobject fieldIO(const word& name, const fvMesh& mesh)
 {
@@ -751,8 +758,24 @@ void Foam::eulerianSolid::setCartesianGeometry()
                 << S/mS << " is not along an axis" << exit(FatalError);
         }
     };
+    if (angled_)
+    {
+        // Angled cells (WP G.2, decision 0104): each face adds half its
+        // area to the mesh line of the cell it crosses
+        setLineDirections();
+        auto add = [&](const label celli, const vector& S)
+        {
+            A[celli][mainAxis(inLines(celli, S))] += 0.5*mag(S);
+        };
+        forAll(own, facei)
+        {
+            add(own[facei], Sf[facei]);
+            add(nei[facei], Sf[facei]);
+        }
+    }
     forAll(own, facei)
     {
+        if (angled_) break;
         check(Sf[facei], magSf[facei]);
         A[own[facei]] += 0.5*cmptMag(Sf[facei]);
         A[nei[facei]] += 0.5*cmptMag(Sf[facei]);
@@ -778,6 +801,12 @@ void Foam::eulerianSolid::setCartesianGeometry()
                 A[fc[i]][d] += 0.5*mag(pS[i]);
                 continue;
             }
+            if (angled_)
+            {
+                A[fc[i]][mainAxis(inLines(fc[i], pS[i]))] +=
+                    0.5*mag(pS[i]);
+                continue;
+            }
             check(pS[i], mag(pS[i]));
             A[fc[i]] += 0.5*cmptMag(pS[i]);
         }
@@ -790,6 +819,110 @@ void Foam::eulerianSolid::setCartesianGeometry()
         {
             hCell_[celli][a] = V[celli]/A[celli][a];
         }
+    }
+}
+
+
+void Foam::eulerianSolid::setLineDirections()
+{
+    // WP G.2, decision 0104. A cell's faces pair up by most nearly opposite
+    // normals (mutual best, n_f.n_g < -0.5); a pair's line joins the two
+    // face centres (exact mesh line of a parallelepiped: a face's area
+    // vector then has no component along the other two lines). A face
+    // left alone (the outer face of a wedge axis prism) gives the line from
+    // the cell centre to it. The three lines are labelled by the axes they
+    // lie closest to (the permutation with the largest sum of |t_a . e_a|)
+    // and point along +axis, so neighbouring cells of a structured mesh
+    // agree on the labels.
+    const fvMesh& mesh = mesh_;
+    const cellList& cells = mesh.cells();
+    const vectorField& Sa = mesh.faceAreas();
+    const vectorField& Cf = mesh.faceCentres();
+    const vectorField& C = mesh.cellCentres();
+    const labelUList& own = mesh.owner();
+    lineDirs_.setSize(mesh.nCells());
+    static const FixedList<FixedList<direction, 3>, 6> perms
+    ({
+        {0, 1, 2}, {0, 2, 1}, {1, 0, 2}, {1, 2, 0}, {2, 0, 1}, {2, 1, 0}
+    });
+    forAll(cells, celli)
+    {
+        const cell& cf = cells[celli];
+        DynamicList<vector> n(cf.size());
+        forAll(cf, k)
+        {
+            const label f = cf[k];
+            const vector S(own[f] == celli ? Sa[f] : -Sa[f]);
+            n.append(S/max(mag(S), VSMALL));
+        }
+        auto best = [&](const label k) -> label
+        {
+            label b = -1;
+            scalar m = -0.5;
+            forAll(cf, j)
+            {
+                if (j != k && mag(Sa[cf[j]]) > VSMALL && (n[k] & n[j]) < m)
+                {
+                    m = n[k] & n[j];
+                    b = j;
+                }
+            }
+            return b;
+        };
+        DynamicList<vector> lines(3);
+        boolList used(cf.size(), false);
+        forAll(cf, k)
+        {
+            if (used[k] || mag(Sa[cf[k]]) <= VSMALL) continue;
+            const label j = best(k);
+            if (j >= 0 && best(j) == k)
+            {
+                used[k] = used[j] = true;
+                lines.append(Cf[cf[j]] - Cf[cf[k]]);
+            }
+        }
+        forAll(cf, k)
+        {
+            if (used[k] || mag(Sa[cf[k]]) <= VSMALL) continue;
+            used[k] = true;
+            lines.append(2*(Cf[cf[k]] - C[celli]));
+        }
+        if (lines.size() != 3)
+        {
+            FatalErrorInFunction
+                << "Angled meshes need hex cells (or wedge axis prisms): cell "
+                << celli << " at " << C[celli] << " has " << lines.size()
+                << " mesh lines from its " << cf.size() << " faces"
+                << exit(FatalError);
+        }
+        label pb = 0;
+        scalar sb = -1;
+        forAll(perms, p)
+        {
+            scalar s = 0;
+            for (direction i = 0; i < 3; ++i)
+            {
+                const vector t(lines[i]/mag(lines[i]));
+                s += mag(t[perms[p][i]]);
+            }
+            if (s > sb)
+            {
+                sb = s;
+                pb = p;
+            }
+        }
+        tensor T(Zero);
+        for (direction i = 0; i < 3; ++i)
+        {
+            const direction a = perms[pb][i];
+            vector t(lines[i]/mag(lines[i]));
+            if (t[a] < 0)
+            {
+                t = -t;
+            }
+            T.row(a, t);
+        }
+        lineDirs_[celli] = T;
     }
 }
 

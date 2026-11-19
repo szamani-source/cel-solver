@@ -76,6 +76,13 @@ void Foam::eulerianSolid::setImmersedWalls
         FatalErrorInFunction
             << "one friction angle per body" << exit(FatalError);
     }
+    if (angled_ && freeSurface_)
+    {
+        FatalErrorInFunction
+            << "STL (immersed) walls with freeSurface need an axis-aligned "
+            << "mesh; angled meshes are WP G.5 (decision 0104)"
+            << exit(FatalError);
+    }
 
     const fvMesh& mesh = mesh_;
     const labelUList& own = mesh.owner();

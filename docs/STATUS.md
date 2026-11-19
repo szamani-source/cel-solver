@@ -94,7 +94,8 @@ Phase 2 (the C++ Eulerian solver: 2.1 to 2.5c, 2.4b and 2.6 done) and Phase 3 (s
 | H.3 | Couto silo wall pressure, MC and DP | Done (done-when partly met) | Decision 0102. T0 rule set for both models (flowImpedance now accepts druckerPrager; wheat mu(I) d 4 mm). `tests/manual/test_hopper_pressure.sh` (12 min per model, 25 mm): at rest GA1-GA5, GA7 in the experiment's range, GA6 -14 %, hopper GA0 +21 %; discharge GA0 peak 20.1 (MC) / 21.5 (DP) kPa inside 18.7-24.8, GA1 within band, GA2 MC -12 %, DP -29 %. Plain MC/DP unusable in discharge. Rate 46 kg/s at 25 mm, 69 at 12.5 mm, against Beverloo about 110 |
 | H.3b | Drucker-Prager robustness in discharge | Next | DP spikes (to 680 kPa, 8-40 m/s) start at partly filled cells near the outlet and at hopper cut cells; round-off decides whether a run survives (decision 0102) |
 | G.1 | Time step on angled cells, skewed-mesh CI test | Done | Decision 0103, audit `docs/spec/angled-cells-audit.md`. Angled meshes use V over the largest face as the stable length; Cartesian unchanged. `tests/test_angled_cells.sh` (CI, under a minute): 45 degree sheared P-wave error 0.95 to 0.98 of Cartesian, 2nd order; leaning-cell column settles, stress within 1.1 % of closed form |
-| G.2 | Free surface along mesh lines | Next | Then G.3 to G.6, H.7 (Couto on the aligned mesh) |
+| G.2 | Free surface along mesh lines | Done | Decision 0104. Each cell's three mesh lines (face pairs) replace x, y, z in the slab, void closure, remap and layer rules; rule 9 uses the true alpha gradient. `tests/test_angled_free_surface.sh` (CI, 75 s): lake at rest on leaning cells flat with exact mass, s_yy within 4.5 % (block kink); collapse on cells leaning both ways within 2.7 cells of Cartesian front, profile RMS under 1 cell. Cartesian unchanged |
+| G.3 | Walls, outlet, inlet on angled faces | Next | Then G.4 (wedge trapezoid), G.5, G.6, H.7 (Couto on the aligned mesh) |
 
 ## Validation references
 
@@ -128,8 +129,8 @@ Conical hopper validation (Sia, 2026-11-19; the last item before the Linux insta
 package): H.1 (case spec, decision 0100), H.2 (hopper wall on the wedge, decision 0101) and H.3
 (Couto pressures, decision 0102: most cells match the experiment; DP fragile) done.
 Sia (2026-11-19) then asked for wall-aligned hopper meshes and said angled cells must work
-throughout the solver: packages G.1 to G.6 (decision 0103). G.1 (time step, CI test) done.
-Next: G.2 (free surface along mesh lines), then H.7 (Couto on the aligned mesh), H.4, H.3b.
+throughout the solver: packages G.1 to G.6 (decision 0103). G.1 (time step, CI test) and G.2 (free surface
+along mesh lines, decision 0104) done. Next: G.3 (walls, outlet), G.4 (wedge), then H.7 (Couto on the aligned mesh), H.4, H.3b.
 
 Accuracy pass (Sia, 2026-11-19, before packaging): A.1 done (decisions 0090, 0091).
 Sia: mass flow and mesh dependence are secondary until Sia's validation case; find

@@ -302,8 +302,14 @@ class eulerianSolid
         label wedgeH_;
         scalarField hoopRate_;
 
-        //- Cell lengths along x, y, z (Cartesian hex cells, freeSurface)
+        //- Cell lengths along x, y, z (Cartesian hex cells, freeSurface);
+        //  on angled meshes along each cell's mesh lines (WP G.2)
         vectorField hCell_;
+
+        //- Angled meshes (WP G.2, decision 0104): each cell's mesh-line
+        //  directions as the rows of a tensor, row a the line closest to
+        //  axis a (pointing along +a). Empty on axis-aligned meshes
+        List<tensor> lineDirs_;
 
         //- Passed from lagrangeStep to remap (freeSurface): slab side per
         //  axis (+1, -1 or 0 spread), material fraction of the Lagrangian
@@ -409,7 +415,18 @@ class eulerianSolid
         void updateInlets(const scalar t0, const scalar dt);
 
         //- Cell lengths, checking that every face is normal to an axis
+        //  (angled meshes: along the mesh lines)
         void setCartesianGeometry();
+
+        //- Angled meshes: each cell's mesh-line directions (WP G.2)
+        void setLineDirections();
+
+        //- A vector in a cell's mesh-line frame: its components along the
+        //  cell's three mesh lines (the vector itself on axis-aligned meshes)
+        inline vector inLines(const label celli, const vector& S) const
+        {
+            return lineDirs_.empty() ? S : (lineDirs_[celli] & S);
+        }
 
         //- Remap with void (freeSurface): slab volume fluxes, decision 0031
         void remapFreeSurface(const scalar dt);
