@@ -25,8 +25,9 @@ rate effects are left out. Checks (decision 0074):
 
 - deformable within 5 % of rigid (the reference run: the rigid machinery
   is checked against Prandtl in WP 4.4);
-- final penetration of each within 30 % of the energy estimate (a sanity
-  band: on 2026-11-18 both read 26 % short, decision 0074);
+- final penetration of each within 20 % of the energy estimate (a sanity
+  band: on 2026-11-18 both read 26 % short, decision 0074; 15 % short since
+  WP A.3, decision 0093, and the band went from 30 to 20 %);
 - both at rest (speed below 2 % of the impact speed over the last 0.05 s);
 - mass kept to 1e-10, nothing lost in hand-overs, density within 3 % (the
   clay's elastic compression under the impact, bulk modulus 10 MPa).
@@ -62,7 +63,7 @@ DEPTH_B = 0.03                  # deformable body depth in z (-0.01 to 0.02)
 CU, E_CLAY, NU_CLAY = 10e3, 3e6, 0.45
 T_END = 0.3
 CX, CY, VX, VY = 23, 24, 25, 26
-TOL, TOL_RIGID, RHO_TOL = 0.30, 0.05, 1.03
+TOL, TOL_RIGID, RHO_TOL = 0.20, 0.05, 1.03
 
 
 def reference():

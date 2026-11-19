@@ -1,9 +1,9 @@
 #!/bin/bash
 # Decision 0091: a rigid footing held 2.5 mm above a sand layer at rest must
-# leave the layer at rest (psi 0 and psi 30). Not passing yet: it is the
-# done-when of the next package (body near a free surface). About 1 minute.
+# leave the layer at rest (psi 0 and psi 30). Passes since WP A.3 (decisions
+# 0092, 0093: empty slivers under a body stay empty). About 1 minute.
 set -eu
-root="$(cd "$(dirname "$0")/../.." && pwd)"
+root="$(cd "$(dirname "$0")/.." && pwd)"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 

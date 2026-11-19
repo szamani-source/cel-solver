@@ -1,7 +1,8 @@
 # 0092: Empty slivers cut off by a body: the cause is found, the fix is not kept yet
 
 Date: 2026-11-19 (accuracy package A.2, thread "Fix accuracy issues before packaging")
-Status: finding recorded; code change parked in `docs/patches/A2-empty-sliver-mixing.patch`.
+Status: finding recorded; the code change was parked here and merged in A.3 with a
+geometry fix that removed its steel packing (decision 0093).
 
 ## Context
 

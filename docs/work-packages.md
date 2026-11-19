@@ -173,6 +173,8 @@ since deformable bodies are subcycled, decision 0072), and 6.3 into 6.3a (scalin
 
 Note (2026-11-19, accuracy pass before packaging): Sia asked to fix accuracy issues
 before the install package. A.1 (ranking and the first fixes, decisions 0090, 0091)
-done; A.2 (body near a free surface) done when `tests/manual/test_body_above_surface.sh`
-passes. Mass flow and mesh dependence wait for Sia's validation case. Decisions for
+done; A.2 (body near a free surface: cause, decision 0092) done; A.3 (sliver contact
+onset) done when `tests/test_body_above_surface.sh` passes with `test_projectile.sh` and
+`test_deformable_push.sh` still passing (decision 0093); A.4 the sand footing with
+psi 30. Mass flow and mesh dependence wait for Sia's validation case. Decisions for
 this pass are numbered from 0090.

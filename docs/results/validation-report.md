@@ -24,14 +24,14 @@ Cells are 10 mm unless stated.
 | 5 | Cohesion: arching above the outlet | Jenike critical width, 109 mm (c 500 Pa), 55 mm (c 250 Pa) | stops at 80 / 100 mm, flows at 120 / 140 mm; c 250 Pa switches between 40 and 60 mm | bracket | Pass | CI `test_cohesion.sh` |
 | 6 | Tank with STL walls and floor | same tank with mesh walls | 68.8 against 65.8 kg/s/m (+4.4 %); hopper 60 deg 66.2 (Rose-Tanaka predicts 1.21 x flat, got 1.01; 1.07 at 5 mm, decision 0091) | 5 % | Pass (close to the limit) | CI `test_stl_silo.sh` |
 | 7 | Strip footing on Tresca clay | Prandtl, Nc = 2 + pi = 5.14 | 4.73 (-8.1 %) at 10 mm, 5.04 (-1.9 %) at 5 mm | 10 % | Pass | CI `test_footing.sh` |
-| 8 | Strip footing on sand (phi 30) | Martin 2005, N_gamma 7.653 | about 11 at 10 mm, 9.7 at 5 mm (+27 %) | 15 % | Known issue: 27 % high or more (a body above the surface disturbs it, decision 0091) | manual `test_sand_footing.sh`, `test_body_above_surface.sh` |
+| 8 | Strip footing on sand (phi 30) | Martin 2005, N_gamma 7.653 | about 11 at 10 mm, 9.7 at 5 mm (+27 %) | 15 % | Known issue: 27 % high or more (the hover effect, decision 0091, is fixed but did not change psi 0) | manual `test_sand_footing.sh`; CI `test_body_above_surface.sh` |
 | 9 | Pile section through clay, smooth | Randolph and Houlsby 1984, 9.14 | 9.29 (+1.7 %) | 10 % | Pass | CI `test_pile.sh` |
 | 10 | Pile section, rough (adhesion) | Randolph and Houlsby, 11.94 | 10.47 (-12 %) at 10 mm, 11.26 (-5.7 %) at 5 mm | 15 % | Pass | CI `test_rough_pile.sh` |
 | 11 | Taylor bar, Lagrangian hex8 (3D quarter) | Abaqus Benchmarks copper rod: shortening 13.10 mm, widening 5.528 mm (C3D8R) | 13.14 (+0.3 %), 5.76 (+4.2 %) | 5 % / 10 % | Pass | CI `test_taylor_bar.sh` |
 | 12 | Taylor bar, Eulerian on the axisymmetric wedge | Abaqus axisymmetric CAX4R: 13.11 mm, 6.006 mm | 13.02 (-0.7 %), 5.02 (-16 %) at 0.2 mm cells | 5 % / 20 % | Pass; widening short (known issue) | CI `test_taylor_wedge.sh` |
 | 13 | Silo fed from the top while it discharges | unfed rate; mass balance | outflow -1.0 / -2.7 % with feed 36.8 / 73.7 kg/s/m; matched feed holds the tank within 1.05 %; balance 4e-14 | 5 % | Pass | CI `test_fed_silo.sh` |
 | 14 | Cylindrical silo on the wedge against a 3D quarter model | 3D Beverloo; each other | C 0.678 (wedge) and 0.680 (quarter, square outlet by its hydraulic diameter), 0.2 % apart (6.8 % by an equal-area circle, decision 0090); wedge 5 times faster | 10 % / 3 % | Pass | CI `test_wedge_silo.sh` |
-| 15 | Projectile: free steel slug into clay | same slug as a rigid body; Prandtl energy estimate 32.3 mm | 23.75 mm against rigid 23.84 (-0.3 %); both 26 % short of the estimate | 5 % / 30 % | Pass; 26 % short (known issue) | CI `test_projectile.sh` |
+| 15 | Projectile: free steel slug into clay | same slug as a rigid body; Prandtl energy estimate 32.3 mm | 27.60 mm against rigid 27.52 (+0.3 %); both 15 % short of the estimate (26 % before A.3, decision 0093) | 5 % / 20 % | Pass; 15 % short (known issue) | CI `test_projectile.sh` |
 | 16 | Deformable footing push (steel hex8) | the same footing rigid | mean force -3 %, density 1.013 rho0 | 5 % / 2 % | Pass | CI `test_deformable_push.sh` |
 | 17 | Free body dropped onto T0 | its weight at rest; momentum | force / weight 1.0000, momentum 1e-5 | 2 % | Pass | CI `test_free_body.sh` |
 | 18 | MPI with bodies (1, 2, 4 processors) | serial run | first 100 steps 5e-15; outcomes within the round-off band | decision 0080 | Pass | CI `test_mpi_bodies.sh` |
@@ -72,13 +72,13 @@ These check the numerics against exact or independent answers and run in CI:
    surface disturbs the material at rest (edge cells at 0.1 to 0.2 m/s and 20 kPa for
    psi 0; associated flow blows up before contact; cause: small-cell mixing into empty
    slivers, decision 0092). Fixing that leaves psi 0 unchanged, so the excess has
-   another cause too. Failing test `tests/manual/test_body_above_surface.sh` (A.3). Treat
-   bearing results on sand as upper estimates until then.
-3. **Projectile 26 % short** (decision 0074). The slug stops short of the quasi-static
-   Prandtl estimate, more so at low speed (-33 % at 0.5 m/s, -21 % at 2 m/s), so not
-   inertia of the clay. Related to the clay footing reading 8 % low at 10 mm. About
-   40 % of it is early contact from small-cell mixing (-15 % with the parked fix,
-   decision 0092).
+   another cause too. The hover effect is fixed (A.3, decision 0093,
+   `tests/test_body_above_surface.sh`). Treat bearing results on sand as upper
+   estimates until the rest is found.
+3. **Projectile 15 % short** (decisions 0074, 0093). The slug stops short of the
+   quasi-static Prandtl estimate. It read 26 % short (more so at low speed: -33 % at
+   0.5 m/s, -21 % at 2 m/s) until A.3 removed the early contact from small-cell mixing.
+   Related to the clay footing reading 8 % low at 10 mm.
 4. **Wedge Taylor bar widening short** (decision 0063). 5.02 against 6.006 mm (-16 %) at
    0.2 mm cells: the thin lip at the impact face is smeared over a cell or two; first
    order in the cell size. Use the Lagrangian body for thin flanges and lips.

@@ -2,13 +2,14 @@
 # WP 4.2: exact cells and faces covered by STL bodies (celBodyCells): a plane
 # at 30 deg cell by cell, a faceted sphere at 10 and 20 cells per diameter
 # (summed volume against the STL's own volume), a cube moving one cell and a
-# turning cube, and 2 processors against serial.
+# turning cube, a box whose surface strips meet on a mesh face (decision
+# 0093), and 2 processors against serial.
 set -eu
 root="$(cd "$(dirname "$0")/.." && pwd)"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 python3 "$root/tests/bodyCells/cases.py" make "$work"
-for c in plane sphere10 sphere20 cube cubeTurn; do
+for c in plane sphere10 sphere20 cube cubeTurn seam; do
     (cd "$work/$c" && blockMesh > log.blockMesh 2>&1 \
         && celBodyCells > log.celBodyCells 2>&1) \
         || { tail -n 30 "$work/$c/log.celBodyCells"; exit 1; }
