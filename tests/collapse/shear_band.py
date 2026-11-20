@@ -107,6 +107,8 @@ def one(args):
         mp = f"{path}/constant/materialProperties"
         add = MU_I if law == "muI" else NONLOCAL
         txt = open(mp).read().replace("sigmaT 0;\n", "sigmaT 0;\n" + add)
+        if os.environ.get("CEL_NO_CAP"):
+            txt = txt.replace("shearCap yes;", "shearCap no;")
         open(mp, "w").write(txt)
     sec = vc.run(path)
     out = dict(law=law, h=h, nx=nx, ny=ny, seconds=sec)

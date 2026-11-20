@@ -121,3 +121,32 @@ lid slips over the top cell and the band follows the cell (2.4, 1.3, 1.1 d),
 the mesh dependence the law removes. Consequence for real cases: cells must
 be about 1 d or finer near the band for the converged width; on coarser
 cells the nonlocal law still widens the band but does not converge.
+
+## N.3 first runs (2026-11-20 evening): interior closer, front still mesh-bound
+
+`CEL_LAWS=NL tests/collapse/shear_band.py` (collapse a = 0.5, T0 mu(I) set
+plus `nonlocalA 0.48`, `flowImpedance yes`; grain size d by `CEL_NL_D`).
+Interior velocity field, 5 mm against 2.5 mm cells (2.5 mm averaged onto
+the 5 mm cells, full cells two cells from any void), rms difference over
+the largest speed, and run-out at 1 s (front where the layer is 5 mm):
+
+| Law | t 0.1 / 0.2 / 0.5 s | Run-out 10 / 5 / 2.5 mm |
+| --- | --- | --- |
+| MC (local) | 12 / 13 / 15 % | - / 0.325 / 0.425 |
+| mu(I) (local) | 13 / 14 / 23 % | - / 0.325 / 1.0 (stray mass) |
+| nonlocal, d 5 mm | 11 / 8 / 10 % | 0.200 / 0.250 / 0.300 |
+| nonlocal, d 10 mm | 5 / 5 / 10 % | 0.200 / 0.250 / 0.338 |
+
+With the nonlocal law the body deforms over a wide zone (about 100 mm at
+0.1 s, no internal band); the "band width" measure of decision 0038 now
+picks the steepest gradient at the moving front, two cells from the void,
+so it stays 1 to 2 cells on every mesh and is not a measure of the law.
+The interior field converges about twice as well as with the local laws,
+but run-out does not: the thin layer that runs out at the front is a few
+cells thick on every mesh and is governed by the free-surface rules
+(partly filled cells, rule 9, the void opening), where P -> 0 and the
+law's g_loc -> 0. Turning the shear cap off changes neither.
+
+Fixed on the way: tiny P at free-surface cells (P/g and tau/P overflowed:
+the kernel treats P below 1e-300 rho_s as zero, mu capped at 1e3, and the
+face test compares 2 P dc < z_s g without dividing by g).

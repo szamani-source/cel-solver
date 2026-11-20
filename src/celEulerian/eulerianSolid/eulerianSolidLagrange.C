@@ -1971,14 +1971,11 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                   : 1;
                 const scalar P = -tr(sigma_[celli])/3;
                 e[celli] = 0;
-                if (w > 0 && P > 0 && g[celli] > 0)
+                // (compared without dividing by g, which can be tiny)
+                const scalar zsc = Foam::sqrt(G*rho_[celli]);
+                if (w > 0 && P > 0 && 2*w*P*dcMax[celli] < zsc*g[celli])
                 {
-                    const scalar eta = w*P/g[celli];
-                    const scalar zsc = Foam::sqrt(G*rho_[celli]);
-                    if (2*eta*dcMax[celli] < zsc)
-                    {
-                        e[celli] = eta;
-                    }
+                    e[celli] = w*P/g[celli];
                 }
             }
         }
