@@ -76,14 +76,6 @@ void Foam::eulerianSolid::setImmersedWalls
         FatalErrorInFunction
             << "one friction angle per body" << exit(FatalError);
     }
-    if (angled_ && freeSurface_)
-    {
-        FatalErrorInFunction
-            << "STL (immersed) walls with freeSurface need an axis-aligned "
-            << "mesh; angled meshes are WP G.5 (decision 0104)"
-            << exit(FatalError);
-    }
-
     const fvMesh& mesh = mesh_;
     const labelUList& own = mesh.owner();
     const labelUList& nei = mesh.neighbour();
@@ -254,6 +246,18 @@ void Foam::eulerianSolid::setImmersedWalls
         vectorField Amax(nCells, Zero);
         auto addA = [&](const label c, const vector& S, const scalar f)
         {
+            if (angled_)
+            {
+                // angled cells (WP G.5, decision 0107): the face's area
+                // goes to the mesh line it lies across
+                const vector Sl(inLines(c, S));
+                const vector m(cmptMag(Sl));
+                const direction k =
+                    m.x() >= m.y() && m.x() >= m.z()
+                  ? 0 : (m.y() >= m.z() ? 1 : 2);
+                Amax[c][k] = max(Amax[c][k], f*mag(S));
+                return;
+            }
             const vector a(f*cmptMag(S));
             Amax[c] = max(Amax[c], a);
         };

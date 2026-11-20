@@ -16,6 +16,10 @@ Description
                                     //   cell bounds in a frame turned by
                                     //   this angle (deg) about z, for a
                                     //   mesh of blocks turned the same way
+        fillRight   ((y0 x0) (y1 x1) ...);
+                                    // optional: material only left of
+                                    //   x(y) (linear in y, cell centre
+                                    //   height), e.g. inside a silo wall
         fillSlope   30;             // optional (WP G.3): fill and cell
                                     //   bounds in (x, y + x tan(slope)),
                                     //   for a strip sheared along a slope
@@ -141,10 +145,31 @@ int main(int argc, char *argv[])
         const boundBox bb(fillPts, cp[celli], false);
         const scalar hx = bb.max().x() - bb.min().x();
         const scalar hy = bb.max().y() - bb.min().y();
-        const scalar fx =
+        scalar fx =
             min(max((min(bb.max().x(), box[2]) - max(bb.min().x(), box[0]))/hx, 0), 1);
         const scalar fy =
             min(max((min(bb.max().y(), box[3]) - max(bb.min().y(), box[1]))/hy, 0), 1);
+        if (dict.found("fillRight"))
+        {
+            const List<vector2D> xr(dict.get<List<vector2D>>("fillRight"));
+            const scalar yc = 0.5*(bb.min().y() + bb.max().y());
+            scalar xl = xr.last().y();
+            if (yc <= xr.first().x())
+            {
+                xl = xr.first().y();
+            }
+            for (label k = 1; k < xr.size(); ++k)
+            {
+                if (yc >= xr[k-1].x() && yc <= xr[k].x())
+                {
+                    const scalar w =
+                        (yc - xr[k-1].x())/max(xr[k].x() - xr[k-1].x(), SMALL);
+                    xl = xr[k-1].y() + w*(xr[k].y() - xr[k-1].y());
+                    break;
+                }
+            }
+            fx *= min(max((xl - bb.min().x())/hx, 0), 1);
+        }
         scalar a = fx*fy;
         a = a >= 1 - 1e-12 ? 1 : (a > 1e-12 ? a : 0);
         alpha[celli] = a;
