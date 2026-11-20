@@ -32,7 +32,7 @@ LAW = dict(muS=0.3819, mu2=0.6435, I0=0.278, A=0.48, d=1.0e-3, rhoS=2450.0)
 RHO, E, NU, G = 1500.0, 1.0e6, 0.3, 9.81
 H = 40 * LAW["d"]
 P0, V = 200.0, 0.02
-T_END = float(os.environ.get("CEL_T_END", "1.0"))
+T_END = float(os.environ.get("CEL_T_END", "1.0"))   # steady by 1 s (0.2 % of V to 2 s)
 
 
 def field_file(cls, obj, dims, internal, bc):
@@ -71,9 +71,11 @@ def make(p, n, nonlocal_on):
     mat = (f"rho {RHO};\nfreeSurface no;\ntype mohrCoulomb;\nE {E!r};\nnu {NU!r};\n"
            f"phi {phi!r};\nc 0;\npsi 0;\nmu2 {LAW['mu2']!r};\nI0 {LAW['I0']!r};\n"
            f"d {LAW['d']!r};\nrhoS {LAW['rhoS']!r};\n")
+    # flow impedance: the face shear jump between flowing cells follows the
+    # law's viscosity, not the elastic impedance (decisions 0040, 0111)
+    mat += "flowImpedance yes;\n"
     if nonlocal_on:
         mat += f"nonlocalA {LAW['A']!r};\n"
-    mat += os.environ.get("CEL_EXTRA_MATERIAL", "")
     mat += os.environ.get("CEL_EXTRA_MATERIAL", "")
     cs.write(f"{p}/constant/materialProperties",
              cs.HEADER.format(cls="dictionary", obj="materialProperties") + mat)
@@ -127,19 +129,29 @@ def profile(p):
     return y, U[:, 0], S[:, 1], -S[:, 3]        # y, u, tau (xy), P (-yy)
 
 
-def reference(y, tau, P):
-    """1D steady nonlocal solution for the run's own tau and P(y): g from
-    k g - g'' = k g_loc, gamma_dot = g mu, u(0) = 0."""
+def reference(y, P):
+    """1D steady nonlocal solution for the run's own P(y): g from
+    k g - g'' = k g_loc with mu = tau/P, gamma_dot = g mu, u(0) = 0, and the
+    uniform shear stress tau found so that u(H) = V. Returns tau, yf, uf."""
     law = ngf.NGF(**LAW)
     nf = 4000
     yf = (np.arange(nf) + 0.5) * H / nf
     Pf = np.interp(yf, y, P)
-    muf = abs(tau) / Pf
-    gf = law.solve_layer(yf, muf, Pf) if hasattr(law, "solve_layer") else \
-        ngf.solve_layer(law, yf, muf, Pf)
-    rate = gf * muf
-    uf = np.concatenate([[0], np.cumsum(rate) * H / nf])[:-1] + 0.5 * rate * H / nf
-    return yf, uf
+
+    def lid(tau):
+        muf = tau / Pf
+        rate = ngf.solve_layer(law, yf, muf, Pf) * muf
+        uf = np.cumsum(rate) * H / nf - 0.5 * rate * H / nf
+        return uf[-1] + 0.5 * rate[-1] * H / nf, uf
+
+    lo, hi = 0.0, LAW["mu2"] * Pf.min()
+    for _ in range(50):
+        tau = 0.5 * (lo + hi)
+        if lid(tau)[0] > V:
+            hi = tau
+        else:
+            lo = tau
+    return tau, yf, lid(tau)[1]
 
 
 def band(y, u):
@@ -152,17 +164,20 @@ def band(y, u):
 def main():
     work = os.path.abspath(sys.argv[1])
     mode = sys.argv[2] if len(sys.argv) > 2 else "nonlocal"
-    ns = [int(x) for x in sys.argv[3:]] or [10, 20, 40]
+    ns = [int(x) for x in sys.argv[3:]] or [20, 40, 80]
+    out = {}
     for n in ns:
         p = make(f"{work}/{mode}_{n}", n, mode == "nonlocal")
         run(p)
         y, u, tau, P = profile(p)
-        yf, uf = reference(y, tau.mean(), P)
+        tref, yf, uf = reference(y, P)
         err = np.abs(u - np.interp(y, yf, uf)).max() / V
-        print(f"{mode} {n} cells ({H / n / LAW['d']:g} d): band {band(y, u) / LAW['d']:.1f} d, "
-              f"tau {tau.mean():.1f} Pa (spread {np.ptp(tau):.2g}), P {P.min():.0f}-{P.max():.0f} Pa, "
-              f"mu {abs(tau.mean()) / P.max():.3f}-{abs(tau.mean()) / P.min():.3f}; "
+        out[n] = (band(y, u), band(yf, uf), err)
+        print(f"{mode} {n} cells ({H / n / LAW['d']:g} d): band {out[n][0] / LAW['d']:.2f} d "
+              f"(1D nonlocal {out[n][1] / LAW['d']:.2f} d), tau {tau.mean():.1f} Pa "
+              f"(1D nonlocal {tref:.1f}), P {P.min():.0f}-{P.max():.0f} Pa; "
               f"profile vs 1D nonlocal {err * 100:.1f} % of V", flush=True)
+    return out
 
 
 if __name__ == "__main__":

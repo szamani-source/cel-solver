@@ -48,7 +48,7 @@ Packages (one done-when test each, written first):
 | WP | Title | Done when |
 | --- | --- | --- |
 | N.1 | Fluidity field and the point update | `tests/test_nonlocal.sh`: (a) homogeneous simple shear gives mu(I) to 1e-6; (b) the steady fluidity across a 1D layer with a stress gradient matches an independent Python solution of g - xi^2 g'' = g_loc to 1 % |
-| N.2 | Coupled into the Eulerian step: sheared layer | A granular layer sheared between a moving lid and a rough base, under gravity, on 3 meshes (cells 4, 2, 1 d): the shear band width converges (in d) and the velocity profile matches the 1D nonlocal solution within 5 % |
+| N.2 | Coupled into the Eulerian step: sheared layer | A granular layer sheared between a moving lid and a rough base, under gravity, on 3 meshes (cells 2, 1, 0.5 d; was 4, 2, 1 d, see N.2 result): the shear band width converges (in d) and the velocity profile matches the 1D nonlocal solution within 5 % |
 | N.3 | Mesh convergence of the column collapse | Collapse a = 0.5 on 10 / 5 / 2.5 mm with the T0 set plus nonlocal: band width and run-out converge (5 and 2.5 mm within 5 %; now 0.30 / 0.33 / 0.43, decision 0038) |
 
 ## Consequences
@@ -93,3 +93,31 @@ material cells with fluidity, take the face shear from the nonlocal
 viscosity eta = P/g (the tangent of gamma_dot = g mu) in place of z_s, as
 flowImpedance does for mu(I), and at fixed-velocity walls likewise; then
 run 10 / 20 / 40 cells.
+
+## N.2 result (2026-11-20 evening): face shear from the law; band converges
+
+Change: with `nonlocalA` and `flowImpedance yes`, a cell's face viscosity is
+the law's secant eta = P/g (tau = mu P, gamma_dot = g mu), including cells
+below mu_s that creep through the nonlocal term, in place of the mu(I)
+tangent; a cell counts as flowing only where 2 eta / delta < z_s over its
+closest neighbour (elsewhere the elastic jump and the shear cap stay). At
+fixed-velocity patches the face shear uses min(z_s, eta / (delta/2)) for
+such cells (only with nonlocal; mu(I) runs unchanged).
+
+`tests/test_nonlocal_shear.sh` (about 4 minutes), 1D nonlocal reference
+with the run's own P(y) and the shear stress that gives u(H) = V:
+
+| Cells | Nonlocal band | 1D nonlocal | Profile error | Local band |
+| --- | --- | --- | --- | --- |
+| 4 d (10) | 5.0 d | 3.7 d | 10.5 % of V | |
+| 2 d (20) | 4.19 d | 3.31 d | 8.5 % | 2.37 d |
+| 1 d (40) | 3.30 d | 3.21 d | 0.9 % | 1.28 d |
+| 0.5 d (80) | 3.24 d | 3.16 d | 2.3 % | 1.08 d |
+
+The band is about 3 d wide here (the law's length A d / sqrt|mu - mu_s|),
+so cells of 4 and 2 d cannot resolve it; the done-when meshes move from
+4 / 2 / 1 d to 2 / 1 / 0.5 d (checked: 1 and 0.5 d). With the local law the
+lid slips over the top cell and the band follows the cell (2.4, 1.3, 1.1 d),
+the mesh dependence the law removes. Consequence for real cases: cells must
+be about 1 d or finer near the band for the converged width; on coarser
+cells the nonlocal law still widens the band but does not converge.

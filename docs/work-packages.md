@@ -219,5 +219,5 @@ Sia (2026-11-20): needed before the Linux install, with cohesion and compaction.
 | WP | Title | Done when |
 | --- | --- | --- |
 | N.1 | Fluidity field and the point update | `tests/test_nonlocal.sh`: homogeneous simple shear gives the local law mu_s + b I to 1e-6; steady fluidity across a 1D layer with a stress gradient matches an independent Python solution to 1 % |
-| N.2 | Coupled into the Eulerian step: sheared layer | A granular layer sheared between a moving lid and a rough base, under gravity, on 3 meshes (cells 4, 2, 1 d): the shear band width converges (in d) and the velocity profile matches the 1D nonlocal solution within 5 % |
+| N.2 | Coupled into the Eulerian step: sheared layer | A granular layer sheared between a moving lid and a rough base, under gravity, on 3 meshes (cells 2, 1, 0.5 d; the band is about 3 d, decision 0111): the shear band width converges (in d) and the velocity profile matches the 1D nonlocal solution within 5 % |
 | N.3 | Mesh convergence of the column collapse | Collapse a = 0.5 on 10 / 5 / 2.5 mm with the T0 set plus nonlocal: band width and run-out converge (5 and 2.5 mm within 5 %; now 0.30 / 0.33 / 0.43, decision 0038) |
