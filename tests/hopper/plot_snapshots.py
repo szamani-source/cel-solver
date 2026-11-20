@@ -44,6 +44,9 @@ def match(cen, a):
     return idx
 
 
+T_OPEN = float(os.environ.get("CEL_TOPEN", hp.T_OPEN))
+
+
 def main():
     p, out, title = sys.argv[1], sys.argv[2], sys.argv[3]
     times = [float(x) for x in sys.argv[4:]]
@@ -77,7 +80,8 @@ def main():
                 ax.set_ylabel("y (m)")
             else:
                 ax.set_yticklabels([])
-            ax.set_title(f"t = {t:g} s ({t - hp.T_OPEN:.2f} s after opening)" if i == 0
+            ax.set_title(f"t = {t:g} s ({t - T_OPEN:.2f} s after opening)" if i == 0 and t >= T_OPEN
+                         else f"t = {t:g} s (outlet closed)" if i == 0
                          else "", fontsize=9)
             if j == len(times) - 1:
                 fig.colorbar(pc, ax=axs[i, :], shrink=0.8, label=lab)
