@@ -1932,11 +1932,22 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
     // Neighbour alpha and slab sides across coupled patches
     List<scalarField> aNbr(mesh.boundary().size());
     List<vectorField> leanNbr(mesh.boundary().size());
+    // Angled meshes: the neighbour cell's mesh-line frame across coupled
+    // patches (WP G.6), so a processor face reads the neighbour's side as
+    // an internal face does
+    List<tensorField> dirsNbr(mesh.boundary().size());
     if (fs)
     {
         tmp<volVectorField> tl = workField<vector>(mesh, "lean", dimless);
         tl.ref().primitiveFieldRef() = lean_;
         tl.ref().correctBoundaryConditions();
+        tmp<volTensorField> td;
+        if (!lineDirs_.empty())
+        {
+            td = workField<tensor>(mesh, "lineDirs", dimless);
+            td.ref().primitiveFieldRef() = lineDirs_;
+            td.ref().correctBoundaryConditions();
+        }
         forAll(mesh.boundary(), patchi)
         {
             if (mesh.boundary()[patchi].coupled())
@@ -1945,9 +1956,18 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                     alpha_.boundaryField()[patchi].patchNeighbourField();
                 leanNbr[patchi] =
                     tl().boundaryField()[patchi].patchNeighbourField();
+                if (td.valid())
+                {
+                    dirsNbr[patchi] =
+                        td().boundaryField()[patchi].patchNeighbourField();
+                }
             }
         }
     }
+    auto inLinesNbr = [&](const label patchi, const label i, const vector& S)
+    {
+        return dirsNbr[patchi].empty() ? S : (dirsNbr[patchi][i] & S);
+    };
 
 
     // 1. Face states ---------------------------------------------------------
@@ -2469,7 +2489,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                         puo[i], pso[i], zp[fc[i]], zs[fc[i]], aP > alphaEmpty,
                         touches(aP, lean_[fc[i]], inLines(fc[i], pS[i])),
                         pun[i], psn[i], zpn[i], zsn[i], aN > alphaEmpty,
-                        touches(aN, leanNbr[patchi][i], inLines(fc[i], -pS[i])),
+                        touches(aN, leanNbr[patchi][i], inLinesNbr(patchi, i, -pS[i])),
                         tensileStrength_, pvS[i], t, kj
                     );
                 }
