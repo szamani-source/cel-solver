@@ -1,7 +1,8 @@
 """Wall pressure of the Couto silo runs against Couto et al. (2013) and
 Zheng and Yu (2015) Fig. 11 (WP H.7). WORKDIR is a test_hopper_pressure.sh
 work folder holding couto_mc_aligned and/or couto_dp_aligned. Other runs:
-CEL_PLOT_RUNS="label=folder=cell;label=folder=cell" (cell: wall band, m).
+CEL_PLOT_RUNS="label=folder=cell[=rest write];..." (cell: wall band, m;
+rest write: the cells_* file read as at rest, cells_0.5 by default).
 Discharge writes missing from a run (stopped early) are left out.
 
     python3 plot_wall_pressure.py WORKDIR OUT.png "title"
@@ -15,9 +16,11 @@ c=dict(hc.COUTO); rows=hp.table()
 root=sys.argv[1]; out=sys.argv[2]; title=sys.argv[3]
 COLS=["#c0392b", "#1f6fb4", "#7d3c98", "#d68910"]
 if os.environ.get("CEL_PLOT_RUNS"):
-    runs=[tuple(e.split("=")) for e in os.environ["CEL_PLOT_RUNS"].split(";")]
-    runs=[(n, p, COLS[i], float(cl)) for i,(n,p,cl) in enumerate(runs)]
+    runs=[e.split("=") for e in os.environ["CEL_PLOT_RUNS"].split(";")]
+    REST={e[1]: e[3] for e in runs if len(e) > 3}
+    runs=[(e[0], e[1], COLS[i], float(e[2])) for i,e in enumerate(runs)]
 else:
+    REST={}
     runs=[("MC", f"{root}/couto_mc_aligned", COLS[0], 0.025), ("DP plane strain", f"{root}/couto_dp_aligned", COLS[1], 0.025)]
 runs=[r for r in runs if os.path.isdir(r[1])]
 CELLW={r[1]: r[3] for r in runs}
@@ -38,10 +41,12 @@ for ax,phase,label in ((axs[0],"static","At rest (after filling, t = 0.5 s)"),(a
         ax.text(hi+0.4,z,n,va='center',fontsize=8,color='#444')
     for name,p,col,_ in runs:
         if phase=="static":
-            pr=prof(p,"cells_0.5"); ax.plot(pr[:,1],pr[:,0],color=col,lw=1.6,label=f"celFoam {name}")
+            pr=prof(p,REST.get(p,"cells_0.5")); ax.plot(pr[:,1],pr[:,0],color=col,lw=1.6,label=f"celFoam {name}")
         else:
             ws=[w for w in hp.WRITES if hp.AVG[0]<=w<=hp.AVG[1]
                 and (os.path.exists(f"{p}/cells_{w:g}.dat") or os.path.exists(f"{p}/cells_{w:g}.dat.proc0"))]
+            if not ws:
+                continue
             P=[prof(p,f"cells_{w:g}") for w in ws]
             m=min(len(q) for q in P); A=np.array([q[:m,1] for q in P]); z=P[0][:m,0]
             ax.fill_betweenx(z,A.min(0),A.max(0),color=col,alpha=0.12,lw=0)
