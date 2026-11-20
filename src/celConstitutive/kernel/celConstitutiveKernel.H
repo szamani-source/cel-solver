@@ -35,6 +35,7 @@ namespace constitutive
 {
 
 class FrictionLaw;
+class Nonlocal;
 
 //- Six Voigt components, order xx, yy, zz, xy, yz, zx
 typedef double Voigt[6];
@@ -144,6 +145,29 @@ public:
     virtual const FrictionLaw* frictionLaw() const
     {
         return nullptr;
+    }
+
+    //- The nonlocal fluidity law (WP N.1), or null
+    virtual const Nonlocal* nonlocal() const
+    {
+        return nullptr;
+    }
+
+    //- One increment over dt at fluidity g [1/s] (nonlocal models); the
+    //  others ignore g and call updateRate
+    virtual void updateFluidity
+    (
+        const Voigt deps,
+        double dt,
+        double g,
+        const Voigt sigOld,
+        const History& hOld,
+        Voigt sigNew,
+        History& hNew
+    ) const
+    {
+        (void)g;
+        updateRate(deps, dt, sigOld, hOld, sigNew, hNew);
     }
 
     //- Elastic P-wave modulus K + 4G/3 (stable time step)

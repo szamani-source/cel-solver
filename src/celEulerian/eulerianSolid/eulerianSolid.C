@@ -3,6 +3,7 @@
 \*---------------------------------------------------------------------------*/
 
 #include "eulerianSolid.H"
+#include "celNonlocal.H"
 #include "unitConversion.H"
 #include "surfaceFields.H"
 #include "zeroGradientFvPatchFields.H"
@@ -471,6 +472,39 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
     if (spreadLayers_)
     {
         Info<< "Top layers spread sideways (rule 9)" << nl;
+    }
+    if (material_->nonlocal())
+    {
+        // Constraint patches (empty, wedge, cyclic, processor) keep their
+        // type, the rest zero gradient
+        wordList types(mesh.boundary().size(), "zeroGradient");
+        forAll(mesh.boundary(), patchi)
+        {
+            if (polyPatch::constraintType(mesh.boundary()[patchi].type()))
+            {
+                types[patchi] = mesh.boundary()[patchi].type();
+            }
+        }
+        fluidity_.reset
+        (
+            new volScalarField
+            (
+                IOobject
+                (
+                    "g",
+                    mesh.time().timeName(),
+                    mesh,
+                    IOobject::NO_READ,
+                    IOobject::AUTO_WRITE
+                ),
+                mesh,
+                dimensionedScalar(dimless/dimTime, Zero),
+                types
+            )
+        );
+        const auto& law = *material_->nonlocal();
+        Info<< "Nonlocal fluidity (WP N.1): A " << law.A() << ", d "
+            << law.d() << " m, b " << law.b() << ", mu_s " << law.muS() << nl;
     }
 
     if (maxCo_ <= 0)

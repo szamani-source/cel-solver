@@ -205,6 +205,7 @@ MohrCoulomb::MohrCoulomb(const Parameters& p)
     }
 
     law_ = FrictionLaw::New(p, phi);
+    nl_ = Nonlocal::New(p, phi);
 }
 
 
@@ -568,6 +569,26 @@ double MohrCoulomb::yield(const Voigt sigma) const
     symmetricEigen(A, w, V);
     return (w[0] - w[2]) + (w[0] + w[2])*sinPhi_ - 2.0*c_*cosPhi_;
 }
+
+void MohrCoulomb::updateFluidity
+(
+    const Voigt deps,
+    double dt,
+    double g,
+    const Voigt sigOld,
+    const History& hOld,
+    Voigt sigNew,
+    History& hNew
+) const
+{
+    Voigt trial;
+    el_.addStress(sigOld, deps, trial);
+    if (!nl_ || !nl_->update(el_, sigOld, trial, dt, g, hOld, sigNew, hNew))
+    {
+        updateRate(deps, dt, sigOld, hOld, sigNew, hNew);
+    }
+}
+
 
 } // End namespace constitutive
 } // End namespace cel

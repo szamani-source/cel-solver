@@ -18,18 +18,22 @@ Model: the nonlocal granular fluidity (NGF) model of Kamrin and Koval (2012)
 and Henann and Kamrin (2013), in the elasto-viscoplastic form Henann and
 Kamrin (2014) used in Abaqus/Explicit:
 
-- fluidity g [1/s] with mu = |tau|/P and the plastic shear rate
+- fluidity g [1/s] with mu = sqrt(J2)/P and the plastic shear rate
   gamma_dot_p = g mu;
 - local fluidity g_loc = sqrt(P/(rhoS d^2)) (mu - mu_s)/(b mu) for
   mu > mu_s, else 0, with b = (mu_2 - mu_s)/I0 (the steady homogeneous
-  limit is the Jop mu(I) law the solver already has);
+  limit is the linear local law mu = mu_s + b I, the small-I slope of the
+  solver's mu(I) entries);
 - nonlocal equation, solved each step on the Eulerian mesh for the material
   cells (void and walls: zero normal gradient):
   g - xi^2 lap(g) = g_loc, xi = A d / sqrt(|mu - mu_s|) (capped);
-- stress update per point with g fixed: elastic predictor, then the
-  deviatoric stress relaxed along its own direction with
-  gamma_dot_p = g mu (closed form for fixed g and P); the pressure part and
-  dilatancy as in the current MC/DP return.
+- stress update per point: elastic predictor, then the deviatoric stress
+  relaxed along its own direction at fixed P with gamma_dot_p = g mu, where
+  g = g_loc(mu_new) + (g_field - g_loc(mu_old)): the local part implicit
+  (one scalar root), the nonlocal part lagged one step. A lagged g alone is
+  unstable once G dt mu g'(mu)/P > 2, which explicit steps reach at once.
+  No volume change in the flow (dilatancy with the nonlocal law is later).
+  Tension (P <= 0) falls back to the base model's return.
 
 Entries: `nonlocal yes; nonlocalA 0.48;` in a mohrCoulomb or druckerPrager
 model with the mu(I) set (mu2, I0, d, rhoS). Off by default: existing cases
@@ -37,14 +41,15 @@ unchanged bit for bit. Glass-bead constants from Henann and Kamrin (2013):
 mu_s 0.3819, mu_2 0.6435, I0 0.278, A 0.48 (to be checked against the paper
 in N.1, as for every copied value).
 
+Sia (18:19 UTC): develop and test on simple cases, not the silo (the silo comes back only after the law is proven).
+
 Packages (one done-when test each, written first):
 
 | WP | Title | Done when |
 | --- | --- | --- |
 | N.1 | Fluidity field and the point update | `tests/test_nonlocal.sh`: (a) homogeneous simple shear gives mu(I) to 1e-6; (b) the steady fluidity across a 1D layer with a stress gradient matches an independent Python solution of g - xi^2 g'' = g_loc to 1 % |
-| N.2 | Coupled into the Eulerian step | Steady flow down an incline (layer of 20 d): velocity profile within 5 % of the 1D solution, and a thin layer stops (h_stop) as the 1D model predicts within 10 % |
-| N.3 | Mesh convergence of the collapse | Column collapse a = 0.5 on 10 / 5 / 2.5 mm with the T0 set plus nonlocal: band width in mm and run-out converge (5 and 2.5 mm within 5 %) |
-| N.4 | Couto silo on two meshes | Rate and wall pressures on the aligned mesh at two resolutions within 10 % of each other; compared with the papers |
+| N.2 | Coupled into the Eulerian step: sheared layer | A granular layer sheared between a moving lid and a rough base, under gravity, on 3 meshes (cells 4, 2, 1 d): the shear band width converges (in d) and the velocity profile matches the 1D nonlocal solution within 5 % |
+| N.3 | Mesh convergence of the column collapse | Collapse a = 0.5 on 10 / 5 / 2.5 mm with the T0 set plus nonlocal: band width and run-out converge (5 and 2.5 mm within 5 %; now 0.30 / 0.33 / 0.43, decision 0038) |
 
 ## Consequences
 
@@ -52,3 +57,16 @@ Packages (one done-when test each, written first):
   band (Sia: 10 to 20 d), so very coarse meshes get no benefit.
 - One Helmholtz solve per step (OpenFOAM's linear solvers, host only).
 - Cohesion and compaction follow as their own package series.
+
+## N.1 result (2026-11-20)
+
+`tests/test_nonlocal.sh` (under a minute) passes: kernel homogeneous shear
+(MC and DP, dt 1e-6 and 1e-4 s, rates 1 to 50 1/s) gives mu_s + b I exactly;
+the fluidity across a 40-cell layer with mu from 0.30 to 0.50 matches a
+4000-cell independent solution within 0.1 % of g_max, with and without void
+on top, and spreads fluidity into the part below mu_s (12 to 19 % of g_max).
+Code: kernel `celNonlocal` (`nonlocalA` entry in mohrCoulomb and
+druckerPrager), `nonlocalFluidity()` in celEulerian (OpenFOAM PCG, Gauss
+linear corrected), field `g` written, driver `celFluidityCheck`.
+Adding virtuals to the kernel Model changes its layout: rebuild every
+application (./Allwmake) after pulling.

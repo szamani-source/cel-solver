@@ -114,6 +114,7 @@ DruckerPrager::DruckerPrager(const Parameters& p, const Options& opts)
     coefficients(fit_, psi, etaBar_, unused);
 
     law_ = FrictionLaw::New(p, phi);
+    nl_ = Nonlocal::New(p, phi);
 }
 
 
@@ -241,6 +242,26 @@ double DruckerPrager::yield(const Voigt sigma) const
 {
     return std::sqrt(J2(sigma)) + eta_*meanStress(sigma) - xi_*c_;
 }
+
+void DruckerPrager::updateFluidity
+(
+    const Voigt deps,
+    double dt,
+    double g,
+    const Voigt sigOld,
+    const History& hOld,
+    Voigt sigNew,
+    History& hNew
+) const
+{
+    Voigt trial;
+    el_.addStress(sigOld, deps, trial);
+    if (!nl_ || !nl_->update(el_, sigOld, trial, dt, g, hOld, sigNew, hNew))
+    {
+        updateRate(deps, dt, sigOld, hOld, sigNew, hNew);
+    }
+}
+
 
 } // End namespace constitutive
 } // End namespace cel

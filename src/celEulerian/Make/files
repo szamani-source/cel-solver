@@ -2,5 +2,6 @@ eulerianSolid/eulerianSolid.C
 eulerianSolid/eulerianSolidLagrange.C
 eulerianSolid/eulerianSolidRemap.C
 eulerianSolid/eulerianSolidImmersed.C
+eulerianSolid/eulerianSolidNonlocal.C
 
 LIB = $(FOAM_USER_LIBBIN)/libcelEulerian

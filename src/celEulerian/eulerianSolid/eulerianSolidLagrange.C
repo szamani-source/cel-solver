@@ -1701,6 +1701,10 @@ void groupSum(const labelList& mixTo, Field<Type>& f)
 
 void Foam::eulerianSolid::lagrangeStep(const scalar dt)
 {
+    if (fluidity_.valid())
+    {
+        solveFluidity();
+    }
     using namespace lagrangeStepDetail;
 
     const fvMesh& mesh = mesh_;
@@ -3064,14 +3068,25 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
             epsP[celli] = transform(Q, epsP[celli]);
         }
 
-        if (dEps != symmTensor::zero)
+        if (dEps != symmTensor::zero || fluidity_.valid())
         {
             constitutiveModel::history hOld, hNew;
             constitutiveModel::toVoigt(epsP[celli], hOld.epsP, 2);
             hOld.epsPEq = epsPEq[celli];
 
             symmTensor sNew;
-            material_->update(dEps, dt, sigma[celli], hOld, sNew, hNew);
+            if (fluidity_.valid())
+            {
+                material_->updateFluidity
+                (
+                    dEps, dt, fluidity_()[celli], sigma[celli], hOld, sNew,
+                    hNew
+                );
+            }
+            else
+            {
+                material_->update(dEps, dt, sigma[celli], hOld, sNew, hNew);
+            }
 
             // A.4 (decision 0095): a partly filled cell lets the plastic
             // normal strain of its material go into the void (the elastic

@@ -120,6 +120,10 @@ class eulerianSolid
         //- Constitutive model, selected by keyword "type"
         autoPtr<constitutiveModel> material_;
 
+        //- Nonlocal fluidity g [1/s] (WP N.1, decision 0111), solved at the
+        //  start of each Lagrange step when the model has nonlocalA
+        autoPtr<volScalarField> fluidity_;
+
         //- Fraction of the CFL limit used for the time step
         scalar maxCo_;
 
@@ -444,6 +448,10 @@ class eulerianSolid
             return lineDirs_.empty() ? S : (lineDirs_[celli] & S);
         }
 
+        //- Nonlocal fluidity: k g - div(a_f grad g) = k g_loc from the
+        //  stress at the start of the step (WP N.1, eulerianSolidNonlocal.C)
+        void solveFluidity();
+
         //- Remap with void (freeSurface): slab volume fluxes, decision 0031
         void remapFreeSurface(const scalar dt);
 
@@ -491,6 +499,12 @@ public:
 
         const fvMesh& mesh() const { return mesh_; }
         const constitutiveModel& material() const { return *material_; }
+
+        //- Nonlocal fluidity field, or null without the nonlocal law
+        const volScalarField* fluidity() const
+        {
+            return fluidity_.valid() ? &fluidity_() : nullptr;
+        }
         scalar maxCo() const { return maxCo_; }
         bool solveMomentum() const { return solveMomentum_; }
         bool secondOrder() const { return secondOrder_; }
