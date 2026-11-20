@@ -83,7 +83,8 @@ def build(work, check):
     p, c = bc.aligned_buffered_case(work, "couto_mc_gap", "mc", check, c, nProcs=NP,
                                     head_rows=HEAD_ROWS)
     dp = f"{p}/system/decomposeParDict"
-    open(dp, "w").write(open(dp).read().replace(f"n ({NP} 1 1)", f"n (1 {NP} 1)"))
+    txt = open(dp).read().replace(f"n ({NP} 1 1)", f"n (1 {NP} 1)")
+    open(dp, "w").write(txt)
     open(f"{p}/system/controlDict", "a").write(
         f"gravityRamp 0.1;\ndamping 100;\ndampingStart {T_DAMP!r};\n")
     info = dict(gap=gap, w=w, y_fill=y_fill, H=H, mass=full * c["rho"])
