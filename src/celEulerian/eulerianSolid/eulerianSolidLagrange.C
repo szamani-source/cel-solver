@@ -2735,6 +2735,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
     if (solveMomentum_)
     {
         vectorField& U = U_.primitiveFieldRef();
+        const bool damp = mesh_.time().value() >= dampingStart_ - SMALL;
         forAll(U, celli)
         {
             if (imm && cellOpen_[celli] <= 0)
@@ -2748,7 +2749,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                 continue;
             }
             U[celli] += dt*(force[celli]/mG[celli] + g);
-            if (damping_ > 0)
+            if (damping_ > 0 && damp)
             {
                 U[celli] /= 1 + damping_*dt;
             }
