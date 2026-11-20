@@ -150,3 +150,22 @@ law's g_loc -> 0. Turning the shear cap off changes neither.
 Fixed on the way: tiny P at free-surface cells (P/g and tau/P overflowed:
 the kernel treats P below 1e-300 rho_s as zero, mu capped at 1e3, and the
 face test compares 2 P dc < z_s g without dividing by g).
+
+## N.3 front study (2026-11-20 night, Sia chose to dig into the front)
+
+Run-out at 1 s, front where the layer is 5 mm thick, 5 / 2.5 mm cells
+(`tests/collapse/shear_band.py` with `CEL_NO_SPREAD`, `CEL_EXTRA_MATERIAL`;
+nonlocal with d 10 mm and the C.3 tangent face viscosity):
+
+| Variant | MC | Nonlocal (10 / 5 / 2.5 mm) |
+| --- | --- | --- |
+| T0 rules (rule 9 on) | 0.325 / 0.425 (+31 %) | 0.200 / 0.250 / 0.575 (late creep at 2.5 mm) |
+| rule 9 off (`spreadLayers no`) | 0.300 / 0.338 (+13 %) | 0.200 / 0.225 / 0.250 (+11 %) |
+| fullBlend | 0.375 / 0.450 (+20 %) | |
+
+Rule 9 (decision 0024: partly filled top layers spread sideways in the x
+sweep) is the largest mesh-dependent part of the run-out: a thin film a
+cell or two thick runs ahead of the deposit, and a finer mesh lets a
+thinner film run further. Without it the nonlocal 2.5 mm run also stays
+quiet (with it, the toe crept to the far wall after 0.5 s). The rest
+(+11 to 13 % per halving) is checked on 1.25 mm next.

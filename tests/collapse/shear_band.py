@@ -103,13 +103,16 @@ def one(args):
     txt = re.sub(r"writeTimes[^;]*;", "writeTimes (" + " ".join(str(t) for t in SNAP + [0.5])
                  + ");", open(dct).read())
     open(dct, "w").write(txt)
-    if law in ("muI", "NL"):
-        mp = f"{path}/constant/materialProperties"
-        add = MU_I if law == "muI" else NONLOCAL
-        txt = open(mp).read().replace("sigmaT 0;\n", "sigmaT 0;\n" + add)
-        if os.environ.get("CEL_NO_CAP"):
-            txt = txt.replace("shearCap yes;", "shearCap no;")
-        open(mp, "w").write(txt)
+    mp = f"{path}/constant/materialProperties"
+    add = {"muI": MU_I, "NL": NONLOCAL}.get(law, "")
+    # front study (WP N.3): rule variants from the environment
+    add += os.environ.get("CEL_EXTRA_MATERIAL", "")
+    txt = open(mp).read().replace("sigmaT 0;\n", "sigmaT 0;\n" + add)
+    if os.environ.get("CEL_NO_CAP"):
+        txt = txt.replace("shearCap yes;", "shearCap no;")
+    if os.environ.get("CEL_NO_SPREAD"):
+        txt = txt.replace("spreadLayers yes;", "spreadLayers no;")
+    open(mp, "w").write(txt)
     sec = vc.run(path)
     out = dict(law=law, h=h, nx=nx, ny=ny, seconds=sec)
     for t in SNAP:
