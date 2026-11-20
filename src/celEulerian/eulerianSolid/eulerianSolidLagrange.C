@@ -55,6 +55,8 @@
     material and then opens void. alphaL_, lean_ and smooth_ go to the remap.
 \*---------------------------------------------------------------------------*/
 
+#include "cubicEqn.H"
+#include <algorithm>
 #include "eulerianSolid.H"
 #include "cyclicFvPatch.H"
 #include "processorFvPatch.H"
@@ -1320,28 +1322,33 @@ inline bool voidFace
 }
 
 
-//- Principal stresses, ascending, by the trigonometric solution of the
-//  symmetric cubic (never fails). OpenFOAM's eigenValues warns "Eigenvalue
-//  computation fails" on near-decoupled tensors with round-off xz, yz shears
-//  (wedge and plane cases): millions of lines on the Couto silo, which
-//  filled the disk
-inline vector principal(const symmTensor& s)
+//- Principal stresses, ascending: OpenFOAM's eigenValues (v2512,
+//  symmTensor.cxx) step for step, so every result is unchanged bit for bit,
+//  without its warning. On wedge stresses whose xz, yz shears are round-off
+//  the cubic solver reports a non-real root and printed "Eigenvalue
+//  computation fails" for each: millions of lines per Couto silo run, which
+//  filled the disk and slowed the runs. Such a root is used as OpenFOAM
+//  uses it.
+inline vector principal(const symmTensor& T)
 {
-    const scalar q = tr(s)/3;
-    const scalar p1 = sqr(s.xy()) + sqr(s.xz()) + sqr(s.yz());
-    const scalar p2 =
-        sqr(s.xx() - q) + sqr(s.yy() - q) + sqr(s.zz() - q) + 2*p1;
-    if (!(p2 > max(sqr(1e-12*mag(s)), VSMALL)))
+    if ((sqr(T.xy()) + sqr(T.xz()) + sqr(T.yz())) < ROOTSMALL)
     {
-        return vector(q, q, q);
+        vector eVals(T.diag());
+        std::sort(eVals.begin(), eVals.end());
+        return eVals;
     }
-    const scalar p = Foam::sqrt(p2/6);
-    const symmTensor B((s - q*symmTensor::I)/p);
-    const scalar r = max(scalar(-1), min(scalar(1), 0.5*det(B)));
-    const scalar phi = Foam::acos(r)/3;
-    const scalar e1 = q + 2*p*Foam::cos(phi);
-    const scalar e3 = q + 2*p*Foam::cos(phi + 2*constant::mathematical::pi/3);
-    return vector(e3, 3*q - e1 - e3, e1);
+    const scalar b = - T.xx() - T.yy() - T.zz();
+    const scalar c =
+        T.xx()*T.yy() + T.xx()*T.zz() + T.yy()*T.zz()
+      - T.xy()*T.yx() - T.yz()*T.zy() - T.zx()*T.xz();
+    const scalar d =
+      - T.xx()*T.yy()*T.zz()
+      - T.xy()*T.yz()*T.zx() - T.xz()*T.zy()*T.yx()
+      + T.xx()*T.yz()*T.zy() + T.yy()*T.zx()*T.xz() + T.zz()*T.xy()*T.yx();
+    const Roots<3> roots(cubicEqn(1, b, c, d).roots());
+    vector eVals(roots[0], roots[1], roots[2]);
+    std::sort(eVals.begin(), eVals.end());
+    return eVals;
 }
 
 
