@@ -845,6 +845,7 @@ void Foam::eulerianSolid::setLineDirections()
     const vectorField& C = mesh.cellCentres();
     const labelUList& own = mesh.owner();
     lineDirs_.setSize(mesh.nCells());
+    lineRot_.setSize(mesh.nCells());
     static const FixedList<FixedList<direction, 3>, 6> perms
     ({
         {0, 1, 2}, {0, 2, 1}, {1, 0, 2}, {1, 2, 0}, {2, 0, 1}, {2, 1, 0}
@@ -927,6 +928,22 @@ void Foam::eulerianSolid::setLineDirections()
             T.row(a, t);
         }
         lineDirs_[celli] = T;
+
+        // Lines square to each other (WP G.3): the frame is a rotation
+        // (rows made exactly orthonormal); leaning lines keep x, y, z
+        lineRot_[celli] = tensor::I;
+        if (mag((T & T.T()) - tensor::I) < 1e-6)
+        {
+            tensor Q(T);
+            for (label it = 0; it < 5; ++it)
+            {
+                Q = 0.5*(Q + inv(Q).T());
+            }
+            if (mag(Q - tensor::I) > 1e-12)
+            {
+                lineRot_[celli] = Q;
+            }
+        }
     }
 }
 

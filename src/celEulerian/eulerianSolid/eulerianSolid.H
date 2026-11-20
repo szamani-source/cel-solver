@@ -317,6 +317,11 @@ class eulerianSolid
         //  axis a (pointing along +a). Empty on axis-aligned meshes
         List<tensor> lineDirs_;
 
+        //- Angled meshes (WP G.3, decision 0106): the line frame where its
+        //  lines are square to each other (rows = turned x, y, z), else I:
+        //  the axes of the void closure's normal stress and strain
+        List<tensor> lineRot_;
+
         //- Passed from lagrangeStep to remap (freeSurface): slab side per
         //  axis (+1, -1 or 0 spread), material fraction of the Lagrangian
         //  cell, and 1 where the cell and all its neighbours are full

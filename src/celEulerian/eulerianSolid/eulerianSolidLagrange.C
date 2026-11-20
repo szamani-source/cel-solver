@@ -2771,6 +2771,11 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
     direction voidAxis[3];
     scalar voidDm[3], voidDm0[3], voidDmMax[3];
     scalar voidA = 1, voidMatV = 0;
+    // Angled meshes (WP G.3, decision 0106): in a cell whose mesh lines
+    // are square to each other but turned, the void closure works on the
+    // normal components along the lines (identity elsewhere: x, y, z)
+    bool voidRot = false;
+    tensor voidR(tensor::I);
 
     forAll(sigma, celli)
     {
@@ -2837,7 +2842,16 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                 {symmTensor::XX, symmTensor::YY, symmTensor::ZZ};
             bool same = full;
             scalar matV = full ? 1 : a;     // material volume / V
-            symmTensor dE(dEps);
+            voidRot = !lineRot_.empty() && lineRot_[celli] != tensor::I;
+            if (voidRot)
+            {
+                voidR = lineRot_[celli];
+            }
+            symmTensor dE(voidRot ? transform(voidR, dEps) : dEps);
+            const symmTensor sF
+            (
+                voidRot ? transform(voidR, sigma[celli]) : sigma[celli]
+            );
             nVoidAxes = 0;
             for (direction d = 0; d < vector::nComponents; ++d)
             {
@@ -2866,7 +2880,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                     const scalar cap =
                         (full && tensileStrength_ >= GREAT)
                       ? GREAT
-                      : a*max(scalar(0), sT - sigma[celli].component(diag[d]))/M;
+                      : a*max(scalar(0), sT - sF.component(diag[d]))/M;
                     dm = min(r, cap);
                 }
                 if (dm != r)
@@ -2890,7 +2904,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
             voidMatV = matV - (full ? 1 : a);
             if (!same)
             {
-                dEps = dE;
+                dEps = voidRot ? transform(voidR.T(), dE) : dE;
                 alphaL_[celli] =
                     min(max(matV*Vo[celli]/VL, scalar(0)), scalar(1));
             }
@@ -2926,11 +2940,17 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
             if (nVoidAxes > 0)
             {
                 const symmTensor eOld(constitutiveModel::fromVoigt(hOld.epsP));
+                // strain along the turned lines (angled meshes)
+                symmTensor dEF(voidRot ? transform(voidR, dEps) : dEps);
                 for (label pass = 0; pass < 3; ++pass)
                 {
-                    const symmTensor dP
+                    const symmTensor dPg
                     (
                         constitutiveModel::fromVoigt(hNew.epsP) - eOld
+                    );
+                    const symmTensor dP
+                    (
+                        voidRot ? transform(voidR, dPg) : dPg
                     );
                     bool changed = false;
                     for (label k = 0; k < nVoidAxes; ++k)
@@ -2949,7 +2969,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                         if (dm > voidDm[k])
                         {
                             voidDm[k] = dm;
-                            dEps.component(diag3[d]) = dm/(voidA + 0.5*dm);
+                            dEF.component(diag3[d]) = dm/(voidA + 0.5*dm);
                             changed = true;
                         }
                     }
@@ -2972,10 +2992,11 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                         {
                             voidDm[k] =
                                 voidDm0[k] + f*(voidDm[k] - voidDm0[k]);
-                            dEps.component(diag3[voidAxis[k]]) =
+                            dEF.component(diag3[voidAxis[k]]) =
                                 voidDm[k]/(voidA + 0.5*voidDm[k]);
                         }
                     }
+                    dEps = voidRot ? transform(voidR.T(), dEF) : dEF;
                     material_->update
                     (
                         dEps, dt, sigma[celli], hOld, sNew, hNew

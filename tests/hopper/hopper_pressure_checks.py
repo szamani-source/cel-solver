@@ -73,12 +73,29 @@ def pressures(path, c, name):
     return out
 
 
+def leak_volume(p, a, out):
+    """Full-silo material volume of the flagged cells: alpha x open volume,
+    the cell volume from the wedge (r dr dy over the wedge angle)."""
+    if not out.any():
+        return 0.0
+    # cell sizes from neighbouring centres are not stored: use the open
+    # fraction and a local size estimate from the nearest distinct centres
+    x, y = a[:, 0], a[:, 1]
+    vol = 0.0
+    for i in np.where(out)[0]:
+        dx = np.min(np.abs(x[np.abs(y - y[i]) < 1e-9] - x[i])[np.abs(x[np.abs(y - y[i]) < 1e-9] - x[i]) > 1e-12], initial=0.007)
+        dy = np.min(np.abs(y[np.abs(x - x[i]) < 1e-9] - y[i])[np.abs(y[np.abs(x - x[i]) < 1e-9] - y[i]) > 1e-12], initial=0.007)
+        vol += a[i, 2] * a[i, 10] * 2 * math.pi * x[i] * dx * dy
+    return vol
+
+
 def main():
+    global CELL
     work = sys.argv[1]
     model = sys.argv[2] if len(sys.argv) > 2 else "mc"
     t0 = time.perf_counter()
     mesh = sys.argv[3] if len(sys.argv) > 3 else "aligned"
-    blend = "fullBlend yes;\n" if mesh == "aligned" else ""
+    blend = "fullBlend yes;\n" if mesh != "cut" else ""
     os.environ.setdefault("CEL_HOPPER_RULES", MU_I + RULES + blend)
     check = dict(tEnd=T_END, maxCo=0.4, writeTimes=WRITES, tOpen=T_OPEN)
     if mesh == "aligned":
@@ -89,6 +106,17 @@ def main():
             outlet_ratio=float(os.environ.get("CEL_OUTLET_RATIO", 1 / 3)),
             wall_ratio=float(os.environ.get("CEL_WALL_RATIO", 1.0)),
             ncols=int(os.environ["CEL_NCOLS"]) if "CEL_NCOLS" in os.environ else None)
+    elif mesh == "aligned_buffered":
+        # STL shell inside a wall-aligned mesh (Sia, 2026-11-20; WP G.5)
+        import buffered_case as bc
+        CELL = 0.012
+        p, c = bc.aligned_buffered_case(work, f"couto_{model}_{mesh}", model, check,
+                                        nProcs=NP)
+    elif mesh == "buffered":
+        # STL shell inside a larger mesh, rounded corners (Sia, 2026-11-20)
+        import buffered_case as bc
+        CELL = 0.007
+        p, c = bc.buffered_case(work, f"couto_{model}_{mesh}", model, check, nProcs=NP)
     else:
         p, c = hc.couto_case(work, f"couto_{model}_{mesh}", model, CELL, check,
                              nProcs=NP)
@@ -114,6 +142,16 @@ def main():
           f"discharge {rate:.1f} kg/s over {AVG[0] - T_OPEN:.2f} to "
           f"{AVG[1] - T_OPEN:.2f} s after opening; largest speed after opening "
           f"{h[t > T_OPEN, 9].max():.1f} m/s")
+    if mesh in ("buffered", "aligned_buffered"):
+        import buffered_case as bc
+        print("[leak] material outside the STL shell (full-silo kg; where)")
+        for w in WRITES[::4]:
+            a = read_cells(p, f"cells_{w:g}")
+            out, r, y = bc.leak_report(c, a)
+            vol = leak_volume(p, a, out)
+            print(f"  t {w:g}: {out.sum()} cells, {vol * c['rho']:.4f} kg"
+                  + (f", r {r[out].min():.3f}-{r[out].max():.3f} m, y {y[out].min():.3f}-"
+                     f"{y[out].max():.3f} m" if out.any() else ""))
     rest = pressures(p, c, f"cells_{T_OPEN:g}")
     H = hc.hopper_geometry(c)[1] + c["Hc"]
     K, mu = 0.338, c["mu"]
