@@ -14,7 +14,12 @@ widened by 15 %; GA4 to GA7 within that or 15 % of Janssen (K_A 0.338, mu 0.2).
 In discharge GA0, GA1, GA2 within the experiment's discharge range widened by
 15 %. Also reported: every cell, the discharge rate, the largest speed.
 
-    python3 hopper_pressure_checks.py WORKDIR [mc|dp]
+WP H.7 (decisions 0103, 0104): by default the silo is on the wall-aligned
+mesh (hopper_case.aligned_case: hopper wall a mesh patch, outlet rows 3x
+finer, Sia 2026-11-19) with `fullBlend yes` added to the rule set; `cut`
+runs the cut-cell (STL) silo of WP H.3 with the H.3 rules.
+
+    python3 hopper_pressure_checks.py WORKDIR [mc|dp] [aligned|cut]
 """
 
 import csv
@@ -72,10 +77,21 @@ def main():
     work = sys.argv[1]
     model = sys.argv[2] if len(sys.argv) > 2 else "mc"
     t0 = time.perf_counter()
-    os.environ.setdefault("CEL_HOPPER_RULES", MU_I + RULES)
-    p, c = hc.couto_case(work, f"couto_{model}", model, CELL,
-                         dict(tEnd=T_END, maxCo=0.4, writeTimes=WRITES, tOpen=T_OPEN),
-                         nProcs=NP)
+    mesh = sys.argv[3] if len(sys.argv) > 3 else "aligned"
+    blend = "fullBlend yes;\n" if mesh == "aligned" else ""
+    os.environ.setdefault("CEL_HOPPER_RULES", MU_I + RULES + blend)
+    check = dict(tEnd=T_END, maxCo=0.4, writeTimes=WRITES, tOpen=T_OPEN)
+    if mesh == "aligned":
+        # grading (Sia): CEL_OUTLET_RATIO (outlet row over top row, 1/3),
+        # CEL_WALL_RATIO (wall column over axis column, 1), CEL_NCOLS
+        p, c = hc.aligned_case(
+            work, f"couto_{model}_{mesh}", model, CELL, check, nProcs=NP,
+            outlet_ratio=float(os.environ.get("CEL_OUTLET_RATIO", 1 / 3)),
+            wall_ratio=float(os.environ.get("CEL_WALL_RATIO", 1.0)),
+            ncols=int(os.environ["CEL_NCOLS"]) if "CEL_NCOLS" in os.environ else None)
+    else:
+        p, c = hc.couto_case(work, f"couto_{model}_{mesh}", model, CELL, check,
+                             nProcs=NP)
     dp = f"{p}/system/decomposeParDict"
     txt = open(dp).read().replace(f"n ({NP} 1 1)", f"n (1 {NP} 1)")
     open(dp, "w").write(txt)
@@ -94,7 +110,7 @@ def main():
                                          * math.cos(math.radians(hc.THETA)))
     i, j = np.searchsorted(t, AVG[0]), np.searchsorted(t, AVG[1]) - 1
     rate = -(m[j] - m[i]) / (t[j] - t[i])
-    print(f"[1] Couto silo, {model.upper()}, {CELL * 1e3:.1f} mm cells ({wall:.0f} s): "
+    print(f"[1] Couto silo, {model.upper()}, {mesh} mesh, {CELL * 1e3:.1f} mm cells ({wall:.0f} s): "
           f"discharge {rate:.1f} kg/s over {AVG[0] - T_OPEN:.2f} to "
           f"{AVG[1] - T_OPEN:.2f} s after opening; largest speed after opening "
           f"{h[t > T_OPEN, 9].max():.1f} m/s")

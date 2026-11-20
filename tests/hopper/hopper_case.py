@@ -171,7 +171,35 @@ def couto_case(work, name, model="mc", cell=0.025, check=None, c=None, nProcs=1)
     return p, c
 
 
-def aligned_mesh(path, c, cell, top_rows=0, wall_ratio=1.0, outlet_ratio=1.0):
+def aligned_case(work, name, model="mc", cell=0.025, check=None, c=None, nProcs=1,
+                 outlet_ratio=1 / 3, wall_ratio=1.0, ncols=None):
+    """The Couto silo on the wall-aligned mesh (WP H.7, decisions 0103, 0104):
+    the hopper wall is the mesh patch `hopperWall`, no STL. Outlet rows
+    outlet_ratio times the hopper's top row (Sia, 2026-11-19); three rows of
+    headroom above the fill."""
+    c = dict(COUTO, **(c or {}))
+    b, ht = hopper_geometry(c)
+    H = ht + c["Hc"]
+    check = dict(check or {})
+    check.setdefault("fill", [-1.0, -1.0, 1.0, H])
+    check.setdefault("U0", [0.0, 0.0, 0.0])
+    p = vc.make_case(f"{work}/{name}", 1, 1, material(c, model), check, nProcs=nProcs)
+    aligned_mesh(p, c, cell, top_rows=3, wall_ratio=wall_ratio, outlet_ratio=outlet_ratio,
+                 ncols=ncols)
+    dw = math.degrees(math.atan(c["mu"]))
+    mp = f"{p}/constant/materialProperties"
+    txt = open(mp).read()
+    i = txt.index("walls\n{")
+    txt = txt[:i] + ("walls\n{\n" f"    right {{ friction {dw!r}; }}\n"
+                     f"    hopperWall {{ friction {dw!r}; }}\n    top {{ friction 0; }}\n}}\n")
+    txt = txt.replace(f"rho {vc.RHO};", f"rho {c['rho']!r};")
+    t_open = check.get("tOpen", 1e9)
+    txt += f"outlets\n{{\n    outlet {{ friction {dw!r}; openTime {t_open!r}; }}\n}}\n"
+    open(mp, "w").write(txt)
+    return p, c
+
+
+def aligned_mesh(path, c, cell, top_rows=0, wall_ratio=1.0, outlet_ratio=1.0, ncols=None):
     """Wall-aligned (body-fitted) wedge mesh (Sia, 2026-11-19): the hopper is
     one trapezoid block whose column lines fan from vertical at the axis to
     the wall slope (rows horizontal); the cylinder block above has square
@@ -185,7 +213,7 @@ def aligned_mesh(path, c, cell, top_rows=0, wall_ratio=1.0, outlet_ratio=1.0):
     t = math.radians(THETA)
     co, si = math.cos(t), math.sin(t)
     R, Ro = c["R"], c["Rout"]
-    n = int(round(R / cell))
+    n = ncols or int(round(R / cell))
     nh = max(1, int(round(ht / cell)))
     if outlet_ratio != 1.0:
         # rows growing from the outlet by a fixed ratio: the smallest count
