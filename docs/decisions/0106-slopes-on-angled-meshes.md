@@ -51,3 +51,32 @@ axis) and a sheared strip (lines along the slope and vertical lines).
 - G.3 stays open: next suspects are the wall-row face states (mirror ghost
   plus the x, y, z hydrostatic jump on faces not normal to gravity) and the
   surface rules for faces at an angle to gravity.
+
+## Update 2026-11-20 (afternoon): turned cells in the lines' frame
+
+In cells whose mesh lines are square but turned (`lineRot_` not I) three
+more pieces now work in the lines' frame R, so a turned mesh does what a
+Cartesian one does with gravity turned:
+
+- the hydrostatic jump: R^T J(R d, R g) R (layer form along the dominant
+  line, as the Cartesian reference uses);
+- the face reconstruction and its component-wise limiter (states, jumps
+  and directional derivatives along dPQ turned into R, back after), for
+  stress and velocity;
+- the remap of U, sigma and epsP (components remapped in R, back after).
+
+Axis-aligned, leaning (G.1, G.2, Couto) and wedge cells keep lineRot = I
+and take none of these paths: test_angled_cells, _free_surface, _stl,
+test_wedge, _hopper_wedge, _wedge_silo pass unchanged.
+
+Turned slope now: slide 1.2 % (was 0.1 % with a wrong jump that happened
+to slide right, 3.5 % with the jump alone), normal speed 0.024 m/s (limit
+0.0145), mass 1.7e-8 (limit 1e-10), at rest 0.021 m/s (was 0.3-0.5; limit
+0.007). Sheared unchanged (leaning lines, not covered by R).
+
+Still frame-dependent: comparing turned and Cartesian cell by cell after
+5 steps, everything agrees to round-off except the top full row under the
+void, which grows a slope-frame shear (1e-6 Pa against 1e-12) from the
+first steps. Next suspect: a free-surface rule on the face between the top
+full row and the void (traction-free face velocity or the open-side test).
+`/tmp` script cmp.py in the thread compares the two runs row by row.

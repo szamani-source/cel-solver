@@ -1371,6 +1371,63 @@ void Foam::eulerianSolid::remapFreeSurface(const scalar dt)
         qIn[patchi] = scalarField(n.size(), Zero);
     }
     const bool anyIn = inletPatch_.size() > 0;
+
+    // Turned cells (WP G.3): U, sigma and epsP are remapped component by
+    // component in the mesh lines' frame (lineRot_), so the limiter does
+    // what it does on a Cartesian mesh; turned back after. Axis-aligned
+    // and leaning cells (lineRot_ = I) are untouched
+    bool turned = false;
+    if (angled_)
+    {
+        forAll(lineRot_, c)
+        {
+            if (lineRot_[c] != tensor::I)
+            {
+                turned = true;
+                break;
+            }
+        }
+    }
+    auto turn = [&](const bool back)
+    {
+        auto Rof = [&](const label c) -> tensor
+        {
+            return back ? lineRot_[c].T() : lineRot_[c];
+        };
+        vectorField& Ui = U_.primitiveFieldRef();
+        symmTensorField& si = sigma_.primitiveFieldRef();
+        symmTensorField& ei = epsP_.primitiveFieldRef();
+        forAll(Ui, c)
+        {
+            const tensor R(Rof(c));
+            Ui[c] = R & Ui[c];
+            si[c] = transform(R, si[c]);
+            ei[c] = transform(R, ei[c]);
+        }
+        forAll(mesh.boundary(), patchi)
+        {
+            const labelUList& fc = mesh.boundary()[patchi].faceCells();
+            fvPatchVectorField& Ub = U_.boundaryFieldRef()[patchi];
+            fvPatchSymmTensorField& sb = sigma_.boundaryFieldRef()[patchi];
+            fvPatchSymmTensorField& eb = epsP_.boundaryFieldRef()[patchi];
+            forAll(fc, i)
+            {
+                const tensor R(Rof(fc[i]));
+                if (Ub.size()) Ub[i] = R & Ub[i];
+                if (sb.size()) sb[i] = transform(R, sb[i]);
+                if (eb.size()) eb[i] = transform(R, eb[i]);
+                if (anyIn && UIn[patchi].size())
+                {
+                    UIn[patchi][i] = R & UIn[patchi][i];
+                    sIn[patchi][i] = transform(R, sIn[patchi][i]);
+                }
+            }
+        }
+    };
+    if (turned)
+    {
+        turn(false);
+    }
     remapField
     (
         mesh, geo, phi, dmInt, dmPatch, mNew, lim("U"), U_, &smooth_,
@@ -1391,6 +1448,13 @@ void Foam::eulerianSolid::remapFreeSurface(const scalar dt)
         mesh, geo, phi, dmInt, dmPatch, mNew, lim("epsPEq"), epsPEq_, &smooth_,
         anyIn ? &qIn : nullptr
     );
+    if (turned)
+    {
+        turn(true);
+        U_.correctBoundaryConditions();
+        sigma_.correctBoundaryConditions();
+        epsP_.correctBoundaryConditions();
+    }
 
     vectorField& U = U_.primitiveFieldRef();
     symmTensorField& sigma = sigma_.primitiveFieldRef();

@@ -56,6 +56,7 @@
 \*---------------------------------------------------------------------------*/
 
 #include "cubicEqn.H"
+#include <type_traits>
 #include <algorithm>
 #include "eulerianSolid.H"
 #include "cyclicFvPatch.H"
@@ -351,7 +352,8 @@ void faceStates
     const volScalarField* rho = nullptr,
     const vector& gravity = Zero,
     const volScalarField* smooth = nullptr,
-    const volScalarField* eFac = nullptr
+    const volScalarField* eFac = nullptr,
+    const List<tensor>* rot = nullptr
 )
 {
     const bool grav = rho && magSqr(gravity) > 0;
@@ -373,11 +375,10 @@ void faceStates
     // and the vector dPQ from owner to neighbour centre
     // eP, eQ: hydrostatic jumps of the two cells over dPQ (zero without
     // gravity, which leaves the original scheme unchanged)
-    auto states0 = [&]
+    auto statesCore = [&]
     (
         const Type& qP, const Type& qQ,
-        const UList<vector>* gP, const UList<vector>* gQ,
-        const vector& dPQ,
+        const Type& DP, const Type& DQ,
         Type& outP, Type& outQ,
         const Type& eP, const Type& eQ
     )
@@ -398,8 +399,8 @@ void faceStates
             for (direction d = 0; d < nCmpt; ++d)
             {
                 const scalar a = component(qQ, d) - component(qP, d);
-                const scalar sP = mcSlope(a, dPQ & (*gP)[d]);
-                const scalar sQ = mcSlope(a, dPQ & (*gQ)[d]);
+                const scalar sP = mcSlope(a, component(DP, d));
+                const scalar sQ = mcSlope(a, component(DQ, d));
                 setComponent(outP, d) = component(qP, d) + 0.5*sP;
                 setComponent(outQ, d) = component(qQ, d) - 0.5*sQ;
             }
@@ -411,11 +412,67 @@ void faceStates
             const scalar eq = component(eQ, d);
             const scalar a =
                 component(qQ, d) - component(qP, d) - 0.5*(ep + eq);
-            const scalar sP = mcSlope(a, (dPQ & (*gP)[d]) - ep);
-            const scalar sQ = mcSlope(a, (dPQ & (*gQ)[d]) - eq);
+            const scalar sP = mcSlope(a, (component(DP, d)) - ep);
+            const scalar sQ = mcSlope(a, (component(DQ, d)) - eq);
             setComponent(outP, d) = component(qP, d) + 0.5*(sP + ep);
             setComponent(outQ, d) = component(qQ, d) - 0.5*(sQ + eq);
         }
+    };
+
+
+    // Turned cells (WP G.3): the face states are reconstructed and limited
+    // in the mesh lines' frame R of the face (faceR, set per face), so a
+    // turned mesh gives what a Cartesian one gives with gravity turned:
+    // states, jumps and the directional derivatives along dPQ turned into
+    // R, the usual component-wise rules, the result turned back
+    const tensor* faceR = nullptr;
+    auto rotT = [](const tensor& R, const Type& x) -> Type
+    {
+        if constexpr (std::is_same<Type, symmTensor>::value)
+        {
+            return transform(R, x);
+        }
+        else if constexpr (std::is_same<Type, vector>::value)
+        {
+            return R & x;
+        }
+        else
+        {
+            return x;
+        }
+    };
+    auto states0 = [&]
+    (
+        const Type& qP, const Type& qQ,
+        const UList<vector>* gP, const UList<vector>* gQ,
+        const vector& dPQ,
+        Type& outP, Type& outQ,
+        const Type& eP, const Type& eQ
+    )
+    {
+        Type DP(Zero), DQ(Zero);
+        if (secondOrder)
+        {
+            for (direction d = 0; d < nCmpt; ++d)
+            {
+                setComponent(DP, d) = dPQ & (*gP)[d];
+                setComponent(DQ, d) = dPQ & (*gQ)[d];
+            }
+        }
+        if (!faceR)
+        {
+            statesCore(qP, qQ, DP, DQ, outP, outQ, eP, eQ);
+            return;
+        }
+        const tensor& R = *faceR;
+        Type oP, oQ;
+        statesCore
+        (
+            rotT(R, qP), rotT(R, qQ), rotT(R, DP), rotT(R, DQ), oP, oQ,
+            rotT(R, eP), rotT(R, eQ)
+        );
+        outP = rotT(R.T(), oP);
+        outQ = rotT(R.T(), oQ);
     };
 
     // With the free surface (decision 0031): a side whose cell or a
@@ -461,12 +518,36 @@ void faceStates
         return eFac ? (*eFac)[celli] : 1;
     };
 
-    auto eqJump = [&](const scalar r, const vector& d) -> Type
+    // In a turned cell (square mesh lines, not on the axes; WP G.3) the
+    // jump is taken in the lines' frame R, as on a Cartesian mesh with
+    // gravity turned, and turned back: R^T J(R d, R g) R
+    auto eqJump = [&](const scalar r, const vector& d, const label c) -> Type
     {
-        return grav ? equilibriumJump<Type>(r, d, gravity) : zeroT;
+        if (!grav)
+        {
+            return zeroT;
+        }
+        if constexpr (std::is_same<Type, symmTensor>::value)
+        {
+            if (rot && !rot->empty() && (*rot)[c] != tensor::I)
+            {
+                const tensor& R = (*rot)[c];
+                return transform
+                (
+                    R.T(), equilibriumJump<Type>(r, R & d, R & gravity)
+                );
+            }
+        }
+        return equilibriumJump<Type>(r, d, gravity);
     };
 
     List<vector> gP(nCmpt), gQ(nCmpt);
+
+    auto turnedR = [&](const label c) -> const tensor*
+    {
+        return rot && !rot->empty() && (*rot)[c] != tensor::I
+            ? &(*rot)[c] : nullptr;
+    };
 
     forAll(own, facei)
     {
@@ -480,11 +561,16 @@ void faceStates
                 gQ[d] = g[d][N];
             }
         }
+        faceR = turnedR(P);
+        if (!faceR)
+        {
+            faceR = turnedR(N);
+        }
         states
         (
             q[P], q[N], &gP, &gQ, delta[facei], qO[facei], qN[facei],
-            eqJump(grav ? (*rho)[P] : 0, delta[facei]),
-            eqJump(grav ? (*rho)[N] : 0, delta[facei]),
+            eqJump(grav ? (*rho)[P] : 0, delta[facei], P),
+            eqJump(grav ? (*rho)[N] : 0, delta[facei], N),
             sm(P), sm(N), ef(P), ef(N)
         );
     }
@@ -542,11 +628,12 @@ void faceStates
                         gQ[d] = gn[d][i];
                     }
                 }
+                faceR = turnedR(fc[i]);
                 states
                 (
                     q[fc[i]], qn[i], &gP, &gQ, pd[i], pO[i], pN[i],
-                    eqJump(grav ? (*rho)[fc[i]] : 0, pd[i]),
-                    eqJump(rn[i], pd[i]),
+                    eqJump(grav ? (*rho)[fc[i]] : 0, pd[i], fc[i]),
+                    eqJump(rn[i], pd[i], fc[i]),
                     sm(fc[i]), smN[i], ef(fc[i]), efN[i]
                 );
             }
@@ -568,8 +655,9 @@ void faceStates
                 // The mirror ghost carries the cell's own hydrostatic
                 // jump, so the deviation is mirrored (decision 0030)
                 Type ghost;
+                faceR = turnedR(fc[i]);
                 const vector dG(2*(Cf[i] - C[fc[i]]));
-                const Type e(eqJump(grav ? (*rho)[fc[i]] : 0, dG));
+                const Type e(eqJump(grav ? (*rho)[fc[i]] : 0, dG, fc[i]));
                 states
                 (
                     q[fc[i]], 2*qb[i] - q[fc[i]] + e, &gP, &gP,
@@ -1912,7 +2000,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
     faceStates
     (
         tUw.valid() ? tUw() : U_, secondOrder_, UO.ref(), UN.ref(), nullptr, Zero,
-        smoothPtr
+        smoothPtr, nullptr, angled_ ? &lineRot_ : nullptr
     );
     // Axisymmetric wedge (WP 3.8a, decision 0061): wall stress extrapolated
     tmp<volSymmTensorField> tsWalls;
@@ -1923,7 +2011,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
     faceStates
     (
         tsWalls.valid() ? tsWalls() : sref, secondOrder_, sO.ref(), sN.ref(),
-        &rho_, g, smoothPtr, eFacPtr
+        &rho_, g, smoothPtr, eFacPtr, angled_ ? &lineRot_ : nullptr
     );
 
     // Cell state the wall face of an immersed wall cell sees: the cell
