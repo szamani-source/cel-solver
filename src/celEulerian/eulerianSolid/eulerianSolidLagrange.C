@@ -965,9 +965,17 @@ void slabSides
     const scalar v1 = 0,
     const scalar v2 = 0,
     const vector& gVec = Zero,
-    const surfaceScalarField* faceOpen = nullptr
+    const surfaceScalarField* faceOpen = nullptr,
+    const List<tensor>* frame = nullptr,
+    const vectorField* hLines = nullptr
 )
 {
+    // Angled meshes (WP G.2, decision 0104): a face's area vector in the
+    // cell's mesh-line frame; the vector itself on axis-aligned meshes
+    auto L = [frame](const label c, const vector& S) -> vector
+    {
+        return frame ? ((*frame)[c] & S) : S;
+    };
     const labelUList& own = mesh.owner();
     const labelUList& nei = mesh.neighbour();
     const vectorField& Sf = mesh.Sf().primitiveField();
@@ -980,8 +988,9 @@ void slabSides
         aPlus[celli] = a[celli]*vector::one;
         aMinus[celli] = aPlus[celli];
     }
-    auto set = [&](const label c, const vector& Sout, const scalar ab)
+    auto set = [&](const label c, const vector& Sout0, const scalar ab)
     {
+        const vector Sout(L(c, Sout0));
         const direction d = faceAxis(Sout);
         if (Sout[d] > 0)
         {
@@ -1063,8 +1072,9 @@ void slabSides
             {
                 if ((pS[i] & gVec) < -1e-6*mag(pS[i])*mag(gVec))
                 {
-                    const direction d = faceAxis(pS[i]);
-                    if (pS[i][d] > 0)
+                    const vector Sl(L(fc[i], pS[i]));
+                    const direction d = faceAxis(Sl);
+                    if (Sl[d] > 0)
                     {
                         aPlusL[fc[i]][d] = 0;
                     }
@@ -1128,6 +1138,27 @@ void slabSides
     tmp<volVectorField> tD = workField<vector>(mesh, "alphaDif", dimless);
     volVectorField& D = tD.ref();
     D.primitiveFieldRef() = aPlus - aMinus;
+    if (frame)
+    {
+        // Angled cells (WP G.2, decision 0104): the differences along the
+        // mesh lines, D_a ~ 2 h_a t_a.grad(alpha), become the gradient's
+        // x, y, z components (times 2 h, h the mean line length), so the
+        // rule compares the gradient along gravity with the horizontal
+        // one, as on an axis-aligned mesh. Along the mesh lines a leaning
+        // column mixed the surface slope into the gradient along gravity
+        vectorField& Dp = D.primitiveFieldRef();
+        forAll(Dp, celli)
+        {
+            const vector& h = (*hLines)[celli];
+            const scalar hm = cmptAv(h);
+            vector q(Dp[celli]);
+            for (direction k = 0; k < vector::nComponents; ++k)
+            {
+                q[k] *= h[k] > VSMALL ? hm/h[k] : 0;
+            }
+            Dp[celli] = inv((*frame)[celli]) & q;
+        }
+    }
     D.correctBoundaryConditions();
     const vectorField& Dc = D.primitiveField();
 
@@ -1137,8 +1168,9 @@ void slabSides
     {
         Dn[celli] = Dc[celli];
     }
-    auto setN = [&](const label c, const vector& Sout, const vector& Db)
+    auto setN = [&](const label c, const vector& Sout0, const vector& Db)
     {
+        const vector Sout(L(c, Sout0));
         const direction e = faceAxis(Sout);
         Dn[c][2*e + (Sout[e] > 0 ? 0 : 1)] = Db;
     };
@@ -1684,7 +1716,9 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
         (
             mesh, alpha_, kinds, lean_, smooth_, gAxis,
             blendVoid_[0], fullBlend_ ? blendVoid_[1] : 0, g_,
-            imm ? &faceOpen_() : nullptr
+            imm ? &faceOpen_() : nullptr,
+            lineDirs_.empty() ? nullptr : &lineDirs_,
+            &hCell_
         );
 
         tsmooth = workField<scalar>(mesh, "smooth", dimless);
@@ -1725,7 +1759,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
             forAll(f, celli)
             {
                 const scalar w =
-                    gm*r[celli]*(cmptMag(gHat) & hCell_[celli]);
+                    gm*r[celli]*(cmptMag(inLines(celli, gHat)) & hCell_[celli]);
                 if (w > 0)
                 {
                     const scalar sgg = gHat & (se[celli] & gHat);
@@ -1920,7 +1954,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                 {
                     const label P = fc[i];
                     vector v(U_[P]), t(Zero);
-                    if (!fs || touches(alpha_[P], lean_[P], pS[i]))
+                    if (!fs || touches(alpha_[P], lean_[P], inLines(P, pS[i])))
                     {
                         wallFace
                         (
@@ -1975,7 +2009,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                 const vector& A = wallA_[celli];
                 const scalar mA = mag(A);
                 vector v(U_[celli]), t(Zero);
-                if (!fs || touches(alpha_[celli], lean_[celli], A))
+                if (!fs || touches(alpha_[celli], lean_[celli], inLines(celli, A)))
                 {
                     wallFace
                     (
@@ -2187,9 +2221,9 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
             (
                 n,
                 UO()[facei], sO()[facei], zp[P], zs[P], aP > alphaEmpty,
-                touches(aP, lean_[P], Sf[facei]),
+                touches(aP, lean_[P], inLines(P, Sf[facei])),
                 UN()[facei], sN()[facei], zp[N], zs[N], aN > alphaEmpty,
-                touches(aN, lean_[N], -Sf[facei]),
+                touches(aN, lean_[N], inLines(N, -Sf[facei])),
                 tensileStrength_, vS[facei], t, kj
             );
         }
@@ -2313,9 +2347,9 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                     (
                         n,
                         puo[i], pso[i], zp[fc[i]], zs[fc[i]], aP > alphaEmpty,
-                        touches(aP, lean_[fc[i]], pS[i]),
+                        touches(aP, lean_[fc[i]], inLines(fc[i], pS[i])),
                         pun[i], psn[i], zpn[i], zsn[i], aN > alphaEmpty,
-                        touches(aN, leanNbr[patchi][i], -pS[i]),
+                        touches(aN, leanNbr[patchi][i], inLines(fc[i], -pS[i])),
                         tensileStrength_, pvS[i], t, kj
                     );
                 }
@@ -2403,7 +2437,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                 // feed) the fed material's own traction -p n
                 v = -inletNow_[ink]*n;
                 t = -inletP_[ink]*n;
-                if (touches(alpha_[P], lean_[P], pS[i]))
+                if (touches(alpha_[P], lean_[P], inLines(P, pS[i])))
                 {
                     const scalar vn = v & n;
                     const scalar tn = tnL + zp[P]*(vn - vnL);
@@ -2413,7 +2447,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                     }
                 }
             }
-            else if (fs && !touches(alpha_[P], lean_[P], pS[i]))
+            else if (fs && !touches(alpha_[P], lean_[P], inLines(P, pS[i])))
             {
                 // Material not at the face (decision 0021 rule 3). An open
                 // outlet takes the free one-sided velocity anyway, so the
@@ -2525,9 +2559,10 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
         dVa.setSize(mesh.nCells(), Zero);
         forAll(own, facei)
         {
-            const direction d = faceAxis(Sf[facei]);
-            dVa[own[facei]][d] += phiL_[facei];
-            dVa[nei[facei]][d] -= phiL_[facei];
+            dVa[own[facei]][faceAxis(inLines(own[facei], Sf[facei]))] +=
+                phiL_[facei];
+            dVa[nei[facei]][faceAxis(inLines(nei[facei], Sf[facei]))] -=
+                phiL_[facei];
         }
         forAll(mesh.boundary(), patchi)
         {
@@ -2537,7 +2572,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
             const scalarField& pphi = phiL_.boundaryField()[patchi];
             forAll(fc, i)
             {
-                dVa[fc[i]][faceAxis(pS[i])] += pphi[i];
+                dVa[fc[i]][faceAxis(inLines(fc[i], pS[i]))] += pphi[i];
             }
         }
     }
@@ -2636,14 +2671,14 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
             const label b = wallBody_[celli];
             const vector& A = wallA_[celli];
             const scalar mA = mag(A);
-            if (fs && !touches(alpha_[celli], lean_[celli], A))
+            if (fs && !touches(alpha_[celli], lean_[celli], inLines(celli, A)))
             {
                 // Material not at the wall (WP 4.3c): the wall face stays
                 // with the body, no force
                 T[celli] += A*wallU_[celli];
                 wallPhi_[celli] = wallU_[celli] & A;
                 dV[celli] += wallPhi_[celli];
-                dVa[celli][faceAxis(A)] += wallPhi_[celli];
+                dVa[celli][faceAxis(inLines(celli, A))] += wallPhi_[celli];
                 continue;
             }
             vector v, t;
@@ -2666,7 +2701,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                 // the axis of the face's largest component (as a staircase
                 // face), and no mass enters
                 wallPhi_[celli] = v & A;
-                dVa[celli][faceAxis(A)] += wallPhi_[celli];
+                dVa[celli][faceAxis(inLines(celli, A))] += wallPhi_[celli];
                 continue;
             }
             // Material that enters through the wall face (where it pulls

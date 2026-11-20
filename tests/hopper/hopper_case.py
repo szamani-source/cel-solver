@@ -44,7 +44,7 @@ def material(c, model):
     if m == "mc":
         txt += "sigmaT 0;\n"
     else:
-        txt += "fit compression;\n"
+        txt += "fit " + os.environ.get("CEL_DP_FIT", "compression") + ";\n"
     return txt + os.environ.get("CEL_HOPPER_RULES",
                                 "shearCap yes;\nspreadLayers yes;\n"
                                 "normalCap yes;\n")
@@ -142,7 +142,7 @@ def hopper_stl(c, ext=6.0, seg=0.01):
     return "\n".join(out) + "\n"
 
 
-def couto_case(work, name, model="mc", cell=0.025, check=None, c=None):
+def couto_case(work, name, model="mc", cell=0.025, check=None, c=None, nProcs=1):
     c = dict(COUTO, **(c or {}))
     b, ht = hopper_geometry(c)
     H = ht + c["Hc"]
@@ -150,7 +150,8 @@ def couto_case(work, name, model="mc", cell=0.025, check=None, c=None):
     check = dict(check or {})
     check.setdefault("fill", [-1.0, 0.0, 1.0, H])
     check.setdefault("U0", [0.0, 0.0, 0.0])
-    p = vc.make_case(f"{work}/{name}", 1, 1, material(c, model), check)
+    p = vc.make_case(f"{work}/{name}", 1, 1, material(c, model), check,
+                     nProcs=nProcs)
     wedge_mesh(p, c, cell, ny)
     cs.write(f"{p}/constant/triSurface/hopper.stl", hopper_stl(c))
     dw = math.degrees(math.atan(c["mu"]))
@@ -168,6 +169,54 @@ def couto_case(work, name, model="mc", cell=0.025, check=None, c=None):
     txt += f"outlets\n{{\n    outlet {{ friction {dw!r}; openTime {t_open!r}; }}\n}}\n"
     open(mp, "w").write(txt)
     return p, c
+
+
+def aligned_mesh(path, c, cell, top_rows=0, wall_ratio=1.0, outlet_ratio=1.0):
+    """Wall-aligned (body-fitted) wedge mesh (Sia, 2026-11-19): the hopper is
+    one trapezoid block whose column lines fan from vertical at the axis to
+    the wall slope (rows horizontal); the cylinder block above has square
+    cells joined cell to cell. Patches: outlet, hopperWall, right, top,
+    front/back (wedge). top_rows adds rows of headroom above the fill.
+    Grading (Sia, 2026-11-19): wall_ratio is the wall column's width over
+    the axis column's (both blocks, so fine along both walls); outlet_ratio
+    is the outlet row's height over the hopper's top row, whose height stays
+    about `cell` (the rows above stay uniform)."""
+    b, ht = hopper_geometry(c)
+    t = math.radians(THETA)
+    co, si = math.cos(t), math.sin(t)
+    R, Ro = c["R"], c["Rout"]
+    n = int(round(R / cell))
+    nh = max(1, int(round(ht / cell)))
+    if outlet_ratio != 1.0:
+        # rows growing from the outlet by a fixed ratio: the smallest count
+        # whose top row is at most `cell`
+        def top(m):
+            q = (1 / outlet_ratio) ** (1 / max(m - 1, 1))
+            return ht * (q - 1) / (q ** m - 1) * q ** (m - 1)
+        nh = next(m for m in range(2, 400) if top(m) <= cell * 1.0001)
+    gy = 1 / outlet_ratio
+    nc = int(round(c["Hc"] / cell)) + top_rows
+    Hm = ht + nc * c["Hc"] / int(round(c["Hc"] / cell))
+
+    def P(r, y, sg):
+        return (r * co, y, sg * r * si)
+    v = [P(0, 0, 0), P(Ro, 0, -1), P(R, ht, -1), P(0, ht, 0), P(Ro, 0, 1),
+         P(R, ht, 1), P(R, Hm, -1), P(0, Hm, 0), P(R, Hm, 1)]
+    vs = "\n".join(f"    ({x!r} {y!r} {z!r})" for x, y, z in v)
+    cs.write(f"{path}/system/blockMeshDict",
+             cs.HEADER.format(cls="dictionary", obj="blockMeshDict")
+             + f"scale 1;\nvertices\n(\n{vs}\n);\nblocks\n(\n"
+             f"    hex (0 1 2 3 0 4 5 3) ({n} {nh} 1) simpleGrading ({wall_ratio!r} {gy!r} 1)\n"
+             f"    hex (3 2 6 7 3 5 8 7) ({n} {nc} 1) simpleGrading ({wall_ratio!r} 1 1)\n);\n"
+             "boundary\n(\n"
+             "    outlet { type patch; faces ((0 1 4 0)); }\n"
+             "    hopperWall { type patch; faces ((1 2 5 4)); }\n"
+             "    right { type patch; faces ((2 6 8 5)); }\n"
+             "    top { type patch; faces ((7 8 6 7)); }\n"
+             "    front { type wedge; faces ((0 3 2 1) (3 7 6 2)); }\n"
+             "    back { type wedge; faces ((0 4 5 3) (3 5 8 7)); }\n"
+             "    axis { type empty; faces ((0 3 3 0) (3 7 7 3)); }\n);\n")
+    return Hm
 
 
 def wall_pressures(path, c, cell):

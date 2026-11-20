@@ -982,11 +982,12 @@ void Foam::eulerianSolid::remapFreeSurface(const scalar dt)
     vectorField dVa(nCells, Zero);
     forAll(own, facei)
     {
-        const direction d = axisOf(Sf[facei]);
         VL[own[facei]] += dt*phiI[facei];
         VL[nei[facei]] -= dt*phiI[facei];
-        dVa[own[facei]][d] += dt*phiI[facei];
-        dVa[nei[facei]][d] -= dt*phiI[facei];
+        dVa[own[facei]][axisOf(inLines(own[facei], Sf[facei]))] +=
+            dt*phiI[facei];
+        dVa[nei[facei]][axisOf(inLines(nei[facei], Sf[facei]))] -=
+            dt*phiI[facei];
     }
     forAll(bm, patchi)
     {
@@ -996,7 +997,7 @@ void Foam::eulerianSolid::remapFreeSurface(const scalar dt)
         forAll(fc, i)
         {
             VL[fc[i]] += dt*pPhi[i];
-            dVa[fc[i]][axisOf(pS[i])] += dt*pPhi[i];
+            dVa[fc[i]][axisOf(inLines(fc[i], pS[i]))] += dt*pPhi[i];
         }
     }
     if (wedge_)
@@ -1016,7 +1017,8 @@ void Foam::eulerianSolid::remapFreeSurface(const scalar dt)
             if (wallPhi_[celli] != 0)
             {
                 VL[celli] += dt*wallPhi_[celli];
-                dVa[celli][axisOf(wallA_[celli])] += dt*wallPhi_[celli];
+                dVa[celli][axisOf(inLines(celli, wallA_[celli]))] +=
+                    dt*wallPhi_[celli];
             }
         }
     }
@@ -1098,6 +1100,8 @@ void Foam::eulerianSolid::remapFreeSurface(const scalar dt)
         }
         return aL*ad;
     };
+    // Sout in the donor cell's mesh-line frame (WP G.2); a coupled
+    // neighbour takes the local cell's frame (structured meshes agree)
     auto sideOf = [&](const vector& lean, const vector& Sout) -> scalar
     {
         const direction d = axisOf(Sout);
@@ -1125,7 +1129,8 @@ void Foam::eulerianSolid::remapFreeSurface(const scalar dt)
         const scalar v =
             overlap
             (
-                alphaL_[D], H[D][axisOf(Sout)], ad, sideOf(lean_[D], Sout)
+                alphaL_[D], H[D][axisOf(inLines(D, Sout))], ad,
+                sideOf(lean_[D], inLines(D, Sout))
             )*Ao[facei];
         vfInt[facei] = v;
         outTot[D] += v;
@@ -1149,8 +1154,8 @@ void Foam::eulerianSolid::remapFreeSurface(const scalar dt)
                 vp[i] =
                     overlap
                     (
-                        alphaL_[D], H[D][axisOf(pS[i])], ad,
-                        sideOf(lean_[D], pS[i])
+                        alphaL_[D], H[D][axisOf(inLines(D, pS[i]))], ad,
+                        sideOf(lean_[D], inLines(D, pS[i]))
                     )*pmS[i];
                 outTot[D] += vp[i];
             }
@@ -1160,8 +1165,9 @@ void Foam::eulerianSolid::remapFreeSurface(const scalar dt)
                 vp[i] =
                     overlap
                     (
-                        aLNbr[patchi][i], HNbr[patchi][i][axisOf(Sout)], ad,
-                        sideOf(leanNbr[patchi][i], Sout)
+                        aLNbr[patchi][i],
+                        HNbr[patchi][i][axisOf(inLines(fc[i], Sout))], ad,
+                        sideOf(leanNbr[patchi][i], inLines(fc[i], Sout))
                     )*pmS[i];
             }
             else if

@@ -295,6 +295,10 @@ class eulerianSolid
         //- Axisymmetric wedge mesh: has wedge patches (WP 3.8a)
         bool wedge_;
 
+        //- Mesh has angled cells: a face (other than empty and wedge
+        //  sides) whose normal is not along x, y or z (WP G.1, decision 0103)
+        bool angled_;
+
         //- Wedge mesh: radial and hoop axes (-1 otherwise), and each
         //  cell's hoop volume rate sum(v.S) over its two wedge sides from
         //  the last Lagrange step [m^3/s] (WP 3.8b, decision 0061): the
@@ -304,8 +308,14 @@ class eulerianSolid
         label wedgeH_;
         scalarField hoopRate_;
 
-        //- Cell lengths along x, y, z (Cartesian hex cells, freeSurface)
+        //- Cell lengths along x, y, z (Cartesian hex cells, freeSurface);
+        //  on angled meshes along each cell's mesh lines (WP G.2)
         vectorField hCell_;
+
+        //- Angled meshes (WP G.2, decision 0104): each cell's mesh-line
+        //  directions as the rows of a tensor, row a the line closest to
+        //  axis a (pointing along +a). Empty on axis-aligned meshes
+        List<tensor> lineDirs_;
 
         //- Passed from lagrangeStep to remap (freeSurface): slab side per
         //  axis (+1, -1 or 0 spread), material fraction of the Lagrangian
@@ -397,6 +407,13 @@ class eulerianSolid
         //  mesh the smallest in-plane length (WP 3.8a)
         tmp<scalarField> cellSize() const;
 
+        //- True if any face (empty and wedge sides excepted) has a normal
+        //  off the x, y and z axes, on any processor (WP G.1)
+        bool meshHasAngledFaces() const;
+
+        //- Angled meshes: V over the cell's largest face area (WP G.1)
+        tmp<scalarField> angledCellSize() const;
+
         //- Read materialProperties inlets (WP 3.7a)
         void readInlets();
 
@@ -404,7 +421,18 @@ class eulerianSolid
         void updateInlets(const scalar t0, const scalar dt);
 
         //- Cell lengths, checking that every face is normal to an axis
+        //  (angled meshes: along the mesh lines)
         void setCartesianGeometry();
+
+        //- Angled meshes: each cell's mesh-line directions (WP G.2)
+        void setLineDirections();
+
+        //- A vector in a cell's mesh-line frame: its components along the
+        //  cell's three mesh lines (the vector itself on axis-aligned meshes)
+        inline vector inLines(const label celli, const vector& S) const
+        {
+            return lineDirs_.empty() ? S : (lineDirs_[celli] & S);
+        }
 
         //- Remap with void (freeSurface): slab volume fluxes, decision 0031
         void remapFreeSurface(const scalar dt);

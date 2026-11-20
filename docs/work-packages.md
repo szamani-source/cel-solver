@@ -191,7 +191,23 @@ series are numbered from 0100. Packages:
 | H.1 | Case spec and reference data | `tests/test_hopper_spec.sh` passes (data consistent with the geometry and the papers' closed forms) |
 | H.2 | Conical hopper walls on the wedge (was 3.8d) | Couto silo filled at rest on the wedge with a cut-cell hopper wall: mass held, cylinder pressure on Janssen (K = nu/(1-nu), decision 0101) within 10 %, closed outlet holds |
 | H.3 | Couto silo wall pressure, MC and DP | Case A pass bands met by both models (at rest and at 0.5 s of discharge) |
+| H.3b | Drucker-Prager robustness in discharge | Couto silo DP run to 1.5 s at maxCo 0.399, 0.4 and 0.401: largest speed below 5 m/s, stress below 100 kPa |
 | H.4 | P1 basic hopper discharge, MC and DP | Case B: outlet-centre plateau within 20 % of 1.37 m/s, mass flow, both models, psi 1 deg; psi 5 deg reported |
 | H.5 | Flat-bottomed silo Beverloo sweep | Case C: C within 20 % of 0.59 at D0 0.1, 0.2, 0.3 m |
 | H.6 | Mesh and shear band check | Cases A and B at 5 mm cells: results within the bands and within 10 % of 10 mm; report added to `docs/results/validation-report.md` |
+
+Note (2026-11-19, angled cells): Sia wants wall-aligned (body-fitted) hopper meshes and
+said it is very important that the solver handles angled hex cells of varying shape.
+Audit in `docs/spec/angled-cells-audit.md`, decision 0103. Every package keeps Cartesian
+meshes bit-for-bit. Packages:
+
+| WP | Title | Done when |
+| --- | --- | --- |
+| G.1 | Time step on angled cells, skewed-mesh CI test | `tests/test_angled_cells.sh` passes: sheared-mesh P-wave as accurate as Cartesian, leaning-cell column at the solver's own step on the closed-form stress |
+| G.2 | Free surface, void closure and remap along mesh lines | `tests/test_angled_free_surface.sh` passes: lake at rest on leaning cells (mass exact, surface flat, stress within 5 % at most, 0.5 % on average) and column collapse on cells leaning both ways within 3 cells of Cartesian |
+| G.3 | Walls, friction, outlet, inlet and surface layers on angled faces | Block sliding down a frictional angled wall at the closed-form speed; outlet discharge on an aligned hopper mesh |
+| G.4 | Wedge with fanned trapezoid blocks | Couto silo at rest on the aligned wedge mesh with free surface: Janssen within 5 % |
+| G.5 | STL walls on angled meshes | STL wall on a sheared mesh holds material like the Cartesian case, or a clear error |
+| G.6 | MPI and restart on angled meshes | 4-processor and restarted runs of the G.2 case match serial to round-off |
+| H.7 | Couto comparison on the aligned mesh | `tests/manual/test_hopper_pressure.sh` on the aligned mesh, compared with the cut-cell results |
 
