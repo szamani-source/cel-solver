@@ -37,6 +37,13 @@ import void_checks as vc  # noqa: E402
 A, E_MPA, T_MAX = 0.5, 1.0, 1.0
 SNAP = [0.1, 0.2]
 MU_I = "mu2 0.961813;\nI0 0.279;\nd 0.001;\nrhoS 2650;\n"   # decision 0037
+# WP N.3 (decision 0111): nonlocal fluidity on the mu(I) set, with the grain
+# size d set so the band (a few d) is resolved on 5 and 2.5 mm cells; A of
+# Henann and Kamrin (2013), glass beads
+NL_D = float(os.environ.get("CEL_NL_D", "0.005"))
+NONLOCAL = (MU_I.replace("d 0.001;", f"d {NL_D!r};")
+            + "nonlocalA 0.48;\nflowImpedance yes;\n")
+LAWS = os.environ.get("CEL_LAWS", "MC muI").split()
 
 
 def set_cell(h):
@@ -96,9 +103,10 @@ def one(args):
     txt = re.sub(r"writeTimes[^;]*;", "writeTimes (" + " ".join(str(t) for t in SNAP + [0.5])
                  + ");", open(dct).read())
     open(dct, "w").write(txt)
-    if law == "muI":
+    if law in ("muI", "NL"):
         mp = f"{path}/constant/materialProperties"
-        txt = open(mp).read().replace("sigmaT 0;\n", "sigmaT 0;\n" + MU_I)
+        add = MU_I if law == "muI" else NONLOCAL
+        txt = open(mp).read().replace("sigmaT 0;\n", "sigmaT 0;\n" + add)
         open(mp, "w").write(txt)
     sec = vc.run(path)
     out = dict(law=law, h=h, nx=nx, ny=ny, seconds=sec)
@@ -118,7 +126,7 @@ def one(args):
 def main():
     work = sys.argv[1]
     sizes = [float(s) / 1000 for s in sys.argv[2:]] or [0.01, 0.005, 0.0025]
-    jobs = [(work, h, law) for h in sizes for law in ("MC", "muI")]
+    jobs = [(work, h, law) for h in sizes for law in LAWS]
     t0 = time.perf_counter()
     with ProcessPoolExecutor(max_workers=min(4, len(jobs))) as ex:
         res = list(ex.map(one, jobs))

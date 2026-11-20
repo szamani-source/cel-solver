@@ -1,5 +1,6 @@
 #include "celNonlocal.H"
 
+#include <algorithm>
 #include <cmath>
 #include <stdexcept>
 
@@ -48,13 +49,17 @@ std::unique_ptr<Nonlocal> Nonlocal::New(const Parameters& p, double phiDeg)
 void Nonlocal::muP(const Voigt s, double& mu, double& P) const
 {
     P = -meanStress(s);
-    mu = P > 0 ? std::sqrt(J2(s))/P : 0;
+    // P so small that tau/P or rhoS/P would overflow (a free-surface cell,
+    // as FrictionLaw::inertialNumber): no friction, no fluidity
+    // (mu capped at 1e3, far above any admissible friction, so k(mu) stays
+    // finite)
+    mu = P > 1e-300*rhoS_ ? std::min(std::sqrt(J2(s))/P, 1e3) : 0;
 }
 
 
 double Nonlocal::gLoc(double mu, double P) const
 {
-    if (!(mu > muS_) || !(P > 0))
+    if (!(mu > muS_) || !(P > 1e-300*rhoS_))
     {
         return 0;
     }
@@ -81,7 +86,7 @@ bool Nonlocal::update
 ) const
 {
     const double P = -meanStress(trial);
-    if (!(P > 0))
+    if (!(P > 1e-300*rhoS_))
     {
         return false;
     }
