@@ -171,7 +171,10 @@ int main(int argc, char *argv[])
             fx *= min(max((xl - bb.min().x())/hx, 0), 1);
         }
         scalar a = fx*fy;
-        a = a >= 1 - 1e-12 ? 1 : (a > 1e-12 ? a : 0);
+        // round-off of the fill frame (fillAngle, fillSlope: turned points)
+        // leaves slivers of 1e-9 next to the fill; treat them as empty/full
+        const scalar tol = (dict.found("fillAngle") || dict.found("fillSlope")) ? 1e-6 : 1e-12;
+        a = a >= 1 - tol ? 1 : (a > tol ? a : 0);
         alpha[celli] = a;
         rho[celli] = rho0*a;
         U[celli] = a > 0 ? U0 : Zero;

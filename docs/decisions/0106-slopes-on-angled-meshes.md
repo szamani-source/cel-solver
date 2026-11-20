@@ -80,3 +80,18 @@ void, which grows a slope-frame shear (1e-6 Pa against 1e-12) from the
 first steps. Next suspect: a free-surface rule on the face between the top
 full row and the void (traction-free face velocity or the open-side test).
 `/tmp` script cmp.py in the thread compares the two runs row by row.
+
+## Update 2026-11-20 (evening): the top-row shear was a fill artifact
+
+The turned fill (celVoidCheck `fillAngle`) left slivers of alpha 1e-9 in
+the row above the fill (round-off of the turned points; the empty cut-off
+was 1e-12), so the top full row was not under void but under a
+near-empty material row. With the cut-off at 1e-6 for turned and sheared
+fills, turned matches Cartesian cell by cell to round-off (stress 3e-9 of
+its scale after 13 steps).
+
+Slope test now: at rest at friction 60 deg passes on both turned (5.5e-5
+m/s, same as Cartesian) and sheared (1.5e-4 m/s). Still open: the sliding
+layer lifts off the wall on turned and sheared cells after about 0.1 s
+(normal speed 0.033 / 0.035 m/s, limit 0.0145; turned slide 2 %, mass
+1.2e-4); Cartesian slides cleanly.
