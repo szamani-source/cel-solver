@@ -95,3 +95,22 @@ m/s, same as Cartesian) and sheared (1.5e-4 m/s). Still open: the sliding
 layer lifts off the wall on turned and sheared cells after about 0.1 s
 (normal speed 0.033 / 0.035 m/s, limit 0.0145; turned slide 2 %, mass
 1.2e-4); Cartesian slides cleanly.
+
+Sliding lift-off traced (turned against Cartesian, cell by cell):
+
+- Partly filled surface cells: the slab side (lean) is set where the
+  neighbours' alpha along a line differs by more than 1e-9. On turned
+  cells the fill and the remap leave round-off differences of about
+  1e-9 along the slope, so a half-full surface row leans sideways at
+  random and the turned run parts from Cartesian at 2 % in 2 ms. With
+  the tolerance 1e-6 on angled meshes the two agree to 1e-14, but the
+  leaning-left collapse of test_angled_free_surface then runs away (front
+  0.44 m against 0.26), so the change was not kept. A lean decision that
+  is robust to round-off without that side effect is still needed.
+- Full layer sliding (slope test): turned matches Cartesian to 1e-9 until
+  about 0.09 s, when the top row's stress is pure shear (22 Pa) with
+  normal stresses near zero (-1e-3 Pa). Whether that row opens void then
+  hangs on a 1e-4 Pa difference; Cartesian opens it and slides on,
+  turned does not, and within 10 ms its stress grows to 1e5 Pa at the
+  wall. Cartesian with the slope angle changed by 1e-7 deg stays clean,
+  so the turned path after that point is unstable, not just different.
