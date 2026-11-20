@@ -173,6 +173,11 @@ class eulerianSolid
         //- Velocity damping [1/s] (controlDict damping)
         scalar damping_;
 
+        //- Damping starts at this time [s] (controlDict dampingStart,
+        //  default 0): lets material fall freely while a silo fills
+        //  through an inlet, then settle under damping
+        scalar dampingStart_;
+
         //- Wall patches: name -> tan(friction angle) (materialProperties walls)
         HashTable<scalar> wallFriction_;
 

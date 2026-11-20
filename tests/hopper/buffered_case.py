@@ -384,17 +384,19 @@ def outer_path(c, D, y_top):
 
 
 def aligned_buffered_mesh(path, c, ncols=44, wall_ratio=0.6, h_out=0.004, h_hop=0.012,
-                          h_top=0.025, y_t=0.55, n_buf=4):
+                          h_top=0.025, y_t=0.55, n_buf=4, head_rows=3):
     """Four curved blocks in the wedge: inside the shell's mid-line M (the
     inner wall offset by TS/2) the hopper block (axis to M, its right edge
     follows the lip, both fillets and the cone, so the columns lean with the
     wall) and the cylinder block; outside M, n_buf columns out to the
     domain side O (TS + 3 x 7 mm outside the inner wall): the shell's outer
     half and about 3 cells of buffer, aligned with the wall. Rows: h_out at
-    the outlet growing to h_hop at y_t, then to h_top in the cylinder."""
+    the outlet growing to h_hop at y_t, then to h_top in the cylinder;
+    head_rows rows of h_top above the silo top (room for a heap when the
+    silo is filled through an inlet)."""
     b, ht = hc.hopper_geometry(c)
     R, Htop = c["R"], ht + c["Hc"]
-    Hm = Htop + 3 * h_top
+    Hm = Htop + head_rows * h_top
     D = TS + 3 * 0.007
     t = math.radians(hc.THETA)
     co, si = math.cos(t), math.sin(t)

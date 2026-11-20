@@ -51,3 +51,66 @@ axis) and a sheared strip (lines along the slope and vertical lines).
 - G.3 stays open: next suspects are the wall-row face states (mirror ghost
   plus the x, y, z hydrostatic jump on faces not normal to gravity) and the
   surface rules for faces at an angle to gravity.
+
+## Update 2026-11-20 (afternoon): turned cells in the lines' frame
+
+In cells whose mesh lines are square but turned (`lineRot_` not I) three
+more pieces now work in the lines' frame R, so a turned mesh does what a
+Cartesian one does with gravity turned:
+
+- the hydrostatic jump: R^T J(R d, R g) R (layer form along the dominant
+  line, as the Cartesian reference uses);
+- the face reconstruction and its component-wise limiter (states, jumps
+  and directional derivatives along dPQ turned into R, back after), for
+  stress and velocity;
+- the remap of U, sigma and epsP (components remapped in R, back after).
+
+Axis-aligned, leaning (G.1, G.2, Couto) and wedge cells keep lineRot = I
+and take none of these paths: test_angled_cells, _free_surface, _stl,
+test_wedge, _hopper_wedge, _wedge_silo pass unchanged.
+
+Turned slope now: slide 1.2 % (was 0.1 % with a wrong jump that happened
+to slide right, 3.5 % with the jump alone), normal speed 0.024 m/s (limit
+0.0145), mass 1.7e-8 (limit 1e-10), at rest 0.021 m/s (was 0.3-0.5; limit
+0.007). Sheared unchanged (leaning lines, not covered by R).
+
+Still frame-dependent: comparing turned and Cartesian cell by cell after
+5 steps, everything agrees to round-off except the top full row under the
+void, which grows a slope-frame shear (1e-6 Pa against 1e-12) from the
+first steps. Next suspect: a free-surface rule on the face between the top
+full row and the void (traction-free face velocity or the open-side test).
+`/tmp` script cmp.py in the thread compares the two runs row by row.
+
+## Update 2026-11-20 (evening): the top-row shear was a fill artifact
+
+The turned fill (celVoidCheck `fillAngle`) left slivers of alpha 1e-9 in
+the row above the fill (round-off of the turned points; the empty cut-off
+was 1e-12), so the top full row was not under void but under a
+near-empty material row. With the cut-off at 1e-6 for turned and sheared
+fills, turned matches Cartesian cell by cell to round-off (stress 3e-9 of
+its scale after 13 steps).
+
+Slope test now: at rest at friction 60 deg passes on both turned (5.5e-5
+m/s, same as Cartesian) and sheared (1.5e-4 m/s). Still open: the sliding
+layer lifts off the wall on turned and sheared cells after about 0.1 s
+(normal speed 0.033 / 0.035 m/s, limit 0.0145; turned slide 2 %, mass
+1.2e-4); Cartesian slides cleanly.
+
+Sliding lift-off traced (turned against Cartesian, cell by cell):
+
+- Partly filled surface cells: the slab side (lean) is set where the
+  neighbours' alpha along a line differs by more than 1e-9. On turned
+  cells the fill and the remap leave round-off differences of about
+  1e-9 along the slope, so a half-full surface row leans sideways at
+  random and the turned run parts from Cartesian at 2 % in 2 ms. With
+  the tolerance 1e-6 on angled meshes the two agree to 1e-14, but the
+  leaning-left collapse of test_angled_free_surface then runs away (front
+  0.44 m against 0.26), so the change was not kept. A lean decision that
+  is robust to round-off without that side effect is still needed.
+- Full layer sliding (slope test): turned matches Cartesian to 1e-9 until
+  about 0.09 s, when the top row's stress is pure shear (22 Pa) with
+  normal stresses near zero (-1e-3 Pa). Whether that row opens void then
+  hangs on a 1e-4 Pa difference; Cartesian opens it and slides on,
+  turned does not, and within 10 ms its stress grows to 1e5 Pa at the
+  wall. Cartesian with the slope angle changed by 1e-7 deg stays clean,
+  so the turned path after that point is unstable, not just different.

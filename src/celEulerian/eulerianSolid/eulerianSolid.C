@@ -219,6 +219,10 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
         mesh.time().controlDict().getOrDefault<scalar>("gravityRamp", 0)
     ),
     damping_(mesh.time().controlDict().getOrDefault<scalar>("damping", 0)),
+    dampingStart_
+    (
+        mesh.time().controlDict().getOrDefault<scalar>("dampingStart", 0)
+    ),
     wallFriction_(readWalls(mesh, materialProperties_)),
     vStar_
     (
@@ -540,7 +544,8 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
     }
     if (damping_ > 0)
     {
-        Info<< "Velocity damping " << damping_ << " 1/s" << nl;
+        Info<< "Velocity damping " << damping_ << " 1/s from t = "
+            << dampingStart_ << " s" << nl;
     }
     forAllConstIters(wallFriction_, iter)
     {

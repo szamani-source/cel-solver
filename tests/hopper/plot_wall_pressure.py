@@ -1,6 +1,9 @@
 """Wall pressure of the Couto silo runs against Couto et al. (2013) and
 Zheng and Yu (2015) Fig. 11 (WP H.7). WORKDIR is a test_hopper_pressure.sh
-work folder holding couto_mc_aligned and/or couto_dp_aligned.
+work folder holding couto_mc_aligned and/or couto_dp_aligned. Other runs:
+CEL_PLOT_RUNS="label=folder=cell[=rest write];..." (cell: wall band, m;
+rest write: the cells_* file read as at rest, cells_0.5 by default).
+Discharge writes missing from a run (stopped early) are left out.
 
     python3 plot_wall_pressure.py WORKDIR OUT.png "title"
 """
@@ -11,11 +14,20 @@ os.environ["CEL_CELL"]="0.025"
 import hopper_pressure_checks as hp, hopper_case as hc
 c=dict(hc.COUTO); rows=hp.table()
 root=sys.argv[1]; out=sys.argv[2]; title=sys.argv[3]
-runs=[("MC", f"{root}/couto_mc_aligned", "#c0392b"), ("DP plane strain", f"{root}/couto_dp_aligned", "#1f6fb4")]
+COLS=["#c0392b", "#1f6fb4", "#7d3c98", "#d68910"]
+if os.environ.get("CEL_PLOT_RUNS"):
+    runs=[e.split("=") for e in os.environ["CEL_PLOT_RUNS"].split(";")]
+    REST={e[1]: e[3] for e in runs if len(e) > 3}
+    runs=[(e[0], e[1], COLS[i], float(e[2])) for i,e in enumerate(runs)]
+else:
+    REST={}
+    runs=[("MC", f"{root}/couto_mc_aligned", COLS[0], 0.025), ("DP plane strain", f"{root}/couto_dp_aligned", COLS[1], 0.025)]
 runs=[r for r in runs if os.path.isdir(r[1])]
+CELLW={r[1]: r[3] for r in runs}
 def prof(p, name):
     np.savetxt(f"{p}/cells.dat", hp.read_cells(p, name))
-    cyl, hop = hc.wall_pressures(p, c, 0.025)
+    hp.CELL=CELLW[p]
+    cyl, hop = hc.wall_pressures(p, c, CELLW[p])
     # hopper: average per height band
     zs=np.unique(np.round(hop[:,0],3)); hp_=np.array([[z, hop[np.abs(hop[:,0]-z)<1e-3,1].mean()] for z in zs])
     return np.vstack([hp_, cyl])
@@ -27,11 +39,14 @@ for ax,phase,label in ((axs[0],"static","At rest (after filling, t = 0.5 s)"),(a
         lo,hi=hp.exp_range(rows,phase,n)
         ax.plot([lo,hi],[z,z],color='k',lw=5,alpha=0.35,solid_capstyle='butt',label='Couto et al. 2013 (range of 7 tests)' if k==0 else None)
         ax.text(hi+0.4,z,n,va='center',fontsize=8,color='#444')
-    for name,p,col in runs:
+    for name,p,col,_ in runs:
         if phase=="static":
-            pr=prof(p,"cells_0.5"); ax.plot(pr[:,1],pr[:,0],color=col,lw=1.6,label=f"celFoam {name}")
+            pr=prof(p,REST.get(p,"cells_0.5")); ax.plot(pr[:,1],pr[:,0],color=col,lw=1.6,label=f"celFoam {name}")
         else:
-            ws=[w for w in hp.WRITES if hp.AVG[0]<=w<=hp.AVG[1]]
+            ws=[w for w in hp.WRITES if hp.AVG[0]<=w<=hp.AVG[1]
+                and (os.path.exists(f"{p}/cells_{w:g}.dat") or os.path.exists(f"{p}/cells_{w:g}.dat.proc0"))]
+            if not ws:
+                continue
             P=[prof(p,f"cells_{w:g}") for w in ws]
             m=min(len(q) for q in P); A=np.array([q[:m,1] for q in P]); z=P[0][:m,0]
             ax.fill_betweenx(z,A.min(0),A.max(0),color=col,alpha=0.12,lw=0)
