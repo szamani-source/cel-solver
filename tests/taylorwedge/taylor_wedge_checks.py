@@ -21,6 +21,8 @@ Checks:
 3. 0.2 mm: widening within 20 % of 6.006 mm (the thin lip at the face edge
    is smeared over a cell or two: decision 0063).
 4. Both errors smaller at 0.2 mm than at 0.4 mm.
+4a. The widening extrapolated to zero cell size from the two sizes (first
+   order, decision 0098) within 10 % of 6.006 mm.
 5. Kinetic energy at 80 microseconds below 5 % of the initial.
 
 Run by tests/test_taylor_wedge.sh after celVoidCheck is built:
@@ -98,6 +100,14 @@ def main():
           and abs(f["wide"] - WIDE_REF) < abs(c["wide"] - WIDE_REF),
           "both errors smaller at the finer size")
     check(f["ke"] < 0.05, f"kinetic energy left below 5 % ({f['ke']:.3f})")
+    # A.7 (decision 0098): the lip error is first order in the cell size, so the
+    # two sizes extrapolate (Richardson, h -> 0) to the converged widening
+    wx = 2 * f["wide"] - c["wide"]
+    sx = 2 * f["short"] - c["short"]
+    ewx = (wx - WIDE_REF) / WIDE_REF
+    print(f"extrapolated to h -> 0: widening {wx * 1e3:.2f} mm ({100 * ewx:+.1f} %), "
+          f"shortening {sx * 1e3:.2f} mm ({100 * (sx - SHORT_REF) / SHORT_REF:+.1f} %)")
+    check(abs(ewx) <= 0.10, f"extrapolated widening within 10 % ({100 * ewx:+.1f} %)")
     print(f"WP 2.6 checks: {'ALL PASS' if not fails else 'FAILED'} "
           f"({time.perf_counter() - t0:.0f} s)")
     return 1 if fails else 0
