@@ -12,6 +12,13 @@ Description
 
     \verbatim
         fill        (x0 y0 x1 y1);  // material rectangle (cell fractions)
+        fillAngle   -30;            // optional (WP G.3): fill and the
+                                    //   cell bounds in a frame turned by
+                                    //   this angle (deg) about z, for a
+                                    //   mesh of blocks turned the same way
+        fillSlope   30;             // optional (WP G.3): fill and cell
+                                    //   bounds in (x, y + x tan(slope)),
+                                    //   for a strip sheared along a slope
         U0          (0 0 0);        // initial velocity of the material
         xSplit      0.3;            // optional: material left of xSplit
         Uleft       (-0.5 0 0);     //   starts with Uleft instead
@@ -103,9 +110,35 @@ int main(int argc, char *argv[])
     vectorField& U = solid.URef().primitiveFieldRef();
     symmTensorField& s = solid.sigmaRef().primitiveFieldRef();
     const labelListList& cp = mesh.cellPoints();
+    // Points in the fill frame (WP G.3): x' = x cos a + y sin a,
+    // y' = -x sin a + y cos a, a = fillAngle
+    pointField fillPts(mesh.points());
+    if (dict.found("fillAngle"))
+    {
+        const scalar fa =
+            dict.get<scalar>("fillAngle")*constant::mathematical::pi/180;
+        const scalar ca = Foam::cos(fa), sa = Foam::sin(fa);
+        forAll(fillPts, pi)
+        {
+            const point& q = mesh.points()[pi];
+            fillPts[pi] =
+                point(q.x()*ca + q.y()*sa, -q.x()*sa + q.y()*ca, q.z());
+        }
+    }
+    if (dict.found("fillSlope"))
+    {
+        const scalar ts = Foam::tan
+        (
+            dict.get<scalar>("fillSlope")*constant::mathematical::pi/180
+        );
+        forAll(fillPts, pi)
+        {
+            fillPts[pi].y() += fillPts[pi].x()*ts;
+        }
+    }
     forAll(alpha, celli)
     {
-        const boundBox bb(mesh.points(), cp[celli], false);
+        const boundBox bb(fillPts, cp[celli], false);
         const scalar hx = bb.max().x() - bb.min().x();
         const scalar hy = bb.max().y() - bb.min().y();
         const scalar fx =

@@ -28,6 +28,13 @@ the walls (blockMesh trapezoid blocks). The solver must handle angled cells.
 | immersed (STL) open lengths | per axis on a Cartesian mesh | STL on a skewed mesh | G.5 |
 | MPI, restart | untested on skewed meshes | | G.6 |
 
+## Slopes (G.3, decision 0106)
+
+`tests/manual/test_angled_walls.sh` (moves to `tests/` when it passes): a 30 degree slope on Cartesian (gravity turned),
+turned and sheared strips. The void closure now uses the line frame on turned
+square cells. Mean slide speed passes on all three meshes; lift-off, mass
+through the top and creep at rest still fail on the turned and sheared strips.
+
 ## Rule
 
 Every change keeps Cartesian meshes bit-for-bit (all existing tests unchanged).
