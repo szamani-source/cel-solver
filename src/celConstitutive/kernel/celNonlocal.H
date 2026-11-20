@@ -47,10 +47,17 @@ class Nonlocal
     double A_;
     double d_;
     double rhoS_;
+    //- Cohesion as an added pressure, c cot(phi) (WP C.1, decision 0112):
+    //  the law reads P* = P + pC everywhere it reads P
+    double pC_;
 
 public:
 
-    Nonlocal(double muS, double b, double A, double d, double rhoS);
+    Nonlocal
+    (
+        double muS, double b, double A, double d, double rhoS,
+        double pC = 0
+    );
 
     //- The law for a base model with friction angle phiDeg, or null if p
     //  has no nonlocalA (or 0). Needs mu2, I0, d, rhoS; throws otherwise.
@@ -60,11 +67,14 @@ public:
     double b() const { return b_; }
     double A() const { return A_; }
     double d() const { return d_; }
+    double pC() const { return pC_; }
+    double rhoS() const { return rhoS_; }
 
-    //- mu = sqrt(J2)/P and P of a stress (P <= 0: mu = 0)
+    //- mu = sqrt(J2)/P* and P* = P + c cot(phi) of a stress (P* <= 0:
+    //  mu = 0)
     void muP(const Voigt s, double& mu, double& P) const;
 
-    //- Local fluidity [1/s]
+    //- Local fluidity [1/s] at mu and P* (as muP returns)
     double gLoc(double mu, double P) const;
 
     //- Coefficient k = |mu - mu_s|/(A d)^2 [1/m^2]

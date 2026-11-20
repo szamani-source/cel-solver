@@ -32,6 +32,8 @@ LAW = dict(muS=0.3819, mu2=0.6435, I0=0.278, A=0.48, d=1.0e-3, rhoS=2450.0)
 RHO, E, NU, G = 1500.0, 1.0e6, 0.3, 9.81
 H = 40 * LAW["d"]
 P0, V = 200.0, 0.02
+# WP C.3 (decision 0112): cohesion c [Pa]; the law reads P* = P + c cot(phi)
+C = float(os.environ.get("CEL_C", "0"))
 T_END = float(os.environ.get("CEL_T_END", "1.0"))   # steady by 1 s (0.2 % of V to 2 s)
 
 
@@ -69,7 +71,7 @@ def make(p, n, nonlocal_on):
     cs.write(f"{p}/system/fvSolution", cs.HEADER.format(cls="dictionary", obj="fvSolution"))
     phi = math.degrees(math.atan(LAW["muS"]))
     mat = (f"rho {RHO};\nfreeSurface no;\ntype mohrCoulomb;\nE {E!r};\nnu {NU!r};\n"
-           f"phi {phi!r};\nc 0;\npsi 0;\nmu2 {LAW['mu2']!r};\nI0 {LAW['I0']!r};\n"
+           f"phi {phi!r};\nc {C!r};\npsi 0;\nmu2 {LAW['mu2']!r};\nI0 {LAW['I0']!r};\n"
            f"d {LAW['d']!r};\nrhoS {LAW['rhoS']!r};\n")
     # flow impedance: the face shear jump between flowing cells follows the
     # law's viscosity, not the elastic impedance (decisions 0040, 0111)
@@ -136,7 +138,7 @@ def reference(y, P):
     law = ngf.NGF(**LAW)
     nf = 4000
     yf = (np.arange(nf) + 0.5) * H / nf
-    Pf = np.interp(yf, y, P)
+    Pf = np.interp(yf, y, P) + C / LAW["muS"]
 
     def lid(tau):
         muf = tau / Pf

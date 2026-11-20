@@ -9,13 +9,17 @@ namespace cel
 namespace constitutive
 {
 
-Nonlocal::Nonlocal(double muS, double b, double A, double d, double rhoS)
+Nonlocal::Nonlocal
+(
+    double muS, double b, double A, double d, double rhoS, double pC
+)
 :
     muS_(muS),
     b_(b),
     A_(A),
     d_(d),
-    rhoS_(rhoS)
+    rhoS_(rhoS),
+    pC_(pC)
 {}
 
 
@@ -39,16 +43,21 @@ std::unique_ptr<Nonlocal> Nonlocal::New(const Parameters& p, double phiDeg)
             "nonlocal: needs mu2 > tan(phi), I0 > 0, d > 0, rhoS > 0"
         );
     }
+    // Cohesion c (Mohr-Coulomb's c, Drucker-Prager's c as given): the
+    // friction law acts on P* = P + c cot(phi), so yield at mu_s is the
+    // cohesive line tau = c' + mu_s P (decision 0112)
+    const double c = parameter(p, "c", 0);
+    const double pC = (c > 0 && muS > 0) ? c/muS : 0;
     return std::unique_ptr<Nonlocal>
     (
-        new Nonlocal(muS, (mu2 - muS)/I0, A, d, rhoS)
+        new Nonlocal(muS, (mu2 - muS)/I0, A, d, rhoS, pC)
     );
 }
 
 
 void Nonlocal::muP(const Voigt s, double& mu, double& P) const
 {
-    P = -meanStress(s);
+    P = -meanStress(s) + pC_;
     // P so small that tau/P or rhoS/P would overflow (a free-surface cell,
     // as FrictionLaw::inertialNumber): no friction, no fluidity
     // (mu capped at 1e3, far above any admissible friction, so k(mu) stays
@@ -85,7 +94,7 @@ bool Nonlocal::update
     History& hNew
 ) const
 {
-    const double P = -meanStress(trial);
+    const double P = -meanStress(trial) + pC_;
     if (!(P > 1e-300*rhoS_))
     {
         return false;
@@ -148,7 +157,7 @@ bool Nonlocal::update
     const double f = tau/tauT;
     for (int i = 0; i < 3; ++i)
     {
-        sigNew[i] = -P + f*s[i];
+        sigNew[i] = pC_ - P + f*s[i];
         sigNew[i + 3] = f*s[i + 3];
     }
     plasticCorrector(el, trial, sigNew, hOld, false, hNew);

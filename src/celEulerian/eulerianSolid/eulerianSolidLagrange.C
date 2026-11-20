@@ -59,6 +59,7 @@
 #include <type_traits>
 #include <algorithm>
 #include "eulerianSolid.H"
+#include "celNonlocal.H"
 #include "cyclicFvPatch.H"
 #include "processorFvPatch.H"
 #include "processorPolyPatch.H"
@@ -1926,12 +1927,14 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                     w*flowViscosity(sigma_[celli], flowLaw_, cCot, sm[celli]);
             }
         }
-        // Nonlocal fluidity (WP N.2, decision 0111): the law's own secant
-        // viscosity eta = P/g (tau = mu P, gamma_dot = g mu) replaces the
-        // mu(I) tangent, including cells below mu_s that creep through the
-        // nonlocal term. A cell counts as flowing only where that viscosity
-        // lowers the face shear jump below zs over its closest neighbour
-        // (2 eta dc < zs); elsewhere it stays 0, so the shear cap is kept
+        // Nonlocal fluidity (WP N.2, decision 0111; C.3, decision 0112): a
+        // cell flows where the law's secant viscosity P*/g (tau = mu P*,
+        // gamma_dot = g mu, P* = P + c cot(phi)) is below 10 zs over its
+        // closest neighbour (2 eta dc < 10 zs), including cells below mu_s
+        // that creep through the nonlocal term; its face viscosity is the
+        // law's tangent d tau/d gamma_dot = b d sqrt(rho_s P*) (as the mu(I)
+        // flow impedance), or the secant if smaller. Elsewhere 0, so the
+        // shear cap is kept
         if (fluidity_.valid())
         {
             const surfaceScalarField& deltaCoeffs = mesh.deltaCoeffs();
@@ -1959,6 +1962,12 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                 }
             }
             const scalarField& g = fluidity_().primitiveField();
+            const auto& law = *material_->nonlocal();
+            const scalar bdRho = law.b()*law.d()*Foam::sqrt(law.rhoS());
+            // Flowing where the secant viscosity P*/g is below 10 z_s over
+            // the closest neighbour (the margin is not sensitive: 10 and
+            // 100 agree to 0.2 % in the sheared layer, decision 0112)
+            const scalar nlK = 10;
             forAll(e, celli)
             {
                 const scalar w =
@@ -1969,13 +1978,14 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                         fullBlend_ ? blendVoid_[1] : 0
                     )
                   : 1;
-                const scalar P = -tr(sigma_[celli])/3;
+                // P* = P + c cot(phi), as the law reads it (decision 0112)
+                const scalar P = -tr(sigma_[celli])/3 + cCot;
                 e[celli] = 0;
                 // (compared without dividing by g, which can be tiny)
                 const scalar zsc = Foam::sqrt(G*rho_[celli]);
-                if (w > 0 && P > 0 && 2*w*P*dcMax[celli] < zsc*g[celli])
+                if (w > 0 && P > 0 && 2*w*P*dcMax[celli] < nlK*zsc*g[celli])
                 {
-                    e[celli] = w*P/g[celli];
+                    e[celli] = w*min(P/g[celli], bdRho*Foam::sqrt(P));
                 }
             }
         }
