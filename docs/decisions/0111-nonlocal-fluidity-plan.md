@@ -70,3 +70,26 @@ druckerPrager), `nonlocalFluidity()` in celEulerian (OpenFOAM PCG, Gauss
 linear corrected), field `g` written, driver `celFluidityCheck`.
 Adding virtuals to the kernel Model changes its layout: rebuild every
 application (./Allwmake) after pulling.
+
+## N.2 first runs (2026-11-20 evening): the face shear jump dominates
+
+`tests/nonlocal/shear_layer.py` (layer of 40 d, lid at 0.02 m/s, P0 200 Pa
+under the lid, gravity, started at rest; 10 cells of 4 d, 2 s, steady):
+
+| Run | Shear stress across the layer | Flow |
+| --- | --- | --- |
+| local mu(I) | 87 Pa in the body, 44 Pa in the top cell | top two cells only |
+| nonlocal | 70 to 75 Pa, 32 Pa in the top cell | top three cells |
+| local + flowImpedance | 60 Pa, top cells 50 to 69 | the lid slips over the top cell |
+| nonlocal + flowImpedance | 46 Pa | the lid slips over the top cell |
+
+In steady simple shear the shear stress must be uniform; it is not,
+because the faces carry the Riemann shear jump z_s (v_R - v_L)/2 on top of
+the cell stresses (z_s = sqrt(G rho), about 24 kPa s/m here: 240 Pa for a
+0.01 m/s jump). That numerical viscosity (decision 0039: about
+0.06 rho c_s h) is larger than the granular stress, so the band is set by
+the face rule and the cell size, not by the law. Next (N.2): between
+material cells with fluidity, take the face shear from the nonlocal
+viscosity eta = P/g (the tangent of gamma_dot = g mu) in place of z_s, as
+flowImpedance does for mu(I), and at fixed-velocity walls likewise; then
+run 10 / 20 / 40 cells.
