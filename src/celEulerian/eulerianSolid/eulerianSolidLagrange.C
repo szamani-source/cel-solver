@@ -1331,7 +1331,7 @@ inline vector principal(const symmTensor& s)
     const scalar p1 = sqr(s.xy()) + sqr(s.xz()) + sqr(s.yz());
     const scalar p2 =
         sqr(s.xx() - q) + sqr(s.yy() - q) + sqr(s.zz() - q) + 2*p1;
-    if (p2 <= sqr(SMALL*(mag(s) + VSMALL)))
+    if (!(p2 > max(sqr(1e-12*mag(s)), VSMALL)))
     {
         return vector(q, q, q);
     }
