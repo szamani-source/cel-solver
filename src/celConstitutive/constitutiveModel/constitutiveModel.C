@@ -120,4 +120,23 @@ void Foam::constitutiveModel::update
 }
 
 
+void Foam::constitutiveModel::updateFluidity
+(
+    const symmTensor& deps,
+    const scalar dt,
+    const scalar g,
+    const symmTensor& sigOld,
+    const history& hOld,
+    symmTensor& sigNew,
+    history& hNew
+) const
+{
+    double d[6], s[6], sn[6];
+    toVoigt(deps, d, 2);    // engineering shear for the kernel
+    toVoigt(sigOld, s);
+    kernel_->updateFluidity(d, dt, g, s, hOld, sn, hNew);
+    sigNew = fromVoigt(sn);
+}
+
+
 // ************************************************************************* //

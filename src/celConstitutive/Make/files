@@ -5,6 +5,7 @@ kernel/celDruckerPrager.C
 kernel/celEigen.C
 kernel/celMohrCoulomb.C
 kernel/celMuI.C
+kernel/celNonlocal.C
 
 constitutiveModel/constitutiveModel.C
 constitutiveModel/constitutiveModelNew.C

@@ -1,0 +1,3 @@
+fluidityCheck.C
+
+EXE = $(FOAM_USER_APPBIN)/celFluidityCheck

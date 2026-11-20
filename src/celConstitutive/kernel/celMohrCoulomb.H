@@ -41,6 +41,7 @@ Description
 
 #include "celConstitutiveKernel.H"
 #include "celMuI.H"
+#include "celNonlocal.H"
 
 namespace cel
 {
@@ -82,6 +83,7 @@ private:
 
     //- mu(I) friction, or null (rate-independent)
     std::unique_ptr<FrictionLaw> law_;
+    std::unique_ptr<Nonlocal> nl_;
 
     //- Friction-dependent constants of one return
     struct Friction
@@ -151,6 +153,22 @@ public:
     {
         return law_.get();
     }
+
+    const Nonlocal* nonlocal() const override
+    {
+        return nl_.get();
+    }
+
+    void updateFluidity
+    (
+        const Voigt deps,
+        double dt,
+        double g,
+        const Voigt sigOld,
+        const History& hOld,
+        Voigt sigNew,
+        History& hNew
+    ) const override;
 
     //- As update, and report which return was taken
     Return updateReturn

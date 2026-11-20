@@ -156,6 +156,25 @@ public:
             history& hNew
         ) const;
 
+        //- One increment over dt at nonlocal fluidity g [1/s] (WP N.1);
+        //  models without the nonlocal law ignore g
+        void updateFluidity
+        (
+            const symmTensor& deps,
+            const scalar dt,
+            const scalar g,
+            const symmTensor& sigOld,
+            const history& hOld,
+            symmTensor& sigNew,
+            history& hNew
+        ) const;
+
+        //- The nonlocal fluidity law, or null
+        const cel::constitutive::Nonlocal* nonlocal() const
+        {
+            return kernel_->nonlocal();
+        }
+
         //- True if the model's response depends on the time step
         bool rateDependent() const
         {

@@ -59,6 +59,7 @@
 #include <type_traits>
 #include <algorithm>
 #include "eulerianSolid.H"
+#include "celNonlocal.H"
 #include "cyclicFvPatch.H"
 #include "processorFvPatch.H"
 #include "processorPolyPatch.H"
@@ -1701,6 +1702,10 @@ void groupSum(const labelList& mixTo, Field<Type>& f)
 
 void Foam::eulerianSolid::lagrangeStep(const scalar dt)
 {
+    if (fluidity_.valid())
+    {
+        solveFluidity();
+    }
     using namespace lagrangeStepDetail;
 
     const fvMesh& mesh = mesh_;
@@ -1920,6 +1925,68 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
             {
                 e[celli] =
                     w*flowViscosity(sigma_[celli], flowLaw_, cCot, sm[celli]);
+            }
+        }
+        // Nonlocal fluidity (WP N.2, decision 0111; C.3, decision 0112): a
+        // cell flows where the law's secant viscosity P*/g (tau = mu P*,
+        // gamma_dot = g mu, P* = P + c cot(phi)) is below 10 zs over its
+        // closest neighbour (2 eta dc < 10 zs), including cells below mu_s
+        // that creep through the nonlocal term; its face viscosity is the
+        // law's tangent d tau/d gamma_dot = b d sqrt(rho_s P*) (as the mu(I)
+        // flow impedance), or the secant if smaller. Elsewhere 0, so the
+        // shear cap is kept
+        if (fluidity_.valid())
+        {
+            const surfaceScalarField& deltaCoeffs = mesh.deltaCoeffs();
+            scalarField dcMax(e.size(), 0);
+            forAll(own, facei)
+            {
+                dcMax[own[facei]] = max(dcMax[own[facei]], deltaCoeffs[facei]);
+                dcMax[nei[facei]] = max(dcMax[nei[facei]], deltaCoeffs[facei]);
+            }
+            forAll(mesh.boundary(), patchi)
+            {
+                const fvPatch& p = mesh.boundary()[patchi];
+                if (p.coupled())
+                {
+                    const labelUList& fc = p.faceCells();
+                    forAll(fc, i)
+                    {
+                        dcMax[fc[i]] =
+                            max
+                            (
+                                dcMax[fc[i]],
+                                deltaCoeffs.boundaryField()[patchi][i]
+                            );
+                    }
+                }
+            }
+            const scalarField& g = fluidity_().primitiveField();
+            const auto& law = *material_->nonlocal();
+            const scalar bdRho = law.b()*law.d()*Foam::sqrt(law.rhoS());
+            // Flowing where the secant viscosity P*/g is below 10 z_s over
+            // the closest neighbour (the margin is not sensitive: 10 and
+            // 100 agree to 0.2 % in the sheared layer, decision 0112)
+            const scalar nlK = 10;
+            forAll(e, celli)
+            {
+                const scalar w =
+                    fs
+                  ? fullWeight
+                    (
+                        alpha_[celli], blendVoid_[0],
+                        fullBlend_ ? blendVoid_[1] : 0
+                    )
+                  : 1;
+                // P* = P + c cot(phi), as the law reads it (decision 0112)
+                const scalar P = -tr(sigma_[celli])/3 + cCot;
+                e[celli] = 0;
+                // (compared without dividing by g, which can be tiny)
+                const scalar zsc = Foam::sqrt(G*rho_[celli]);
+                if (w > 0 && P > 0 && 2*w*P*dcMax[celli] < nlK*zsc*g[celli])
+                {
+                    e[celli] = w*min(P/g[celli], bdRho*Foam::sqrt(P));
+                }
             }
         }
         teta.ref().correctBoundaryConditions();
@@ -2612,7 +2679,14 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                 v = pU[i];
                 const scalar vn = v & n;
                 const vector vt(v - vn*n);
-                t = (tnL + zp[P]*(vn - vnL))*n + ttL + zs[P]*(vt - vtL);
+                // Flowing cell with nonlocal fluidity: its viscosity over
+                // the half cell, if smaller than zs (WP N.2; unchanged
+                // for mu(I) flow impedance)
+                const scalar ks =
+                    fi && fluidity_.valid() && teta()[P] > 0
+                  ? min(zs[P], teta()[P]*deltaCoeffs.boundaryField()[patchi][i])
+                  : zs[P];
+                t = (tnL + zp[P]*(vn - vnL))*n + ttL + ks*(vt - vtL);
             }
             else if (kind == boundaryKind::wall)
             {
@@ -3064,14 +3138,25 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
             epsP[celli] = transform(Q, epsP[celli]);
         }
 
-        if (dEps != symmTensor::zero)
+        if (dEps != symmTensor::zero || fluidity_.valid())
         {
             constitutiveModel::history hOld, hNew;
             constitutiveModel::toVoigt(epsP[celli], hOld.epsP, 2);
             hOld.epsPEq = epsPEq[celli];
 
             symmTensor sNew;
-            material_->update(dEps, dt, sigma[celli], hOld, sNew, hNew);
+            if (fluidity_.valid())
+            {
+                material_->updateFluidity
+                (
+                    dEps, dt, fluidity_()[celli], sigma[celli], hOld, sNew,
+                    hNew
+                );
+            }
+            else
+            {
+                material_->update(dEps, dt, sigma[celli], hOld, sNew, hNew);
+            }
 
             // A.4 (decision 0095): a partly filled cell lets the plastic
             // normal strain of its material go into the void (the elastic
