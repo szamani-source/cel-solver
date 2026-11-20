@@ -169,3 +169,21 @@ cell or two thick runs ahead of the deposit, and a finer mesh lets a
 thinner film run further. Without it the nonlocal 2.5 mm run also stays
 quiet (with it, the toe crept to the far wall after 0.5 s). The rest
 (+11 to 13 % per halving) is checked on 1.25 mm next.
+
+1.25 mm runs (rule 9 off), run-out at 1 s (5 mm front) and deposit height:
+
+| Law | 10 / 5 / 2.5 / 1.25 mm run-out | Interior field 2.5 vs 1.25 mm (0.1 / 0.2 / 0.5 s) | Deposit at x = 150 mm (2.5 / 1.25) |
+| --- | --- | --- | --- |
+| MC | - / 0.300 / 0.338 / 0.350 | 5 / 6 / 28 % | 72.5 / 65.5 mm |
+| nonlocal (d 10 mm) | 0.200 / 0.225 / 0.250 / 0.287 | 3 / 1 / 6 % | 82.3 / 81.1 mm |
+
+With the nonlocal law the body converges: the deposit agrees within 1 to
+2 mm up to x = 230 mm and the interior field within 1 to 6 %. What still
+grows is a thin tongue at the toe (10 to 18 mm thick at 1.25 mm), the
+stress-free partly filled cells of decision 0024 (rule 4: a partly filled
+cell carries no stress until full, so a film has no frictional strength).
+With MC the run-out number converges but the body keeps slumping with
+refinement (72.5 to 65.5 mm), which the law cannot stop.
+Recommendation: nonlocal cases use `spreadLayers no`; the toe needs
+frictional strength in partly filled cells (decision 0024's open WP 3.2s),
+a package of its own.
