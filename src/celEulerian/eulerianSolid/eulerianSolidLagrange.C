@@ -1320,11 +1320,36 @@ inline bool voidFace
 }
 
 
+//- Principal stresses, ascending, by the trigonometric solution of the
+//  symmetric cubic (never fails). OpenFOAM's eigenValues warns "Eigenvalue
+//  computation fails" on near-decoupled tensors with round-off xz, yz shears
+//  (wedge and plane cases): millions of lines on the Couto silo, which
+//  filled the disk
+inline vector principal(const symmTensor& s)
+{
+    const scalar q = tr(s)/3;
+    const scalar p1 = sqr(s.xy()) + sqr(s.xz()) + sqr(s.yz());
+    const scalar p2 =
+        sqr(s.xx() - q) + sqr(s.yy() - q) + sqr(s.zz() - q) + 2*p1;
+    if (p2 <= sqr(SMALL*(mag(s) + VSMALL)))
+    {
+        return vector(q, q, q);
+    }
+    const scalar p = Foam::sqrt(p2/6);
+    const symmTensor B((s - q*symmTensor::I)/p);
+    const scalar r = max(scalar(-1), min(scalar(1), 0.5*det(B)));
+    const scalar phi = Foam::acos(r)/3;
+    const scalar e1 = q + 2*p*Foam::cos(phi);
+    const scalar e3 = q + 2*p*Foam::cos(phi + 2*constant::mathematical::pi/3);
+    return vector(e3, 3*q - e1 - e3, e1);
+}
+
+
 //- Mohr-Coulomb yield function (s1 - s3)/2 + (s1 + s3)/2 sin(phi)
 //  - c cos(phi) of a stress (tension positive)
 inline scalar mcYield(const symmTensor& s, const scalar sinPhi, const scalar cCos)
 {
-    const vector ev(eigenValues(s));
+    const vector ev(principal(s));
     const scalar s1 = cmptMax(ev);
     const scalar s3 = cmptMin(ev);
     return 0.5*(s1 - s3) + 0.5*(s1 + s3)*sinPhi - cCos;
@@ -1351,7 +1376,7 @@ inline scalar flowViscosity
 )
 {
     sinMob = 0;
-    const vector ev(eigenValues(s));
+    const vector ev(principal(s));
     const scalar s1 = cmptMax(ev);
     const scalar s3 = cmptMin(ev);
     const scalar pm = cCot - 0.5*(s1 + s3);
@@ -2060,7 +2085,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
             {
                 // Flowing cell: no elastic stress rate along the plastic
                 // flow direction m = (e1 e1 - e3 e3)/sqrt(2) while loading
-                const vector ev(eigenValues(sigma_[celli]));
+                const vector ev(principal(sigma_[celli]));
                 const tensor E(eigenVectors(sigma_[celli], ev));
                 direction i1 = 0, i3 = 0;
                 for (direction k = 1; k < 3; ++k)
