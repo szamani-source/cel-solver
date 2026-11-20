@@ -28,7 +28,7 @@ Cells are 10 mm unless stated.
 | 9 | Pile section through clay, smooth | Randolph and Houlsby 1984, 9.14 | 9.29 (+1.7 %) | 10 % | Pass | CI `test_pile.sh` |
 | 10 | Pile section, rough (adhesion) | Randolph and Houlsby, 11.94 | 10.47 (-12 %) at 10 mm, 11.26 (-5.7 %) at 5 mm | 15 % | Pass | CI `test_rough_pile.sh` |
 | 11 | Taylor bar, Lagrangian hex8 (3D quarter) | Abaqus Benchmarks copper rod: shortening 13.10 mm, widening 5.528 mm (C3D8R) | 13.14 (+0.3 %), 5.76 (+4.2 %) | 5 % / 10 % | Pass | CI `test_taylor_bar.sh` |
-| 12 | Taylor bar, Eulerian on the axisymmetric wedge | Abaqus axisymmetric CAX4R: 13.11 mm, 6.006 mm | 13.02 (-0.7 %), 5.02 (-16 %) at 0.2 mm cells | 5 % / 20 % | Pass; widening short (known issue) | CI `test_taylor_wedge.sh` |
+| 12 | Taylor bar, Eulerian on the axisymmetric wedge | Abaqus axisymmetric CAX4R: 13.11 mm, 6.006 mm | 13.02 (-0.7 %), 5.02 (-16 %) at 0.2 mm cells; 6.37 (+6 %) extrapolated to h -> 0 (decision 0098) | 5 % / 20 % (extrapolated 10 %) | Pass; lip is first-order smearing | CI `test_taylor_wedge.sh` |
 | 13 | Silo fed from the top while it discharges | unfed rate; mass balance | outflow -1.0 / -2.7 % with feed 36.8 / 73.7 kg/s/m; matched feed holds the tank within 1.05 %; balance 4e-14 | 5 % | Pass | CI `test_fed_silo.sh` |
 | 14 | Cylindrical silo on the wedge against a 3D quarter model | 3D Beverloo; each other | C 0.678 (wedge) and 0.680 (quarter, square outlet by its hydraulic diameter), 0.2 % apart (6.8 % by an equal-area circle, decision 0090); wedge 5 times faster | 10 % / 3 % | Pass | CI `test_wedge_silo.sh` |
 | 15 | Projectile: free steel slug into clay | same slug as a rigid body; Prandtl energy estimate 32.3 mm | 27.60 mm against rigid 27.52 (+0.3 %); both 15 % short of the estimate (26 % before A.3b, decision 0094) | 5 % / 30 % | Pass; 15 % short (known issue) | CI `test_projectile.sh` |
@@ -84,7 +84,8 @@ These check the numerics against exact or independent answers and run in CI:
    mixing. Related to the clay footing reading 8 % low at 10 mm.
 4. **Wedge Taylor bar widening short** (decision 0063). 5.02 against 6.006 mm (-16 %) at
    0.2 mm cells: the thin lip at the impact face is smeared over a cell or two; first
-   order in the cell size. Use the Lagrangian body for thin flanges and lips.
+   order in the cell size; the two sizes extrapolate to 6.37 mm (+6 %, decision 0098,
+   checked in CI). Use the Lagrangian body for thin flanges and lips.
 5. **Shear bands are mesh dependent** (decision 0038): collapse run-outs grow with
    refinement (0.30 / 0.33 / 0.43 at 10 / 5 / 2.5 mm). mu(I) does not regularise them.
 6. **STL tank +4.4 %** against mesh walls (decision 0052), within its 5 % limit. The

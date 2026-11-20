@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-11-19 (accuracy pass A.4: decision 0095; A.3b: decision 0094; A.3a: 0093; A.2: 0092; A.1: decisions 0090, 0091; phase 6: WP 6.1 MPI with bodies, 6.2a restart, 6.3a scaling, 6.3b validation report; 2026-11-18: WP 2.6 Taylor bar on the wedge, WP 3.8c wedge silo, 3.8b, 3.8a wedge, WP 3.7b fed silo, WP 5.3a, 5.2, 5.1, 4.3e, 4.3d, WP 3.7a solid inlet; WP 4.4c, 4.4b, 4.4, 4.3b, WP 3.5 cohesion, tutorial T0 rule set, WP 4.5, 4.3c, 4.3a, 3.6e, 3.6h, 3.6g, 3.6f; 4.1, 4.0, 4.2; 2026-11-17: 3.6d, 3.6c2, 3.6c, 3.6b, 3.6s, validation references)
+Last updated: 2026-11-19 (accuracy pass A.7: decision 0098; A.6: 0097; A.5: 0096; A.4: decision 0095; A.3b: decision 0094; A.3a: 0093; A.2: 0092; A.1: decisions 0090, 0091; phase 6: WP 6.1 MPI with bodies, 6.2a restart, 6.3a scaling, 6.3b validation report; 2026-11-18: WP 2.6 Taylor bar on the wedge, WP 3.8c wedge silo, 3.8b, 3.8a wedge, WP 3.7b fed silo, WP 5.3a, 5.2, 5.1, 4.3e, 4.3d, WP 3.7a solid inlet; WP 4.4c, 4.4b, 4.4, 4.3b, WP 3.5 cohesion, tutorial T0 rule set, WP 4.5, 4.3c, 4.3a, 3.6e, 3.6h, 3.6g, 3.6f; 4.1, 4.0, 4.2; 2026-11-17: 3.6d, 3.6c2, 3.6c, 3.6b, 3.6s, validation references)
 
 Plan doc: https://claude.ai/artifact/DTT6kSikz9ZUTBkUxY6Grr
 
@@ -89,7 +89,10 @@ Phase 2 (the C++ Eulerian solver: 2.1 to 2.5c, 2.4b and 2.6 done) and Phase 3 (s
 | A.3a | Steel packing with the sliver fix | Done | Decision 0093. A geometry bug: a hex8 node line exactly on a mesh face lost its cut line in `cutGeometry::faceCovered`; fixed, `seam` case in `test_body_cells.sh`. With it the parked sliver fix passes the hover test, the projectile (-14.9 % rigid, -14.6 % steel, 1.015 rho0) and the deformable push, but the full suite showed two tests on a round-off knife edge, so the fix stays parked |
 | A.3b | Robust free-surface small cells; sliver fix merged | Done | Decision 0094. The silo blow-up was round-off dust (1e-18 kg at alpha 1e-6) taking ordinary face forces; a cell's inertia is now at least 0.5 rho0 alpha Vo. Sliver fix merged; `tests/test_body_above_surface.sh` in CI; projectile -14.9 % / -14.6 % (was -26 %); wedge silo and steel push pass at maxCo 0.399, 0.4, 0.401 |
 | A.4 | Sand footing with psi 30 | Done | Decision 0095. The blow-up was a partly filled surface cell that could not dilate: `voidPlasticFlow yes` (default off) lets plastic normal strain go into the void. `tests/test_sand_dilation.sh` (about 2 min): psi 30 push runs to 0.06 B, density 1.001 rho0. The N_gamma excess is a numerical rate effect (rho c v): psi 30 reads 20 / 16.6 / 13.9 / 11.9 as the push halves (exact 7.65), psi 0 10.9 / 9.3. Domain width ruled out. Manual N_gamma check still fails |
-| A.5 | Rate-free Mohr-Coulomb flow impedance (split from A.4) | Next | Decision 0095 item 3: numerical viscosity in slowly yielding Mohr-Coulomb cells (decision 0040 for a rate-independent law), and psi 30 locking past 0.06 B. Done when the sand footing reads within 15 % at two push speeds |
+| A.5 | Rate-free Mohr-Coulomb flow impedance (split from A.4) | Parked (Sia, 2026-11-19) | Decision 0096. No single scheme term carries the rate effect (face jumps, plastic predictor, wall impedance each tried); a frictional mechanism amplifies any velocity-proportional resistance about 30 times (50/s damping +15 %), so the static value needs rho c v about 1 % of gamma B. A rate-free scheme is a multi-session study; `sand_checks.py --scale K` added |
+| A.6 | Cohesive tank creep | Done (finding) | Decision 0097: a full-height plug on vertical bands at yield, slowed by the rate effect; 0.07 / 0.19 / 0.85 / 0.89 kg/s/m at 40 / 60 / 80 / 100 mm (c 500 Pa), 0.11 at c 1000 Pa. No code change |
+| A.0 | Wedge against 3D quarter 6.8 % | Done in A.1 | Decision 0090: the equal-area outlet sizing; 0.2 % by hydraulic diameter |
+| A.7 | Taylor-bar lip | Done (finding, test check) | Decision 0098: first-order smearing of a thin lip; widening 3.66 / 5.01 mm at 0.4 / 0.2 mm extrapolates to 6.37 mm (+6 %); `test_taylor_wedge.sh` checks the extrapolated value within 10 % |
 | H.1 | Conical hopper case spec (Sia's validation case) | Done | Decision 0100. `docs/spec/conical-hopper.md` and `docs/spec/hopper-data/`: Couto et al. (2013) wheat silo (Table 1 copied) and Zheng and Yu (2015) Abaqus CEL (Figs. 3, 10, 11 digitised); cases A (wall pressure), B (hopper discharge), C (flat-bottom Beverloo); pass bands set. `tests/test_hopper_spec.sh` passes |
 | H.2 | Conical hopper walls on the wedge (was 3.8d) | Done | Decision 0101. Hopper wall = STL body extruded in the wedge's face planes (`tests/hopper/hopper_case.py`). `tests/test_hopper_wedge.sh` passes (about 4 min, 25 mm): Couto silo at rest, mass exact, closed outlet holds, cylinder pressure on Janssen with K = nu/(1-nu) within -4.7 to +6.0 %, transition stress 12.6 kPa (experiment 11.7 to 13.4). Hopper wall at rest 11.4 kPa against GA0 8.6 to 9.6 (H.3) |
 | H.3 | Couto silo wall pressure, MC and DP | Done (done-when partly met) | Decision 0102. T0 rule set for both models (flowImpedance now accepts druckerPrager; wheat mu(I) d 4 mm). `tests/manual/test_hopper_pressure.sh` (12 min per model, 25 mm): at rest GA1-GA5, GA7 in the experiment's range, GA6 -14 %, hopper GA0 +21 %; discharge GA0 peak 20.1 (MC) / 21.5 (DP) kPa inside 18.7-24.8, GA1 within band, GA2 MC -12 %, DP -29 %. Plain MC/DP unusable in discharge. Rate 46 kg/s at 25 mm, 69 at 12.5 mm, against Beverloo about 110 |
@@ -138,8 +141,11 @@ Sia: mass flow and mesh dependence are secondary until Sia's validation case; fi
 where errors come from. A.2 found the cause (decision 0092). A.3a fixed the steel packing
 (a geometry bug, decision 0093). A.3b made near-empty cells robust and merged the sliver
 fix (decision 0094). A.4 made associated surface cells dilate and found the sand footing
-excess is a numerical rate effect (decision 0095). Next: A.5 (rate-free flow impedance),
-or the wedge 6.8 % item and the cohesive tank, as the coordinator queues them.
+excess is a numerical rate effect (decision 0095). A.5 found it is friction amplifying any
+velocity-proportional resistance (decision 0096, parked by Sia); A.6 traced the cohesive
+tank creep to the same effect (decision 0097); A.7 closed the Taylor-bar lip as first-order
+smearing (decision 0098). Next: the coordinator's queue (laptop install and packaging come
+last, per Sia).
 
 Phase 6 (2026-11-19) done: WP 6.1 (MPI with bodies), 6.2a (restart), 6.3a (scaling,
 `docs/results/scaling.md`), 6.3b (validation report, `docs/results/validation-report.md`);
@@ -259,7 +265,8 @@ mesh, as Abaqus CEL). Order:
 
 - Sand footing reads high, by a numerical rate effect (decision 0095): rho c v of the
   push against the load scale; psi 30 +160 % at 0.01 m/s, +55 % at 0.00125 m/s, still
-  falling; psi 30 also stiffens past 0.06 B. Package A.5. Quasi-static loads on
+  falling; psi 30 also stiffens past 0.06 B. A.5 (decision 0096, parked): the
+  static value needs rho c v about 1 % of the mechanism's stress. Quasi-static loads on
   frictional material are upper estimates.
 - Free-surface corner beside a pushed footing (decision 0094): one round-off variant
   of the mixing arithmetic (ga/gV instead of r ga/gm) sends the steel push's corner
@@ -300,8 +307,10 @@ mesh, as Abaqus CEL). Order:
   the rule.
 - Cohesive tank creep (WP 3.5, decision 0054): a tank that has stopped behind a
   cohesive arch keeps creeping out at 0.5 to 2 kg/s/m (under 1 % of Beverloo at
-  c = 500 Pa; 4.5 % at c = 250 Pa and a 40 mm outlet), steady over 1 s. Likely the same
-  family as the inclined layer's creep. The cohesion bracket is checked at 10 mm only.
+  c = 500 Pa; 4.5 % at c = 250 Pa and a 40 mm outlet), steady over 1 s. Traced (A.6,
+  decision 0097): a full-height plug on vertical bands at yield, a marginal collapse
+  slowed by the rate effect (decision 0096); it falls toward zero away from the
+  critical width. The cohesion bracket is checked at 10 mm only.
 - Meshes (decision 0041): `freeSurface yes` (the silo physics) needs a Cartesian hex
   mesh (every face normal to an axis; grading allowed). Without void the code runs on
   any mesh but is untested there: face states assume the face midway between centres,

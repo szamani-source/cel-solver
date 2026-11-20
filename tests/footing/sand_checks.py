@@ -76,7 +76,7 @@ def travel(t):
 
 
 def check_sand(work):
-    print(f"[1] Smooth strip footing B = 0.1 m ({B / CELL:.0f} cells) on sand, phi 30, psi {PSI:g},")
+    print(f"[1] Smooth strip footing B = {B:g} m ({B / CELL:.0f} cells) on sand, phi 30, psi {PSI:g},")
     print("    gamma 17.7 kN/m3, E 10 MPa, pushed to a settlement of 0.06 B")
     tEnd = T_RAMP + (GAP + S_MAX) / SPEED - 0.5 * T_RAMP
     mat = (f"type mohrCoulomb;\nE {E_SAND!r};\nnu {NU!r};\nphi {PHI!r};\nc 0;\n"
@@ -89,7 +89,7 @@ def check_sand(work):
     v = SPEED
     table = f"table ((0 (0 0 0)) ({T_RAMP!r} (0 {-v!r} 0)) ({tEnd + 1!r} (0 {-v!r} 0)))"
     y0 = DEPTH + GAP
-    sp.add_moving_body(p, "footing", (X0, y0, -0.01), (X0 + B, y0 + 0.1, 0.02), table, FRICTION)
+    sp.add_moving_body(p, "footing", (X0, y0, -CELL), (X0 + B, y0 + B, 2 * CELL), table, FRICTION)
     sec = vc.run(p)
     h = np.loadtxt(f"{p}/history.dat")
     gamma = RHO * vc.G_ACC
@@ -137,8 +137,15 @@ def check_sand(work):
 
 
 def main():
-    global VOIDFLOW, STABLE, CELL, NX, NY, PSI, FRICTION, NOBLEND, MAXCO, X0, GAP, DEPTH, SPEED, E_SAND, S_MAX
+    global B, T_RAMP, VOIDFLOW, STABLE, CELL, NX, NY, PSI, FRICTION, NOBLEND, MAXCO, X0, GAP, DEPTH, SPEED, E_SAND, S_MAX
     work = sys.argv[1]
+    if "--scale" in sys.argv[2:]:
+        # every length times k (B, cells, layer, gap, settlement), same
+        # cell count: rho c v / (gamma B) falls by k (decision 0096)
+        k = float(sys.argv[sys.argv.index("--scale") + 1])
+        vc.CELL = CELL = CELL * k
+        B, X0, GAP, DEPTH, S_MAX, T_RAMP = (B * k, X0 * k, GAP * k, DEPTH * k,
+                                            S_MAX * k, T_RAMP * k)
     if "--fine" in sys.argv[2:]:
         vc.CELL = CELL = 0.005
         NX, NY = 120, 68
