@@ -211,3 +211,14 @@ meshes bit-for-bit. Packages:
 | G.6 | MPI and restart on angled meshes | 4-processor and restarted runs of the G.2 case match serial to round-off |
 | H.7 | Couto comparison on the aligned mesh | `tests/manual/test_hopper_pressure.sh` on the aligned mesh, compared with the cut-cell results |
 
+
+## Mesh dependence: nonlocal fluidity (N series, decision 0111)
+
+Sia (2026-11-20): needed before the Linux install, with cohesion and compaction.
+
+| WP | Title | Done when |
+| --- | --- | --- |
+| N.1 | Fluidity field and the point update | `tests/test_nonlocal.sh`: homogeneous simple shear gives mu(I) to 1e-6; steady fluidity across a 1D layer with a stress gradient matches an independent Python solution to 1 % |
+| N.2 | Coupled into the Eulerian step | Steady flow down an incline (20 d): velocity profile within 5 % of the 1D solution; h_stop within 10 % |
+| N.3 | Mesh convergence of the collapse | Collapse a = 0.5 on 10 / 5 / 2.5 mm: band width and run-out converge (5 and 2.5 mm within 5 %) |
+| N.4 | Couto silo on two meshes | Rate and wall pressures within 10 % between two aligned-mesh resolutions |
