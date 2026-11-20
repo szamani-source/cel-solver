@@ -24,7 +24,7 @@ Cells are 10 mm unless stated.
 | 5 | Cohesion: arching above the outlet | Jenike critical width, 109 mm (c 500 Pa), 55 mm (c 250 Pa) | stops at 80 / 100 mm, flows at 120 / 140 mm; c 250 Pa switches between 40 and 60 mm | bracket | Pass | CI `test_cohesion.sh` |
 | 6 | Tank with STL walls and floor | same tank with mesh walls | 68.8 against 65.8 kg/s/m (+4.4 %); hopper 60 deg 66.2 (Rose-Tanaka predicts 1.21 x flat, got 1.01; 1.07 at 5 mm, decision 0091) | 5 % | Pass (close to the limit) | CI `test_stl_silo.sh` |
 | 7 | Strip footing on Tresca clay | Prandtl, Nc = 2 + pi = 5.14 | 4.73 (-8.1 %) at 10 mm, 5.04 (-1.9 %) at 5 mm | 10 % | Pass | CI `test_footing.sh` |
-| 8 | Strip footing on sand (phi 30) | Martin 2005, N_gamma 7.653 | about 11 at 10 mm, 9.7 at 5 mm (+27 %) | 15 % | Known issue: 27 % high or more (the hover effect, decision 0091, is fixed but did not change psi 0) | manual `test_sand_footing.sh`; CI `test_body_above_surface.sh` |
+| 8 | Strip footing on sand (phi 30) | Martin 2005, N_gamma 7.653 | psi 30: 20 at 0.01 m/s, 11.9 at 0.00125 m/s (10 mm); psi 0 about 11 at 10 mm, 9.7 at 5 mm | 15 % | Known issue: numerical rate effect, rho c v (decision 0095) | manual `test_sand_footing.sh`; CI `test_body_above_surface.sh`, `test_sand_dilation.sh` |
 | 9 | Pile section through clay, smooth | Randolph and Houlsby 1984, 9.14 | 9.29 (+1.7 %) | 10 % | Pass | CI `test_pile.sh` |
 | 10 | Pile section, rough (adhesion) | Randolph and Houlsby, 11.94 | 10.47 (-12 %) at 10 mm, 11.26 (-5.7 %) at 5 mm | 15 % | Pass | CI `test_rough_pile.sh` |
 | 11 | Taylor bar, Lagrangian hex8 (3D quarter) | Abaqus Benchmarks copper rod: shortening 13.10 mm, widening 5.528 mm (C3D8R) | 13.14 (+0.3 %), 5.76 (+4.2 %) | 5 % / 10 % | Pass | CI `test_taylor_bar.sh` |
@@ -73,8 +73,11 @@ These check the numerics against exact or independent answers and run in CI:
    psi 0; associated flow blows up before contact; cause: small-cell mixing into empty
    slivers, decision 0092). Fixing that leaves psi 0 unchanged, so the excess has
    another cause too. The hover effect is fixed (A.3b, decision 0094,
-   `tests/test_body_above_surface.sh`). Treat bearing results on sand as upper
-   estimates until the rest is found.
+   `tests/test_body_above_surface.sh`). A.4 (decision 0095) found the rest: the reading
+   scales with the push speed times rho c (numerical viscosity of the face Riemann
+   solver and predictor, as decision 0040); psi 30 now runs (`voidPlasticFlow`) and
+   reads 20 at 0.01 m/s, 11.9 at 0.00125 m/s, still falling. Treat bearing results on
+   sand as upper estimates until A.5.
 3. **Projectile 15 % short** (decisions 0074, 0094). The slug stops short of the
    quasi-static Prandtl estimate. It read 26 % short (more so at low speed: -33 % at
    0.5 m/s, -21 % at 2 m/s) until A.3b removed the early contact from small-cell

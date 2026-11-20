@@ -280,6 +280,10 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
     (
         materialProperties_.getOrDefault<Switch>("fullBlend", false)
     ),
+    voidPlasticFlow_
+    (
+        materialProperties_.getOrDefault<Switch>("voidPlasticFlow", false)
+    ),
     blendVoid_
     (
         materialProperties_.getOrDefault<FixedList<scalar, 2>>

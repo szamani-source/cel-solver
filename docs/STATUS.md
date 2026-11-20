@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-11-19 (accuracy pass A.3b: decision 0094; A.3a: 0093; A.2: 0092; A.1: decisions 0090, 0091; phase 6: WP 6.1 MPI with bodies, 6.2a restart, 6.3a scaling, 6.3b validation report; 2026-11-18: WP 2.6 Taylor bar on the wedge, WP 3.8c wedge silo, 3.8b, 3.8a wedge, WP 3.7b fed silo, WP 5.3a, 5.2, 5.1, 4.3e, 4.3d, WP 3.7a solid inlet; WP 4.4c, 4.4b, 4.4, 4.3b, WP 3.5 cohesion, tutorial T0 rule set, WP 4.5, 4.3c, 4.3a, 3.6e, 3.6h, 3.6g, 3.6f; 4.1, 4.0, 4.2; 2026-11-17: 3.6d, 3.6c2, 3.6c, 3.6b, 3.6s, validation references)
+Last updated: 2026-11-19 (accuracy pass A.4: decision 0095; A.3b: decision 0094; A.3a: 0093; A.2: 0092; A.1: decisions 0090, 0091; phase 6: WP 6.1 MPI with bodies, 6.2a restart, 6.3a scaling, 6.3b validation report; 2026-11-18: WP 2.6 Taylor bar on the wedge, WP 3.8c wedge silo, 3.8b, 3.8a wedge, WP 3.7b fed silo, WP 5.3a, 5.2, 5.1, 4.3e, 4.3d, WP 3.7a solid inlet; WP 4.4c, 4.4b, 4.4, 4.3b, WP 3.5 cohesion, tutorial T0 rule set, WP 4.5, 4.3c, 4.3a, 3.6e, 3.6h, 3.6g, 3.6f; 4.1, 4.0, 4.2; 2026-11-17: 3.6d, 3.6c2, 3.6c, 3.6b, 3.6s, validation references)
 
 Plan doc: https://claude.ai/artifact/DTT6kSikz9ZUTBkUxY6Grr
 
@@ -88,7 +88,8 @@ Phase 2 (the C++ Eulerian solver: 2.1 to 2.5c, 2.4b and 2.6 done) and Phase 3 (s
 | A.2 | Body near a free surface | Done (cause found, fix parked) | Cause: small-cell mixing spreads the material into empty slivers under a body (decision 0092). A fix (`docs/patches/A2-empty-sliver-mixing.patch`) passes the hover test and cuts the projectile gap from -26 % to -15 %, but packs material at steel bodies (1.05 rho0), so it is not merged |
 | A.3a | Steel packing with the sliver fix | Done | Decision 0093. A geometry bug: a hex8 node line exactly on a mesh face lost its cut line in `cutGeometry::faceCovered`; fixed, `seam` case in `test_body_cells.sh`. With it the parked sliver fix passes the hover test, the projectile (-14.9 % rigid, -14.6 % steel, 1.015 rho0) and the deformable push, but the full suite showed two tests on a round-off knife edge, so the fix stays parked |
 | A.3b | Robust free-surface small cells; sliver fix merged | Done | Decision 0094. The silo blow-up was round-off dust (1e-18 kg at alpha 1e-6) taking ordinary face forces; a cell's inertia is now at least 0.5 rho0 alpha Vo. Sliver fix merged; `tests/test_body_above_surface.sh` in CI; projectile -14.9 % / -14.6 % (was -26 %); wedge silo and steel push pass at maxCo 0.399, 0.4, 0.401 |
-| A.4 | Sand footing with psi 30 | Next | Contact is reached cleanly now; the associated push blows up at about 0.6 s (decision 0092). Then the psi 0 excess |
+| A.4 | Sand footing with psi 30 | Done | Decision 0095. The blow-up was a partly filled surface cell that could not dilate: `voidPlasticFlow yes` (default off) lets plastic normal strain go into the void. `tests/test_sand_dilation.sh` (about 2 min): psi 30 push runs to 0.06 B, density 1.001 rho0. The N_gamma excess is a numerical rate effect (rho c v): psi 30 reads 20 / 16.6 / 13.9 / 11.9 as the push halves (exact 7.65), psi 0 10.9 / 9.3. Domain width ruled out. Manual N_gamma check still fails |
+| A.5 | Rate-free Mohr-Coulomb flow impedance (split from A.4) | Next | Decision 0095 item 3: numerical viscosity in slowly yielding Mohr-Coulomb cells (decision 0040 for a rate-independent law), and psi 30 locking past 0.06 B. Done when the sand footing reads within 15 % at two push speeds |
 | H.1 | Conical hopper case spec (Sia's validation case) | Done | Decision 0100. `docs/spec/conical-hopper.md` and `docs/spec/hopper-data/`: Couto et al. (2013) wheat silo (Table 1 copied) and Zheng and Yu (2015) Abaqus CEL (Figs. 3, 10, 11 digitised); cases A (wall pressure), B (hopper discharge), C (flat-bottom Beverloo); pass bands set. `tests/test_hopper_spec.sh` passes |
 | H.2 | Conical hopper walls on the wedge (was 3.8d) | Done | Decision 0101. Hopper wall = STL body extruded in the wedge's face planes (`tests/hopper/hopper_case.py`). `tests/test_hopper_wedge.sh` passes (about 4 min, 25 mm): Couto silo at rest, mass exact, closed outlet holds, cylinder pressure on Janssen with K = nu/(1-nu) within -4.7 to +6.0 %, transition stress 12.6 kPa (experiment 11.7 to 13.4). Hopper wall at rest 11.4 kPa against GA0 8.6 to 9.6 (H.3) |
 | H.3 | Couto silo wall pressure, MC and DP | Next | |
@@ -129,7 +130,9 @@ Accuracy pass (Sia, 2026-11-19, before packaging): A.1 done (decisions 0090, 009
 Sia: mass flow and mesh dependence are secondary until Sia's validation case; find
 where errors come from. A.2 found the cause (decision 0092). A.3a fixed the steel packing
 (a geometry bug, decision 0093). A.3b made near-empty cells robust and merged the sliver
-fix (decision 0094). Next: A.4, the sand footing with psi 30.
+fix (decision 0094). A.4 made associated surface cells dilate and found the sand footing
+excess is a numerical rate effect (decision 0095). Next: A.5 (rate-free flow impedance),
+or the wedge 6.8 % item and the cohesive tank, as the coordinator queues them.
 
 Phase 6 (2026-11-19) done: WP 6.1 (MPI with bodies), 6.2a (restart), 6.3a (scaling,
 `docs/results/scaling.md`), 6.3b (validation report, `docs/results/validation-report.md`);
@@ -247,8 +250,10 @@ mesh, as Abaqus CEL). Order:
 
 ## Known issues
 
-- Sand footing with psi = phi (decision 0092): contact is reached cleanly since A.3b,
-  but the push blows up at about 0.6 s. Package A.4.
+- Sand footing reads high, by a numerical rate effect (decision 0095): rho c v of the
+  push against the load scale; psi 30 +160 % at 0.01 m/s, +55 % at 0.00125 m/s, still
+  falling; psi 30 also stiffens past 0.06 B. Package A.5. Quasi-static loads on
+  frictional material are upper estimates.
 - Free-surface corner beside a pushed footing (decision 0094): one round-off variant
   of the mixing arithmetic (ga/gV instead of r ga/gm) sends the steel push's corner
   group to -3 m/s and 1.032 rho0 at t = 0.12 s; the shipped form reads 1.007 at maxCo

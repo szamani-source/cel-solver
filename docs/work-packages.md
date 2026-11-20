@@ -176,7 +176,9 @@ before the install package. A.1 (ranking and the first fixes, decisions 0090, 00
 done; A.2 (body near a free surface) done when `tests/manual/test_body_above_surface.sh`
 passes. A.3 split (decision 0093): A.3a the steel packing (a geometry bug) done; A.3b
 robust free-surface small cells and the sliver fix merged (decision 0094); A.4 the
-sand footing with psi 30. Mass flow and mesh dependence wait for Sia's validation case. Decisions for
+sand footing with psi 30 (decision 0095: surface cells dilate, excess is a rate effect);
+A.5 split from A.4: rate-free Mohr-Coulomb flow impedance, done when the sand footing
+reads within 15 % of N_gamma at two push speeds. Mass flow and mesh dependence wait for Sia's validation case. Decisions for
 this pass are numbered from 0090.
 
 Note (2026-11-19, conical hopper validation, Sia's validation case and the last item

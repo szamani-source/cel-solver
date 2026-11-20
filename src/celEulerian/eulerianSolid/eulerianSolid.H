@@ -237,6 +237,12 @@ class eulerianSolid
         //  log(void): face states, stress predictor and flow viscosity
         Switch fullBlend_;
 
+        //- A.4 (decision 0095): materialProperties voidPlasticFlow; in a
+        //  partly filled cell the plastic normal strain the material takes
+        //  on an axis (dilation, or extension of the deviatoric flow) goes
+        //  into the cell's void instead of compressing the material
+        Switch voidPlasticFlow_;
+
         //- Void range of the blend, fullBlendVoid (v1 v2), default (1e-4 1e-2)
         FixedList<scalar, 2> blendVoid_;
 
