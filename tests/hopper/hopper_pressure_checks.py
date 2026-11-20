@@ -80,10 +80,18 @@ def main():
     mesh = sys.argv[3] if len(sys.argv) > 3 else "aligned"
     blend = "fullBlend yes;\n" if mesh == "aligned" else ""
     os.environ.setdefault("CEL_HOPPER_RULES", MU_I + RULES + blend)
-    make = hc.aligned_case if mesh == "aligned" else hc.couto_case
-    p, c = make(work, f"couto_{model}_{mesh}", model, CELL,
-                dict(tEnd=T_END, maxCo=0.4, writeTimes=WRITES, tOpen=T_OPEN),
-                nProcs=NP)
+    check = dict(tEnd=T_END, maxCo=0.4, writeTimes=WRITES, tOpen=T_OPEN)
+    if mesh == "aligned":
+        # grading (Sia): CEL_OUTLET_RATIO (outlet row over top row, 1/3),
+        # CEL_WALL_RATIO (wall column over axis column, 1), CEL_NCOLS
+        p, c = hc.aligned_case(
+            work, f"couto_{model}_{mesh}", model, CELL, check, nProcs=NP,
+            outlet_ratio=float(os.environ.get("CEL_OUTLET_RATIO", 1 / 3)),
+            wall_ratio=float(os.environ.get("CEL_WALL_RATIO", 1.0)),
+            ncols=int(os.environ["CEL_NCOLS"]) if "CEL_NCOLS" in os.environ else None)
+    else:
+        p, c = hc.couto_case(work, f"couto_{model}_{mesh}", model, CELL, check,
+                             nProcs=NP)
     dp = f"{p}/system/decomposeParDict"
     txt = open(dp).read().replace(f"n ({NP} 1 1)", f"n (1 {NP} 1)")
     open(dp, "w").write(txt)
