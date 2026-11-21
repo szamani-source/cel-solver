@@ -18,7 +18,8 @@ shell inside it (buffered_case.aligned_buffered_case, WP G.5).
 
     CEL_NPROCS=4 python3 top_fill.py WORKDIR
 
-Environment: CEL_RIN (m, 0.25), CEL_VIN (m/s, 3), CEL_HEAD (m, 0.40).
+Environment: CEL_RIN (m, 0.25), CEL_VIN (m/s, 3), CEL_HEAD (m, 0.40),
+CEL_SETTLE (s, 1.0).
 """
 import math
 import os
@@ -41,7 +42,8 @@ R_IN = float(os.environ.get("CEL_RIN", 0.25))
 V_IN = float(os.environ.get("CEL_VIN", 3.0))
 R_HEAD = float(os.environ.get("CEL_HEAD", 0.40))
 H_TOP = 0.025
-T_FALL, T_SETTLE = 0.3, 1.0
+T_FALL = 0.3
+T_SETTLE = float(os.environ.get("CEL_SETTLE", 1.0))   # s after the inlet closes
 CELLS = ["GA0", "GA1", "GA2", "GA3", "GA4", "GA5", "GA6", "GA7"]
 
 
