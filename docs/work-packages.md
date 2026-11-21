@@ -224,3 +224,6 @@ Sia (2026-11-20): needed before the Linux install, with cohesion and compaction.
 | C.1 | Cohesion in the nonlocal law | Homogeneous shear with c = 500 Pa: mu* = tau/(P + c cot phi) = mu_s + b I* (decision 0112) |
 | C.2 | Vertical cut (cohesive column) | Critical c of the a = 0.5 column inside Terzaghi's limits (230 to 344 Pa) on 5 and 2.5 mm, MC and DP |
 | C.3 | Cohesion in the sheared layer | N.2 with c: band and profile within 5 % of the 1D nonlocal solution with P* |
+| K.1 | Compaction cap in the kernel | Isotropic and oedometer loading on eps_v = lambda* ln(P/P0), unloading elastic, MC and DP (decision 0113) |
+| K.2 | Cap in the Eulerian solver: settling column | Every loaded cell on ln(rho/rho0) = P0/K + lambda* ln(P/P0) within 2 %, mass conserved, at rest |
+| K.3 | Filling from the top with the cap | The decision 0108 top fill no longer doubles the wall pressures |

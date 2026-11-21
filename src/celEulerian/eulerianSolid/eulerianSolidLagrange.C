@@ -3143,6 +3143,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
             constitutiveModel::history hOld, hNew;
             constitutiveModel::toVoigt(epsP[celli], hOld.epsP, 2);
             hOld.epsPEq = epsPEq[celli];
+            hOld.pc = pc_.valid() ? pc_()[celli] : 0;
 
             symmTensor sNew;
             if (fluidity_.valid())
@@ -3247,6 +3248,10 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
             e.xz() *= 0.5;
             epsP[celli] = e;
             epsPEq[celli] = hNew.epsPEq;
+            if (pc_.valid())
+            {
+                pc_()[celli] = hNew.pc;
+            }
         }
 
         // 6. Lagrangian density
@@ -3258,6 +3263,10 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
     sigma_.correctBoundaryConditions();
     epsP_.correctBoundaryConditions();
     epsPEq_.correctBoundaryConditions();
+    if (pc_.valid())
+    {
+        pc_().correctBoundaryConditions();
+    }
 }
 
 

@@ -150,3 +150,40 @@ law's g_loc -> 0. Turning the shear cap off changes neither.
 Fixed on the way: tiny P at free-surface cells (P/g and tau/P overflowed:
 the kernel treats P below 1e-300 rho_s as zero, mu capped at 1e3, and the
 face test compares 2 P dc < z_s g without dividing by g).
+
+## N.3 front study (2026-11-20 night, Sia chose to dig into the front)
+
+Run-out at 1 s, front where the layer is 5 mm thick, 5 / 2.5 mm cells
+(`tests/collapse/shear_band.py` with `CEL_NO_SPREAD`, `CEL_EXTRA_MATERIAL`;
+nonlocal with d 10 mm and the C.3 tangent face viscosity):
+
+| Variant | MC | Nonlocal (10 / 5 / 2.5 mm) |
+| --- | --- | --- |
+| T0 rules (rule 9 on) | 0.325 / 0.425 (+31 %) | 0.200 / 0.250 / 0.575 (late creep at 2.5 mm) |
+| rule 9 off (`spreadLayers no`) | 0.300 / 0.338 (+13 %) | 0.200 / 0.225 / 0.250 (+11 %) |
+| fullBlend | 0.375 / 0.450 (+20 %) | |
+
+Rule 9 (decision 0024: partly filled top layers spread sideways in the x
+sweep) is the largest mesh-dependent part of the run-out: a thin film a
+cell or two thick runs ahead of the deposit, and a finer mesh lets a
+thinner film run further. Without it the nonlocal 2.5 mm run also stays
+quiet (with it, the toe crept to the far wall after 0.5 s). The rest
+(+11 to 13 % per halving) is checked on 1.25 mm next.
+
+1.25 mm runs (rule 9 off), run-out at 1 s (5 mm front) and deposit height:
+
+| Law | 10 / 5 / 2.5 / 1.25 mm run-out | Interior field 2.5 vs 1.25 mm (0.1 / 0.2 / 0.5 s) | Deposit at x = 150 mm (2.5 / 1.25) |
+| --- | --- | --- | --- |
+| MC | - / 0.300 / 0.338 / 0.350 | 5 / 6 / 28 % | 72.5 / 65.5 mm |
+| nonlocal (d 10 mm) | 0.200 / 0.225 / 0.250 / 0.287 | 3 / 1 / 6 % | 82.3 / 81.1 mm |
+
+With the nonlocal law the body converges: the deposit agrees within 1 to
+2 mm up to x = 230 mm and the interior field within 1 to 6 %. What still
+grows is a thin tongue at the toe (10 to 18 mm thick at 1.25 mm), the
+stress-free partly filled cells of decision 0024 (rule 4: a partly filled
+cell carries no stress until full, so a film has no frictional strength).
+With MC the run-out number converges but the body keeps slumping with
+refinement (72.5 to 65.5 mm), which the law cannot stop.
+Recommendation: nonlocal cases use `spreadLayers no`; the toe needs
+frictional strength in partly filled cells (decision 0024's open WP 3.2s),
+a package of its own.

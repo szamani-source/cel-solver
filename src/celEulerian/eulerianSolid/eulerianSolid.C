@@ -4,6 +4,7 @@
 
 #include "eulerianSolid.H"
 #include "celNonlocal.H"
+#include "celCap.H"
 #include "unitConversion.H"
 #include "surfaceFields.H"
 #include "zeroGradientFvPatchFields.H"
@@ -505,6 +506,43 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
         const auto& law = *material_->nonlocal();
         Info<< "Nonlocal fluidity (WP N.1): A " << law.A() << ", d "
             << law.d() << " m, b " << law.b() << ", mu_s " << law.muS() << nl;
+    }
+    if (material_->cap())
+    {
+        if (immersed_)
+        {
+            FatalErrorInFunction
+                << "capLambda (WP K.2) is not yet remapped with immersed "
+                << "bodies" << exit(FatalError);
+        }
+        wordList types(mesh.boundary().size(), "zeroGradient");
+        forAll(mesh.boundary(), patchi)
+        {
+            if (polyPatch::constraintType(mesh.boundary()[patchi].type()))
+            {
+                types[patchi] = mesh.boundary()[patchi].type();
+            }
+        }
+        pc_.reset
+        (
+            new volScalarField
+            (
+                IOobject
+                (
+                    "pc",
+                    mesh.time().timeName(),
+                    mesh,
+                    IOobject::READ_IF_PRESENT,
+                    IOobject::AUTO_WRITE
+                ),
+                mesh,
+                dimensionedScalar(dimPressure, Zero),
+                types
+            )
+        );
+        Info<< "Compaction cap (WP K.2): lambda* "
+            << material_->cap()->lambda() << ", p0 "
+            << material_->cap()->p0() << " Pa" << nl;
     }
 
     if (maxCo_ <= 0)

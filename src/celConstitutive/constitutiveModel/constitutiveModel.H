@@ -175,6 +175,12 @@ public:
             return kernel_->nonlocal();
         }
 
+        //- The compaction cap (WP K.1), or null
+        const cel::constitutive::Cap* cap() const
+        {
+            return kernel_->cap();
+        }
+
         //- True if the model's response depends on the time step
         bool rateDependent() const
         {

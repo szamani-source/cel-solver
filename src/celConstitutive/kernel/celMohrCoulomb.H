@@ -42,6 +42,7 @@ Description
 #include "celConstitutiveKernel.H"
 #include "celMuI.H"
 #include "celNonlocal.H"
+#include "celCap.H"
 
 namespace cel
 {
@@ -84,6 +85,15 @@ private:
     //- mu(I) friction, or null (rate-independent)
     std::unique_ptr<FrictionLaw> law_;
     std::unique_ptr<Nonlocal> nl_;
+
+    //- Compaction cap (WP K.1, decision 0113), or null
+    std::unique_ptr<Cap> cap_;
+
+    //- Cap the new stress, if there is a cap
+    void capStress(const Voigt sigOld, Voigt sigNew, History& hNew) const
+    {
+        if (cap_) cap_->apply(el_, sigOld, sigNew, hNew);
+    }
 
     //- Friction-dependent constants of one return
     struct Friction
@@ -152,6 +162,11 @@ public:
     const FrictionLaw* frictionLaw() const override
     {
         return law_.get();
+    }
+
+    const Cap* cap() const override
+    {
+        return cap_.get();
     }
 
     const Nonlocal* nonlocal() const override

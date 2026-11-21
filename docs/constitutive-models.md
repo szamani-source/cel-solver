@@ -36,8 +36,16 @@ then ported to C++ with the same tests (WP 2.2, 2.5a, 2.5b).
   phi_m = atan(mu(I)) with I from the plastic shear rate and pressure. Without mu2 (or
   with mu2 = tan(phi)) the models are unchanged.
 
+- **Nonlocal fluidity (WP N.1, decision 0111).** `nonlocalA` (with the mu(I)
+  entries) adds the Kamrin-Henann granular fluidity, a grain-size length that
+  removes mesh dependence of shear bands; with cohesion the law reads
+  P* = P + c cot(phi) (decision 0112).
+- **Compaction cap (WP K.1, decision 0113).** `capLambda` (lambda*, the
+  modified compression index from an oedometer, lambda/(1 + e0)) and `capP0`:
+  a volumetric yield p <= p_c on both frictional models, p_c hardening so that
+  loading follows eps_v = lambda* ln(P/P0); unloading is elastic (E, nu).
+
 ## Later candidates (not scheduled)
 
 - Strain softening / critical state (state-dependent friction and dilation).
 - Hypoplasticity for sand under cyclic or complex loading.
-- Cap models for compaction.

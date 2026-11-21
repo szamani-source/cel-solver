@@ -880,6 +880,10 @@ void Foam::eulerianSolid::remap(const scalar dt)
     remapField(mesh, geo, phi, dmInt, dmPatch, mNew, lim("sigma"), sigma_);
     remapField(mesh, geo, phi, dmInt, dmPatch, mNew, lim("epsP"), epsP_);
     remapField(mesh, geo, phi, dmInt, dmPatch, mNew, lim("epsPEq"), epsPEq_);
+    if (pc_.valid())
+    {
+        remapField(mesh, geo, phi, dmInt, dmPatch, mNew, lim("epsPEq"), pc_());
+    }
 
     if (immersed_)
     {
@@ -1448,6 +1452,15 @@ void Foam::eulerianSolid::remapFreeSurface(const scalar dt)
         mesh, geo, phi, dmInt, dmPatch, mNew, lim("epsPEq"), epsPEq_, &smooth_,
         anyIn ? &qIn : nullptr
     );
+    if (pc_.valid())
+    {
+        // Fed material arrives unloaded (pc 0, set where first loaded)
+        remapField
+        (
+            mesh, geo, phi, dmInt, dmPatch, mNew, lim("epsPEq"), pc_(),
+            &smooth_, anyIn ? &qIn : nullptr
+        );
+    }
     if (turned)
     {
         turn(true);
