@@ -3254,6 +3254,26 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
             }
         }
 
+        // Rest relaxation (decision 0114): horizontal block of a resting
+        // full cell towards K0 times the vertical stress
+        if
+        (
+            restTime_ > 0
+         && alpha_[celli] >= alphaFull
+         && mag(U_[celli]) < restSpeed_
+        )
+        {
+            const vector n(g_/mag(g_));
+            symmTensor& s = sigma[celli];
+            const scalar sv = n & (s & n);
+            if (sv < 0)
+            {
+                const symmTensor Ph(symmTensor::I - sqr(n));
+                const symmTensor sh(symm(Ph & s & Ph));
+                s += min(dt/restTime_, scalar(1))*(restK0_*sv*Ph - sh);
+            }
+        }
+
         // 6. Lagrangian density
         rho[celli] = m[celli]/VL;
     }

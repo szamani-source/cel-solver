@@ -269,6 +269,16 @@ class eulerianSolid
         //  than along a horizontal axis is spread along that axis
         Switch spreadLayers_;
 
+        //- Top-fill fix, step 2 (decision 0114): materialProperties
+        //  restRelax { time T; speed v; K0 k; }. In full cells slower than
+        //  v the horizontal stress block relaxes towards K0 times the
+        //  vertical (gravity-direction) stress with time constant T, which
+        //  undoes lateral stress locked in by impacts. Off when T <= 0.
+        //  K0 defaults to 1 - sin(phi) (Jaky).
+        scalar restTime_ = 0;
+        scalar restSpeed_ = 0;
+        scalar restK0_ = 0;
+
         //- Number of faces capped by rule 8 in the last Lagrange step
         //  (this processor, owner side of coupled faces)
         label nCapped_;

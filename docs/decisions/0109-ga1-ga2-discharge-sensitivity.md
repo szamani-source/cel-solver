@@ -38,3 +38,25 @@ scale), which Sia scheduled before the Linux install.
 
 GA1/GA2 stay a known gap in STATUS. Runs: /tmp scratch (wallmu.py,
 rules.py variants of hopper_pressure_checks), about 18 min each on 4 cores.
+
+## Revisit with the nonlocal law (2026-11-21)
+
+Best setup (rounded-corner STL mesh, outlet cells 3-5 mm, 25 mm in the
+upper cylinder, 2-cell wall-gap start, `gap_case.py`), MC, the T0 rules
+plus fullBlend, with the nonlocal fluidity of decision 0111 (A 0.48,
+d 4 mm). Discharge mean 0.25-1.0 s after opening, kPa:
+
+| run | rate kg/s | GA0 | GA1 | GA2 | GA3 |
+|---|---|---|---|---|---|
+| local mu(I) (above) | 122.9 | 20.1 | 5.77 | 4.32 | |
+| nonlocal, spreadLayers yes | 119.4 | 24.1 | 5.63 | 5.03 | 4.51 |
+| nonlocal, spreadLayers no | 119.3 | 24.3 | 5.31 | 5.18 | 5.27 |
+| Couto | (110-131 Beverloo) | 18.7-24.8 | 7.1-8.2 | 5.8-6.5 | 4.4-5.6 |
+
+GA2 moves up about 0.8 kPa (now 11-14 % low), GA1 does not move (25-30 %
+low), the rate stays inside Beverloo, no leak. About 2 h each on 4 cores.
+The cooperative length is a few grain sizes (about 3 d = 12 mm), below the
+25 mm cylinder cells, so the law cannot widen the converging zone there;
+resolving it would need cells near d in the cylinder (about 25 times more
+cells). GA1 stays a known gap; it is not a reason to hold the Linux
+install. Abaqus (Zheng and Yu) is also low at GA2.
