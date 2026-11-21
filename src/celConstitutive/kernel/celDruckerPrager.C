@@ -115,6 +115,7 @@ DruckerPrager::DruckerPrager(const Parameters& p, const Options& opts)
 
     law_ = FrictionLaw::New(p, phi);
     nl_ = Nonlocal::New(p, phi);
+    cap_ = Cap::New(p);
 }
 
 
@@ -128,6 +129,7 @@ void DruckerPrager::update
 ) const
 {
     returnMap(eta_, xi_, etaBar_, deps, sigOld, hOld, sigNew, hNew);
+    capStress(sigOld, sigNew, hNew);
 }
 
 
@@ -155,7 +157,7 @@ void DruckerPrager::updateRate
         {
             if (mu == law_->muS() && !law_->dilatant())
             {
-                update(deps, sigOld, hOld, s, h);
+                returnMap(eta_, xi_, etaBar_, deps, sigOld, hOld, s, h);
                 return;
             }
             double eta, xi, etaBar = etaBar_, unused;
@@ -179,6 +181,7 @@ void DruckerPrager::updateRate
         },
         sigNew, hNew
     );
+    capStress(sigOld, sigNew, hNew);
 }
 
 
@@ -259,7 +262,9 @@ void DruckerPrager::updateFluidity
     if (!nl_ || !nl_->update(el_, sigOld, trial, dt, g, hOld, sigNew, hNew))
     {
         updateRate(deps, dt, sigOld, hOld, sigNew, hNew);
+        return;
     }
+    capStress(sigOld, sigNew, hNew);
 }
 
 

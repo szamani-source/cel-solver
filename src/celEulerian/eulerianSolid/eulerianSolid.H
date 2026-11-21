@@ -124,6 +124,11 @@ class eulerianSolid
         //  start of each Lagrange step when the model has nonlocalA
         autoPtr<volScalarField> fluidity_;
 
+        //- Compaction cap (WP K.2, decision 0113): preconsolidation
+        //  pressure pc [Pa] per cell (0 = not yet loaded), mass-weighted
+        //  in the remap; only with capLambda
+        autoPtr<volScalarField> pc_;
+
         //- Fraction of the CFL limit used for the time step
         scalar maxCo_;
 

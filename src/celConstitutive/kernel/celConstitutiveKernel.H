@@ -36,6 +36,7 @@ namespace constitutive
 
 class FrictionLaw;
 class Nonlocal;
+class Cap;
 
 //- Six Voigt components, order xx, yy, zz, xy, yz, zx
 typedef double Voigt[6];
@@ -51,6 +52,10 @@ struct History
 
     //- True if the last increment returned to a cone apex
     bool apex = false;
+
+    //- Compaction cap (WP K.1, decision 0113): preconsolidation pressure
+    //  [Pa]; 0 = not yet set (normally consolidated at the first loading)
+    double pc = 0;
 };
 
 //- Relative tolerance on the trial yield function below which a step is
@@ -149,6 +154,12 @@ public:
 
     //- The nonlocal fluidity law (WP N.1), or null
     virtual const Nonlocal* nonlocal() const
+    {
+        return nullptr;
+    }
+
+    //- The compaction cap (WP K.1), or null
+    virtual const Cap* cap() const
     {
         return nullptr;
     }

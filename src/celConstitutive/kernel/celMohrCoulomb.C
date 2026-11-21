@@ -206,6 +206,7 @@ MohrCoulomb::MohrCoulomb(const Parameters& p)
 
     law_ = FrictionLaw::New(p, phi);
     nl_ = Nonlocal::New(p, phi);
+    cap_ = Cap::New(p);
 }
 
 
@@ -219,6 +220,7 @@ void MohrCoulomb::update
 ) const
 {
     updateReturn(deps, sigOld, hOld, sigNew, hNew);
+    capStress(sigOld, sigNew, hNew);
 }
 
 
@@ -246,7 +248,7 @@ void MohrCoulomb::updateRate
         {
             if (mu == law_->muS() && !law_->dilatant())
             {
-                update(deps, sigOld, hOld, s, h);
+                updateReturn(deps, sigOld, hOld, s, h);
                 return;
             }
             // phi_m in degrees and back, as mu_i.py, so both sides round alike
@@ -275,6 +277,7 @@ void MohrCoulomb::updateRate
         },
         sigNew, hNew
     );
+    capStress(sigOld, sigNew, hNew);
 }
 
 
@@ -586,7 +589,9 @@ void MohrCoulomb::updateFluidity
     if (!nl_ || !nl_->update(el_, sigOld, trial, dt, g, hOld, sigNew, hNew))
     {
         updateRate(deps, dt, sigOld, hOld, sigNew, hNew);
+        return;
     }
+    capStress(sigOld, sigNew, hNew);
 }
 
 
