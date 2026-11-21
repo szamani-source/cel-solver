@@ -19,7 +19,10 @@ shell inside it (buffered_case.aligned_buffered_case, WP G.5).
     CEL_NPROCS=4 python3 top_fill.py WORKDIR
 
 Environment: CEL_RIN (m, 0.25), CEL_VIN (m/s, 3), CEL_HEAD (m, 0.40),
-CEL_SETTLE (s, 1.0).
+CEL_SETTLE (s, 1.0), CEL_FILL_MASS (kg, the Couto mass): the mass the inlet
+feeds. The inlet time is set from the inlet patch's real radius on the mesh
+(the faces whose centre lies inside R_IN, so the outer edge of the last
+column): the nominal pi R_IN^2 put in 1541 kg for 1503 (decision 0114).
 """
 import math
 import os
@@ -61,23 +64,46 @@ def split_inlet(p, r_in):
              "        set inletFaces;\n    }\n);\n")
 
 
+def sh(p, cmd, log, env=None):
+    with open(f"{p}/log.{log}", "w") as f:
+        r = subprocess.run(cmd, cwd=p, stdout=f, stderr=subprocess.STDOUT,
+                           env=dict(env or os.environ, PWD=p))
+    if r.returncode:
+        raise RuntimeError(f"{cmd[0]} failed:\n" + open(f"{p}/log.{log}").read()[-3000:])
+
+
+def mesh(p):
+    sh(p, ["blockMesh"], "blockMesh")
+    sh(p, ["topoSet"], "topoSet")
+    sh(p, ["createPatch", "-overwrite"], "createPatch")
+
+
+def inlet_radius(p):
+    """Outer radius of the inlet patch on the mesh (largest r of its points)."""
+    import re
+    sys.path.insert(0, os.path.join(HERE, "..", "angled"))
+    import angled_checks as ac
+    m = f"{p}/constant/polyMesh"
+    b = open(f"{m}/boundary").read()
+    blk = b[b.index("inlet"):]
+    n = int(re.search(r"nFaces\s+(\d+)", blk).group(1))
+    s0 = int(re.search(r"startFace\s+(\d+)", blk).group(1))
+    pts = ac.foam_list(f"{m}/points", "point")
+    faces = ac.foam_list(f"{m}/faces", "face")
+    ids = sorted({i for f in faces[s0:s0 + n] for i in f})
+    return float(pts[ids, 0].max() / math.cos(math.radians(hc.THETA)))
+
+
 def run(p):
-    def sh(cmd, log, env=None):
-        with open(f"{p}/log.{log}", "w") as f:
-            r = subprocess.run(cmd, cwd=p, stdout=f, stderr=subprocess.STDOUT,
-                               env=dict(env or os.environ, PWD=p))
-        if r.returncode:
-            raise RuntimeError(f"{cmd[0]} failed:\n" + open(f"{p}/log.{log}").read()[-3000:])
-    sh(["blockMesh"], "blockMesh")
-    sh(["topoSet"], "topoSet")
-    sh(["createPatch", "-overwrite"], "createPatch")
+    def sh_(cmd, log, env=None):
+        sh(p, cmd, log, env)
     if NP > 1:
-        sh(["decomposePar", "-force"], "decomposePar")
+        sh_(["decomposePar", "-force"], "decomposePar")
         env = dict(os.environ, OMPI_ALLOW_RUN_AS_ROOT="1", OMPI_ALLOW_RUN_AS_ROOT_CONFIRM="1")
-        sh(["mpirun", "-np", str(NP), "--oversubscribe", "celVoidCheck", "-parallel"],
-           "driver", env)
+        sh_(["mpirun", "-np", str(NP), "--oversubscribe", "celVoidCheck", "-parallel"],
+            "driver", env)
     else:
-        sh(["celVoidCheck"], "driver")
+        sh_(["celVoidCheck"], "driver")
 
 
 def main():
@@ -90,8 +116,15 @@ def main():
            + math.pi * ht / 3 * (c["R"] ** 2 + c["R"] * c["Rout"] + c["Rout"] ** 2))
     # the spout below the lip (Y0 to 0) is part of the Couto fill too
     vol += math.pi * c["Rout"] ** 2 * (-bc.Y0)
-    mass = vol * c["rho"]
-    t_fill = mass / (c["rho"] * V_IN * math.pi * R_IN ** 2)
+    mass = float(os.environ.get("CEL_FILL_MASS", vol * c["rho"]))
+    # mesh once with a dummy time to read the inlet's real radius
+    q, _ = bc.aligned_buffered_case(work, "inlet_probe", "mc",
+                                    dict(tEnd=1e-6, fill=[-1.0, -1.0, 1.0, bc.Y0 - 1.0]),
+                                    dict(c), head_rows=int(round(R_HEAD / H_TOP)))
+    split_inlet(q, R_IN)
+    mesh(q)
+    r_mesh = inlet_radius(q)
+    t_fill = mass / (c["rho"] * V_IN * math.pi * r_mesh ** 2)
     t_damp = round(t_fill + T_FALL, 3)
     t_end = round(t_fill + T_SETTLE, 2)
     writes = [round(t_fill + 0.2, 2), round(t_end - 0.2, 2), t_end]
@@ -112,7 +145,8 @@ def main():
     open(f"{p}/system/controlDict", "a").write(
         f"gravityRamp 0.1;\ndamping 100;\ndampingStart {t_damp!r};\n")
     split_inlet(p, R_IN)
-    print(f"inlet r < {R_IN} m at {V_IN} m/s, closes at {t_fill:.3f} s "
+    mesh(p)
+    print(f"inlet r < {R_IN} m (on the mesh {r_mesh:.4f} m) at {V_IN} m/s, closes at {t_fill:.3f} s "
           f"(fill mass {mass:.0f} kg); damping from {t_damp} s; end {t_end} s", flush=True)
     run(p)
     h = vc.history(p)
