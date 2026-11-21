@@ -409,6 +409,28 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
         Info<< "Axisymmetric wedge mesh (WP 3.8a): wedge sides carry the "
             << "rotated cell state; wall stresses extrapolated" << nl;
     }
+    if (materialProperties_.found("restRelax"))
+    {
+        const dictionary& d = materialProperties_.subDict("restRelax");
+        restTime_ = d.get<scalar>("time");
+        restSpeed_ = d.get<scalar>("speed");
+        restK0_ = d.getOrDefault<scalar>
+        (
+            "K0",
+            1 - Foam::sin(degToRad(materialProperties_.get<scalar>("phi")))
+        );
+        if (restTime_ > 0)
+        {
+            if (mag(g_) <= 0)
+            {
+                FatalIOErrorInFunction(materialProperties_)
+                    << "restRelax needs gravity" << exit(FatalIOError);
+            }
+            Info<< "Rest relaxation (decision 0114): time " << restTime_
+                << " s below " << restSpeed_ << " m/s towards K0 "
+                << restK0_ << nl;
+        }
+    }
     if (spreadLayers_ && !freeSurface_)
     {
         FatalIOErrorInFunction(materialProperties_)

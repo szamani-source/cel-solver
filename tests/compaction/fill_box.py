@@ -16,16 +16,25 @@ import inlet_checks as ic
 vc = ic.vc
 work, mode, cap = sys.argv[1], sys.argv[2], sys.argv[3] == "cap"
 LAM = float(os.environ.get("LAM", "0.02"))
-ic.H = 0.6; ic.S_IN = 2.0; ic.T_START = 0.05; ic.T_STOP = 1.05
-T_DAMP, T_END = 1.4, 2.4
-name = f"{mode}_{'cap' if cap else 'nocap'}"
+# step 1 of the top-fill fix (Sia 2026-11-21): slower landing. S_IN sets the
+# inlet speed (feed time scales so the mass is the same), BOX_H the box height
+# (drop height)
+S_IN = float(os.environ.get("S_IN", "2.0"))
+T_FEED = 2.0 / S_IN
+ic.H = float(os.environ.get("BOX_H", "0.6")); ic.S_IN = S_IN; ic.T_START = 0.05; ic.T_STOP = 0.05 + T_FEED
+T_DAMP, T_END = T_FEED + 0.35, T_FEED + 1.35
+name = f"{mode}_{'cap' if cap else 'nocap'}_s{S_IN:g}_h{ic.H:g}" + (f"_relax{os.environ['RELAX']}" if os.environ.get("RELAX") else "")
 p = ic.setup(work, name)
 mp = f"{p}/constant/materialProperties"; t = open(mp).read()
 extra = "fullBlend yes;\n" + (f"capLambda {LAM!r};\ncapP0 100;\n" if cap else "")
+# step 2 (decision 0114): RELAX = rest relaxation time [s] (speed 0.01 m/s)
+RELAX = float(os.environ.get("RELAX", "0"))
+if RELAX > 0:
+    extra += f"restRelax {{ time {RELAX!r}; speed 0.01; }}\n"
 t = t.replace("normalCap yes;\n", "normalCap yes;\n" + extra)
 Hf = 0.04 * 2.0 * 1.0 / 0.2      # same mass as the fed box
 if mode == "gravity":
-    t = t.replace("endTime 1.05;", "endTime 0.0;").replace("startTime 0.05;", "startTime 0.0;")
+    t = t.replace(f"endTime {ic.T_STOP!r};", "endTime 0.0;").replace("startTime 0.05;", "startTime 0.0;")
 open(mp, "w").write(t)
 dct = f"{p}/system/voidCheckDict"; d = open(dct).read()
 d = d.replace("tEnd 1.2;", f"tEnd {T_END};")
