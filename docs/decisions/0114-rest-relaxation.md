@@ -63,5 +63,23 @@ Test: `tests/test_rest_relax.sh` (about 3 minutes).
 - The gravity-on state is unchanged (K 0.42 to 0.43).
 - Step 3 (cap-coupled K0) is not needed for the box.
 - The wall stress near the base of the top-filled box stays about 20 %
-  above gravity-on (denser, lower deposit). The Couto silo top fill with
-  relaxation is the next check (decision 0108 case).
+  above gravity-on (denser, lower deposit).
+
+## Couto silo top fill with relaxation (decision 0108 case)
+
+`tests/hopper/top_fill.py` with `restRelax { time 0.05; speed 0.01; }`
+added to the T0 rules plus fullBlend, MC, 4 cores, 3.5 h. Wall pressure
+at rest, kPa:
+
+| | top fill | top fill + relax (1 s settle) | gravity on | Couto |
+|---|---|---|---|---|
+| GA0 | 16.8 | 10.2 | 12.4 | 8.6-9.6 |
+| GA1 | 9.4 | 7.4 | 4.6 | 4.0-4.5 |
+| GA5 | 8.0 | 4.4 | 2.8 | 2.8-3.2 |
+| GA7 | 4.3 | 2.6 | 1.3 | 1.4-1.7 |
+
+Relaxation removes about half of the excess in the cylinder and brings GA0
+closest to the experiment of any start, but the pressures were still
+falling at the end (GA1 8.0, 7.6, 7.4 at 0.2, 0.8, 1.0 s after the inlet
+closed): the silo cells only rest once damping has stopped the flow. A
+2 s settle is running.
