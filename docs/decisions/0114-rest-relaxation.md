@@ -71,15 +71,26 @@ Test: `tests/test_rest_relax.sh` (about 3 minutes).
 added to the T0 rules plus fullBlend, MC, 4 cores, 3.5 h. Wall pressure
 at rest, kPa:
 
-| | top fill | top fill + relax (1 s settle) | gravity on | Couto |
-|---|---|---|---|---|
-| GA0 | 16.8 | 10.2 | 12.4 | 8.6-9.6 |
-| GA1 | 9.4 | 7.4 | 4.6 | 4.0-4.5 |
-| GA5 | 8.0 | 4.4 | 2.8 | 2.8-3.2 |
-| GA7 | 4.3 | 2.6 | 1.3 | 1.4-1.7 |
+| | top fill | + relax, 1 s settle | + relax, 2 s settle | gravity on | Couto |
+|---|---|---|---|---|---|
+| GA0 | 16.8 | 10.2 | 9.3 | 12.4 | 8.6-9.6 |
+| GA1 | 9.4 | 7.4 | 6.8 | 4.6 | 4.0-4.5 |
+| GA2 | | 6.8 | 6.3 | | 4.1-4.5 |
+| GA5 | 8.0 | 4.4 | 4.2 | 2.8 | 2.8-3.2 |
+| GA7 | 4.3 | 2.6 | 2.6 | 1.3 | 1.4-1.7 |
 
 Relaxation removes about half of the excess in the cylinder and brings GA0
 closest to the experiment of any start, but the pressures were still
 falling at the end (GA1 8.0, 7.6, 7.4 at 0.2, 0.8, 1.0 s after the inlet
-closed): the silo cells only rest once damping has stopped the flow. A
-2 s settle is running.
+closed): the silo cells only rest once damping has stopped the flow.
+
+With a 2 s settle (`CEL_SETTLE=2.0`, 4.1 h) GA0 is 9.3 kPa, inside the
+experiment's range (the first start to get there), and the hopper and
+lower cylinder keep falling slowly (GA1 6.93 to 6.81 over the last 0.2 s).
+The upper cylinder (GA5 to GA7) stays about 40-80 % high: the top fill
+leaves a 0.2 m heap above the silo top and 1541 kg against 1503 (denser
+packing), and relaxing K alone does not move vertical load onto the
+walls. Step 3 (cap-coupled K0) would not change that either; the
+remaining gap is the fill mass and heap, not locked-in K. The gravity-on
+start stays the default for validation; top fill plus restRelax is the
+option for filling studies.
