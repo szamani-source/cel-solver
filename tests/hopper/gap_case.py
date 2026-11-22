@@ -22,6 +22,8 @@ columns there are about 12 mm already); the headroom stays 0.3 m.
 CEL_NCOLS (44), CEL_WALL_RATIO (0.6, wall column / axis column) and
 CEL_H_HOP (m, 0.012, row height at the top of the hopper block) set the
 rest of the grading (decision 0115 addendum: the fine "ideal" mesh).
+CEL_OUTLET_WALL_RATIO (default CEL_WALL_RATIO): the column grading at the
+outlet only (decision 0116: 1 keeps the outlet cells at 3 mm or more).
 """
 import math
 import os
@@ -45,6 +47,7 @@ H_TOP = float(os.environ.get("CEL_H_TOP", 0.025))
 NCOLS = int(os.environ.get("CEL_NCOLS", 44))
 WALL_RATIO = float(os.environ.get("CEL_WALL_RATIO", 0.6))
 H_HOP = float(os.environ.get("CEL_H_HOP", 0.012))
+OWR = os.environ.get("CEL_OUTLET_WALL_RATIO")      # decision 0116
 HEAD_ROWS = int(round(12 * 0.025 / H_TOP))
 CELLS = ["GA0", "GA1", "GA2", "GA3", "GA4", "GA5", "GA6", "GA7"]
 
@@ -92,7 +95,8 @@ def build(work, check):
                  + [[Hm + 1.0, float(G[-1, 0] * ct)]])
     p, c = bc.aligned_buffered_case(work, "couto_mc_gap", "mc", check, c, nProcs=NP,
                                     head_rows=HEAD_ROWS, h_top=H_TOP,
-                                    ncols=NCOLS, wall_ratio=WALL_RATIO, h_hop=H_HOP)
+                                    ncols=NCOLS, wall_ratio=WALL_RATIO, h_hop=H_HOP,
+                                    **({} if OWR is None else dict(outlet_wall_ratio=float(OWR))))
     dp = f"{p}/system/decomposeParDict"
     txt = open(dp).read().replace(f"n ({NP} 1 1)", f"n (1 {NP} 1)")
     open(dp, "w").write(txt)

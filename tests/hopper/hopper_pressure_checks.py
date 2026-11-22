@@ -110,8 +110,18 @@ def main():
         # STL shell inside a wall-aligned mesh (Sia, 2026-11-20; WP G.5)
         import buffered_case as bc
         CELL = 0.012
+        # mesh knobs as in gap_case.py (decision 0115 addendum, 0116):
+        # CEL_H_TOP, CEL_NCOLS, CEL_WALL_RATIO, CEL_H_HOP, CEL_OUTLET_WALL_RATIO
+        e = os.environ
+        h_top = float(e.get("CEL_H_TOP", 0.025))
+        mesh_kw = dict(h_top=h_top, head_rows=int(round(3 * 0.025 / h_top)),
+                       ncols=int(e.get("CEL_NCOLS", 44)),
+                       wall_ratio=float(e.get("CEL_WALL_RATIO", 0.6)),
+                       h_hop=float(e.get("CEL_H_HOP", 0.012)))
+        if "CEL_OUTLET_WALL_RATIO" in e:
+            mesh_kw["outlet_wall_ratio"] = float(e["CEL_OUTLET_WALL_RATIO"])
         p, c = bc.aligned_buffered_case(work, f"couto_{model}_{mesh}", model, check,
-                                        nProcs=NP)
+                                        nProcs=NP, **mesh_kw)
     elif mesh == "buffered":
         # STL shell inside a larger mesh, rounded corners (Sia, 2026-11-20)
         import buffered_case as bc
