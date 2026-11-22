@@ -25,16 +25,16 @@ GPL-3.0.</p>
 as sand leaving a silo, is tracked on a <strong>fixed Eulerian mesh</strong>: the material
 moves through the cells, and each cell records how full it is. Structures that keep their
 shape, such as a footing, a pile or a steel projectile, are <strong>Lagrangian</strong>
-bodies whose mesh moves with them. Contact forces pass between the two. This is the same
+bodies that move through the fixed mesh. Forces pass between the two. This is the same
 idea as Abaqus/Explicit CEL and LS-DYNA multi-material ALE
 <a class="cite" href="references.html#ref-benson1992">Benson 1992</a>
 <a class="cite" href="references.html#ref-qiu2011">Qiu et al. 2011</a>.</p>
 
 <p>celFoam integrates the equations explicitly in time. Each step:</p>
 <ol>
-<li>picks a stable time step from the wave speed and the flow speed (CFL condition);</li>
+<li>picks a stable time step from the elastic wave speed and the smallest cell (CFL condition);</li>
 <li>updates the stress in every cell with the material model;</li>
-<li>computes contact forces between bodies and material;</li>
+<li>computes the forces between bodies and material on the cells the bodies cut;</li>
 <li>moves the material and the bodies (central-difference velocity and position update);</li>
 <li>maps the moved material back onto the fixed mesh (remap);</li>
 <li>writes results when asked.</li>
@@ -57,7 +57,7 @@ time, a solid inlet that feeds material in, walls from STL surfaces</td></tr>
 cells of varying shape</td></tr>
 <tr><td>Lagrangian bodies</td><td>Rigid bodies from STL files (prescribed or free motion), deformable
 bodies of hex8 elements with hourglass control</td></tr>
-<tr><td>Coupling</td><td>Penalty contact in both directions between bodies and the Eulerian material</td></tr>
+<tr><td>Coupling</td><td>Forces in both directions between bodies and the Eulerian material, through the cells each body's surface cuts (no penalty stiffness)</td></tr>
 <tr><td>Running</td><td>Serial or MPI parallel on any number of processors, restart from any
 written time</td></tr>
 </tbody>
@@ -68,7 +68,7 @@ written time</td></tr>
 input and output <a class="cite" href="references.html#ref-weller1998">Weller et al. 1998</a>.
 The physics lives in four libraries of our own: <code>celConstitutive</code> (material
 models), <code>celEulerian</code> (the Eulerian solid), <code>celLagrangian</code> (bodies)
-and <code>celCoupling</code> (contact). OpenFOAM's own source is never changed, so any
+and <code>celCoupling</code> (the cells bodies cut). OpenFOAM's own source is never changed, so any
 standard OpenFOAM v2512 installation can host celFoam.</p>
 
 <h2 id="how-to-read">How to read this manual</h2>

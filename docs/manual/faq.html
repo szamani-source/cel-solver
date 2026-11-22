@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FAQ and known issues · celFoam manual</title>
+<link rel="stylesheet" href="assets/katex/katex.min.css">
+<link rel="stylesheet" href="assets/manual.css">
+<script defer src="assets/katex/katex.min.js"></script>
+<script defer src="assets/katex/contrib/auto-render.min.js"></script>
+<script defer src="assets/manual.js"></script>
+</head>
+<body>
+<main>
+
+<h1>FAQ and known issues</h1>
+<p class="lead">Answers to the questions new users ask first, what the common error messages mean,
+and the limits of the code as it stands. Each known issue names the design note in
+<code>docs/decisions/</code> that records it.</p>
+
+<h2 id="setup">Setting up a case</h2>
+
+<h3 id="which-model">Mohr-Coulomb or Drucker-Prager?</h3>
+<p>For bulk solids, start with Mohr-Coulomb: its friction angle is the one quoted in the literature and
+on data sheets, and it gave the best discharge rate in the Couto silo (123.8 kg/s against the Beverloo
+range of 110 to 131). Drucker-Prager is smoother and slightly cheaper. If you use it, take the
+<code>fit plane_strain</code>; the compression fit made the same silo discharge at 45 kg/s instead of
+110. See <a href="theory-materials.html#drucker-prager">Material models</a>.</p>
+
+<h3 id="which-rules">Which flow rules should I switch on?</h3>
+<p>For silo and hopper discharge use the set in
+<a href="case-setup.html#rule-sets">Recommended rule sets</a>: <code>shearCap</code>,
+<code>normalCap</code>, <code>spreadLayers</code>, <code>flowImpedance</code> (with \(\mu(I)\)) and
+<code>fullBlend</code>. For clay under footings and piles leave them off; those cases use the set of
+decisions 0055 and 0056. The rules change how partly filled cells and faces at yield behave; they do
+not change the material law.</p>
+
+<h3 id="2d-mass">Why are the masses in the log so small in 2D?</h3>
+<p>A 2D (plane-strain) mesh is one cell thick, and every mass and flow rate in the log is for that
+thickness. Divide by the thickness to get values per metre. Make the thickness equal to the in-plane
+cell size: the time step is taken from \(V^{1/3}\), so a thin slab of large cells runs with too small a
+step (<a href="meshing.html">Meshing guide</a>).</p>
+
+<h3 id="rest">How do I start from a settled state?</h3>
+<p>The default is to switch gravity on in a full container and let it settle with light damping
+(<code>gravityRamp</code>, <code>damping</code>, <code>dampingStart</code>). This gave the best wall
+pressures in the Couto silo (\(K \approx 0.43\)). <code>restRelax</code> drives the stress toward
+\(K_0 = 1-\sin\varphi\) <a class="cite" href="references.html#ref-jaky1944">Jáky 1944</a> instead. Filling
+from the top through a narrow inlet doubles the wall pressures, because the impact locks stress in and
+plain Mohr-Coulomb has no compaction; use the cap if you need a filling history. See
+<a href="case-setup.html#starting-state">Starting at rest</a>.</p>
+
+<h3 id="cells">How fine must the mesh be?</h3>
+<p>The cells at an outlet set the discharge rate: on the Couto silo, 25 mm cells gave 21 kg/s and
+3 to 5 mm cells 106 to 124 kg/s. Use cells of 3 to 5 mm at outlets, finer cells near walls, and
+coarser cells higher up. Without the nonlocal law a shear band is one to four cells wide on any mesh, so
+results that depend on the band (collapse run-out, footing loads) change with the mesh; switch on
+<code>nonlocalA</code> to give the band a physical width. Details in the
+<a href="meshing.html">Meshing guide</a>.</p>
+
+<h3 id="time-step">The run is slow. What sets the time step?</h3>
+<p>The elastic wave speed \(c = \sqrt{M/\rho}\) and the smallest cell, through <code>maxCo</code>
+(default 0.4). Halving the smallest cell halves the step; quadrupling \(E\) halves it too. Use graded meshes so that
+only the cells that need it are small, and run large cases on several processors
+(<a href="case-setup.html#parallel">Running in parallel</a>).</p>
+
+<h3 id="restart">How do I restart a run?</h3>
+<p>Set <code>startFrom latestTime</code> in <code>controlDict</code> and run again. The restart is exact
+only when the run wrote with <code>writeFormat binary</code> or <code>writePrecision 17</code> (decision
+0081); the tutorials write ASCII with 8 digits, which is fine for viewing but restarts a little off. A
+free or deformable body must restart from a time that celFoam wrote, because its state is stored there.</p>
+
+<h2 id="errors">Error messages</h2>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Message</th><th>What to do</th></tr></thead>
+<tbody>
+<tr><td><code>outlets need freeSurface yes</code>, <code>inlets need freeSurface yes</code>,
+<code>spreadLayers needs freeSurface yes</code></td><td>Material leaves or enters, so the code must track void:
+add <code>freeSurface yes</code> to <code>materialProperties</code>.</td></tr>
+<tr><td><code>moving rigid bodies need freeSurface yes</code></td><td>A cell a moving body uncovers starts
+empty, which needs void (decision 0053).</td></tr>
+<tr><td><code>Outlet ... must be a plain patch without a fixed velocity</code></td><td>Give the outlet patch a
+zeroGradient velocity condition in <code>0/U</code>; the outlet sets its own state.</td></tr>
+<tr><td><code>Angled meshes need hex cells</code></td><td>Every cell must be a hexahedron (or a wedge prism on
+the axis). Remesh with blockMesh (<a href="meshing.html">Meshing guide</a>).</td></tr>
+<tr><td><code>flowImpedance needs mu2 &gt; tan(phi)</code></td><td>The rule needs a \(\mu(I)\) law: set
+<code>mu2</code> above \(\tan\varphi\), with <code>I0</code> and <code>d</code>.</td></tr>
+<tr><td><code>restRelax needs gravity</code></td><td>Set a gravity vector in <code>constant/g</code>.</td></tr>
+<tr><td><code>capLambda ... is not yet remapped with immersed bodies</code></td><td>The cap cannot be used with
+STL or deformable bodies yet; use mesh walls, or switch the cap off.</td></tr>
+<tr><td><code>Body ... cannot start at t = ... without its state</code></td><td>Restart a free or
+deformable body only from a time that celFoam wrote.</td></tr>
+<tr><td><code>Inlet ...: negative speed</code></td><td>An inlet only feeds material in; use an outlet to let
+it out.</td></tr>
+<tr><td><code>rho must be positive in every cell</code></td><td>Set a positive density in every cell of
+<code>0/rho</code> (or leave the field out and give <code>rho</code> in <code>materialProperties</code>);
+empty cells are set by <code>alpha</code>, not by a zero density.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="known-issues">Known issues</h2>
+<p>These are the limits found so far, with the decision that records each one. None of them stops a run;
+they bound how far a result can be trusted.</p>
+
+<h3 id="ki-silo">Silos and hoppers</h3>
+<ul>
+<li><strong>Couto silo at rest and in discharge.</strong> Wall pressures at rest (GA0) are about
+20 to 25 % above the measurements; in discharge GA1 reads 26 % low and GA2 7 % low. The Abaqus model of
+<a class="cite" href="references.html#ref-zheng2015">Zheng and Yu 2015</a> is also low at GA2. Wall friction,
+<code>normalCap</code> and <code>flowImpedance</code> were ruled out as causes.</li>
+<li><strong>Silo with \(\mu(I)\)</strong> (decisions 0045, 0046). The discharge rate depends on how cells
+that have just loosened are counted, about 20 % between stiffnesses; dilatancy and blended rules did not
+cure it.</li>
+<li><strong>Cohesive tank creep</strong> (decisions 0054, 0097). A tank held up by a cohesive arch keeps
+creeping out at under 1 % of the Beverloo rate (4.5 % near the critical width).</li>
+<li><strong>Free-surface tanks without \(\mu(I)\)</strong> (decision 0051). A plain Mohr-Coulomb tank with
+<code>freeSurface yes</code> settles slowly and its bottom stress reads 17 % high, because noise-level void
+switches full cells to the partly filled rules. Silo runs avoid it with <code>flowImpedance</code>.</li>
+</ul>
+
+<h3 id="ki-mesh">Meshes</h3>
+<ul>
+<li><strong>Mesh dependence</strong> (decision 0038). Without the nonlocal law, shear bands are one to
+four cells wide and collapse run-out grows with refinement. The nonlocal law gives them a width set by
+the grain size.</li>
+<li><strong>Turned and sheared cells</strong> (decision 0106). On meshes whose lines are turned away from
+the walls, a layer sliding along a wall lifts off slightly (normal speed 0.033 m/s against a limit of
+0.0145). Keep mesh lines along the walls, as in the <a href="meshing.html">Meshing guide</a>.</li>
+<li><strong>STL walls</strong> (decision 0051). Where an STL floor meets an STL wall, the corner cell has
+one oblique wall face and is not exactly in equilibrium; a lake in an all-STL tank moves up to 0.3 m/s at
+the corners without damping. Body-fitted meshes avoid this.</li>
+</ul>
+
+<h3 id="ki-bodies">Bodies and geotechnics</h3>
+<ul>
+<li><strong>Footings on sand read high</strong> (decisions 0095, 0096). The load includes a numerical rate
+effect that grows with \(\rho c v\) of the push: at \(\psi = 30^\circ\) it is +160 % at 0.01 m/s and
++55 % at 0.00125 m/s. Treat quasi-static loads on frictional material as upper estimates.</li>
+<li><strong>Projectile penetration</strong> (decisions 0074, 0094). A slug into Tresca clay stops 15 %
+short of the energy estimate from <a class="cite" href="references.html#ref-prandtl1921">Prandtl 1921</a>.</li>
+<li><strong>Deformable bodies much finer than the cells</strong> (decision 0073) pack the material
+beneath them (1.039 \(\rho_0\) for a 20 &times; 20 footing on 1 cm cells). Keep body elements near the
+cell size; soft bodies need <code>hourglass 0.3</code>.</li>
+<li><strong>Free body rotating in contact</strong> (decision 0058). A symmetric block dropped with inertia
+picks up a small spin at impact from a few per cent of asymmetry in the reaction.</li>
+<li><strong>Taylor bar</strong> (decision 0098). The shortening matches Abaqus to 0.3 %; the lip at the
+impact face is first-order and slightly rounded.</li>
+</ul>
+
+<h3 id="ki-running">Running</h3>
+<ul>
+<li><strong>Parallel round-off</strong> (decision 0080). With bodies, caps or void rules, a parallel run
+matches serial to round-off until a switch flips, then differs as much as a serial run with a
+\(10^{-12}\) perturbation would (footing force 2 to 4 %, tank discharge rate unchanged).</li>
+<li><strong>Restart precision</strong> (decision 0081). Exact only with binary output or 17 digits.</li>
+<li><strong>Explicit cost.</strong> Stiff materials and small cells make many steps; the full test suite
+takes about 3 hours.</li>
+</ul>
+
+<h2 id="help">Getting help</h2>
+<p>Open an issue in the repository <a href="https://github.com/szamani-source/cel-solver">szamani-source/cel-solver</a>
+with the case directory (without time folders), the end of <code>log.celFoam</code> and the version
+(<code>git rev-parse --short HEAD</code>). The status of every work package and the full list of open
+issues is kept in <code>docs/STATUS.md</code>.</p>
+
+</main>
+</body>
+</html>

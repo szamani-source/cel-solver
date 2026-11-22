@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bodies and contact · celFoam manual</title>
+<link rel="stylesheet" href="assets/katex/katex.min.css">
+<link rel="stylesheet" href="assets/manual.css">
+<script defer src="assets/katex/katex.min.js"></script>
+<script defer src="assets/katex/contrib/auto-render.min.js"></script>
+<script defer src="assets/manual.js"></script>
+</head>
+<body>
+<main>
+
+<h1>Theory III: bodies and contact</h1>
+<p class="lead">The Lagrangian side of celFoam: rigid bodies given by STL surfaces, deformable
+bodies of hex8 elements, and how both exchange forces with the Eulerian material through the
+cells their surfaces cut.</p>
+
+<h2 id="overview">Overview</h2>
+<p>A body is a closed surface that moves through the fixed Eulerian mesh. Where it lies, cells are
+cut into an open part, which holds material, and a covered part, which does not. The body surface
+inside each cut cell becomes one more face of that cell, solved like a wall with the body's velocity.
+The force on the body is minus the sum of those face forces. This is a cut-cell (immersed boundary)
+coupling <a class="cite" href="references.html#ref-mittal2005">Mittal and Iaccarino 2005</a> rather than
+the penalty contact of most CEL codes: it needs no penalty stiffness, and no material ever crosses the
+body surface (decisions 0042, 0047). The same machinery gives fixed walls of any shape: a body that does
+not move.</p>
+
+<h2 id="cut-cells">Exact cut geometry</h2>
+<p>For every cell near a body celFoam computes, without sampling (decision 0043):</p>
+<ul>
+<li>the covered length of each mesh edge, from its crossings with the surface triangles;</li>
+<li>the covered area of each face by Green's theorem over its covered part;</li>
+<li>the covered volume of each cell by the divergence theorem over the clipped triangles and the
+covered parts of its faces.</li>
+</ul>
+<p>Material then fills only the open volume \(V(1-\alpha_\text{body})\) and crosses only the open part of
+each face. The wall face of a cut cell has the area vector that closes the cell,
+\(\mathbf S_w = -\sum_f \mathbf S_f^\text{open}\), so a uniform stress gives exactly no force. Its
+Riemann solution is the wall solution of <a href="theory-equations.html#boundaries">Theory I</a> (no tension,
+Coulomb friction with the body's friction angle and adhesion) in the body's moving frame.</p>
+<p>Cut cells with an open fraction below one half are mixed with a full neighbour, so their small
+volume does not limit the time step; covered cells next to material hold the average state of their
+open neighbours as ghost values, so reconstruction and remap need no special case near a body.</p>
+
+<h2 id="rigid">Rigid bodies</h2>
+<p>A rigid body carries a reference point \(\mathbf c\) (its <code>centre</code>) and a rotation \(\mathbf R\) from its
+pose at time zero, so a surface point \(\mathbf X_0\) is at</p>
+$$\mathbf x(t) = \mathbf c(t) + \mathbf R(t)\,(\mathbf X_0 - \mathbf c_0),\qquad
+\dot{\mathbf x} = \mathbf v(t) + \boldsymbol\omega(t)\times(\mathbf x - \mathbf c(t)).$$
+<p><strong>Prescribed motion.</strong> \(\mathbf v(t)\) and \(\boldsymbol\omega(t)\) are given as functions of time. Over a
+step, \(\mathbf c\) moves by the exact integral of \(\mathbf v\), and \(\mathbf R\) turns by the angle \(|\mathbf W|\) about
+\(\mathbf W/|\mathbf W|\), \(\mathbf W = \int\boldsymbol\omega\,dt\), which is exact while the axis is fixed. The force of
+the material on the body is reported, not applied.</p>
+<p><strong>Free bodies</strong> (decision 0058). With a mass \(m\) and inertia \(\mathbf J_0\) the motion follows from the
+force \(\mathbf F\) and moment \(\mathbf M\) of the material, and gravity, by central differences with staggered
+velocities, like the material:</p>
+$$\mathbf v \mathrel{+}= \Delta t\Big(\frac{\mathbf F}{m} + \mathbf g\Big),\qquad
+\boldsymbol\omega \mathrel{+}= \Delta t\,\mathbf J^{-1}\big(\mathbf M - \boldsymbol\omega\times\mathbf J\boldsymbol\omega\big),\qquad
+\mathbf J = \mathbf R\mathbf J_0\mathbf R^{\mathsf T}.$$
+<p>A body dropped on a deposit comes to rest carrying its own weight to 0.01 %, with momentum conserved
+to \(10^{-5}\).</p>
+
+<h2 id="moving">Moving cut cells</h2>
+<p>When a body moves, each step runs (decision 0053):</p>
+<ol>
+<li>the Lagrange step at the old pose, with the body's velocity on its wall faces;</li>
+<li>the bodies move;</li>
+<li>the remap, in which each wall cell is mapped onto the open volume the body leaves,
+\(V_t = V_o + \Delta t\,\mathbf v_w\cdot\mathbf A\), so a full cell stays full and no material is squeezed
+into the part the body takes;</li>
+<li>the cut cells are recomputed at the new pose and the material carried onto them: a cell the body now
+covers hands its mass, momentum, stress and history to a neighbour; a cell the body uncovers starts empty.</li>
+</ol>
+<p>Uncovered cells start as void, so moving and free bodies need <code>freeSurface yes</code>.</p>
+
+<h2 id="hex8">Deformable bodies: hex8 elements</h2>
+<p>A deformable body is a box of 8-node hexahedra integrated explicitly, the standard element of
+explicit codes (decision 0070). The gradient operator is the mean of the shape-function gradients over
+the element <a class="cite" href="references.html#ref-flanagan1981">Flanagan and Belytschko 1981</a>,</p>
+$$\mathbf B_I = \frac{1}{V}\int_V \nabla N_I\,dV = \frac{1}{V}\sum_\text{faces}\int N_I\,\mathbf n\,dA,
+\qquad \mathbf f_I^\text{int} = V\,\boldsymbol\sigma\cdot\mathbf B_I ,$$
+<p class="eq-where">with each face integral exact (2&times;2 Gauss points on the bilinear face), so
+\(\sum_I \mathbf x_I\otimes\mathbf B_I = \mathbf I\) and the element passes the patch test for any shape. Masses are
+lumped; velocities are staggered in time (central difference); the strain increment and spin come from
+the velocity gradient on the mid-step shape; the stress is rotated with Hughes-Winget and updated by the
+same material models as the Eulerian side.</p>
+
+<h3 id="hourglass">Hourglass control</h3>
+<p>One-point integration leaves zero-energy (hourglass) modes. They are resisted with the
+Flanagan-Belytschko base vectors \(\boldsymbol\gamma_a\), orthogonal to every linear velocity field
+<a class="cite" href="references.html#ref-flanagan1981">Flanagan and Belytschko 1981</a>:</p>
+<ul>
+<li><code>stiffness</code> (default; LS-DYNA type 4): hourglass forces grow with the integrated hourglass velocity,
+\(\mathbf Q_a \mathrel{+}= \Delta t\,k\,\mathbf q_a\), \(\mathbf q_a = \sum_I \mathbf v_I\gamma_{aI}\),
+\(\mathbf f_I = -\sum_a \mathbf Q_a\gamma_{aI}\), with \(k = \kappa\,M V\sum_I|\mathbf B_I|^2/8\) (\(\kappa\) = <code>hourglass</code>,
+\(M\) the P-wave modulus). Conserves energy; for elastic bodies.</li>
+<li><code>viscous</code> (LS-DYNA type 1): forces from the current hourglass velocity with coefficient
+\(\kappa\,\rho c V^{2/3}/4\). For bodies in large plastic flow such as impact and penetration (decision 0071).</li>
+</ul>
+
+<h3 id="coupling-deformable">Coupling a deformable body</h3>
+<p>The body's surface is the boundary of its elements, two triangles per element face, and is cut into
+the mesh like an STL. The force of the material on each wall cell goes to the nodes of the nearest
+surface triangle with barycentric weights. The elements run one coupling step ahead and are subcycled
+with their own stable step, so the surface moves exactly as the material saw it move (decision 0072).
+An optional viscous damping \(2\zeta\rho c L_e\mathbf D\) stops a stiff body from ringing after an impact.</p>
+<p>The element's stable step is \(V/(\text{largest face area})/c\). Keep elements close to the Eulerian cell
+size: much finer bodies over-pack the material beneath them (decision 0073).</p>
+
+<h2 id="parallel">Bodies in parallel runs</h2>
+<p>Every processor holds the whole surface of every body (walls and inserts are small); each processor
+cuts its own cells. Body forces and moments are summed over processors. Small cut cells are not mixed
+across processor boundaries; if one would need it, the log reports it as unmixed (decision 0080).</p>
+
+<h2 id="checks">What has been checked</h2>
+<table>
+<thead><tr><th>Case</th><th>Result</th></tr></thead>
+<tbody>
+<tr><td>Strip footing on Tresca clay (rigid, pushed)</td><td>\(N_c\) within 2 % of Prandtl's \(2+\pi\) on the finer mesh</td></tr>
+<tr><td>Pile section through clay, smooth and rough</td><td>within 2 % and 6 % of Randolph and Houlsby</td></tr>
+<tr><td>Free body dropped onto a deposit</td><td>force/weight 1.0000 at rest</td></tr>
+<tr><td>Steel slug into clay (free, rigid and deformable)</td><td>deformable and rigid within 0.3 %</td></tr>
+<tr><td>Taylor bar (hex8 alone)</td><td>shortening within 0.3 % of Abaqus</td></tr>
+</tbody>
+</table>
+<p>Details on the <a href="validation.html">Validation</a> page.</p>
+
+</main>
+</body>
+</html>

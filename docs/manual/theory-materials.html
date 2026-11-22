@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Material models · celFoam manual</title>
+<link rel="stylesheet" href="assets/katex/katex.min.css">
+<link rel="stylesheet" href="assets/manual.css">
+<script defer src="assets/katex/katex.min.js"></script>
+<script defer src="assets/katex/contrib/auto-render.min.js"></script>
+<script defer src="assets/manual.js"></script>
+</head>
+<body>
+<main>
+
+<h1>Theory II: material models</h1>
+<p class="lead">The stress update at one point: elasticity, the yield surfaces of metals, clay
+and sand, rate-dependent and nonlocal friction for flowing grains, cohesion, compaction, and
+friction against walls.</p>
+
+<h2 id="interface">One interface for every model</h2>
+<p>Every model maps a strain increment \(\Delta\boldsymbol\varepsilon\), the rotated old stress
+\(\tilde{\boldsymbol\sigma}\) and the history \(\mathbf h_n\) to the new stress and history. The Eulerian
+material and the deformable bodies call the same code (library <code>celConstitutive</code>). Each model was
+first written in Python and the C++ version is checked against it point by point to \(10^{-14}\).</p>
+
+<p>All models start with an elastic predictor. With Lam&eacute;'s constants
+\(\lambda = \frac{E\nu}{(1+\nu)(1-2\nu)}\) and \(G = \frac{E}{2(1+\nu)}\):</p>
+$$\boldsymbol\sigma^{\text{trial}} = \tilde{\boldsymbol\sigma} + \lambda\operatorname{tr}(\Delta\boldsymbol\varepsilon)\,\mathbf I + 2G\,\Delta\boldsymbol\varepsilon .$$
+<p>If no yield function is positive, \(\boldsymbol\sigma_{n+1} = \boldsymbol\sigma^{\text{trial}}\). Otherwise a return
+mapping brings the stress back to the yield surface
+<a class="cite" href="references.html#ref-simo1998">Simo and Hughes 1998</a>
+<a class="cite" href="references.html#ref-desouzaneto2008">de Souza Neto et al. 2008</a>, and the plastic strain
+grows by \(\Delta\boldsymbol\varepsilon^p = \mathbb C^{-1}:(\boldsymbol\sigma^{\text{trial}}-\boldsymbol\sigma_{n+1})\). The
+returns are closed-form (exact for the perfectly plastic and linearly hardening models), so the result
+does not depend on the size of the step.</p>
+
+<p>Notation: \(s_1 \ge s_2 \ge s_3\) are the principal stresses (tension positive),
+\(p_m = \tfrac13\operatorname{tr}\boldsymbol\sigma\) the mean stress, \(p = -p_m\) the pressure, \(\mathbf s\) the
+deviatoric stress and \(J_2 = \tfrac12\mathbf s:\mathbf s\).</p>
+
+<h2 id="elastic">Linear elastic</h2>
+<p><code>type linearElastic</code>: the predictor alone, isotropic Hooke's law with \(E\) and \(\nu\). Used for
+rigid-ish deformable bodies and for wave tests.</p>
+
+<h2 id="von-mises">von Mises (J2) plasticity</h2>
+<p><code>type vonMises</code>, for metals and for undrained clay (where it is equivalent to Tresca in plane strain):</p>
+$$f = \sqrt{3J_2} - (\sigma_y + H\,\bar\varepsilon^p) \le 0,$$
+<p class="eq-where">with yield stress \(\sigma_y\) and linear hardening modulus \(H\). The radial return scales the
+deviatoric trial stress back to the cylinder; it is exact for linear hardening
+<a class="cite" href="references.html#ref-simo1998">Simo and Hughes 1998</a>.</p>
+
+<h2 id="mohr-coulomb">Mohr-Coulomb</h2>
+<p><code>type mohrCoulomb</code>, the standard model for soils and bulk solids. In principal stresses the
+yield function and the plastic potential are</p>
+$$f = (s_1 - s_3) + (s_1+s_3)\sin\varphi - 2c\cos\varphi,\qquad g = (s_1 - s_3) + (s_1+s_3)\sin\psi ,$$
+<p class="eq-where">with friction angle \(\varphi\), cohesion \(c\) and dilation angle \(\psi\). On any plane the shear
+stress is at most \(c + \sigma_n'\tan\varphi\), with \(\sigma_n'\) the compressive normal stress. The flow is
+non-associated: \(\psi < \varphi\) gives the moderate dilation real sands show; \(\psi = \varphi\) would greatly
+overpredict it.</p>
+
+<p>The return is solved exactly in principal space: first to the main plane; if that crosses an edge,
+to the edge (triaxial compression corner \(s_1 = s_2\) or extension corner \(s_2 = s_3\)); if that fails,
+to the apex at \(s_1 = s_2 = s_3 = c\cot\varphi\). Each is a 1&times;1 or 2&times;2 linear solve
+<a class="cite" href="references.html#ref-desouzaneto2008">de Souza Neto et al. 2008</a>. With \(\varphi = 0\) the
+model is Tresca, used for undrained clay with \(c = s_u\).</p>
+
+<p><strong>Tension cut-off.</strong> <code>sigmaT</code> adds three Rankine planes \(s_i \le \sigma_T\) with
+\(0 \le \sigma_T \le c\cot\varphi\), and an active-set return over the main, edge and tension planes
+(decision 0015).</p>
+
+<h2 id="drucker-prager">Drucker-Prager</h2>
+<p><code>type druckerPrager</code>, a smooth cone
+<a class="cite" href="references.html#ref-drucker1952">Drucker and Prager 1952</a>:</p>
+$$f = \sqrt{J_2} + \eta\,p_m - \xi c,\qquad g = \sqrt{J_2} + \bar\eta\,p_m ,$$
+<p>matched to Mohr-Coulomb by the option <code>fit</code>
+<a class="cite" href="references.html#ref-desouzaneto2008">de Souza Neto et al. 2008</a>:</p>
+<table>
+<thead><tr><th><code>fit</code></th><th>\(\eta\)</th><th>\(\xi\)</th><th>Matches Mohr-Coulomb</th></tr></thead>
+<tbody>
+<tr><td><code>compression</code> (default)</td><td>\(\dfrac{6\sin\varphi}{\sqrt3(3-\sin\varphi)}\)</td><td>\(\dfrac{6\cos\varphi}{\sqrt3(3-\sin\varphi)}\)</td><td>in triaxial compression (outer cone)</td></tr>
+<tr><td><code>extension</code></td><td>\(\dfrac{6\sin\varphi}{\sqrt3(3+\sin\varphi)}\)</td><td>\(\dfrac{6\cos\varphi}{\sqrt3(3+\sin\varphi)}\)</td><td>in triaxial extension (inner cone)</td></tr>
+<tr><td><code>plane_strain</code></td><td>\(\dfrac{3\tan\varphi}{\sqrt{9+12\tan^2\varphi}}\)</td><td>\(\dfrac{3}{\sqrt{9+12\tan^2\varphi}}\)</td><td>in plane-strain failure</td></tr>
+</tbody>
+</table>
+<p>\(\bar\eta\) follows from \(\psi\) by the same formula. The return goes to the cone, or to the apex
+when the cone return would cross the axis. In silo flow the compression fit is far too strong: use
+<code>plane_strain</code>, which gave a discharge rate within 12 % of Mohr-Coulomb's for the Couto silo.</p>
+
+<h2 id="cohesion">Cohesion and tensile strength</h2>
+<p>A cohesive material (\(c > 0\)) can stand in a vertical cut and arch over an outlet. In the free-surface
+solver, a contact face may carry tension up to the tensile strength: <code>sigmaT</code> if given, otherwise
+\(c\cot\varphi\), the apex of the cone. Beyond it the material tears and void opens (decision 0054). A
+material with \(c = 0\) or \(\sigma_T = 0\) carries no tension at all.</p>
+<p>Checks: a cohesive column with a free face stands or fails within Terzaghi's limits for the critical
+height, \(H_c = (2.67\ \text{to}\ 4)\,\frac{c}{\gamma}\tan(45^\circ+\varphi/2)\)
+<a class="cite" href="references.html#ref-terzaghi1943">Terzaghi 1943</a>, and a cohesive silo arches over outlets
+narrower than Jenike's critical width and flows through wider ones
+<a class="cite" href="references.html#ref-jenike1964">Jenike 1964</a> (see <a href="validation.html">Validation</a>).</p>
+
+<h2 id="mu-i">Rate-dependent friction \(\mu(I)\)</h2>
+<p>Dense granular flows are well described by a friction coefficient that depends on the inertial number
+<a class="cite" href="references.html#ref-gdrmidi2004">GDR MiDi 2004</a>
+<a class="cite" href="references.html#ref-jop2006">Jop et al. 2006</a>,</p>
+$$I = \frac{\dot\gamma\,d}{\sqrt{p/\rho_s}},\qquad
+\mu(I) = \mu_s + \frac{\mu_2 - \mu_s}{I_0/I + 1},$$
+<p class="eq-where">the ratio of the time a grain takes to fall into a hole under the confining pressure \(p\)
+to the time of the shear \(1/\dot\gamma\); \(d\) is the grain diameter and \(\rho_s\) the grain density. At rest
+\(\mu = \mu_s = \tan\varphi\); in fast flow it approaches \(\mu_2\). Glass beads give
+\(\mu_s = \tan 20.9^\circ\), \(\mu_2 = \tan 32.76^\circ\), \(I_0 = 0.279\)
+<a class="cite" href="references.html#ref-jop2005">Jop et al. 2005</a>.</p>
+
+<p>celFoam puts the law inside the Mohr-Coulomb and Drucker-Prager returns (decision 0037). The friction
+sets the mobilised angle \(\varphi_m = \arctan\mu\); a base return at \(\varphi_m\) gives the plastic shear
+increment \(\Delta\gamma = \sqrt{2\,\mathbf e^p:\mathbf e^p}\) and the pressure after the return, hence
+\(I = (\Delta\gamma/\Delta t)\,d\sqrt{\rho_s/p}\). The friction that agrees with its own \(I\), the root of
+\(R(\mu) = \mu - \mu(I(\mu))\), is found by the Illinois method to \(10^{-14}\mu_2\).</p>
+
+<p>The \(\mu(I)\) law is ill-posed at small and large \(I\) in time-dependent flows
+<a class="cite" href="references.html#ref-barker2015">Barker et al. 2015</a>. The optional regularisation of
+<a class="cite" href="references.html#ref-barker2017">Barker and Gray 2017</a> (<code>muIAlpha</code>) replaces the law
+below its well-posed range by \(\mu = \sqrt{\alpha/\ln(A/I)}\). For \(\mu_s = \tan 35^\circ\) the Jop law has no
+well-posed range, so the branch cannot be built and it stays off in the tutorials; the nonlocal law below
+is the cure used instead.</p>
+
+<h3 id="dilatancy">Optional dilatancy</h3>
+<p>With <code>phi0</code>, <code>phiC</code>, <code>bPhi</code> and <code>KDil</code> the dilation angle follows the state, a compressible
+\(\mu(I)/\Phi(I)\) law <a class="cite" href="references.html#ref-pailha2009">Pailha and Pouliquen 2009</a>:</p>
+$$\tan\psi = K_\text{dil}\big(\Phi_s - \Phi_\text{eq}(I)\big),\qquad \Phi_\text{eq}(I) = \Phi_C - b_\Phi I,\qquad
+\Phi_s = \Phi_0\exp(-\operatorname{tr}\boldsymbol\varepsilon^p),$$
+<p class="eq-where">clipped to \(|\psi| \le \varphi_m\). Dense material dilates while it flows, loose material
+contracts, and both tend to the critical solid fraction. It did not improve the silo results and is off
+by default (decision 0048).</p>
+
+<h2 id="nonlocal">Nonlocal friction: shear bands with a physical width</h2>
+<p>With a local friction law a shear band has no length scale: it narrows to one to four cells on any
+mesh, and run-outs and band widths change with the mesh (decision 0038). The nonlocal granular fluidity
+model <a class="cite" href="references.html#ref-kamrin2012">Kamrin and Koval 2012</a>
+<a class="cite" href="references.html#ref-henann2013">Henann and Kamrin 2013</a> adds a length proportional to
+the grain size. The plastic shear rate is written as a fluidity \(g\) times the stress ratio,</p>
+$$\dot\gamma^p = g\,\mu,\qquad \mu = \frac{\tau}{p},\quad \tau = \sqrt{J_2},$$
+<p>and \(g\) obeys a screened Poisson equation, solved on the mesh every step:</p>
+$$\nabla^2 g = \frac{1}{\xi^2}\,(g - g_\text{loc}),\qquad
+\xi = \frac{A\,d}{\sqrt{|\mu - \mu_s|}},\qquad
+g_\text{loc} = \begin{cases}\sqrt{\dfrac{p}{\rho_s d^2}}\ \dfrac{\mu - \mu_s}{b\,\mu} & \mu > \mu_s\\[1ex] 0 & \text{otherwise}\end{cases}$$
+<p class="eq-where">with \(b = (\mu_2 - \mu_s)/I_0\), the small-\(I\) slope of the \(\mu(I)\) law, and the nonlocal amplitude
+\(A\) (<code>nonlocalA</code>; 0.48 for glass beads). In uniform shear \(g = g_\text{loc}\) and the local \(\mu(I)\) law is
+recovered; near a band the fluidity spreads over the cooperativity length \(\xi\), a few grain diameters, so
+the band has a physical width and flow can creep below the yield stress next to a flowing zone, as in
+experiments.</p>
+<p>In the point update the deviator is scaled down at fixed pressure so that
+\(\tau = \tau^\text{trial} - G\,\Delta t\,g\,\mu\), with the local part of \(g\) implicit (an explicit \(g\) is unstable)
+and the nonlocal part from the field equation. A sheared layer on three meshes (cells of 2, 1 and 0.5
+\(d\)) gives a band about \(3d\) wide whose width converges, and a velocity profile within 5 % of the 1D
+nonlocal solution (decision 0111). Cells must be about \(d\) or finer near the band for the converged
+width; coarser cells still widen the band but do not converge.</p>
+<p><strong>With cohesion</strong> the law reads the shifted pressure \(p^* = p + c\cot\varphi\) everywhere it reads
+\(p\), so \(\mu^* = \tau/p^*\) and flow starts at the cohesive yield \(\tau = c + \mu_s p\) (decision 0112).</p>
+
+<h2 id="cap">Compaction cap</h2>
+<p>A frictional cone alone has no volumetric yield: a deposit loaded by its own weight does not compact.
+The cap (<code>capLambda</code>, decision 0113) adds a volumetric yield \(p \le p_c\) whose preconsolidation pressure
+\(p_c\) hardens so that loading along the cap follows the normal compression line in its natural-strain form
+<a class="cite" href="references.html#ref-butterfield1979">Butterfield 1979</a>
+<a class="cite" href="references.html#ref-wood1990">Wood 1990</a>:</p>
+$$\varepsilon_v = \lambda^*\ln\frac{p}{p_0},\qquad \lambda^* = \frac{\lambda}{1+e_0},$$
+<p class="eq-where">with \(\varepsilon_v\) the compressive volumetric strain. Unloading and reloading below \(p_c\) are
+elastic with the bulk modulus \(K\) from \(E\) and \(\nu\). After the frictional update, if \(p' > p_c\) the step's
+volumetric strain is shared so that the new stress lies on the line:</p>
+$$p_{c,\text{new}} = p_c\,\exp\!\Big(\frac{p' - p_c}{K\lambda^*}\Big),$$
+<p>and the stress is scaled by \(p_{c,\text{new}}/p'\) towards the apex, so it stays inside the cone. The cap
+needs \(K\lambda^* > p\) (the elastic line stiffer than the compression line). \(p_c\) starts at
+\(\max(p, p_0)\): material is normally consolidated where it is first loaded. A settling column follows
+\(\ln(\rho/\rho_0) = p_0/K + \lambda^*\ln(p/p_0)\) within 2 % in every loaded cell.</p>
+
+<h2 id="rest">At-rest stress and relaxation</h2>
+<p>A deposit settled under gravity in a wide container carries a horizontal stress \(K_0\) times the
+vertical one, with \(K_0 \approx 1 - \sin\varphi\) for normally consolidated sand
+<a class="cite" href="references.html#ref-jaky1944">Jaky 1944</a>. Grains that land at speed when a silo is
+filled from the top lock in a much larger sideways stress (\(K \approx 0.87\) against 0.42), which a
+perfectly plastic model inside its cone never releases. The option <code>restRelax</code> relaxes the horizontal
+stress of full, slow cells towards \(K_0\) times the vertical stress with a time constant \(T\)
+(decision 0114):</p>
+$$\dot\sigma_h = -\frac{1}{T}\big(\sigma_h - K_0\,\sigma_v\big)\qquad\text{where } |\mathbf v| < v_\text{rest}.$$
+
+<h2 id="walls">Friction against walls</h2>
+<p>Walls, outlets while closed, and STL bodies use Coulomb friction with a wall friction angle
+\(\delta_w\) and, on bodies, an adhesion \(a\): the shear traction is at most \(a + \tan\delta_w\) times the
+wall pressure, and the material separates from the wall rather than pull on it
+(<a href="theory-equations.html#boundaries">Theory I</a>). The wall friction coefficient
+\(\mu_w = \tan\delta_w\) is measured with a shear box against the wall material; the Couto wheat on steel
+has \(\mu_w = 0.20\)
+<a class="cite" href="references.html#ref-couto2013">Couto et al. 2013</a>. It controls how much of the
+weight in a silo the walls carry (Janssen's effect, see <a href="validation.html">Validation</a>).</p>
+
+<h2 id="parameters">Choosing parameters</h2>
+<p>Material values should come from tests on the material or from published data. Typical values:</p>
+<table>
+<thead><tr><th>Parameter</th><th>Dry sand, grain</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>Bulk density \(\rho\)</td><td>750 to 1800 kg/m&sup3;</td><td>wheat 856 kg/m&sup3; (Couto silo)</td></tr>
+<tr><td>Young's modulus \(E\)</td><td>1 to 50 MPa</td><td>of the bulk solid at low pressure; sets the time step. Flow results depend on it only weakly with the T0 rule set</td></tr>
+<tr><td>Poisson's ratio \(\nu\)</td><td>0.25 to 0.35</td><td>sets \(K_0 = \nu/(1-\nu)\) of an elastic fill</td></tr>
+<tr><td>Friction angle \(\varphi\)</td><td>25&deg; to 40&deg;</td><td>wheat 30.2&deg;; the T0 placeholder 35&deg;</td></tr>
+<tr><td>Dilation angle \(\psi\)</td><td>0&deg; to 10&deg;</td><td>use a low value (0.5&deg; to 1&deg;) for silo flow; large \(\psi\) slows discharge</td></tr>
+<tr><td>Cohesion \(c\)</td><td>0 for dry grain</td><td>a few hundred Pa makes powders arch</td></tr>
+<tr><td>\(\mu_2\), \(I_0\)</td><td>\(\mu_2 - \mu_s \approx 0.26\), \(I_0 \approx 0.28\)</td><td>glass beads <a class="cite" href="references.html#ref-jop2005">Jop et al. 2005</a></td></tr>
+<tr><td>\(A\)</td><td>0.48</td><td>glass beads <a class="cite" href="references.html#ref-henann2013">Henann and Kamrin 2013</a></td></tr>
+<tr><td>\(\lambda^*\)</td><td>0.005 to 0.05</td><td>from an oedometer test</td></tr>
+</tbody>
+</table>
+
+</main>
+</body>
+</html>

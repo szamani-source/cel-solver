@@ -113,7 +113,8 @@ Phase 2 (the C++ Eulerian solver: 2.1 to 2.5c, 2.4b and 2.6 done) and Phase 3 (s
 | K.3 | Filling from the top with the cap | Box done; silo next | Decisions 0113, 0114. The cap compacts but top-fill K stays 0.87 (impact-locked lateral stress). Slower inlet barely helps (0.80). New `restRelax { time 0.05; speed 0.01; }` relaxes resting cells to K0 (Jaky): box K 0.42, gravity-on unchanged. `tests/test_rest_relax.sh` (3 min). Couto silo top fill with it (2 s settle): GA0 9.3 kPa (in range), cylinder still 40-80 % high (heap and denser fill). The 1541 kg overfill was the inlet's size on the mesh, now fixed (decision 0115); at 1503 kg the upper cylinder is still 25-60 % high, so the heap and packing are the cause |
 | G.5 | STL walls on angled meshes | Done (decision 0107): `tests/test_angled_stl.sh`; Couto STL shell inside the aligned mesh with rounded corners (`buffered_case.py`): MC 124 kg/s, DP 110 kg/s, no leak, pressures as on the aligned mesh. Top fill through a narrow inlet doubles the at-rest pressures (decision 0108). GA1/GA2 low in discharge is not wall friction, a T0 rule, dilation or the start (decision 0109). Revisited with the nonlocal law (2026-11-21): GA2 up 0.8 kPa (11-14 % low), GA1 unchanged (25-30 % low), rate 119 kg/s; the length scale (about 12 mm) is below the 25 mm cylinder cells. With 12 mm cylinder rows (decision 0115, `CEL_H_TOP`): rate 119.7, GA2 5.39 (7 % low), GA1 5.25 (26 % low). Known gap | |
 | H.7 | Couto on the graded wall-aligned mesh | Done (done-when partly met) | Decision 0105. Outlet rows 3x finer + fullBlend: MC 84.7 kg/s, DP (plane strain) 86.9 kg/s, largest speed 1.4 m/s (was 24-66 m/s spikes); discharge GA0 and GA1 pass both models, GA2 -32 % / -18 %; GA0 at rest +21 % / +17 %. Beverloo 115 kg/s; Sia's Abaqus closer to it |
-| M.0 | User manual skeleton, home page, checker (decision 0116) | Done | `docs/manual/`, `tests/test_manual.sh`; M.1 to M.10 follow, one PR each (`docs/wp/WP-M.md`) |
+| M.0 | User manual skeleton, home page, checker (decision 0116) | Done | `docs/manual/`, `tests/test_manual.sh` (`docs/wp/WP-M.md`) |
+| M.1-M.9 | Manual pages: installation, quick start, case setup (all 71 keywords), meshing, theory (equations, materials, bodies), validation, FAQ and known issues, 43 references | Done | 11 pages, 438 equations typeset in strict mode; DOIs of the less familiar entries checked by web search (doi.org blocked); one PR with M.0 because CI takes 3 h |
 
 ## Validation references
 
@@ -144,7 +145,7 @@ anything that cannot be undone outside this repository.
 ## Next
 
 User manual (Sia, 2026-11-22, decision 0116): HTML pages in `docs/manual/`, packages
-M.0 to M.10 (`docs/work-packages.md`). M.0 done; next M.1 (installation).
+M.0 to M.10 (`docs/work-packages.md`). M.0 to M.9 done; next M.10 (online preview, final review).
 
 Conical hopper validation (Sia, 2026-11-19; the last item before the Linux install
 package): H.1 (case spec, decision 0100), H.2 (hopper wall on the wedge, decision 0101) and H.3

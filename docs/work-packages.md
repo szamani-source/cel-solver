@@ -245,7 +245,7 @@ citations, validation. No new runs. Pages in `docs/manual/`, checked by
 | M.4 | Meshing guide | `meshing.html`: wall-aligned blockMesh, STL shell, cell-size rules |
 | M.5 | Theory I: equations and numerics | `theory-equations.html`: governing equations, Lagrange step, remap, void, time step |
 | M.6 | Theory II: material models | `theory-materials.html`: elastic, J2, DP, MC, mu(I), nonlocal, cohesion, cap, walls |
-| M.7 | Theory III: bodies and contact | `theory-bodies.html`: rigid bodies, hex8, penalty contact |
+| M.7 | Theory III: bodies and contact | `theory-bodies.html`: rigid bodies, hex8, cut-cell coupling |
 | M.8 | Validation | `validation.html`: the benchmarks of the validation report and the Couto silo |
 | M.9 | References with DOI check | every DOI on `references.html` verified against the publisher |
 | M.10 | Final review, FAQ, preview | `faq.html`; every page checked at desktop and phone width, light and dark |

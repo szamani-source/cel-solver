@@ -6,9 +6,24 @@
 
 var NAV = [
     { group: "Start here", pages: [
-        ["index.html", "Home"]
+        ["index.html", "Home"],
+        ["install.html", "Installation"],
+        ["quickstart.html", "Quick start"]
+    ]},
+    { group: "Using celFoam", pages: [
+        ["case-setup.html", "Case setup reference"],
+        ["meshing.html", "Meshing guide"]
+    ]},
+    { group: "Theory", pages: [
+        ["theory-equations.html", "Equations and numerics"],
+        ["theory-materials.html", "Material models"],
+        ["theory-bodies.html", "Bodies and contact"]
+    ]},
+    { group: "Validation", pages: [
+        ["validation.html", "Validation cases"]
     ]},
     { group: "Reference", pages: [
+        ["faq.html", "FAQ and known issues"],
         ["references.html", "References"]
     ]}
 ];

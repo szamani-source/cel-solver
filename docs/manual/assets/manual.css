@@ -249,6 +249,7 @@ figure img {
 figcaption { font-size: 0.9rem; color: var(--fg-muted); margin-top: 0.45rem; }
 
 .katex-display { overflow-x: auto; overflow-y: hidden; padding: 0.2rem 0; }
+.katex { position: relative; }   /* keeps KaTeX's hidden MathML copy inside the line (phone width) */
 
 .eq-where { margin-top: -0.3rem; font-size: 0.95rem; }
 
@@ -344,3 +345,4 @@ ol.refs .key { font-family: var(--mono); font-size: 0.78rem; color: var(--fg-mut
     main { margin: 0; padding: 0; }
     a { color: inherit; }
 }
+:not(pre) > code { overflow-wrap: anywhere; }   /* long paths wrap at phone width */

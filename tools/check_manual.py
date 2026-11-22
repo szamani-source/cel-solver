@@ -41,6 +41,21 @@ REQUIRED = {
     "index.html": ["OpenFOAM v2512", "GPL-3.0", "Eulerian", "Lagrangian", "Mohr-Coulomb",
                    "Drucker-Prager"],
     "references.html": [],
+    "install.html": ["setup_openfoam.sh", "Allwmake", "run_tests.sh", "source /usr/lib/openfoam",
+                     "ParaView", "v2512"],
+    "quickstart.html": ["siloDischarge", "Allrun", "materialProperties", "log.celFoam", "alpha",
+                        "Beverloo"],
+    "case-setup.html": ["controlDict", "materialProperties", "rigidBodies", "walls", "outlets",
+                        "inlets", "wedge", "decomposePar", "startFrom latestTime"],
+    "meshing.html": ["blockMesh", "simpleGrading", "checkMesh", "wedge", "STL", "3 to 5 mm",
+                     "shear band"],
+    "theory-equations.html": ["Lagrange step", "remap", "Riemann", "Hughes-Winget", "maxCo",
+                              "well-balanced"],
+    "theory-materials.html": ["Mohr-Coulomb", "Drucker-Prager", "plane_strain", "mu(I)",
+                              "nonlocal", "capLambda"],
+    "theory-bodies.html": ["cut", "hex8", "hourglass", "Flanagan", "freeSurface yes"],
+    "validation.html": ["Couto", "Beverloo", "Janssen", "123.8", "Prandtl"],
+    "faq.html": ["Known issues", "freeSurface yes", "writeFormat binary", "decision 0080"],
 }
 
 errors = []
@@ -294,19 +309,37 @@ def check_required(pages):
                 err("%s: must mention '%s'" % (n, t))
 
 
+# Keys celFoam writes and reads back itself (restart state in <time>/uniform),
+# not user input.
+STATE_KEYS = {"discharged", "charged", "lostMass", "nHandOver", "vStar", "bodyMassIn",
+              "rotation", "surfacePoints", "surfU", "tHex", "elements", "x", "v",
+              "sigmaV", "Qhg", "history", "workInt", "workExt"}
+
+
 def code_keywords():
-    """Dictionary keywords the C++ code reads (lookup, get, getOrDefault, ...)."""
-    pat = re.compile(r"\b(?:lookupOrDefault|getOrDefault|getOrAdd|lookup|get|found|subDict"
-                     r"|optionalSubDict|isDict|readIfPresent|readEntry|getCheck"
-                     r"|getCheckOrDefault)\s*(?:<[^>()]*>)?\s*\(\s*\"([A-Za-z_][A-Za-z0-9_]*)\"")
+    """Dictionary keywords the C++ code reads: lookup/get/... calls, findDict,
+    Function1 entries, and the parameter lists of the constitutive models."""
+    call = re.compile(r"\b(?:lookupOrDefault|getOrDefault|getOrAdd|lookup|get|found|subDict"
+                      r"|optionalSubDict|findDict|isDict|readIfPresent|readEntry|getCheck"
+                      r"|getCheckOrDefault|functionOrZero)\s*(?:<[^\"()]*?>+)?\s*"
+                      r"\(\s*\"([A-Za-z_][A-Za-z0-9_]*)\"")
+    func1 = re.compile(r"Function1<\w+>::New\s*\(\s*\"([A-Za-z_][A-Za-z0-9_]*)\"")
+    lists = re.compile(r"wordList\(\{([^}]*)\}\)")
     keys = set()
     for base in ("src", "applications"):
-        for d, _, files in os.walk(os.path.join(ROOT, base)):
+        for d, dirs, files in os.walk(os.path.join(ROOT, base)):
+            dirs[:] = [x for x in dirs if x != "lnInclude"]
             for f in files:
-                if f.endswith((".C", ".H")):
-                    keys.update(pat.findall(open(os.path.join(d, f), encoding="utf-8",
-                                                 errors="replace").read()))
-    return keys
+                if not f.endswith((".C", ".H")):
+                    continue
+                src = open(os.path.join(d, f), encoding="utf-8", errors="replace").read()
+                # Comments name keys that are not read; skip them.
+                src = re.sub(r"//[^\n]*|/\*.*?\*/", " ", src, flags=re.S)
+                keys.update(call.findall(src))
+                keys.update(func1.findall(src))
+                for m in lists.findall(src):
+                    keys.update(re.findall(r"\"([A-Za-z_][A-Za-z0-9_]*)\"", m))
+    return keys - STATE_KEYS
 
 
 def check_keywords(pages):

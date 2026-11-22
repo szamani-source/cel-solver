@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Validation cases · celFoam manual</title>
+<link rel="stylesheet" href="assets/katex/katex.min.css">
+<link rel="stylesheet" href="assets/manual.css">
+<script defer src="assets/katex/katex.min.js"></script>
+<script defer src="assets/katex/contrib/auto-render.min.js"></script>
+<script defer src="assets/manual.js"></script>
+</head>
+<body>
+<main>
+
+<h1>Validation cases</h1>
+<p class="lead">How well celFoam reproduces experiments, closed-form solutions and other
+solvers: silo and hopper discharge, wall pressures, granular collapse and flow, cohesion,
+footings, piles, impact, and the parallel and restart machinery. Each case names the test
+in the repository that reproduces it.</p>
+
+<p>"CI" tests run automatically on every change; "manual" tests are in <code>tests/manual/</code>
+because they take too long. Unless stated, the granular material is the T0 placeholder:
+cohesionless Mohr-Coulomb, \(\rho = 1800\) kg/m&sup3;, \(\varphi = 35^\circ\), \(\nu = 0.3\), with the
+T0 rule set and 10 mm cells.</p>
+
+<h2 id="couto">Couto silo: wheat in a conical-hopper silo</h2>
+<p>The main validation case. <a class="cite" href="references.html#ref-couto2013">Couto et al. 2013</a>
+measured the wall pressures of wheat in a 1 m steel silo with a 34.3&deg; conical hopper and a 0.35 m
+outlet, at eight load cells (GA0 on the hopper, GA1 to GA7 up the cylinder), at rest and during discharge.
+<a class="cite" href="references.html#ref-zheng2015">Zheng and Yu 2015</a> ran the same silo in
+Abaqus/Explicit CEL. celFoam runs it on the axisymmetric wedge with the wheat's published values:
+\(\rho = 856\) kg/m&sup3;, \(E = 10.67\) MPa, \(\nu = 0.3\), \(\varphi = 30.2^\circ\), \(c = 0\),
+\(\psi = 1^\circ\), wall friction 0.20.</p>
+
+<p>Setup: the wall-aligned wedge mesh with an STL shell inside it and rounded corners
+(<a href="meshing.html#stl-shell">Meshing</a>), 3 to 5 mm outlet cells, T0 rules plus <code>fullBlend</code>,
+gravity-on start, outlet opened at 0.5 s.</p>
+
+<figure>
+<img src="figures/couto-wall-pressure.png" alt="Wall pressure against height in the Couto silo at rest and during discharge, celFoam Mohr-Coulomb and Drucker-Prager against the experiment's load cells and Abaqus">
+<figcaption>Normal wall pressure against height. Left: at rest. Right: mean during discharge,
+0.25 to 1.0 s after opening, with the Abaqus CEL result of Zheng and Yu. Grey bars: the range of the
+seven Couto tests at each load cell.</figcaption>
+</figure>
+
+<table>
+<thead><tr><th>Quantity</th><th>Reference</th><th>celFoam</th><th>Status</th></tr></thead>
+<tbody>
+<tr><td>Discharge rate</td><td>Beverloo, 110 to 131 kg/s</td><td>Mohr-Coulomb 123.8 kg/s, Drucker-Prager (plane-strain fit) 109.6 kg/s</td><td>within / at the edge</td></tr>
+<tr><td>Wall pressure at rest, cylinder (GA1 to GA7)</td><td>Couto, 1.4 to 4.5 kPa</td><td>most cells inside the measured range</td><td>pass</td></tr>
+<tr><td>Wall pressure at rest, hopper (GA0)</td><td>8.6 to 9.6 kPa</td><td>about 20 to 25 % high</td><td>known gap</td></tr>
+<tr><td>Discharge peak at the transition (GA0)</td><td>18.7 to 24.8 kPa; Abaqus 27.5</td><td>about 24 kPa</td><td>pass</td></tr>
+<tr><td>Discharge, just above the transition (GA1, GA2)</td><td>7.1 to 8.2 and 5.8 to 6.5 kPa</td><td>GA1 5.3 (26 % low), GA2 5.4 (7 % low) with 12 mm upper cells</td><td>known gap; Abaqus is also low at GA2</td></tr>
+<tr><td>Leak through the STL wall</td><td>none</td><td>0 kg</td><td>pass</td></tr>
+</tbody>
+</table>
+
+<figure>
+<img src="figures/couto-discharge-mc.png" alt="Snapshots of bulk density and speed in the Couto silo during discharge">
+<figcaption>Couto silo discharge with Mohr-Coulomb: bulk density (top) and speed (bottom), from the
+opening to 0.65 s after. The flow converges in the hopper; dilated shear zones run from the outlet
+edge to the transition.</figcaption>
+</figure>
+
+<p>What was learned (decisions 0102 to 0115): the outlet cell size sets the rate (21 kg/s with uniform 25 mm
+cells, 106 with 3 to 5 mm outlet cells, 124 with rounded corners and the STL shell); Drucker-Prager must
+use the plane-strain fit; filling from the top raises the wall pressures unless the locked-in sideways
+stress is relaxed; and the GA1 deficit in discharge needs cells near the grain size in the cylinder
+(about 4 mm), which was not run.</p>
+
+<h2 id="benchmarks">Benchmark summary</h2>
+<table>
+<thead><tr><th>#</th><th>Benchmark</th><th>Reference</th><th>Result</th><th>Status</th><th>Test</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Silo discharge (T0 tank), rate across \(E\) = 0.1, 1, 10 MPa</td><td>Beverloo</td><td>65.8 / 52.0 / 60.8 kg/s/m (\(C\) = 0.79 / 0.63 / 0.73)</td><td>about 20 % spread with \(E\) (accepted)</td><td>CI <code>test_discharge.sh</code></td></tr>
+<tr><td>2</td><td>Settled tank, wall stresses</td><td>Janssen</td><td>within 1.7 %, \(K\) = 0.424</td><td>pass</td><td>CI <code>test_silo_settle.sh</code></td></tr>
+<tr><td>3</td><td>Steady inclined layer, 31&deg;</td><td>Bagnold profile of \(\mu(I)\)</td><td>profile error 3.6 / 0.9 / 0.8 % at \(E\) = 0.1 / 1 / 10 MPa</td><td>pass</td><td>CI <code>test_inclined_layer.sh</code></td></tr>
+<tr><td>4</td><td>Column collapse, aspect ratio 0.5 and 2</td><td>Lube et al.; Lajeunesse et al.</td><td>run-out 0.40 / 1.70 (1 MPa), 0.30 / 1.30 (10 MPa)</td><td>pass (low in the band)</td><td>manual <code>test_collapse_mui.sh</code></td></tr>
+<tr><td>5</td><td>Cohesive silo: arching over the outlet</td><td>Jenike critical width 109 / 55 mm</td><td>stops at 80 / 100 mm, flows at 120 / 140 mm (\(c\) = 500 Pa)</td><td>pass</td><td>CI <code>test_cohesion.sh</code></td></tr>
+<tr><td>6</td><td>Tank with STL walls</td><td>same tank with mesh walls</td><td>+4.4 %</td><td>pass</td><td>CI <code>test_stl_silo.sh</code></td></tr>
+<tr><td>7</td><td>Strip footing on Tresca clay</td><td>Prandtl, \(N_c = 2+\pi\)</td><td>&minus;8.1 % (10 cells across), &minus;1.9 % (20 cells)</td><td>pass</td><td>CI <code>test_footing.sh</code></td></tr>
+<tr><td>8</td><td>Strip footing on sand, \(\varphi = 30^\circ\)</td><td>Martin, \(N_\gamma = 7.65\)</td><td>high, falls with push speed</td><td>known issue</td><td>manual <code>test_sand_footing.sh</code></td></tr>
+<tr><td>9</td><td>Pile section through clay, smooth</td><td>Randolph and Houlsby, 9.14</td><td>9.29 (+1.7 %)</td><td>pass</td><td>CI <code>test_pile.sh</code></td></tr>
+<tr><td>10</td><td>Pile section, rough</td><td>Randolph and Houlsby, 11.94</td><td>11.26 (&minus;5.7 %) at 5 mm</td><td>pass</td><td>CI <code>test_rough_pile.sh</code></td></tr>
+<tr><td>11</td><td>Taylor bar, hex8 bodies (3D quarter)</td><td>Abaqus benchmark: 13.10 mm shortening</td><td>13.14 mm (+0.3 %), widening +4.2 %</td><td>pass</td><td>CI <code>test_taylor_bar.sh</code></td></tr>
+<tr><td>12</td><td>Taylor bar, Eulerian on the wedge</td><td>Abaqus axisymmetric: 13.11 mm</td><td>13.02 mm (&minus;0.7 %); lip widening smeared (&minus;16 %)</td><td>pass</td><td>CI <code>test_taylor_wedge.sh</code></td></tr>
+<tr><td>13</td><td>Silo fed from the top while it discharges</td><td>unfed rate, mass balance</td><td>outflow within 3 %; balance \(4\times10^{-14}\)</td><td>pass</td><td>CI <code>test_fed_silo.sh</code></td></tr>
+<tr><td>14</td><td>Round silo on the wedge against a 3D quarter model</td><td>each other</td><td>\(C\) 0.678 against 0.680</td><td>pass</td><td>CI <code>test_wedge_silo.sh</code></td></tr>
+<tr><td>15</td><td>Steel slug into clay</td><td>rigid slug; Prandtl energy estimate</td><td>deformable within 0.3 % of rigid; both 15 % short of the estimate</td><td>known issue</td><td>CI <code>test_projectile.sh</code></td></tr>
+<tr><td>16</td><td>Deformable footing (steel hex8)</td><td>the same footing rigid</td><td>force &minus;3 %</td><td>pass</td><td>CI <code>test_deformable_push.sh</code></td></tr>
+<tr><td>17</td><td>Free body dropped onto a deposit</td><td>its weight</td><td>force/weight 1.0000</td><td>pass</td><td>CI <code>test_free_body.sh</code></td></tr>
+<tr><td>18</td><td>Parallel runs with bodies (1, 2, 4 processors)</td><td>serial run</td><td>\(5\times10^{-15}\) over 100 steps</td><td>pass</td><td>CI <code>test_mpi_bodies.sh</code></td></tr>
+<tr><td>19</td><td>Restart</td><td>continuous run</td><td>identical bit for bit</td><td>pass</td><td>CI <code>test_restart.sh</code></td></tr>
+</tbody>
+</table>
+
+<h2 id="silo-theory">Silo discharge and wall pressure</h2>
+<p><strong>Discharge rate.</strong> A silo empties at a rate that does not depend on the fill height. The
+Beverloo correlation <a class="cite" href="references.html#ref-beverloo1961">Beverloo et al. 1961</a> gives,
+for a round outlet of diameter \(D\) (with the empty annulus correction \(k\,d\) ignored for \(D \gg d\)),</p>
+$$W = C\,\rho\,\sqrt{g}\,D^{5/2},\qquad C \approx 0.55\ \text{to}\ 0.65,$$
+<p class="eq-where">and for a slot of width \(D\), per unit length, \(W = C\rho\sqrt g D^{3/2}\). Continuum
+\(\mu(I)\) simulations reproduce it <a class="cite" href="references.html#ref-staron2014">Staron et al. 2014</a>.
+Hoppers flow faster than flat-bottomed silos by a factor that grows as the hopper steepens
+<a class="cite" href="references.html#ref-nedderman1992">Nedderman 1992</a>.</p>
+
+<p><strong>Wall pressure at rest.</strong> In a tall silo the walls carry part of the weight by friction, so the
+vertical stress saturates with depth <a class="cite" href="references.html#ref-janssen1895">Janssen 1895</a>
+<a class="cite" href="references.html#ref-sperl2006">Sperl 2006</a>. For a round silo of radius \(R\), with
+wall friction \(\mu_w\) and lateral stress ratio \(K\),</p>
+$$\sigma_v(z) = \frac{\rho g R}{2K\mu_w}\Big(1 - e^{-2K\mu_w z/R}\Big),\qquad p_w = K\sigma_v ;$$
+<p class="eq-where">for a 2D slot of width \(W\) replace \(R/2\) by \(W/2\) and \(2K\mu_w z/R\) by \(2K\mu_w z/W\). The
+settled T0 tank matches it within 1.7 % with \(K = 0.424\), close to \(1 - \sin\varphi\)
+<a class="cite" href="references.html#ref-jaky1944">Jaky 1944</a>.</p>
+
+<h2 id="granular-flow">Granular flow and collapse</h2>
+<p><strong>Inclined layer.</strong> A layer flowing steadily down a rough slope of angle \(\theta\) has the
+Bagnold velocity profile <a class="cite" href="references.html#ref-bagnold1954">Bagnold 1954</a>, which follows
+in closed form from the \(\mu(I)\) law <a class="cite" href="references.html#ref-gdrmidi2004">GDR MiDi 2004</a>
+<a class="cite" href="references.html#ref-jop2005">Jop et al. 2005</a>:</p>
+$$u(z) = \frac{2}{3}\,\frac{I_\theta}{d}\sqrt{\phi_s g\cos\theta}\;\Big(h^{3/2} - (h-z)^{3/2}\Big),\qquad
+I_\theta = I_0\,\frac{\tan\theta - \mu_s}{\mu_2 - \tan\theta},$$
+<p class="eq-where">with layer depth \(h\) and solid fraction \(\phi_s\). celFoam reproduces it within 5 % at every
+stiffness tested.</p>
+<p><strong>Column collapse.</strong> A column of grains released on a rough floor spreads to a run-out that
+depends on its aspect ratio \(a\) <a class="cite" href="references.html#ref-lube2005">Lube et al. 2005</a>
+<a class="cite" href="references.html#ref-lajeunesse2005">Lajeunesse et al. 2005</a>. celFoam lands low in the
+experimental band. With a local friction law the run-out grows on finer meshes (0.30, 0.33, 0.43 at 10, 5,
+2.5 mm); the nonlocal law makes the body of the deposit converge, leaving a thin toe (decision 0111).</p>
+
+<h2 id="cohesion">Cohesion</h2>
+<p>A cohesive material arches over an outlet narrower than a critical width and flows through a wider one
+<a class="cite" href="references.html#ref-jenike1964">Jenike 1964</a>; celFoam brackets Jenike's width for
+\(c\) = 250 and 500 Pa. A cohesive column with a free face stands or fails within Terzaghi's limits for the
+critical height <a class="cite" href="references.html#ref-terzaghi1943">Terzaghi 1943</a>, on three meshes,
+with Mohr-Coulomb and Drucker-Prager (CI <code>test_vertical_cut.sh</code>).</p>
+
+<h2 id="geotechnics">Footings, piles and impact</h2>
+<p><strong>Footing on clay.</strong> A rigid strip footing pushed into undrained (Tresca) clay of strength
+\(s_u\) fails at \(q = N_c s_u\) with \(N_c = 2+\pi\) <a class="cite" href="references.html#ref-prandtl1921">Prandtl 1921</a>;
+celFoam is 2 % low with 20 cells across the footing.</p>
+<p><strong>Footing on sand.</strong> The exact \(N_\gamma\) for \(\varphi = 30^\circ\) is 7.65
+<a class="cite" href="references.html#ref-martin2005">Martin 2005</a>. celFoam reads high, and the excess falls as
+the push slows: it is a numerical rate effect of order \(\rho c v\) from the Riemann solver (decision 0095). Treat
+quasi-static bearing loads on frictional material as upper estimates.</p>
+<p><strong>Pile section.</strong> A rigid circle moving through clay meets a limiting resistance of 9.14 \(s_u\)
+(smooth) to 11.94 \(s_u\) (rough) per unit length <a class="cite" href="references.html#ref-randolph1984">Randolph and Houlsby 1984</a>;
+celFoam is within 2 % (smooth) and 6 % (rough, with wall adhesion).</p>
+<p><strong>Taylor bar.</strong> A copper rod hitting a rigid wall <a class="cite" href="references.html#ref-taylor1948">Taylor 1948</a>,
+against the Abaqus benchmark solution: both the hex8 bodies and the Eulerian wedge get the shortening within
+1 %. The Eulerian wedge smears the thin lip at the impact face (first order in the cell size); use a
+Lagrangian body for thin flanges.</p>
+
+<h2 id="verification">Verification underneath</h2>
+<ul>
+<li>Material models: C++ against the Python reference to \(10^{-12}\) to \(10^{-15}\) on hundreds of strain paths.</li>
+<li>Elastic waves at 0&deg; and 45&deg; to the mesh: order 1.8 to 2.1, speeds within 0.2 %; rigid rotation 0.11 % per turn.</li>
+<li>Free surface: lake at rest to \(2.5\times10^{-17}\) m/s, free fall at \(g\), a translating block with exact edges.</li>
+<li>Wedge: Lam&eacute; cylinder within 0.9 %, round Janssen silo within 2 %.</li>
+<li>Angled cells: a column on leaning cells at the closed-form stress; collapse on cells leaning both ways within
+3 cells of the Cartesian run.</li>
+<li>Hex8: patch test to \(10^{-15}\), bar wave within 0.3 %, energy to \(10^{-7}\).</li>
+<li>Cut cells: covered volumes exact to \(4\times10^{-16}\).</li>
+</ul>
+
+<h2 id="cost">Cost</h2>
+<p>About 4 &micro;s per cell per step on one core with the T0 rule set. Four processors run 2.6 to 3.3 times
+faster than one. The 2D tank discharge of the quick start (2,480 cells, 2.3 s) takes about 11 minutes on one
+core; the Couto silo on the wedge (7,584 cells, 3 to 5 mm outlet cells) takes about 2 to 4 hours on four.</p>
+
+</main>
+</body>
+</html>
