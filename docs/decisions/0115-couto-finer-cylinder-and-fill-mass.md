@@ -64,9 +64,8 @@ No leak, largest speed at the end 0.004 m/s, heap top 2.664 m (silo top
   now goes in).
 - The 12 mm rows do not close GA1. With 12 mm rows the cells are still
   about the cooperative length, not several cells per length; resolving
-  it needs cells near d (4 mm) in the cylinder, about 9 times the cells and
-  a smaller time step there is not needed (outlet sets it), so about 9x the
-  run time (about 30 h on 4 cores). Not worth it before the Linux install;
+  it needs cells near d (4 mm) in the cylinder: about 9 times the cells at
+  the same time step (the outlet cells set it), so about 30 h on 4 cores. Not worth it before the Linux install;
   GA1 stays a known gap (Abaqus in Zheng and Yu is also low there).
 - The top-fill excess in the upper cylinder is not the fill mass. What is
   left is the heap (0.19 m above the silo top, where Couto's fill is level)
