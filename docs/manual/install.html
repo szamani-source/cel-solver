@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Installation · celFoam manual</title>
+<link rel="stylesheet" href="assets/katex/katex.min.css">
+<link rel="stylesheet" href="assets/manual.css">
+<script defer src="assets/katex/katex.min.js"></script>
+<script defer src="assets/katex/contrib/auto-render.min.js"></script>
+<script defer src="assets/manual.js"></script>
+</head>
+<body>
+<main>
+
+<h1>Installation</h1>
+<p class="lead">celFoam needs OpenFOAM v2512 from openfoam.com, a C++ compiler and Python 3.
+On Ubuntu 24.04 the whole setup, from a clean machine to a working solver, takes a few
+minutes.</p>
+
+<h2 id="requirements">Requirements</h2>
+
+<table>
+<thead><tr><th>Item</th><th>Needed</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>Operating system</td><td>Linux, x86-64</td><td>Ubuntu 24.04 is tested (it is the system of the
+continuous-integration image). Other distributions work if OpenFOAM v2512 is installed by other means.</td></tr>
+<tr><td>OpenFOAM</td><td>v2512 (openfoam.com)</td><td>Exactly this release. OpenFOAM from openfoam.org
+(OpenFOAM 11, 12, 13, ...) is a different code line and will not build celFoam.</td></tr>
+<tr><td>Compiler and MPI</td><td><code>g++</code>, <code>make</code>, Open MPI</td><td>Installed with OpenFOAM by the methods below.</td></tr>
+<tr><td>Python</td><td>Python 3 with <code>numpy</code></td><td>Used by tests and case scripts; <code>matplotlib</code> for the
+tutorial plots.</td></tr>
+<tr><td>Viewer</td><td>ParaView (optional)</td><td>To look at the results. Any version that reads OpenFOAM cases.</td></tr>
+<tr><td>Disk and memory</td><td>about 3 GB disk, 4 GB memory</td><td>OpenFOAM is about 2 GB. Cases in the tutorials need far less memory.</td></tr>
+<tr><td>Cores</td><td>1 or more</td><td>Every case runs in serial; larger cases run in parallel with MPI.</td></tr>
+</tbody>
+</table>
+
+<h2 id="get-source">1. Get the source</h2>
+
+<pre><code>git clone https://github.com/szamani-source/cel-solver.git
+cd cel-solver</code></pre>
+
+<p>Without git, download the repository as a ZIP from GitHub (<em>Code &rarr; Download ZIP</em>)
+and unpack it. The rest of this page assumes you are in the repository folder.</p>
+
+<h2 id="openfoam">2. Install OpenFOAM v2512</h2>
+
+<p>Pick one method. Method A is the one this project uses and tests.</p>
+
+<h3 id="method-a">Method A: the repository script (recommended)</h3>
+
+<pre><code>sudo tools/setup_openfoam.sh</code></pre>
+
+<p>The script installs the same OpenFOAM build that the project's automated tests use,
+at the standard place, <code>/usr/lib/openfoam/openfoam2512</code>. It downloads the
+OpenFOAM part of the pinned <code>opencfd/openfoam-dev:2512</code> container image straight from
+the registry (no Docker needed), checks every file against its SHA-256 checksum,
+unpacks it and installs the few Ubuntu libraries it needs. This takes about a minute
+(66 s for setup, build and tests together in a fresh cloud machine, decision 0007).</p>
+
+<ul>
+<li>It is safe to run again: it stops at once if OpenFOAM v2512 is already there.</li>
+<li>If the registries cannot be reached, it falls back to building OpenFOAM from the
+SourceForge source tarball, which takes about an hour on 4 cores.
+Force a method with <code>CEL_OF_METHOD=registry</code> or <code>CEL_OF_METHOD=source</code>.</li>
+<li>It needs root (it writes to <code>/usr/lib</code> and runs <code>apt-get</code>), plus
+<code>curl</code>, <code>python3</code> and <code>tar</code>.</li>
+</ul>
+
+<h3 id="method-b">Method B: the openfoam.com packages</h3>
+<p>OpenCFD publishes Ubuntu packages. Add their repository and install the development package:</p>
+<pre><code>curl -s https://dl.openfoam.com/add-debian-repo.sh | sudo bash
+sudo apt-get install openfoam2512-dev</code></pre>
+<p>This installs to the same path as Method A.</p>
+
+<h3 id="method-c">Method C: Docker</h3>
+<p>Run everything inside the image the project's tests use, with the repository mounted:</p>
+<pre><code>docker run -it --rm -v "$PWD":/work -w /work opencfd/openfoam-dev:2512 bash</code></pre>
+
+<div class="note">
+<p><strong>No root access?</strong> Build OpenFOAM v2512 from source in your home folder,
+following the instructions that come with the OpenFOAM source, and source its
+<code>etc/bashrc</code> wherever this manual sources
+<code>/usr/lib/openfoam/openfoam2512/etc/bashrc</code>. celFoam itself never needs root.</p>
+</div>
+
+<h2 id="environment">3. Load the OpenFOAM environment</h2>
+
+<p>Each new terminal needs the OpenFOAM environment before building or running:</p>
+<pre><code>source /usr/lib/openfoam/openfoam2512/etc/bashrc</code></pre>
+
+<p>To check it, <code>echo $WM_PROJECT_VERSION</code> should print <code>v2512</code>.
+You can add the <code>source</code> line to <code>~/.bashrc</code>, unless you also use
+another OpenFOAM installation.</p>
+
+<div class="warn">
+<p><strong>Two OpenFOAM versions on one machine.</strong> Load only one per terminal.
+If <code>~/.bashrc</code> loads another OpenFOAM (for example OpenFOAM 13 from
+<code>/opt/openfoam13</code>), open a fresh terminal, or remove that line, before loading v2512.
+Mixing them gives errors such as missing libraries or the wrong <code>blockMesh</code>.</p>
+</div>
+
+<h2 id="build">4. Build celFoam</h2>
+
+<pre><code>./Allwmake</code></pre>
+
+<p>This builds the four libraries (<code>celConstitutive</code>, <code>celEulerian</code>,
+<code>celLagrangian</code>, <code>celCoupling</code>), the solver <code>celFoam</code> and the
+utility <code>celBodyCells</code>. It takes 2 to 4 minutes. The programs go to
+OpenFOAM's user folders (<code>$FOAM_USER_APPBIN</code> and <code>$FOAM_USER_LIBBIN</code>,
+under <code>~/OpenFOAM</code>), which are already on the path once the environment is
+loaded, so <code>celFoam</code> can be run from any case folder.</p>
+
+<p>Check it:</p>
+<pre><code>which celFoam        # prints a path under ~/OpenFOAM/.../bin
+celFoam -help        # prints the usage</code></pre>
+
+<p>After pulling new code, run <code>./Allwmake</code> again; only the changed parts are rebuilt.
+<code>./Allwclean</code> removes the build.</p>
+
+<h2 id="test">5. Test the installation</h2>
+
+<p>A quick check (under a second) runs the smallest case:</p>
+<pre><code>bash tests/test_smokeBox.sh &amp;&amp; echo OK</code></pre>
+
+<p>Two more checks that exercise gravity, walls, the outlet and MPI, about 2 minutes each:</p>
+<pre><code>bash tests/test_silo_settle.sh &amp;&amp; echo OK
+bash tests/test_discharge.sh &amp;&amp; echo OK</code></pre>
+
+<p>The full regression suite is</p>
+<pre><code>tests/run_tests.sh</code></pre>
+<p>It runs every <code>tests/test_*.sh</code>, prints <code>PASS</code> or <code>FAIL</code> for each, and
+writes each test's output to <code>tests/&lt;name&gt;.log</code>. It takes about three hours on two
+cores, so it is mainly for developers; the automated checks on GitHub run it for every change.</p>
+
+<h2 id="paraview">6. Viewing results</h2>
+
+<p>celFoam writes standard OpenFOAM time folders. To open a case in ParaView, create an
+empty file with the <code>.foam</code> extension in the case and open it:</p>
+<pre><code>touch case.foam
+paraview case.foam</code></pre>
+<p>The fields are described on the <a href="quickstart.html">quick start</a> page. Each
+tutorial also has a <code>plot.py</code> that draws its key results with matplotlib
+(<code>sudo apt-get install python3-matplotlib</code>).</p>
+
+<h2 id="troubleshooting">Troubleshooting</h2>
+
+<table>
+<thead><tr><th>Message</th><th>Cause and fix</th></tr></thead>
+<tbody>
+<tr><td><code>wmake: command not found</code>, or <code>WM_PROJECT_DIR: parameter null or not set</code></td>
+<td>The OpenFOAM environment is not loaded in this terminal. Run the <code>source</code> line of step 3.</td></tr>
+<tr><td><code>celFoam: command not found</code></td><td>Not built yet, or built in another terminal with a
+different OpenFOAM loaded. Load v2512 and run <code>./Allwmake</code>.</td></tr>
+<tr><td>Build errors about unknown OpenFOAM classes or headers</td><td>The loaded OpenFOAM is not v2512
+(check <code>$WM_PROJECT_VERSION</code>).</td></tr>
+<tr><td><code>setup_openfoam.sh</code>: <code>registry ... failed, trying next</code></td><td>The container
+registry was not reachable or rate-limited. The script tries the next one, then the source build.
+A firewall that blocks <code>mirror.gcr.io</code> and <code>registry-1.docker.io</code> leaves only the
+source build.</td></tr>
+<tr><td><code>ModuleNotFoundError: No module named 'numpy'</code></td><td><code>sudo apt-get install python3-numpy</code>
+(add <code>python3-matplotlib</code> for the plots).</td></tr>
+<tr><td>A parallel run stops with an MPI error about slots</td><td>More processors were asked for than the
+machine has cores. The tutorials' <code>Allrun</code> scripts already allow this; when you start
+<code>mpirun</code> by hand, add <code>--oversubscribe</code> (Open MPI), or use fewer processors.</td></tr>
+</tbody>
+</table>
+
+<p>Next: run your first case on the <a href="quickstart.html">quick start</a> page.</p>
+
+</main>
+</body>
+</html>

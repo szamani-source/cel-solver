@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quick start · celFoam manual</title>
+<link rel="stylesheet" href="assets/katex/katex.min.css">
+<link rel="stylesheet" href="assets/manual.css">
+<script defer src="assets/katex/katex.min.js"></script>
+<script defer src="assets/katex/contrib/auto-render.min.js"></script>
+<script defer src="assets/manual.js"></script>
+</head>
+<body>
+<main>
+
+<h1>Quick start: empty a silo</h1>
+<p class="lead">This page runs the <code>siloDischarge</code> tutorial from start to finish: a 2D
+tank of sand-like material settles under gravity, then a slot in its floor opens and the
+tank empties. It shows what a case contains, how to run it and how to read the results.</p>
+
+<h2 id="the-case">The case</h2>
+
+<table>
+<thead><tr><th></th><th>Value</th></tr></thead>
+<tbody>
+<tr><td>Tank</td><td>0.40 m wide, filled to 0.60 m, plane strain (one cell deep)</td></tr>
+<tr><td>Outlet</td><td>a 0.06 m slot in the middle of the floor, closed until 0.3 s</td></tr>
+<tr><td>Material</td><td>density 1800 kg/m&sup3;, Young's modulus 10 MPa, Poisson's ratio 0.3,
+Mohr-Coulomb friction angle 35&deg;, no cohesion</td></tr>
+<tr><td>Friction law</td><td>\(\mu(I)\): friction rises with the shear rate, grains 1 mm</td></tr>
+<tr><td>Walls and floor</td><td>wall friction angle 20&deg;</td></tr>
+<tr><td>Mesh</td><td>10 mm square cells, 40 &times; 62</td></tr>
+<tr><td>Run time</td><td>about 11 minutes on one core (40 s with a softer material, see below)</td></tr>
+</tbody>
+</table>
+
+<h2 id="run">Run it</h2>
+
+<p>Load OpenFOAM and build celFoam first (<a href="install.html">Installation</a>). Then:</p>
+
+<pre><code>cd tutorials/siloDischarge
+./Allrun              # E = 10 MPa, about 11 minutes
+python3 plot.py       # pictures and the discharge rate</code></pre>
+
+<p>Variants:</p>
+<pre><code>./Allrun 0.1          # E = 0.1 MPa: a softer material, about 40 s
+./Allrun 10 4         # E = 10 MPa on 4 processors
+./Allclean            # back to the clean case</code></pre>
+
+<p><code>Allrun</code> does four things, each logged to a <code>log.&lt;program&gt;</code> file:</p>
+<ol>
+<li><code>restore0Dir</code> copies the initial fields from <code>0.orig</code> to <code>0</code>.</li>
+<li><code>blockMesh</code> builds the mesh from <code>system/blockMeshDict</code>.</li>
+<li><code>setFields</code> fills the tank: material fraction <code>alpha</code> = 1 and density 1800 below
+0.6 m, empty (void) above.</li>
+<li><code>celFoam</code> runs the simulation (with <code>decomposePar</code>, a parallel run and
+<code>reconstructPar</code> when more than one processor is asked for).</li>
+</ol>
+
+<div class="note"><p>Two time scales matter here. The time step is set by the elastic wave
+speed \(\sqrt{E/\rho}\), so a stiffer material needs more, smaller steps: 10 MPa takes
+about 15 times as long as 0.1 MPa. The discharge rate barely depends on \(E\), so a soft
+material is a cheap way to try a setup out.</p></div>
+
+<h2 id="files">What is in the case</h2>
+
+<pre><code>siloDischarge/
+├── 0.orig/alpha, rho           initial fields (setFields overwrites the inside)
+├── constant/g                  gravity vector
+├── constant/materialProperties material, walls, outlet, solver options
+├── system/blockMeshDict        the mesh
+├── system/setFieldsDict        where the material starts
+├── system/controlDict          end time, writing, time-step and settling controls
+├── system/decomposeParDict     how to split the mesh for parallel runs
+├── system/fvSchemes, fvSolution  required by OpenFOAM, not used by celFoam
+├── Allrun, Allclean, plot.py</code></pre>
+
+<p>The heart of the case is <code>constant/materialProperties</code>:</p>
+
+<pre><code>rho             1800;          // density, kg/m^3
+freeSurface     yes;           // material plus void: cells can be part full or empty
+
+type            mohrCoulomb;   // material model
+E               1e+07;         // Young's modulus, Pa
+nu              0.3;           // Poisson's ratio
+phi             35;            // friction angle, degrees
+c               0;             // cohesion, Pa
+psi             0;             // dilation angle, degrees
+sigmaT          0;             // tensile strength, Pa
+
+mu2             0.961813;      // mu(I): friction at high shear rate
+I0              0.279;         // mu(I): reference inertial number
+d               0.001;         // grain diameter, m
+rhoS            2650;          // grain density, kg/m^3
+
+shearCap        yes;           // numerical rules for flowing granular material
+spreadLayers    yes;           //   (the "T0 rule set", see the case setup page)
+flowImpedance   yes;
+normalCap       yes;
+
+walls                          // one entry per wall patch
+{
+    left   { friction 20; }    // wall friction angle, degrees
+    right  { friction 20; }
+    bottom { friction 20; }
+    top    { friction 0;  }
+}
+
+outlets
+{
+    outlet { friction 20; openTime 0.3; }   // a floor until 0.3 s, then open
+}</code></pre>
+
+<p>And in <code>system/controlDict</code>, beside the usual OpenFOAM entries:</p>
+
+<pre><code>endTime         2.3;       // settle 0.3 s, then 2 s of discharge
+deltaT          1e-5;      // overwritten every step by celFoam
+writeControl    adjustableRunTime;
+writeInterval   0.05;
+maxCo           0.4;       // fraction of the stable (CFL) time step used
+gravityRamp     0.1;       // gravity grows from 0 over 0.1 s
+damping         250;       // velocity damping (1/s) while settling, off when the outlet opens</code></pre>
+
+<p>Every keyword is explained on the <a href="case-setup.html">case setup</a> page.</p>
+
+<h2 id="log">Reading the log</h2>
+
+<p><code>log.celFoam</code> first lists the settings the solver understood: material model,
+gravity and ramp, damping, each wall and its friction, each outlet and when it opens,
+and the rules that are switched on. Check this block when you set up a new case: a
+misspelt wall name or a switch left off shows up here.</p>
+
+<p>Then, every step:</p>
+<pre><code>Time = 0.30012  deltaT = 2.53e-05</code></pre>
+<p>and at every write time:</p>
+<pre><code>Total mass      = ...     (kg in the mesh, which is 0.01 m deep)
+Total momentum  = ...
+Discharged mass = ...     (left through outlets so far)
+Fed mass        = ...     (came in through inlets so far)</code></pre>
+<p>Divide masses by the mesh depth (0.01 m) for values per metre of depth, as
+<code>plot.py</code> does. The line <code>Outlet outlet opened at t = 0.3 s; damping off</code> marks the opening.</p>
+
+<h2 id="fields">Fields written</h2>
+
+<p>Each write time folder (<code>0.05</code>, <code>0.1</code>, ...) holds:</p>
+<table>
+<thead><tr><th>Field</th><th>Meaning</th><th>Unit</th></tr></thead>
+<tbody>
+<tr><td><code>alpha</code></td><td>material volume fraction: 1 full, 0 empty (void)</td><td>&ndash;</td></tr>
+<tr><td><code>rho</code></td><td>density of the material in the cell</td><td>kg/m&sup3;</td></tr>
+<tr><td><code>U</code></td><td>velocity</td><td>m/s</td></tr>
+<tr><td><code>sigma</code></td><td>Cauchy stress, positive in tension (symmetric tensor)</td><td>Pa</td></tr>
+<tr><td><code>epsP</code>, <code>epsPEq</code></td><td>plastic strain tensor and equivalent plastic strain</td><td>&ndash;</td></tr>
+<tr><td><code>uniform/eulerianSolid</code></td><td>discharged and fed mass and other state needed to restart</td><td>&ndash;</td></tr>
+</tbody>
+</table>
+<p>Some options write more fields, for example <code>g</code> (fluidity of the nonlocal law) and
+<code>pc</code> (preconsolidation pressure of the compaction cap).</p>
+
+<h2 id="results">Results</h2>
+
+<p>Open the case in ParaView with <code>touch silo.foam; paraview silo.foam</code>, or run
+<code>python3 plot.py</code>, which writes the two pictures below and <code>rate.txt</code>.</p>
+
+<figure>
+<img src="figures/silo-snapshots.png" alt="Six snapshots of the tank from 0.3 s to 2.3 s: a fast stream above the outlet, a converging zone around it, the free surface coming down">
+<figcaption>Speed in the tank (blue) and empty cells (grey). After the outlet opens at
+0.3 s, a fast stream forms above it with a converging zone around it, and the top
+surface comes down nearly level, then dips above the outlet.</figcaption>
+</figure>
+
+<figure>
+<img src="figures/silo-mass.png" alt="Mass in the tank against time, falling linearly after the outlet opens">
+<figcaption>Mass in the tank. After a short start it falls at a steady rate, about
+64 kg/s per metre of depth here.</figcaption>
+</figure>
+
+<p>A steady rate that does not depend on the fill height is what experiments show for
+silos, and the Beverloo correlation predicts it
+<a class="cite" href="references.html#ref-beverloo1961">Beverloo et al. 1961</a>.
+For a slot of width \(D\) in 2D, per metre of depth,</p>
+$$W = C\,\rho\,\sqrt{g}\,D^{3/2},$$
+<p class="eq-where">where \(\rho\) is the bulk density and \(C\) a constant of order 1. Here
+\(C = 64/(1800\cdot\sqrt{9.81}\cdot 0.06^{1.5}) \approx 0.78\). The
+<a href="validation.html">validation</a> page compares celFoam with experiments and other
+solvers in more detail.</p>
+
+<h2 id="next-steps">Next steps</h2>
+<ul>
+<li>Change the outlet width in <code>system/blockMeshDict</code> (vertices 1, 2, 9, 10 and the
+block cell counts) and see the rate change with \(D^{3/2}\).</li>
+<li>Try the other tutorials:
+<code>siloCohesion</code> (cohesive material that arches over the outlet),
+<code>siloFed</code> (material fed in at the top while the tank empties),
+<code>stlSilo</code>, <code>stlHopper</code>, <code>stlTank</code> (walls from STL surfaces),
+<code>rigidBodyMotion</code> (a body pushed through the material).</li>
+<li>Read <a href="meshing.html">Meshing</a> before building your own geometry.</li>
+</ul>
+
+</main>
+</body>
+</html>

@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meshing guide · celFoam manual</title>
+<link rel="stylesheet" href="assets/katex/katex.min.css">
+<link rel="stylesheet" href="assets/manual.css">
+<script defer src="assets/katex/katex.min.js"></script>
+<script defer src="assets/katex/contrib/auto-render.min.js"></script>
+<script defer src="assets/manual.js"></script>
+</head>
+<body>
+<main>
+
+<h1>Meshing guide</h1>
+<p class="lead">The Eulerian mesh is fixed: material flows through it. Its cell size near
+outlets, walls and shear bands sets the accuracy more than anything else. This page says
+how to build meshes celFoam handles well and how fine they must be.</p>
+
+<h2 id="what-works">What meshes celFoam accepts</h2>
+<ul>
+<li><strong>Hexahedral cells</strong> from any OpenFOAM mesher. blockMesh is the usual tool.</li>
+<li><strong>2D (plane strain)</strong>: one cell thick, with the front and back faces in patches of type
+<code>empty</code>. Make the thickness equal to the in-plane cell size: on Cartesian meshes the stable
+time step uses the cube root of the cell volume. Masses and forces in the log are for the thickness of the mesh; divide by the
+thickness for values per metre of depth.</li>
+<li><strong>Axisymmetric</strong>: a wedge one cell thick (below).</li>
+<li><strong>3D</strong>: any hex mesh; run in parallel for anything but small cases.</li>
+<li><strong>Angled cells</strong>: cells do not have to be rectangles. Wall-aligned (body-fitted) meshes with
+columns that lean to follow a sloping wall are tested and recommended for hoppers (decisions 0103 to 0110).</li>
+</ul>
+
+<div class="warn"><p><strong>Limits of angled cells today.</strong> Meshes whose rows stay
+horizontal and whose columns lean (the hopper meshes on this page) are fully tested, also in
+parallel and with restart. Meshes turned or sheared so that no family of mesh lines follows
+gravity still show problems at a free surface: a layer resting on a turned slope creeps
+slowly (decision 0106). Keep one family of mesh lines horizontal where material has a free
+surface.</p></div>
+
+<h2 id="wall-aligned">Wall-aligned meshes with blockMesh</h2>
+
+<p>For silos and hoppers, build the mesh so that its boundary <em>is</em> the wall. A conical
+hopper is one trapezoid block whose column lines fan from vertical at the axis to the wall
+slope, while its rows stay horizontal; the cylinder above is a second block whose columns
+continue those of the hopper, so the two blocks join cell to cell. This is the same
+construction as OpenFOAM's own trapezoid tutorials.</p>
+
+<figure>
+<img src="figures/aligned-mesh.png" alt="Wall-aligned wedge mesh of a conical hopper under a cylinder: columns fan from vertical at the axis to the 34.3 degree wall, rows horizontal and finer towards the outlet">
+<figcaption>The mesh of the example below. Rows are 5 times finer at the outlet than at the top of the
+hopper (4 mm), and columns 2.5 times finer at the wall than at the axis. checkMesh: Mesh OK,
+non-orthogonality at most 34&deg;, skewness 0.6.</figcaption>
+</figure>
+
+<p>The complete <code>system/blockMeshDict</code> (the header lines are as in any OpenFOAM dictionary):</p>
+<pre><code>// Wall-aligned wedge mesh of a conical hopper under a cylinder (Couto silo
+// geometry): R 0.5 m, outlet radius 0.175 m, hopper wall 34.3 deg from the
+// vertical, cylinder 2 m. Wedge half angle 2.5 deg about the y axis.
+scale 1;
+
+vertices
+(
+    (0 0 0)                         // 0  axis, outlet level
+    (0.174833 0 -0.00763339)        // 1  outlet edge, front
+    (0.499524 0.476432 -0.0218097)  // 2  top of the hopper wall, front
+    (0 0.476432 0)                  // 3  axis, top of the hopper
+    (0.174833 0 0.00763339)         // 4  outlet edge, back
+    (0.499524 0.476432 0.0218097)   // 5  top of the hopper wall, back
+    (0.499524 2.55143 -0.0218097)   // 6  top of the cylinder, front
+    (0 2.55143 0)                   // 7  axis, top
+    (0.499524 2.55143 0.0218097)    // 8  top of the cylinder, back
+);
+
+blocks
+(
+    // hopper: a trapezoid whose column lines fan from vertical at the axis
+    // to the wall slope; rows 5x finer at the outlet (4 mm), columns 2.5x
+    // finer at the wall than at the axis
+    hex (0 1 2 3 0 4 5 3) (24 48 1) simpleGrading (0.4 5 1)
+
+    // cylinder: the same columns continue, square-ish rows
+    hex (3 2 6 7 3 5 8 7) (24 83 1) simpleGrading (0.4 1 1)
+);
+
+boundary
+(
+    outlet     { type patch; faces ((0 1 4 0)); }
+    hopperWall { type patch; faces ((1 2 5 4)); }
+    right      { type patch; faces ((2 6 8 5)); }
+    top        { type patch; faces ((7 8 6 7)); }
+    front      { type wedge; faces ((0 3 2 1) (3 7 6 2)); }
+    back       { type wedge; faces ((0 4 5 3) (3 5 8 7)); }
+    axis       { type empty; faces ((0 3 3 0) (3 7 7 3)); }
+);</code></pre>
+
+<p>How the vertices are found: a point at radius \(r\) and height \(y\) on the front face of a
+wedge of half angle \(\theta\) is \((r\cos\theta,\ y,\ -r\sin\theta)\), on the back face
+\((r\cos\theta,\ y,\ +r\sin\theta)\). The hopper height follows from the wall angle \(\beta\)
+measured from the vertical: \(h = (R - R_\text{out})/\tan\beta\). Vertices on the axis
+(\(r = 0\)) are shared by both faces, which makes the cells next to the axis prisms that
+blockMesh collapses onto the <code>axis</code> patch.</p>
+
+<p>Then, in <code>constant/materialProperties</code>, make the boundaries walls and the outlet an outlet:</p>
+<pre><code>walls
+{
+    right      { friction 11.3; }
+    hopperWall { friction 11.3; }
+    top        { friction 0; }
+}
+outlets
+{
+    outlet { friction 11.3; openTime 1.0; }
+}</code></pre>
+
+<p>Run <code>blockMesh</code> and then <code>checkMesh</code>. celFoam prints
+<code>Angled cells (WP G.1): ...</code> and <code>Axisymmetric wedge mesh ...</code> at the start when it
+recognises them.</p>
+
+<h3 id="grading">Grading</h3>
+<p><code>simpleGrading (gx gy gz)</code> sets, for each direction, the ratio of the last cell's
+size to the first's along the block's local axes. In the hopper block above the first
+\(x\) cell is at the axis and the last at the wall, so <code>gx = 0.4</code> makes the wall column
+0.4 times as wide as the axis column; the first \(y\) cell is at the outlet, so <code>gy = 5</code>
+makes the top row 5 times as tall as the outlet row. Use the same <code>gx</code> in both blocks so
+that their columns match. Keep neighbouring cells within a factor of about 1.2 in size.</p>
+
+<h2 id="cell-size">How fine?</h2>
+
+<table>
+<thead><tr><th>Where</th><th>Rule</th><th>Why</th></tr></thead>
+<tbody>
+<tr><td>Outlet of a silo or hopper</td><td>Cells of 3 to 5 mm across the outlet (for the 0.35 m Couto outlet that is
+about 40 cells across its radius on the wedge)</td><td>The outlet cells set the discharge rate. For the Couto silo (outlet 0.35 m), the
+rate rose from 21 kg/s with uniform 25 mm cells to 85 with rows 3 times finer at the outlet, and to
+106 with 3 to 5 mm outlet cells; wall grading alone changed almost nothing.</td></tr>
+<tr><td>Next to walls</td><td>Finer columns along the wall (grading 0.3 to 0.5)</td><td>The shear layer along a frictional wall is thin.</td></tr>
+<tr><td>Shear bands</td><td>10 to 20 grain diameters across the band, and cells of about one grain diameter
+\(d\) to converge its width with the nonlocal law</td><td>A local friction law puts every shear band in 1 to 4
+cells, so bands and run-outs depend on the mesh (decision 0038). The nonlocal law gives the band a
+physical width of a few \(d\) (about 3 \(d\) for glass beads, decision 0111), but only cells finer than the band
+can show it.</td></tr>
+<tr><td>Bulk of a silo</td><td>25 mm cells in a 1 m silo gave the discharge rate once the outlet was fine; finer
+cells (12 mm or less) are needed for wall pressures in the upper silo during discharge</td><td>Wall pressures higher up in
+the Couto silo were 15 to 25 % low at 25 mm and still low at 12 mm (decisions 0109, 0115).</td></tr>
+<tr><td>Under a footing or pile</td><td>At least 10 cells across the footing width, better 20</td><td>Bearing capacity
+was 8 % low with 10 cells across a 0.1 m footing and 2 % low with 20 (decision 0055).</td></tr>
+<tr><td>Deformable bodies</td><td>Elements close to the Eulerian cell size</td><td>Much finer elements pack the
+material under them (decision 0073).</td></tr>
+</tbody>
+</table>
+
+<div class="note"><p>Fine cells cost twice: more cells, and a smaller time step, because the
+step is limited by the elastic wave crossing the smallest cell. Halving the cells of a 2D mesh
+everywhere makes a run about 8 times as long. Refine where it matters (outlet, walls, bands) and
+keep the rest coarse.</p></div>
+
+<h2 id="stl">Walls from STL surfaces</h2>
+<p>A wall of any shape can be given as a closed STL surface on a mesh that does not follow it
+(<code>constant/rigidBodies</code>, see <a href="case-setup.html#bodies">Case setup</a>). The cells the
+surface cuts keep only their open part, with exact cut geometry (decisions 0043, 0047). This is the
+easy way to add tanks, inserts and bodies to a simple background mesh, and it is how moving bodies
+work.</p>
+
+<p>Rules for STL walls:</p>
+<ul>
+<li>The surface must be closed, with normals pointing out of the body.</li>
+<li>In 2D and on a wedge, extrude the outline beyond both the front and back of the mesh, so that no
+part of the surface lies on a mesh face (decision 0093).</li>
+<li>Do not place a surface exactly on a mesh face or a mesh line; move it by a fraction of a cell.</li>
+<li>Split long STL edges into pieces of about a cell, so that each triangle stays near the cells it cuts.</li>
+<li>An outlet under an STL floor is still a mesh patch: leave a gap in the STL over the outlet patch.</li>
+</ul>
+
+<h3 id="stl-shell">The best silo setup: an STL shell inside a wall-aligned mesh</h3>
+<p>For the Couto silo the most accurate setup so far combines both approaches: the wall-aligned mesh
+extends about three cells beyond the silo wall, and the wall itself is a 20 mm thick STL shell with
+rounded corners (a 50 mm fillet where the cylinder meets the hopper, 15 mm at the outlet edge, and a
+short 20 mm spout). Material that leaks through the wall would show up in the buffer cells; none did.
+With outlet cells of 3 to 5 mm and <code>fullBlend yes</code>, the Mohr-Coulomb rate was 124 kg/s, inside
+the Beverloo range of 110 to 131 kg/s. Rounded corners raised the rate without changing the wall pressures.
+The scripts that build it are <code>tests/hopper/buffered_case.py</code> and <code>tests/hopper/hopper_case.py</code>.</p>
+
+<figure>
+<img src="figures/couto-stl-shell-mesh.png" alt="Couto silo: STL shell 20 mm thick inside a wall-aligned wedge mesh, with zooms of the outlet edge and the hopper-to-cylinder transition">
+<figcaption>Couto silo: the STL shell (red) inside a wall-aligned wedge mesh of 7,584 cells, outlet rows 4 mm,
+about three buffer cells outside the shell. Left: whole silo; middle: outlet edge; right: transition.</figcaption>
+</figure>
+
+<h2 id="wedge">Axisymmetric wedges</h2>
+<ul>
+<li>One cell thick, symmetric about the plane \(z = 0\), with the axis along \(y\) as in the example.</li>
+<li>Half angle 2.5&deg; (a 5&deg; wedge) is tested; small angles keep the cells nearly flat.</li>
+<li>Front and back patches of type <code>wedge</code>; the collapsed faces on the axis of type <code>empty</code>.</li>
+<li>Cells next to the axis are prisms; that is expected.</li>
+<li>The outlet of a round silo is the floor patch from the axis to the outlet radius.</li>
+</ul>
+<p>A round silo on the wedge discharged at the same rate as a 3D quarter model of it to 0.2 %
+(validation report, benchmark 14), at a small fraction of the cost.</p>
+
+<h2 id="cartesian">Simple Cartesian meshes</h2>
+<p>A uniform Cartesian blockMesh with STL walls is the quickest way to start, and it is what the
+<code>stlSilo</code>, <code>stlHopper</code> and <code>stlTank</code> tutorials use. For hoppers, a wall-aligned mesh is more
+accurate: on a Cartesian mesh a sloping wall cuts cells into small pieces of every shape, and the
+outlet region needs very fine cells everywhere to resolve it.</p>
+
+<h2 id="checks">Checks before a long run</h2>
+<ol>
+<li><code>checkMesh</code> reports <code>Mesh OK</code>; non-orthogonality below about 40&deg;.</li>
+<li>Look at the mesh in ParaView, with the STL surfaces loaded on top.</li>
+<li>Run <code>celBodyCells</code> on cases with STL walls and look at <code>alphaBody</code>: the walls are where you
+expect, and there is a gap over the outlet patch.</li>
+<li>Run a short case with a soft material (lower <code>E</code> by 10 to 100 times): it settles in seconds and
+shows leaks, wrong patches and misplaced material before the real run.</li>
+<li>Read the settings block at the top of <code>log.celFoam</code>: every wall, outlet and inlet is listed.</li>
+</ol>
+
+</main>
+</body>
+</html>

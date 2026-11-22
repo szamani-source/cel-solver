@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Home · celFoam manual</title>
+<link rel="stylesheet" href="assets/katex/katex.min.css">
+<link rel="stylesheet" href="assets/manual.css">
+<script defer src="assets/katex/katex.min.js"></script>
+<script defer src="assets/katex/contrib/auto-render.min.js"></script>
+<script defer src="assets/manual.js"></script>
+</head>
+<body>
+<main>
+
+<h1>celFoam user manual</h1>
+<p class="lead">celFoam is an open-source explicit Coupled Eulerian-Lagrangian (CEL) solver for
+large-deformation solids and bulk materials: silo and hopper discharge, column collapse,
+footings, piles and projectiles in soil. It is built on OpenFOAM v2512 and released under
+GPL-3.0.</p>
+
+<h2 id="what-it-does">What celFoam does</h2>
+
+<p>A CEL solver combines two descriptions of motion. Material that flows a long way, such
+as sand leaving a silo, is tracked on a <strong>fixed Eulerian mesh</strong>: the material
+moves through the cells, and each cell records how full it is. Structures that keep their
+shape, such as a footing, a pile or a steel projectile, are <strong>Lagrangian</strong>
+bodies that move through the fixed mesh. Forces pass between the two. This is the same
+idea as Abaqus/Explicit CEL and LS-DYNA multi-material ALE
+<a class="cite" href="references.html#ref-benson1992">Benson 1992</a>
+<a class="cite" href="references.html#ref-qiu2011">Qiu et al. 2011</a>.</p>
+
+<p>celFoam integrates the equations explicitly in time. Each step:</p>
+<ol>
+<li>picks a stable time step from the elastic wave speed and the smallest cell (CFL condition);</li>
+<li>updates the stress in every cell with the material model;</li>
+<li>computes the forces between bodies and material on the cells the bodies cut;</li>
+<li>moves the material and the bodies (central-difference velocity and position update);</li>
+<li>maps the moved material back onto the fixed mesh (remap);</li>
+<li>writes results when asked.</li>
+</ol>
+
+<h2 id="capabilities">Capabilities</h2>
+
+<div class="table-wrap">
+<table>
+<thead><tr><th>Area</th><th>What is available</th></tr></thead>
+<tbody>
+<tr><td>Eulerian solid</td><td>Explicit cell-centred finite volume, Lagrange step plus remap, material
+and void in every cell, free surface, plane strain (2D), 3D and the axisymmetric wedge</td></tr>
+<tr><td>Material models</td><td>Elastic, von Mises (J2), Drucker-Prager, Mohr-Coulomb with tension
+cut-off, rate-dependent friction \(\mu(I)\), a nonlocal friction law with a length scale,
+cohesion, and a compaction cap</td></tr>
+<tr><td>Boundaries</td><td>Smooth and frictional walls, wall adhesion, outlets that open at a set
+time, a solid inlet that feeds material in, walls from STL surfaces</td></tr>
+<tr><td>Meshes</td><td>Any OpenFOAM hex mesh, including wall-aligned blockMesh meshes with angled
+cells of varying shape</td></tr>
+<tr><td>Lagrangian bodies</td><td>Rigid bodies from STL files (prescribed or free motion), deformable
+bodies of hex8 elements with hourglass control</td></tr>
+<tr><td>Coupling</td><td>Forces in both directions between bodies and the Eulerian material, through the cells each body's surface cuts (no penalty stiffness)</td></tr>
+<tr><td>Running</td><td>Serial or MPI parallel on any number of processors, restart from any
+written time</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>OpenFOAM supplies the mesh, the fields, the parallel decomposition and the file
+input and output <a class="cite" href="references.html#ref-weller1998">Weller et al. 1998</a>.
+The physics lives in four libraries of our own: <code>celConstitutive</code> (material
+models), <code>celEulerian</code> (the Eulerian solid), <code>celLagrangian</code> (bodies)
+and <code>celCoupling</code> (the cells bodies cut). OpenFOAM's own source is never changed, so any
+standard OpenFOAM v2512 installation can host celFoam.</p>
+
+<h2 id="how-to-read">How to read this manual</h2>
+
+<div class="cards">
+<a class="card" href="references.html"><strong>References</strong><span>Every paper and book
+the manual cites, with links.</span></a>
+</div>
+
+<p>The pages are listed in the menu on the left (under <em>Menu</em> on a phone). New
+users should read them in order. Equations follow the conventions below, and every
+claim that comes from the literature links to its entry in the
+<a href="references.html">reference list</a>.</p>
+
+<h2 id="conventions">Conventions</h2>
+<ul>
+<li>SI units throughout: metres, kilograms, seconds, pascals.</li>
+<li>Stress is <strong>positive in tension</strong>. The pressure is
+\(p = -\tfrac13 \operatorname{tr}\boldsymbol\sigma\), positive in compression.</li>
+<li>Bold symbols are vectors and tensors, for example the velocity \(\mathbf v\) and the
+Cauchy stress \(\boldsymbol\sigma\).</li>
+<li>Angles in input files are in degrees.</li>
+<li>Commands to type are shown in boxes like this one:</li>
+</ul>
+<pre><code>source /usr/lib/openfoam/openfoam2512/etc/bashrc
+./Allwmake</code></pre>
+
+<h2 id="licence">Licence and source</h2>
+<p>celFoam is free software under the GNU General Public License version 3 (GPL-3.0),
+the licence of OpenFOAM, which it links against. The source code, tests and design notes
+are in the repository <a href="https://github.com/szamani-source/cel-solver">szamani-source/cel-solver</a>.
+Design choices are recorded as numbered notes in <code>docs/decisions/</code>; this manual
+names them where a choice matters to a user (for example "decision 0105").</p>
+
+<p class="meta">This manual describes the code on the <code>main</code> branch in November 2026.</p>
+
+</main>
+</body>
+</html>

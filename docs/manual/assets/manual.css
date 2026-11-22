@@ -1,0 +1,348 @@
+/* celFoam user manual: one stylesheet for every page. No external fonts or scripts,
+   so the manual works offline (opened from disk) as well as on a web server. */
+
+:root {
+    --bg: #fbfbf9;
+    --bg-side: #f2f1ec;
+    --bg-code: #f0efe9;
+    --bg-note: #eef4fb;
+    --bg-warn: #fdf4e4;
+    --bg-ok: #eef7ef;
+    --fg: #1f2328;
+    --fg-muted: #5b6168;
+    --line: #dcdad2;
+    --accent: #1d5fa7;
+    --accent-soft: #d8e6f6;
+    --note-bar: #3c7fc8;
+    --warn-bar: #c98a12;
+    --ok-bar: #3f8f4e;
+    --mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --side-w: 17rem;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        --bg: #16181b;
+        --bg-side: #1d2024;
+        --bg-code: #23272c;
+        --bg-note: #18263a;
+        --bg-warn: #33290f;
+        --bg-ok: #162b1c;
+        --fg: #e4e6e8;
+        --fg-muted: #9aa1a9;
+        --line: #33383e;
+        --accent: #7fb2ec;
+        --accent-soft: #233a55;
+        --note-bar: #5c9be0;
+        --warn-bar: #d9a43a;
+        --ok-bar: #5fb06e;
+    }
+}
+
+:root[data-theme="dark"] {
+    --bg: #16181b;
+    --bg-side: #1d2024;
+    --bg-code: #23272c;
+    --bg-note: #18263a;
+    --bg-warn: #33290f;
+    --bg-ok: #162b1c;
+    --fg: #e4e6e8;
+    --fg-muted: #9aa1a9;
+    --line: #33383e;
+    --accent: #7fb2ec;
+    --accent-soft: #233a55;
+    --note-bar: #5c9be0;
+    --warn-bar: #d9a43a;
+    --ok-bar: #5fb06e;
+}
+
+* { box-sizing: border-box; }
+
+html { font-size: 16px; scroll-padding-top: 4rem; }
+
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--sans);
+    line-height: 1.6;
+}
+
+/* ---- layout: fixed side menu, content column ---- */
+
+.side {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: var(--side-w);
+    overflow-y: auto;
+    background: var(--bg-side);
+    border-right: 1px solid var(--line);
+    padding: 1.25rem 1rem 2rem;
+    font-size: 0.93rem;
+}
+
+.side .brand {
+    display: block;
+    font-weight: 700;
+    font-size: 1.15rem;
+    color: var(--fg);
+    text-decoration: none;
+    margin: 0 0.5rem 0.15rem;
+}
+
+.side .tagline {
+    margin: 0 0.5rem 1.2rem;
+    color: var(--fg-muted);
+    font-size: 0.82rem;
+    line-height: 1.35;
+}
+
+.side .group {
+    margin: 1.1rem 0.5rem 0.3rem;
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--fg-muted);
+}
+
+.side ul { list-style: none; margin: 0; padding: 0; }
+
+.side a.page {
+    display: block;
+    padding: 0.28rem 0.5rem;
+    border-radius: 6px;
+    color: var(--fg);
+    text-decoration: none;
+}
+
+.side a.page:hover { background: var(--accent-soft); }
+
+.side a.page.current {
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-weight: 600;
+}
+
+.side .toc { margin: 0.2rem 0 0.4rem 0.9rem; border-left: 1px solid var(--line); }
+
+.side .toc a {
+    display: block;
+    padding: 0.12rem 0.6rem;
+    color: var(--fg-muted);
+    text-decoration: none;
+    font-size: 0.84rem;
+}
+
+.side .toc a:hover { color: var(--accent); }
+
+.theme-toggle {
+    margin: 1.5rem 0.5rem 0;
+    background: none;
+    border: 1px solid var(--line);
+    color: var(--fg-muted);
+    border-radius: 6px;
+    padding: 0.25rem 0.6rem;
+    font: inherit;
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+
+.topbar { display: none; }
+
+main {
+    margin-left: var(--side-w);
+    padding: 2.5rem 3rem 4rem;
+    max-width: calc(var(--side-w) + 50rem);
+}
+
+main > * { max-width: 50rem; }
+
+/* ---- type ---- */
+
+h1 { font-size: 2rem; line-height: 1.2; margin: 0 0 0.4rem; }
+h2 { font-size: 1.45rem; margin: 2.4rem 0 0.6rem; padding-top: 0.6rem; border-top: 1px solid var(--line); }
+h3 { font-size: 1.15rem; margin: 1.8rem 0 0.4rem; }
+h4 { font-size: 1rem; margin: 1.4rem 0 0.3rem; }
+
+.lead { font-size: 1.12rem; color: var(--fg-muted); margin: 0 0 1.6rem; }
+
+a { color: var(--accent); }
+
+p, ul, ol { margin: 0.6rem 0; }
+li { margin: 0.2rem 0; }
+
+code, kbd, pre { font-family: var(--mono); font-size: 0.88em; }
+
+code {
+    background: var(--bg-code);
+    padding: 0.08em 0.32em;
+    border-radius: 4px;
+}
+
+pre {
+    background: var(--bg-code);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 0.85rem 1rem;
+    overflow-x: auto;
+    line-height: 1.45;
+}
+
+pre code { background: none; padding: 0; font-size: 1em; }
+
+kbd {
+    border: 1px solid var(--line);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    padding: 0 0.3em;
+}
+
+/* ---- tables ---- */
+
+.table-wrap { overflow-x: auto; margin: 1rem 0; }
+
+table { border-collapse: collapse; width: 100%; font-size: 0.93rem; }
+
+th, td {
+    text-align: left;
+    vertical-align: top;
+    padding: 0.45rem 0.65rem;
+    border-bottom: 1px solid var(--line);
+}
+
+th { background: var(--bg-side); font-weight: 600; }
+
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* ---- callouts ---- */
+
+.note, .warn, .ok {
+    border-left: 4px solid var(--note-bar);
+    background: var(--bg-note);
+    border-radius: 0 8px 8px 0;
+    padding: 0.7rem 1rem;
+    margin: 1.1rem 0;
+}
+
+.warn { border-left-color: var(--warn-bar); background: var(--bg-warn); }
+.ok { border-left-color: var(--ok-bar); background: var(--bg-ok); }
+
+.note > :first-child, .warn > :first-child, .ok > :first-child { margin-top: 0; }
+.note > :last-child, .warn > :last-child, .ok > :last-child { margin-bottom: 0; }
+
+/* ---- figures and equations ---- */
+
+figure { margin: 1.4rem 0; }
+
+figure img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: #fff;
+}
+
+figcaption { font-size: 0.9rem; color: var(--fg-muted); margin-top: 0.45rem; }
+
+.katex-display { overflow-x: auto; overflow-y: hidden; padding: 0.2rem 0; }
+.katex { position: relative; }   /* keeps KaTeX's hidden MathML copy inside the line (phone width) */
+
+.eq-where { margin-top: -0.3rem; font-size: 0.95rem; }
+
+/* ---- citations and references ---- */
+
+a.cite { text-decoration: none; white-space: nowrap; }
+a.cite::before { content: "["; color: var(--fg-muted); }
+a.cite::after { content: "]"; color: var(--fg-muted); }
+a.cite:hover { text-decoration: underline; }
+
+ol.refs { padding-left: 0; list-style: none; }
+ol.refs li { margin: 0 0 0.85rem; padding-left: 1rem; text-indent: -1rem; }
+ol.refs li:target { background: var(--accent-soft); border-radius: 6px; }
+ol.refs .key { font-family: var(--mono); font-size: 0.78rem; color: var(--fg-muted); }
+
+/* ---- cards on the home page ---- */
+
+.cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+    gap: 0.8rem;
+    margin: 1rem 0 1.5rem;
+}
+
+.card {
+    display: block;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 0.85rem 1rem;
+    text-decoration: none;
+    color: var(--fg);
+    background: var(--bg);
+}
+
+.card:hover { border-color: var(--accent); }
+.card strong { display: block; color: var(--accent); margin-bottom: 0.2rem; }
+.card span { font-size: 0.9rem; color: var(--fg-muted); }
+
+/* ---- page footer: previous / next ---- */
+
+.pager {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: 3.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--line);
+    font-size: 0.93rem;
+}
+
+.pager a { text-decoration: none; }
+.pager .next { margin-left: auto; text-align: right; }
+.pager small { display: block; color: var(--fg-muted); }
+
+.meta { color: var(--fg-muted); font-size: 0.85rem; margin-top: 2rem; }
+
+/* ---- narrow screens: menu becomes a drawer ---- */
+
+@media (max-width: 900px) {
+    .topbar {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        background: var(--bg-side);
+        border-bottom: 1px solid var(--line);
+        padding: 0.6rem 1rem;
+    }
+
+    .topbar button {
+        background: none;
+        border: 1px solid var(--line);
+        color: var(--fg);
+        border-radius: 6px;
+        padding: 0.2rem 0.6rem;
+        font: inherit;
+        cursor: pointer;
+    }
+
+    .topbar a { color: var(--fg); font-weight: 700; text-decoration: none; }
+
+    .side { transform: translateX(-100%); transition: transform 0.2s; z-index: 30; box-shadow: none; }
+    body.menu-open .side { transform: none; box-shadow: 0 0 30px rgba(0, 0, 0, 0.3); }
+
+    main { margin-left: 0; padding: 1.25rem 1rem 3rem; }
+    h1 { font-size: 1.6rem; }
+}
+
+@media print {
+    .side, .topbar, .pager, .theme-toggle { display: none; }
+    main { margin: 0; padding: 0; }
+    a { color: inherit; }
+}
+:not(pre) > code { overflow-wrap: anywhere; }   /* long paths wrap at phone width */
