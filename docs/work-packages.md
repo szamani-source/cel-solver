@@ -228,3 +228,24 @@ Sia (2026-11-20): needed before the Linux install, with cohesion and compaction.
 | K.2 | Cap in the Eulerian solver: settling column | Every loaded cell on ln(rho/rho0) = P0/K + lambda* ln(P/P0) within 2 %, mass conserved, at rest |
 | K.3 | Filling from the top with the cap | The decision 0108 top fill no longer doubles the wall pressures |
 | K.3a | Rest relaxation (decision 0114) | Top-filled box K mid-deposit 0.35-0.50 (0.87 without); gravity-on box unchanged (`tests/test_rest_relax.sh`) |
+
+
+## User manual (M series, decision 0116)
+
+Sia (2026-11-22): a comprehensive user manual as HTML pages: setup, theory with
+citations, validation. No new runs. Pages in `docs/manual/`, checked by
+`tests/test_manual.sh`. Brief and log: `docs/wp/WP-M.md`.
+
+| WP | Title | Done when |
+| --- | --- | --- |
+| M.0 | Skeleton, home and reference pages, checker | `tests/test_manual.sh` passes: NAV, links, citations, equations, required terms |
+| M.1 | Installation | `install.html` in NAV, test passes, covers cloud setup, laptop install, build, tests |
+| M.2 | Quick start | `quickstart.html`: the siloDischarge tutorial run end to end, outputs explained |
+| M.3 | Case setup reference | `case-setup.html`: every dictionary keyword the code reads is documented (checked) |
+| M.4 | Meshing guide | `meshing.html`: wall-aligned blockMesh, STL shell, cell-size rules |
+| M.5 | Theory I: equations and numerics | `theory-equations.html`: governing equations, Lagrange step, remap, void, time step |
+| M.6 | Theory II: material models | `theory-materials.html`: elastic, J2, DP, MC, mu(I), nonlocal, cohesion, cap, walls |
+| M.7 | Theory III: bodies and contact | `theory-bodies.html`: rigid bodies, hex8, penalty contact |
+| M.8 | Validation | `validation.html`: the benchmarks of the validation report and the Couto silo |
+| M.9 | References with DOI check | every DOI on `references.html` verified against the publisher |
+| M.10 | Final review, FAQ, preview | `faq.html`; every page checked at desktop and phone width, light and dark |
