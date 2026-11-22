@@ -16,6 +16,9 @@ inside it and rounded corners (buffered_case.aligned_buffered_case).
 
     python3 gap_case.py WORKDIR picture   # build, write the start, picture
     CEL_NPROCS=4 python3 gap_case.py WORKDIR run
+
+Environment: CEL_H_TOP (m, 0.025): row height in the upper cylinder (the
+columns there are about 12 mm already); the headroom stays 0.3 m.
 """
 import math
 import os
@@ -35,7 +38,8 @@ vc = hp.vc
 NP = int(os.environ.get("CEL_NPROCS", "1"))
 GAP_CELLS = 2
 T_DAMP, T_OPEN, T_END = 0.4, 1.0, 2.0
-HEAD_ROWS = 12
+H_TOP = float(os.environ.get("CEL_H_TOP", 0.025))
+HEAD_ROWS = int(round(12 * 0.025 / H_TOP))
 CELLS = ["GA0", "GA1", "GA2", "GA3", "GA4", "GA5", "GA6", "GA7"]
 
 
@@ -66,12 +70,12 @@ def build(work, check):
     H = ht + c["Hc"]
     w, _ = wall_cell_width(c)
     gap = GAP_CELLS * w
-    Hm = H + HEAD_ROWS * 0.025
+    Hm = H + HEAD_ROWS * H_TOP
     G = gap_profile(c, gap, Hm)
     # Couto fill mass in the full silo (incl. the spout) and in the gap fill
     prof = np.vstack([[c["Rout"], bc.Y0], bc.inner_profile(c)])
     ys = np.linspace(bc.Y0, H, 4001)
-    full = np.trapezoid(math.pi * np.interp(ys, prof[:, 1], prof[:, 0]) ** 2, ys)
+    full = getattr(np, "trapezoid", getattr(np, "trapz", None))(math.pi * np.interp(ys, prof[:, 1], prof[:, 0]) ** 2, ys)
     yy = np.linspace(bc.Y0, Hm, 8001)
     area = math.pi * np.clip(np.interp(yy, G[:, 1], G[:, 0]), 0, None) ** 2
     cum = np.concatenate([[0], np.cumsum(0.5 * (area[1:] + area[:-1]) * np.diff(yy))])
@@ -81,7 +85,7 @@ def build(work, check):
                  fillRight=[[float(y), float(r * ct)] for r, y in G[::2]]
                  + [[Hm + 1.0, float(G[-1, 0] * ct)]])
     p, c = bc.aligned_buffered_case(work, "couto_mc_gap", "mc", check, c, nProcs=NP,
-                                    head_rows=HEAD_ROWS)
+                                    head_rows=HEAD_ROWS, h_top=H_TOP)
     dp = f"{p}/system/decomposeParDict"
     txt = open(dp).read().replace(f"n ({NP} 1 1)", f"n (1 {NP} 1)")
     open(dp, "w").write(txt)
@@ -116,11 +120,12 @@ def picture(work):
     P = np.column_stack([r, a[:, 1]])
     k = np.array([np.argmin(((P - q) ** 2).sum(1)) for q in cen])
     val = a[k, 2] * a[k, 10]
-    poly = bc.shell_polygon(c, y_top=info["H"] + HEAD_ROWS * 0.025)
-    fig, axs = plt.subplots(1, 3, figsize=(15, 9), gridspec_kw=dict(width_ratios=[1.1, 1, 1]))
+    poly = bc.shell_polygon(c, y_top=info["H"] + HEAD_ROWS * H_TOP)
+    fig, axs = plt.subplots(1, 4, figsize=(19, 9), gridspec_kw=dict(width_ratios=[1.1, 1, 1, 1]))
     views = [((-0.02, 0.6), (-0.05, 2.85), "Whole silo"),
              ((0.10, 0.32), (-0.03, 0.16), "Outlet edge"),
-             ((0.36, 0.60), (0.36, 0.62), "Transition")]
+             ((0.36, 0.60), (0.36, 0.62), "Transition"),
+             ((0.36, 0.60), (1.40, 1.66), f"Upper cylinder ({H_TOP * 1000:.0f} mm rows)")]
     for ax, (xl, yl, title) in zip(axs, views):
         pc = PolyCollection(polys, array=val, cmap="YlOrBr", clim=(0, 1),
                             edgecolors="#9aa4b1", linewidths=0.25)
@@ -139,7 +144,7 @@ def picture(work):
     fig.suptitle(f"Couto silo start, MC: material placed with a {info['gap'] * 1000:.0f} mm "
                  f"empty gap along the wall ({GAP_CELLS} wall cells of {info['w'] * 1000:.1f} mm); "
                  f"fill top {info['y_fill']:.3f} m so the Couto mass ({info['mass']:.0f} kg) is in")
-    png = "/mnt/project-files/hopper/couto-gap-start.png"
+    png = os.environ.get("CEL_PNG", "/mnt/project-files/hopper/couto-gap-start.png")
     fig.savefig(png, dpi=130)
     print(png, info)
 
