@@ -76,3 +76,27 @@ No leak, largest speed at the end 0.004 m/s, heap top 2.664 m (silo top
 
 STATUS rows G.5 and K.3 updated. Run directories were scratch; the logs are
 copied above.
+
+## Addendum: the fine ("ideal") mesh, built but not run (2026-11-22)
+
+Sia asked to see a mesh that resolves the nonlocal length (about 12 mm), not
+to run it. Same wall-aligned blockMesh, STL shell inside, rounded corners:
+
+    CEL_H_TOP=0.012 CEL_NCOLS=58 CEL_WALL_RATIO=0.25 CEL_H_HOP=0.004 \
+        python3 tests/hopper/gap_case.py WORK picture
+    python3 tests/hopper/plot_mesh_sizes.py WORK/couto_mc_gap PNG TITLE
+
+- Columns: 58, 16 mm at the axis to 4 mm at the wall in the cylinder (was
+  44, 15 to 9 mm). The hopper block shares the columns, so they narrow with
+  the cone: 1.5 mm at the outlet edge, 5.8 mm at the axis there.
+- Rows: 4 mm through the whole hopper (was 4 mm at the outlet growing to
+  12 mm), growing to 12 mm over 0.5 m above the transition, 12 mm above.
+- 21,576 cells (12 mm-row mesh 12,336; best 25 mm mesh 7,584). checkMesh OK:
+  non-orthogonality max 34.9 deg, aspect ratio max 3.3.
+- Stable step 3.75e-6 s (was 5.85e-6 s), set by the 1.5 mm outlet-edge
+  cells: 533,609 steps for 2 s. Scaled from Run 1 (cells x steps), about
+  10 h on 4 cores.
+
+To keep the outlet cells at 3 mm or more, the hopper would need its own
+column count (another block layout), which would bring the step back to
+about 5.9e-6 s and the run to about 6.5 h.

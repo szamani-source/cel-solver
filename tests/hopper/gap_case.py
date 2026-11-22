@@ -19,6 +19,9 @@ inside it and rounded corners (buffered_case.aligned_buffered_case).
 
 Environment: CEL_H_TOP (m, 0.025): row height in the upper cylinder (the
 columns there are about 12 mm already); the headroom stays 0.3 m.
+CEL_NCOLS (44), CEL_WALL_RATIO (0.6, wall column / axis column) and
+CEL_H_HOP (m, 0.012, row height at the top of the hopper block) set the
+rest of the grading (decision 0115 addendum: the fine "ideal" mesh).
 """
 import math
 import os
@@ -39,6 +42,9 @@ NP = int(os.environ.get("CEL_NPROCS", "1"))
 GAP_CELLS = 2
 T_DAMP, T_OPEN, T_END = 0.4, 1.0, 2.0
 H_TOP = float(os.environ.get("CEL_H_TOP", 0.025))
+NCOLS = int(os.environ.get("CEL_NCOLS", 44))
+WALL_RATIO = float(os.environ.get("CEL_WALL_RATIO", 0.6))
+H_HOP = float(os.environ.get("CEL_H_HOP", 0.012))
 HEAD_ROWS = int(round(12 * 0.025 / H_TOP))
 CELLS = ["GA0", "GA1", "GA2", "GA3", "GA4", "GA5", "GA6", "GA7"]
 
@@ -47,7 +53,7 @@ def wall_cell_width(c):
     """Width across the wall of the open cell next to the wall in the
     cylinder: the column spacing at r = R from the aligned mesh's grading."""
     # columns axis -> M (R + TS/2), ncols 44, simpleGrading 0.6 (last/first)
-    n, L, g = 44, c["R"] + 0.5 * bc.TS, 0.6
+    n, L, g = NCOLS, c["R"] + 0.5 * bc.TS, WALL_RATIO
     q = g ** (1.0 / (n - 1))
     a = L * (1 - q) / (1 - q ** n)
     edges = np.concatenate([[0.0], np.cumsum(a * q ** np.arange(n))])
@@ -85,7 +91,8 @@ def build(work, check):
                  fillRight=[[float(y), float(r * ct)] for r, y in G[::2]]
                  + [[Hm + 1.0, float(G[-1, 0] * ct)]])
     p, c = bc.aligned_buffered_case(work, "couto_mc_gap", "mc", check, c, nProcs=NP,
-                                    head_rows=HEAD_ROWS, h_top=H_TOP)
+                                    head_rows=HEAD_ROWS, h_top=H_TOP,
+                                    ncols=NCOLS, wall_ratio=WALL_RATIO, h_hop=H_HOP)
     dp = f"{p}/system/decomposeParDict"
     txt = open(dp).read().replace(f"n ({NP} 1 1)", f"n (1 {NP} 1)")
     open(dp, "w").write(txt)
