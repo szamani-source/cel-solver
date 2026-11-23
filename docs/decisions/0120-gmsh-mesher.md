@@ -1,4 +1,4 @@
-# 0119: Gmsh as a second mesher in celSetup
+# 0120: Gmsh as a second mesher in celSetup
 
 Date: 2026-11-23. Thread "Build case generator and mesh checker" (WP G.1).
 

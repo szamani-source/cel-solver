@@ -8,11 +8,11 @@ Branch: `claude/project-thread-c3f4eh` (thread "Build case generator and mesh ch
 Setting up a case takes a short YAML file (or a GUI form) instead of hand-made
 blockMesh dictionaries: `celSetup case.yaml` writes the wall-aligned mesh with the
 proven rules, every dictionary, the material fill and an Allrun that resumes; `celCheck`
-reports the mesh against the cell-size rules before a run. Decision 0118.
+reports the mesh against the cell-size rules before a run. Decision 0119.
 
 ## Read first
 
-- `docs/decisions/0118-case-setup-tools.md`
+- `docs/decisions/0119-case-setup-tools.md`
 - `tests/hopper/buffered_case.py` (aligned_buffered_mesh: the geometry the conical
   template reproduces), decisions 0105, 0107, 0115
 - `docs/manual/meshing.html` (the cell-size rules)
@@ -32,7 +32,7 @@ reports the mesh against the cell-size rules before a run. Decision 0118.
 
 ## Log
 
-- 2026-11-23: G.3 done (decision 0120). `usermesh.py` (import, suggestions, BTYPES,
+- 2026-11-23: G.3 done (decision 0121). `usermesh.py` (import, suggestions, BTYPES,
   build, finish_import), case.py inlets and per-outlet openTime, miniyaml inline
   mappings, schema boundaries section in YAML and --describe, GUI Load mesh and
   boundaries panel (fieldset min-width 0 or the form scrolls sideways). Test fixture
@@ -43,13 +43,13 @@ reports the mesh against the cell-size rules before a run. Decision 0118.
   other mesher in its own scratch folder; overlay lines only when cells are 4 px or
   more on screen (else they hide the colours). Screenshots
   /mnt/project-files/setup/G2-gui-compare-*.png. Next: G.3 user meshes.
-- 2026-11-23: G.1 done (decision 0119). Sia resumed the work as the G series (GUI,
+- 2026-11-23: G.1 done (decision 0120). Sia resumed the work as the G series (GUI,
   Gmsh or blockMesh, user meshes). `gmsh_mesh.py`: .geo from `conical.layout()`,
   Gmsh (Python module or command), gmshToFoam, patch types. Revolving drops the axis
   side from Gmsh's extrusion list (prisms on the axis); indices handle it. Couto mesh
   matches blockMesh in cells, patches and time step. Also in this step: templates
   return generic walls/outlets/bodies, plane variant of the block layout, renumbered
-  our decision 0117 to 0118 (main took 0117). Next: G.0 merge after v1.0.0, then G.2.
+  our decision to 0119 (main has 0117, v1.0.0 takes 0118). Next: G.0 merge after v1.0.0, then G.2.
 - 2026-11-23: S.4 done. `gui.py` + `gui/` (index.html, app.js, style.css). Endpoints
   init, geometry (instant outline), mesh (scratch case: blockMesh, fill, celCheck), save,
   run, status. Vectorised the polyMesh geometry and the fill (preview 7 s -> 2-4 s).
