@@ -253,12 +253,25 @@ def run_check(case):
             x = m.Cf[f, 0]
             half = 0.5 * float(x.max() - x.min() + osz.mean())
         n_across = half / float(osz.mean())
-        st = "PASS" if n_across >= 35 else ("WARN" if n_across >= 20 else "FAIL")
         what = "radius" if wedge else "half-width"
-        check(f"outlet '{o}'", st,
-              f"cells {osz.min() * 1000:.1f} to {osz.max() * 1000:.1f} mm, {n_across:.0f} across the "
-              f"outlet {what} ({half * 1000:.0f} mm). Rule: about 40 (3 to 5 mm on the 0.35 m Couto "
-              f"outlet); the outlet cells set the discharge rate")
+        # Rule (Sia 2026-11-23): outlet cells in grain diameters. Couto: 3 to 5 mm
+        # cells with d = 4 mm (about 1 d) gave 106-124 kg/s; 3x coarser rows 85,
+        # 25 mm (6 d) 21 kg/s. "About 40 across" is the Couto count, a note only.
+        note = (f"; {n_across:.0f} across the outlet {what} ({half * 1000:.0f} mm), about 40 "
+                f"on the Couto outlet")
+        if d:
+            nd = osz.max() / d
+            st = "PASS" if nd <= 1.3 else ("WARN" if nd <= 2.5 else "FAIL")
+            check(f"outlet '{o}'", st,
+                  f"cells {osz.min() * 1000:.1f} to {osz.max() * 1000:.1f} mm = up to {nd:.2f} d. "
+                  f"Rule: about 1 d or less (3 to 5 mm with d 4 mm in the Couto silo; 2 to 6 d "
+                  f"gave rates 20 to 80 % low); the outlet cells set the discharge rate{note}")
+        else:
+            st = "PASS" if osz.max() <= 0.005 + 1e-9 else "WARN"
+            check(f"outlet '{o}'", st,
+                  f"cells {osz.min() * 1000:.1f} to {osz.max() * 1000:.1f} mm. Rule without a "
+                  f"grain size d: 3 to 5 mm as in the Couto silo; give d to judge by grain "
+                  f"diameters{note}")
         res.setdefault("outlets", {})[o] = dict(min=float(osz.min()), max=float(osz.max()),
                                                 across=n_across)
 

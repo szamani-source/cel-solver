@@ -32,6 +32,9 @@ reports the mesh against the cell-size rules before a run. Decision 0119.
 
 ## Log
 
+- 2026-11-23: Sia answered "yes": celCheck judges outlet cells in grain diameters
+  (PASS up to 1.3 d, WARN to 2.5 d, FAIL above; 3 to 5 mm without d); "40 across" is a
+  note. Examples use d 4 mm (coarse sand) so the outlet cells are about d.
 - 2026-11-23: G.7 done. Manual page setup-tool.html (+ check_manual REQUIRED terms),
   meshing guide links it, tutorial setupPlaneTank. G series complete except G.0 (merge
   after v1.0.0). Open question for Sia: celCheck's outlet rule (about 40 cells across,

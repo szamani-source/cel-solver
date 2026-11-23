@@ -2,7 +2,7 @@
 # Plane tank with a small bottom opening, set up with celSetup (WP G.7):
 # the case is written from planeTank.yaml into ./case, meshed (blockMesh),
 # filled, checked with celCheck and run. Run again to resume.
-#   ./Allrun            # 2 s simulated, about 25 min on one core
+#   ./Allrun            # 2 s simulated, about 1 h on one core
 #   ./Allrun 0.1        # a short check: 0.1 s simulated
 # Open planeTank.yaml in the setup page instead: ../../tools/celSetup --gui planeTank.yaml
 cd "${0%/*}" || exit

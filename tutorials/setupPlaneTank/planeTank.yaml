@@ -26,7 +26,7 @@ material:
   phi: 30                 # deg
   psi: 1                  # deg
   c: 0
-  d: 0.001                # m
+  d: 0.004                # m, grain size (coarse sand; the outlet cells should be about d)
 
 run:
   openTime: 0.5           # s

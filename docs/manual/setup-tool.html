@@ -126,9 +126,10 @@ cd myCase &amp;&amp; ./Allrun                           # run; run again to resu
 <ul>
 <li><strong>Time step</strong>: computed exactly as celFoam does, with the cell that sets it. A warning
 when a few cells make it much shorter than the rest.</li>
-<li><strong>Outlet</strong>: cell sizes across the outlet. The rule comes from the Couto silo, where
-cells of 3 to 5 mm (about 40 across the radius) set the discharge rate; on a much smaller
-outlet it is guidance, not a limit.</li>
+<li><strong>Outlet</strong>: the outlet cells in grain diameters d: about 1 d or less passes. In the
+Couto silo (d 4 mm) cells of 3 to 5 mm gave 106 to 124 kg/s, while cells of 2 to 6 d gave
+rates 30 to 80 % low. The number of cells across the outlet is shown as a note (about 40
+across the Couto radius). Without a grain size the rule is 3 to 5 mm.</li>
 <li><strong>Walls</strong>: cells across a shear band of 10 grain diameters next to the walls.</li>
 <li><strong>Grain size</strong>, <strong>non-orthogonality</strong> (as checkMesh), <strong>size jumps</strong> between
 neighbouring cells, and a <strong>run time</strong> estimate.</li>
