@@ -71,6 +71,14 @@ SCHEMA = {
           level="advanced"),
         E("transitionMargin", 0.05, "m", "the hopper block ends this far above the transition "
           "fillet", level="advanced"),
+        # G.6: options for a longer time step; off by default (the validated mesh)
+        E("outletColumns", "shared", "", "columns of the hopper block: shared keeps the "
+          "cylinder's grading (validated); even makes them uniform across the outlet, so the "
+          "outlet-edge columns are not squeezed (longer time step, not yet validated)",
+          ["shared", "even"], "advanced"),
+        E("axisColumn", 1.0, "", "with outletColumns even: width of the column on the axis "
+          "in outlet columns (2 or 3 lengthens the step the axis cell sets; 1: off)",
+          level="advanced"),
     ],
 }
 
@@ -427,8 +435,8 @@ def build(cfg, src):
     files = {"constant/triSurface/shell.stl": shell_stl(G, info["Hm"] + 0.05, depth=depth)}
     if m.get("mesher", "blockMesh") == "gmsh":
         from . import gmsh_mesh
-        if m.get("outletColumns", "shared") != "shared":
-            raise ValueError("mesh: outletColumns needs mesher: blockMesh")
+        if m.get("outletColumns", "shared") != "shared" or float(m.get("axisColumn", 1)) != 1:
+            raise ValueError("mesh: outletColumns and axisColumn need mesher: blockMesh")
         files["system/mesh.geo"] = gmsh_mesh.geo_script(layout(G, m, y_fill), G, depth)
     else:
         files["system/blockMeshDict"] = bmd

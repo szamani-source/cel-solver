@@ -32,6 +32,9 @@ reports the mesh against the cell-size rules before a run. Decision 0119.
 
 ## Log
 
+- 2026-11-23: G.6 done (decision 0122): schema entries for the existing edgeGrading
+  options, flatBottom axisColumn, table of gains. Open: a Couto run with axisColumn 2
+  to show pressures and rate unchanged, only if Sia wants the speed-up. Next: G.7.
 - 2026-11-23: G.5 done. `flat.py` (blockMesh + own .geo writer for the two blocks),
   conical `shape: plane` (block_mesh_dict depth path, extruded STL, plane volume x2
   per metre). Note: the axisymmetric flat silo's step is set by the axis column (1.86

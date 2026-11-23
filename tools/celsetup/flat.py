@@ -49,6 +49,9 @@ SCHEMA = {
         E("topCell", "preset", "m", "row height in the upper part; preset: from the mesh preset"),
         E("growthLength", "preset", "m", "rows grow from outletCell to topCell over this "
           "height; preset: from the mesh preset", level="advanced"),
+        E("axisColumn", 1.0, "", "width of the column on the axis in outlet cells (G.6: 2 or "
+          "3 lengthens the time step the axis cell sets on a wedge; 1: off, not yet "
+          "validated; blockMesh only)", level="advanced"),
     ],
 }
 PRESETS = {
@@ -77,6 +80,12 @@ def layout(G, m):
     gl = float(m["growthLength"])
     nA = max(1, int(round(G.Ro / h_o)))
     colsA = [(G.Ro, nA, 1.0)]
+    fa = float(m.get("axisColumn") or 1.0)
+    if fa != 1.0:
+        w0 = G.Ro / nA
+        if not 1.0 < fa < nA - 1:
+            raise ValueError(f"mesh: axisColumn must be between 1 and {nA - 1}")
+        colsA = [(fa * w0, 1, 1.0), (G.Ro - fa * w0, nA - 1, 1.0)]
     colsB = [seg(G.R - G.Ro, h_o, h_s)]
     rows = ([seg(gl, h_o, h_t), seg(G.H - gl, h_t, h_t)] if G.H > gl + 1e-9
             else [seg(G.H, h_o, h_t)])
@@ -207,6 +216,8 @@ def build(cfg, src):
     bmd, info = block_mesh_dict(G, L, src)
     mesher = m.get("mesher", "blockMesh")
     if mesher == "gmsh":
+        if len(L["colsA"]) > 1:
+            raise ValueError("mesh: axisColumn needs mesher: blockMesh")
         files = {"system/mesh.geo": geo_script(G, L)}
     else:
         files = {"system/blockMeshDict": bmd}
