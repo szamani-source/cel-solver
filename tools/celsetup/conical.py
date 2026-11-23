@@ -47,6 +47,9 @@ SCHEMA = {
         E("preset", "standard", "", "standard: the validated 7,584-cell Couto mesh numbers; fine: "
           "cells near the nonlocal length (decision 0115); entries below set to a value override it",
           ["standard", "fine"]),
+        E("mesher", "blockMesh", "", "blockMesh (OpenFOAM) or gmsh (Gmsh, GPL, transfinite "
+          "quads: the same block layout and cell counts, interior nodes placed a little "
+          "differently)", ["blockMesh", "gmsh"]),
         E("outletCell", "preset", "m", "row height at the outlet: 3 to 5 mm sets the discharge rate; preset: from the mesh preset"),
         E("hopperTopCell", "preset", "m", "row height at the top of the hopper block; preset: from the mesh preset"),
         E("topCell", "preset", "m", "row height in the upper cylinder; preset: from the mesh preset"),
@@ -212,8 +215,10 @@ def seg(length, h0, h1):
     return (length, max(1, int(round(length / (0.5 * (h0 + h1))))), h1 / h0)
 
 
-def block_mesh_dict(G, m, y_fill, src):
-    """The wall-aligned four-block wedge mesh (aligned_buffered_mesh)."""
+def layout(G, m, y_fill):
+    """The block layout shared by the blockMesh and Gmsh meshers: block
+    corners, the shell mid-line M and the domain side O (r, y paths), column
+    and row counts with their grading segments [(length, n, ratio)]."""
     R = G.R
     h_out, h_hop, h_top = m["outletCell"], m["hopperTopCell"], m["topCell"]
     headroom = m["headroom"] if m["headroom"] is not None else 3 * h_top
@@ -226,32 +231,68 @@ def block_mesh_dict(G, m, y_fill, src):
     if ncols in (None, "auto"):
         ncols = int(round((G.Ro + 0.5 * G.TS) / h_out))
     ncols = int(ncols)
-    co, si = math.cos(G.theta), math.sin(G.theta)
     W = G.wall_path(y_t)
     M = offset_path(W, 0.5 * G.TS)
     M[0, 1], M[-1, 1] = G.Y0, y_t
     O = G.outer_path(D, y_t)
+    rows1 = [seg(y_t - G.Y0, h_out, h_hop)]
+    gl = m["growthLength"]
+    if Hm - y_t > gl + 1e-9:
+        rows2 = [seg(gl, h_hop, h_top), seg(Hm - y_t - gl, h_top, h_top)]
+    else:
+        rows2 = [seg(Hm - y_t, h_hop, h_top)]
+    return dict(R=R, Hm=Hm, D=D, y_t=y_t, ncols=ncols, nb=int(m["bufferColumns"]), M=M, O=O,
+                rows1=rows1, rows2=rows2, wallRatio=float(m["wallRatio"]))
+
+
+def block_mesh_dict(G, m, y_fill, src, depth=None):
+    """The wall-aligned four-block wedge mesh (aligned_buffered_mesh).
+    depth: a plane-strain mesh of that thickness instead (x = r, symmetry
+    plane at x = 0)."""
+    L = layout(G, m, y_fill)
+    R, Hm, D, y_t, ncols, M, O = L["R"], L["Hm"], L["D"], L["y_t"], L["ncols"], L["M"], L["O"]
+    h_out, h_hop, h_top = m["outletCell"], m["hopperTopCell"], m["topCell"]
+    co, si = math.cos(G.theta), math.sin(G.theta)
 
     def P(r, y, sg):
         r, y = float(r), float(y)
+        if depth:
+            return (r, y, sg * 0.5 * depth)
         return (r * co, y, sg * r * si)
     a = [(0.0, G.Y0), (0.0, y_t), (0.0, Hm)]
     mm = [tuple(M[0]), tuple(M[-1]), (R + 0.5 * G.TS, Hm)]
     o = [tuple(O[0]), tuple(O[-1]), (R + D, Hm)]
-    v = [P(r, y, 0) for r, y in a]
+    if depth:
+        v = [P(r, y, -1) for r, y in a]
+    else:
+        v = [P(r, y, 0) for r, y in a]
     for sg in (-1, 1):
         v += [P(r, y, sg) for r, y in mm] + [P(r, y, sg) for r, y in o]
+    if depth:
+        v += [P(r, y, 1) for r, y in a]          # 15-17: back axis
+    A0, A1, A2 = (15, 16, 17) if depth else (0, 1, 2)
     vs = "\n".join(f"    ({x!r} {y!r} {z!r})" for x, y, z in v)
-    n1, g1 = graded([seg(y_t - G.Y0, h_out, h_hop)])
-    gl = m["growthLength"]
-    if Hm - y_t > gl + 1e-9:
-        n2, g2 = graded([seg(gl, h_hop, h_top), seg(Hm - y_t - gl, h_top, h_top)])
-    else:
-        n2, g2 = graded([seg(Hm - y_t, h_hop, h_top)])
+    n1, g1 = graded(L["rows1"])
+    n2, g2 = graded(L["rows2"])
     wr = f"{float(m['wallRatio'])!r}"
     nb = int(m["bufferColumns"])
-    blocks = (f"    hex (0 3 4 1 0 9 10 1) ({ncols} {n1} 1) simpleGrading ({wr} {g1} 1)\n"
-              f"    hex (1 4 5 2 1 10 11 2) ({ncols} {n2} 1) simpleGrading ({wr} {g2} 1)\n"
+    # outlet columns: shared (the cylinder's grading, as validated) or even
+    # (uniform across the outlet, optionally a wider axis column: WP S.6)
+    oc, fa = m.get("outletColumns", "shared"), float(m.get("axisColumn", 1.0))
+    if oc == "shared" and fa == 1.0:
+        hop_grading = f"simpleGrading ({wr} {g1} 1)"
+    else:
+        L0 = float(M[0][0])
+        if oc == "shared":
+            raise ValueError("mesh: axisColumn needs outletColumns: even")
+        w0 = L0 / ncols
+        if fa != 1.0:
+            nx, xb = graded([(fa * w0, 1, 1.0), (L0 - fa * w0, ncols - 1, 1.0)])
+        else:
+            xb = "1"
+        hop_grading = (f"edgeGrading ({xb} {wr} {wr} {xb}  {g1} {g1} {g1} {g1}  1 1 1 1)")
+    blocks = (f"    hex (0 3 4 1 {A0} 9 10 {A1}) ({ncols} {n1} 1) {hop_grading}\n"
+              f"    hex (1 4 5 2 {A1} 10 11 {A2}) ({ncols} {n2} 1) simpleGrading ({wr} {g2} 1)\n"
               f"    hex (3 6 7 4 9 12 13 10) ({nb} {n1} 1) simpleGrading (1 {g1} 1)\n"
               f"    hex (4 7 8 5 10 13 14 11) ({nb} {n2} 1) simpleGrading (1 {g2} 1)\n")
 
@@ -259,17 +300,18 @@ def block_mesh_dict(G, m, y_fill, src):
         inner = " ".join("({!r} {!r} {!r})".format(*P(r, y, sg)) for r, y in pts[1:-1])
         return f"    polyLine {i} {j} ({inner})\n"
     edges = pl(3, 4, M, -1) + pl(9, 10, M, 1) + pl(6, 7, O, -1) + pl(12, 13, O, 1)
+    side = "empty" if depth else "wedge"
     patches = {
-        "outlet": ("patch", "(0 3 9 0)"),
+        "outlet": ("patch", f"(0 3 9 {A0})"),
         "bottom": ("patch", "(3 6 12 9)"),
         "outer": ("patch", "(6 7 13 12) (7 8 14 13)"),
-        "top": ("patch", "(2 5 11 2) (5 8 14 11)"),
-        "front": ("wedge", "(0 1 4 3) (1 2 5 4) (3 4 7 6) (4 5 8 7)"),
-        "back": ("wedge", "(0 9 10 1) (1 10 11 2) (9 12 13 10) (10 13 14 11)"),
+        "top": ("patch", f"(2 5 11 {A2}) (5 8 14 11)"),
+        "front": (side, "(0 1 4 3) (1 2 5 4) (3 4 7 6) (4 5 8 7)"),
+        "back": (side, f"({A0} 9 10 {A1}) ({A1} 10 11 {A2}) (9 12 13 10) (10 13 14 11)"),
+        "axis": ("symmetryPlane" if depth else "empty", f"(0 1 {A1} {A0}) (1 2 {A2} {A1})"),
     }
     pt = [f"    {k}\n    {{\n        type {ty};\n        faces ({f});\n    }}"
           for k, (ty, f) in patches.items()]
-    pt.append("    axis\n    {\n        type empty;\n        faces ((0 1 1 0) (1 2 2 1));\n    }")
     comment = (f"// conicalHopper: R {R:g} m, outlet radius {G.Ro:g} m, hopper wall "
                f"{math.degrees(G.beta):g} deg from the vertical,\n"
                f"// cylinder {G.Hc:g} m; wedge half angle {math.degrees(G.theta):g} deg about y.\n"
@@ -371,17 +413,24 @@ def build(cfg, src):
     if not G.Y0 < y_fill <= G.H + 1e-9:
         raise ValueError(f"geometry: fillHeight must be between 0 and the silo top {G.H:.4f} m")
     bmd, info = block_mesh_dict(G, m, y_fill, src)
-    files = {
-        "system/blockMeshDict": bmd,
-        "constant/triSurface/shell.stl": shell_stl(G, info["Hm"] + 0.05),
-    }
+    files = {"constant/triSurface/shell.stl": shell_stl(G, info["Hm"] + 0.05)}
+    if m.get("mesher", "blockMesh") == "gmsh":
+        from . import gmsh_mesh
+        if m.get("outletColumns", "shared") != "shared":
+            raise ValueError("mesh: outletColumns needs mesher: blockMesh")
+        files["system/mesh.geo"] = gmsh_mesh.geo_script(layout(G, m, y_fill), G)
+    else:
+        files["system/blockMeshDict"] = bmd
     return dict(
         files=files,
         wedge=True,
         theta=G.theta,
-        bodies={"shell": "shell.stl"},
-        boundaryWalls=["outer", "bottom", "top"],      # frictionless domain sides
-        outlets=["outlet"],
+        mesher=m.get("mesher", "blockMesh"),
+        patchTypes={"front": "wedge", "back": "wedge"},
+        bodies={"shell": dict(surface="shell.stl", friction=float(w["friction"]))},
+        walls={"outer": 0.0, "bottom": 0.0, "top": 0.0},
+        wallsNote="domain sides outside the STL wall: frictionless",
+        outlets={"outlet": float(w["friction"])},
         fill=G.fill_polygon(y_fill).tolist(),
         solids=[G.shell_polygon(y_top=info["Hm"] + 0.05).tolist()],
         volume=G.volume_below(y_fill),

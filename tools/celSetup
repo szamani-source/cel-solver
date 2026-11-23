@@ -4,6 +4,7 @@
     celSetup case.yaml [CASE_DIR]   write the case (default: the 'case' name
                                     next to the YAML file), mesh and fill it
                                     if OpenFOAM is loaded
+    celSetup --mesh CASE_DIR        mesh a written case with its mesher
     celSetup --fill CASE_DIR        (re)write 0/alpha and 0/rho on the mesh
     celSetup --no-mesh ...          write the files only
     celSetup --template NAME [FILE] a commented input file with every entry
@@ -48,10 +49,14 @@ def main(argv):
         else:
             sys.stdout.write(txt)
         return 0
+    if "--mesh" in flags:
+        ok, msg = case.mesh(args[0])
+        print("celSetup: " + msg)
+        return 0 if ok else 3
     if "--fill" in flags:
         r = case.fill(args[0])
-        print(f"celSetup: filled {r['cells']} cells, {r['mass']:.1f} kg placed "
-              f"(geometry {r['target']:.1f} kg)")
+        print(f"celSetup: filled {r['cells']} cells, {r['mass']:.1f} {r['unit']} placed "
+              f"(geometry {r['target']:.1f} {r['unit']})")
         return 0
     try:
         cfg = case.resolve(miniyaml.load(args[0]))

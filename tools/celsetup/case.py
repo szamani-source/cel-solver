@@ -37,8 +37,8 @@ def resolve(cfg):
             raise ValueError(f"{sec}: unknown entr{'y' if len(extra) == 1 else 'ies'} "
                              f"{', '.join(sorted(extra))} (celSetup --describe {t} lists them)")
         out[sec] = schema.apply_defaults(given, sec, entries)
-    w = out["walls"]
-    if w.get("friction") is None:
+    w = out.get("walls", {})
+    if "frictionCoefficient" in w and w.get("friction") is None:
         if w.get("frictionCoefficient") is None:
             raise ValueError("walls: give friction (deg) or frictionCoefficient")
         w["friction"] = math.degrees(math.atan(float(w["frictionCoefficient"])))
@@ -57,12 +57,13 @@ def material_text(mat):
         lines.append(("sigmaT", float(st)))
     else:
         lines.append(("fit", mat["fit"]))
-    mu2 = mat["mu2"]
-    mu2 = math.tan(math.radians(phi)) + 0.26 if mu2 == "auto" else float(mu2)
-    rhoS = mat["rhoS"]
-    rhoS = float(mat["rho"]) / 0.62 if rhoS == "auto" else float(rhoS)
-    lines += [("mu2", round(mu2, 6)), ("I0", float(mat["I0"])), ("d", float(mat["d"])),
-              ("rhoS", round(rhoS, 3))]
+    if mat.get("d") is not None:            # mu(I) law
+        mu2 = mat["mu2"]
+        mu2 = math.tan(math.radians(phi)) + 0.26 if mu2 == "auto" else float(mu2)
+        rhoS = mat["rhoS"]
+        rhoS = float(mat["rho"]) / 0.62 if rhoS == "auto" else float(rhoS)
+        lines += [("mu2", round(mu2, 6)), ("I0", float(mat["I0"])), ("d", float(mat["d"])),
+                  ("rhoS", round(rhoS, 3))]
     for k in ("muIAlpha", "nonlocalA", "capLambda"):
         if mat.get(k) is not None:
             lines.append((k, float(mat[k])))
@@ -76,9 +77,20 @@ def material_text(mat):
     for k in schema.SWITCHES:
         v = mat[k]
         lines.append((k, on if v == "auto" else v in (True, "yes")))
+    if dict(lines).get("flowImpedance") and mat.get("d") is None:
+        raise ValueError("material: flowImpedance (part of rules: recommended) needs the mu(I) "
+                         "law: give the grain diameter d, or set rules: none")
     if mat["voidPlasticFlow"] in (True, "yes"):
         lines.append(("voidPlasticFlow", True))
     return "".join(f"{k:<16}{foam.fmt(v)};\n" for k, v in lines)
+
+
+MESH_STEP = {
+    "blockMesh": '    blockMesh > log.blockMesh 2>&1 || { echo "blockMesh failed, see log.blockMesh"; '
+                 'exit 1; }',
+    # Gmsh on system/mesh.geo, gmshToFoam, then the patch types
+    "gmsh": '    python3 "$CELSETUP" --mesh . || exit 1',
+}
 
 
 def write_case(cfg, out_dir, src="celSetup"):
@@ -90,20 +102,21 @@ def write_case(cfg, out_dir, src="celSetup"):
     for rel, txt in b["files"].items():
         foam.write(os.path.join(out_dir, rel), txt)
     H = lambda cls, obj: foam.header(cls, obj, src)  # noqa: E731
-    fr = float(w["friction"])
-    walls = "".join(f"    {p:<10}{{ friction 0; }}\n" for p in b["boundaryWalls"])
-    outlets = "".join(f"    {p} {{ friction {fr!r}; openTime {float(run['openTime'])!r}; }}\n"
-                      for p in b["outlets"])
+    walls = "".join(f"    {p:<10}{{ friction {f!r}; }}\n" for p, f in b["walls"].items())
+    outlets = "".join(f"    {p} {{ friction {f!r}; openTime {float(run['openTime'])!r}; }}\n"
+                      for p, f in b["outlets"].items())
     foam.write(f"{out_dir}/constant/materialProperties",
                H("dictionary", "materialProperties")
                + f"rho             {float(mat['rho'])!r};\nfreeSurface     yes;\n\n"
                + material_text(mat)
-               + "\n// domain sides outside the STL wall: frictionless\nwalls\n{\n" + walls + "}\n"
-               + "outlets\n{\n" + outlets + "}\n")
-    bodies = "".join(f"    {n}\n    {{\n        surface {s};\n        friction {fr!r};\n    }}\n"
-                     for n, s in b["bodies"].items())
-    foam.write(f"{out_dir}/constant/rigidBodies",
-               H("dictionary", "rigidBodies") + "bodies\n{\n" + bodies + "}\n")
+               + f"\n// {b.get('wallsNote', 'walls: mesh patches with their friction (deg)')}\n"
+               + "walls\n{\n" + walls + "}\n"
+               + ("outlets\n{\n" + outlets + "}\n" if outlets else ""))
+    if b["bodies"]:
+        bodies = "".join(f"    {n}\n    {{\n" + "".join(f"        {k:<12}{v};\n" for k, v in d.items())
+                         + "    }\n" for n, d in b["bodies"].items())
+        foam.write(f"{out_dir}/constant/rigidBodies",
+                   H("dictionary", "rigidBodies") + "bodies\n{\n" + bodies + "}\n")
     foam.write(f"{out_dir}/constant/g", H("uniformDimensionedVectorField", "g")
                + f"dimensions      [0 1 -2 0 0 0 0];\nvalue           (0 {-float(run['gravity'])!r} 0);\n")
     foam.write(f"{out_dir}/system/controlDict", H("dictionary", "controlDict") + f"""
@@ -125,7 +138,7 @@ maxCo           {float(run['maxCo'])!r};
 gravityRamp     {float(run['gravityRamp'])!r};
 damping         {float(run['damping'])!r};
 dampingStart    {float(run['dampingStart'])!r};
-""")
+""" + b.get("controlExtra", ""))
     foam.write(f"{out_dir}/system/fvSchemes", H("dictionary", "fvSchemes")
                + "ddtSchemes { default Euler; }\ngradSchemes { default Gauss linear; }\n"
                "divSchemes { default none; }\nlaplacianSchemes { default none; }\n"
@@ -142,7 +155,10 @@ dampingStart    {float(run['dampingStart'])!r};
                    "    \".*\" { type zeroGradient; }\n}\n")
     meta = dict(b["notes"], wedge=b["wedge"], theta=b["theta"], fill=b["fill"],
                 solids=b["solids"], volume=b["volume"], rho=float(mat["rho"]),
-                mass=b["volume"] * float(mat["rho"]), d=float(mat["d"]),
+                mass=b["volume"] * float(mat["rho"]), massUnit=b.get("massUnit", "kg"),
+                plane=b.get("plane"), mesher=b.get("mesher", "blockMesh"),
+                patchTypes=b.get("patchTypes", {}),
+                d=None if mat.get("d") is None else float(mat["d"]),
                 nonlocalA=mat.get("nonlocalA"), E=float(mat["E"]), nu=float(mat["nu"]),
                 maxCo=float(run["maxCo"]), endTime=float(run["endTime"]), nProcs=n,
                 summary=b["summary"])
@@ -156,7 +172,7 @@ CELSETUP="${{CELSETUP:-{setup}}}"
 command -v celSetup >/dev/null 2>&1 && [ ! -x "$CELSETUP" ] && CELSETUP=celSetup
 NP={n}
 if [ ! -f constant/polyMesh/faces ]; then
-    blockMesh > log.blockMesh 2>&1 || {{ echo "blockMesh failed, see log.blockMesh"; exit 1; }}
+{{mesh_step}}
 fi
 if [ ! -f 0/alpha ]; then
     python3 "$CELSETUP" --fill . || exit 1
@@ -167,7 +183,7 @@ if [ "$NP" -gt 1 ]; then
 else
     celFoam >> log.celFoam 2>&1
 fi
-""", 0o755)
+""".replace("{mesh_step}", MESH_STEP[meta["mesher"]]), 0o755)
     foam.write(f"{out_dir}/Allclean", """#!/bin/sh
 # Removes the mesh, results and logs; keeps the setup.
 cd "${0%/*}" || exit
@@ -256,17 +272,35 @@ def fill(case, nsub=8):
     if wedge:
         # flat-faced wedge cell: r dr dy 2 sin(t) cos(t)
         vol *= math.pi / (math.sin(meta["theta"]) * math.cos(meta["theta"]))
-    return dict(mass=vol * meta["rho"], target=meta["mass"], cells=int((alpha > 0).sum()))
+    elif meta.get("plane"):
+        # per metre of depth, both halves when the mesh is half (symmetry plane)
+        vol *= meta["plane"]["mirror"] / meta["plane"]["depth"]
+    return dict(mass=vol * meta["rho"], target=meta["mass"], cells=int((alpha > 0).sum()),
+                unit=meta.get("massUnit", "kg"))
 
 
-def run_mesh_and_fill(case):
-    """blockMesh, then the fill. Returns (ok, message)."""
+def mesh(case):
+    """Mesh a written case with its mesher (system/celSetup.json).
+    Returns (ok, message)."""
+    meta = json.load(open(os.path.join(case, "system", "celSetup.json")))
+    if meta.get("mesher", "blockMesh") == "gmsh":
+        from . import gmsh_mesh
+        return gmsh_mesh.mesh_case(case, meta.get("patchTypes", {}))
     if shutil.which("blockMesh") is None:
         return False, "blockMesh not found: source OpenFOAM's bashrc, then run ./Allrun"
     with open(os.path.join(case, "log.blockMesh"), "w") as f:
-        r = subprocess.run(["blockMesh"], cwd=case, stdout=f, stderr=subprocess.STDOUT)
+        r = subprocess.run(["blockMesh"], cwd=case, stdout=f, stderr=subprocess.STDOUT,
+                           env=dict(os.environ, PWD=os.path.abspath(case)))
     if r.returncode != 0:
         return False, "blockMesh failed, see " + os.path.join(case, "log.blockMesh")
+    return True, "blockMesh mesh written"
+
+
+def run_mesh_and_fill(case):
+    """Mesh (blockMesh or Gmsh), then the fill. Returns (ok, message)."""
+    ok, msg = mesh(case)
+    if not ok:
+        return False, msg
     res = fill(case)
-    return True, (f"filled {res['cells']} cells: {res['mass']:.1f} kg placed "
-                  f"(geometry {res['target']:.1f} kg)")
+    return True, (f"filled {res['cells']} cells: {res['mass']:.1f} {res['unit']} placed "
+                  f"(geometry {res['target']:.1f} {res['unit']})")

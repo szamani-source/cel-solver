@@ -87,10 +87,30 @@ SECTION_TEXT = {
 }
 
 
+OMIT = object()
+
+
+def override(entries, **changes):
+    """A copy of a shared list with some defaults changed; OMIT drops the
+    entry (for templates where it means nothing, e.g. openTime without an
+    outlet)."""
+    out = []
+    for e in entries:
+        if e.key in changes:
+            v = changes[e.key]
+            if v is OMIT:
+                continue
+            e = e._replace(default=v)
+        out.append(e)
+    return out
+
+
 def sections(template_schema):
-    """Ordered {section: entries} for a template."""
+    """Ordered {section: entries} for a template: its own sections, then the
+    shared material and run lists unless the template gives its own."""
     out = dict(template_schema)
-    out.update(SHARED)
+    for k, v in SHARED.items():
+        out.setdefault(k, v)
     return out
 
 

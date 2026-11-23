@@ -251,7 +251,7 @@ citations, validation. No new runs. Pages in `docs/manual/`, checked by
 | M.10 | Final review, FAQ, preview | `faq.html`; every page checked at desktop and phone width, light and dark |
 
 
-## Case setup tools (S series, decision 0117)
+## Case setup tools (S series, decision 0118)
 
 Sia (2026-11-23): setting up cases, above all the mesh, is the hard part. A
 parametric case generator, a pre-run mesh checker and a setup GUI, all before
@@ -266,3 +266,17 @@ the Linux installation package. Brief and log: `docs/wp/WP-S.md`.
 | S.5 | Templates: flat-bottom silo, plane hopper, plane tank, footing | Each writes a case that passes checkMesh and runs 50 steps |
 | S.6 | Wider axis column near the outlet | Time step gain shown by celCheck, Couto at-rest pressures unchanged in a short check |
 | S.7 | Manual pages and tutorial | `tests/test_manual.sh` passes with the setup pages |
+
+G series (Sia 2026-11-23 18:08 UTC, after v1.0.0): the HTML setup GUI, meshing with
+Gmsh or blockMesh, and user-provided meshes. Replaces S.5-S.7 above.
+
+| WP | Title | Done when |
+| --- | --- | --- |
+| G.0 | Setup tools up to date with v1.0.0, merged | PR #77 merged on green CI |
+| G.1 | Gmsh mesher for the conical hopper (decision 0119) | `tests/test_celsetup_gmsh.sh`: same cells and patches as blockMesh, Mesh OK, time step within 1 %, celFoam runs |
+| G.2 | GUI: mesher choice and comparison | GUI test meshes with either and shows both |
+| G.3 | GUI: load a user mesh, pick patches, assign boundary conditions | A polyMesh and a .msh load, patches listed, a case written that runs 50 steps |
+| G.4 | Polish: load/save, examples, field errors | GUI test covers each |
+| G.5 | More templates (flat-bottom silo, plane tank, plane hopper, footing), both meshers | Each passes checkMesh and runs 50 steps |
+| G.6 | Optional faster-time-step mesh options (off by default) | Gain shown by celCheck; at-rest pressures unchanged in a short check |
+| G.7 | Manual page and tutorial | `tests/test_manual.sh` passes with the setup pages |
