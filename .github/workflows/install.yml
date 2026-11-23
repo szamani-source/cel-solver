@@ -1,0 +1,65 @@
+name: install
+
+# Installs celFoam from scratch the way INSTALL.md describes and runs it from the
+# installed copy (decision 0118): the native route on a clean Ubuntu 24.04, as root
+# (system prefix) and as a normal user (home prefix), and the container route.
+on:
+  push:
+    paths: [install.sh, Dockerfile, .dockerignore, VERSION, 'tools/**', 'tutorials/**',
+            INSTALL.md, .github/workflows/install.yml]
+  pull_request:
+    paths: [install.sh, Dockerfile, .dockerignore, VERSION, 'tools/**', 'tutorials/**',
+            INSTALL.md, .github/workflows/install.yml]
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  native:
+    runs-on: ubuntu-24.04
+    container:
+      image: ubuntu:24.04
+    steps:
+      - name: Minimal clean system (curl, python3, tar, sudo only)
+        run: |
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
+              ca-certificates curl python3 tar sudo
+      - uses: actions/checkout@v4
+
+      - name: Install as root (OpenFOAM v2512 too, system prefix)
+        shell: bash
+        run: ./install.sh --get-openfoam
+
+      - name: Run from the installed copy
+        shell: bash
+        run: |
+          celfoam version
+          celfoam test
+          cd /tmp && celfoam tutorials t
+          (cd t/smokeBox && celfoam ./Allrun && grep -q "^End" log.celFoam)
+          (cd t/coutoHopper && celfoam ./Allrun mc mesh | tee mesh.log && grep -q "Mesh OK" mesh.log)
+          (cd t/siloDischarge && grep -q celFoam Allrun)
+          celfoam manual | grep -q index.html
+          test -f /opt/celfoam-1.0.0/docs/manual/index.html
+
+      - name: Install as a normal user (home prefix, existing OpenFOAM)
+        shell: bash
+        run: |
+          useradd -m tester
+          cp -r "$GITHUB_WORKSPACE" /home/tester/src && chown -R tester /home/tester/src
+          sudo -u tester -H bash -c 'cd ~/src && ./install.sh && ~/.local/bin/celfoam test'
+          sudo -u tester -H bash -c 'source ~/celfoam-*/etc/celfoam.sh && which celFoam | grep -q /home/tester/'
+
+  container:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install with --container (Docker)
+        run: ./install.sh --container
+      - name: Run through the container
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          celfoam version
+          mkdir -p /tmp/c && cd /tmp/c
+          celfoam tutorials t
+          cd t/coutoHopper && celfoam ./Allrun mc mesh | tee mesh.log && grep -q "Mesh OK" mesh.log

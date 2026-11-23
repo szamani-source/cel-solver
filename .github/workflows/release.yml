@@ -1,0 +1,35 @@
+name: release
+
+# Publishes a GitHub release when VERSION on main names a version that has no tag yet
+# (decision 0118): tag v<VERSION> on that commit, the source tarball
+# celfoam-<VERSION>.tar.gz, and docs/release-notes/v<VERSION>.md as the notes.
+on:
+  push:
+    branches: [main]
+    paths: [VERSION]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Release if the tag is new
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          v="$(cat VERSION)"
+          if git rev-parse -q --verify "refs/tags/v$v" > /dev/null; then
+              echo "v$v already tagged; nothing to do"; exit 0
+          fi
+          notes="docs/release-notes/v$v.md"
+          test -f "$notes"
+          git archive --format=tar.gz --prefix="celfoam-$v/" -o "celfoam-$v.tar.gz" HEAD
+          sha256sum "celfoam-$v.tar.gz" > "celfoam-$v.tar.gz.sha256"
+          gh release create "v$v" "celfoam-$v.tar.gz" "celfoam-$v.tar.gz.sha256" \
+              --target "$GITHUB_SHA" --title "celFoam $v" --notes-file "$notes"

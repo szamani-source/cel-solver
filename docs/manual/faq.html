@@ -106,10 +106,11 @@ they bound how far a result can be trusted.</p>
 
 <h3 id="ki-silo">Silos and hoppers</h3>
 <ul>
-<li><strong>Couto silo at rest and in discharge.</strong> Wall pressures at rest (GA0) are about
-20 to 25 % above the measurements; in discharge GA1 reads 26 % low and GA2 7 % low. The Abaqus model of
+<li><strong>Couto silo at rest and in discharge.</strong> On the final 4 mm mesh (decision 0117) the hopper
+wall at rest (GA0) reads 36 % above the measurements with the gravity-on start (20 to 25 % on coarser meshes).
+In discharge the maxima at GA1 and GA2 are 11 to 17 % below Couto's maxima; the Abaqus model of
 <a class="cite" href="references.html#ref-zheng2015">Zheng and Yu 2015</a> is also low at GA2. Wall friction,
-<code>normalCap</code> and <code>flowImpedance</code> were ruled out as causes.</li>
+<code>normalCap</code>, <code>flowImpedance</code> and cylinder cell size were ruled out as causes.</li>
 <li><strong>Silo with \(\mu(I)\)</strong> (decisions 0045, 0046). The discharge rate depends on how cells
 that have just loosened are counted, about 20 % between stiffnesses; dilatancy and blended rules did not
 cure it.</li>

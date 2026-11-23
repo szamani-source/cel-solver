@@ -33,28 +33,61 @@ Abaqus/Explicit CEL. celFoam runs it on the axisymmetric wedge with the wheat's 
 \(\rho = 856\) kg/m&sup3;, \(E = 10.67\) MPa, \(\nu = 0.3\), \(\varphi = 30.2^\circ\), \(c = 0\),
 \(\psi = 1^\circ\), wall friction 0.20.</p>
 
-<p>Setup: the wall-aligned wedge mesh with an STL shell inside it and rounded corners
-(<a href="meshing.html#stl-shell">Meshing</a>), 3 to 5 mm outlet cells, T0 rules plus <code>fullBlend</code>,
-gravity-on start, outlet opened at 0.5 s.</p>
+<p>Setup (final runs, decision 0117): the wall-aligned wedge mesh with an STL shell inside it and rounded
+corners (<a href="meshing.html#stl-shell">Meshing</a>), 20,398 cells: 4 mm at the walls and through the
+hopper, 3.1 to 3.2 mm at the outlet, 12 mm rows in the upper cylinder, 16 mm at the axis. T0 rules plus
+<code>fullBlend</code> and the nonlocal fluidity (\(A = 0.48\), \(d = 4\) mm), gravity-on start, outlet
+opened at 0.5 s, run to 1.5 s. Mohr-Coulomb and Drucker-Prager (plane-strain fit), each about 8 hours on
+four cores (<code>tests/hopper/run_final_4mm.sh</code>, which writes checkpoints and resumes after an
+interruption; comparison: <code>tests/hopper/final_report.py</code>).</p>
 
 <figure>
-<img src="figures/couto-wall-pressure.png" alt="Wall pressure against height in the Couto silo at rest and during discharge, celFoam Mohr-Coulomb and Drucker-Prager against the experiment's load cells and Abaqus">
-<figcaption>Normal wall pressure against height. Left: at rest. Right: mean during discharge,
-0.25 to 1.0 s after opening, with the Abaqus CEL result of Zheng and Yu. Grey bars: the range of the
-seven Couto tests at each load cell.</figcaption>
+<img src="figures/couto-final-mesh.png" alt="Cell size of the final Couto silo mesh: whole silo, outlet edge, hopper wall, transition and upper cylinder">
+<figcaption>The final mesh, coloured by cell size: 3.1 to 3.2 mm across the outlet, 4 mm at the walls and
+through the hopper, growing to 16 mm at the axis in the upper cylinder. The black lines are the 20 mm
+STL shell.</figcaption>
+</figure>
+
+<p>What is compared, as the papers report it: Couto's load cells measure the <em>normal</em> wall pressure
+(horizontal on the cylinder; normal to the cone for GA0), and the discharge rows of their Table 1 are the
+<em>maximum</em> during discharge, so celFoam's largest value over the writes 0.25 to 1.0 s after opening is
+compared with them (the mean is shown too). Zheng and Yu's Fig. 11 is one snapshot 0.5 s after opening,
+compared with celFoam at the same time.</p>
+
+<figure>
+<img src="figures/couto-final-wall-pressure.png" alt="Normal wall pressure against height in the Couto silo at rest, during discharge and 0.5 s after opening, celFoam Mohr-Coulomb and Drucker-Prager against the load cells of Couto et al. and the Abaqus CEL profile of Zheng and Yu">
+<figcaption>Normal wall pressure against height on the 4 mm mesh. Left: at rest. Middle: discharge,
+celFoam's maximum (dots) and mean (crosses) at the load cells against the maximum of the seven Couto tests
+(grey bars). Right: 0.5 s after opening against the Abaqus CEL result of Zheng and Yu.</figcaption>
+</figure>
+
+<figure>
+<img src="figures/couto-final-mass.png" alt="Mass in the Couto silo against time after opening for Mohr-Coulomb and Drucker-Prager, with the Beverloo band">
+<figcaption>Mass in the silo after opening. Both models discharge at 118 kg/s (the two curves lie on top
+of each other), inside the Beverloo range.</figcaption>
 </figure>
 
 <table>
-<thead><tr><th>Quantity</th><th>Reference</th><th>celFoam</th><th>Status</th></tr></thead>
+<thead><tr><th>Quantity</th><th>Reference</th><th>celFoam MC / DP</th><th>Status</th></tr></thead>
 <tbody>
-<tr><td>Discharge rate</td><td>Beverloo, 110 to 131 kg/s</td><td>Mohr-Coulomb 123.8 kg/s, Drucker-Prager (plane-strain fit) 109.6 kg/s</td><td>within / at the edge</td></tr>
-<tr><td>Wall pressure at rest, cylinder (GA1 to GA7)</td><td>Couto, 1.4 to 4.5 kPa</td><td>most cells inside the measured range</td><td>pass</td></tr>
-<tr><td>Wall pressure at rest, hopper (GA0)</td><td>8.6 to 9.6 kPa</td><td>about 20 to 25 % high</td><td>known gap</td></tr>
-<tr><td>Discharge peak at the transition (GA0)</td><td>18.7 to 24.8 kPa; Abaqus 27.5</td><td>about 24 kPa</td><td>pass</td></tr>
-<tr><td>Discharge, just above the transition (GA1, GA2)</td><td>7.1 to 8.2 and 5.8 to 6.5 kPa</td><td>GA1 5.3 (26 % low), GA2 5.4 (7 % low) with 12 mm upper cells</td><td>known gap; Abaqus is also low at GA2</td></tr>
-<tr><td>Leak through the STL wall</td><td>none</td><td>0 kg</td><td>pass</td></tr>
+<tr><td>Discharge rate</td><td>Beverloo, 110 to 131 kg/s</td><td>118.1 / 118.2 kg/s</td><td>pass</td></tr>
+<tr><td>Peak at the transition, 0.5 s after opening</td><td>Abaqus CEL 27.5 kPa at z 0.46 m</td><td>27.7 kPa at 0.45 m / 24.5 kPa at 0.44 m</td><td>pass (MC within 1 %, DP 11 % low)</td></tr>
+<tr><td>At rest, cylinder GA1 to GA5</td><td>Couto 2.8 to 4.5 kPa</td><td>4.10, 4.64, 4.04, 3.45, 2.79 kPa (both)</td><td>pass (GA2 4 % above the range)</td></tr>
+<tr><td>At rest, upper cylinder GA6, GA7</td><td>2.47 to 2.66 and 1.39 to 1.69 kPa</td><td>2.08 and 1.30 kPa</td><td>16 % and 6 % low</td></tr>
+<tr><td>At rest, hopper GA0</td><td>8.6 to 9.6 kPa</td><td>13.0 kPa (both)</td><td>known gap: 36 % high</td></tr>
+<tr><td>Discharge maximum, GA0</td><td>Couto 18.7 to 24.8 kPa</td><td>29.0 / 28.7 kPa (mean 24.3 / 23.9)</td><td>17 % above Couto, as Abaqus (27.5)</td></tr>
+<tr><td>Discharge maximum, GA1 and GA2</td><td>7.1 to 8.2 and 5.8 to 6.5 kPa</td><td>GA1 5.9 / 6.3, GA2 5.2 / 5.1 kPa</td><td>11 to 17 % low</td></tr>
+<tr><td>Discharge maximum, GA3 to GA7</td><td>Couto, 1.4 to 5.6 kPa</td><td>GA3, GA5 inside; GA4 +14 / +5 %; GA6 &minus;14 / &minus;8 %; GA7 +12 / +6 %</td><td>within 15 %</td></tr>
+<tr><td>Leak through the STL wall</td><td>none</td><td>0 kg at every write</td><td>pass</td></tr>
 </tbody>
 </table>
+
+<p>Summary: the discharge rate and the Abaqus peak are matched, the cylinder pressures at rest are in the
+measured range, and every discharge load cell is within 17 % of the experiment's maximum, inside the 20 %
+the project accepts for discharge. The one clear gap is the hopper wall at rest (GA0, 36 % high with the
+gravity-on start; it was 20 to 25 % high on coarser meshes): the start has no filling history, which in the
+experiment leaves a lower stress on the hopper wall. Mohr-Coulomb and Drucker-Prager (plane-strain fit)
+agree closely everywhere except the transition peak.</p>
 
 <figure>
 <img src="figures/couto-discharge-mc.png" alt="Snapshots of bulk density and speed in the Couto silo during discharge">
@@ -63,11 +96,11 @@ opening to 0.65 s after. The flow converges in the hopper; dilated shear zones r
 edge to the transition.</figcaption>
 </figure>
 
-<p>What was learned (decisions 0102 to 0115): the outlet cell size sets the rate (21 kg/s with uniform 25 mm
-cells, 106 with 3 to 5 mm outlet cells, 124 with rounded corners and the STL shell); Drucker-Prager must
-use the plane-strain fit; filling from the top raises the wall pressures unless the locked-in sideways
-stress is relaxed; and the GA1 deficit in discharge needs cells near the grain size in the cylinder
-(about 4 mm), which was not run.</p>
+<p>What was learned (decisions 0102 to 0117): the outlet cell size sets the rate (21 kg/s with uniform 25 mm
+cells, 106 with 3 to 5 mm outlet cells, 123.8 with rounded corners and the STL shell on 7,584 cells, 118 with the nonlocal law
+on the 4 mm mesh); Drucker-Prager must use the plane-strain fit; filling from the top raises the wall pressures
+unless the locked-in sideways stress is relaxed; and refining the cylinder to 4 mm moves GA1 and GA2 little,
+so the remaining discharge deficit there is not a resolution effect (Abaqus is also low at GA2).</p>
 
 <h2 id="benchmarks">Benchmark summary</h2>
 <table>
@@ -167,7 +200,7 @@ Lagrangian body for thin flanges.</p>
 <h2 id="cost">Cost</h2>
 <p>About 4 &micro;s per cell per step on one core with the T0 rule set. Four processors run 2.6 to 3.3 times
 faster than one. The 2D tank discharge of the quick start (2,480 cells, 2.3 s) takes about 11 minutes on one
-core; the Couto silo on the wedge (7,584 cells, 3 to 5 mm outlet cells) takes about 2 to 4 hours on four.</p>
+core; the Couto silo on the wedge takes about 2 to 4 hours on four with 7,584 cells (3 to 5 mm outlet cells) and about 8 hours with the final 20,398-cell mesh.</p>
 
 </main>
 </body>

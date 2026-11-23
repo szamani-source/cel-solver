@@ -250,6 +250,18 @@ citations, validation. No new runs. Pages in `docs/manual/`, checked by
 | M.9 | References with DOI check | every DOI on `references.html` verified against the publisher |
 | M.10 | Final review, FAQ, preview | `faq.html`; every page checked at desktop and phone width, light and dark |
 
+## Version 1.0 Linux install (L series, decision 0118)
+
+Sia, 2026-11-23: deploy the first version for Linux installation, for any Linux, with a
+read-me listing what is needed and how to source OpenFOAM. One thread, one PR.
+
+| WP | Title | Done when |
+| --- | --- | --- |
+| L.1 | INSTALL.md, install.sh, the celfoam command, Dockerfile | `INSTALL.md` covers each distribution family; `install.sh` installs as root and as a user |
+| L.2 | coutoHopper tutorial; tutorials and manual installed | `./Allrun mc mesh` gives the 7,584-cell mesh from an installed copy |
+| L.3 | Install tests | `tests/test_install.sh` passes; `.github/workflows/install.yml` passes on a clean Ubuntu 24.04 and with Docker |
+| L.4 | Version 1.0.0: VERSION, LICENSE, CHANGELOG, release notes, release workflow | merging to main publishes the v1.0.0 release |
+| L.5 | Decision, STATUS, manual page | `tests/test_manual.sh` passes |
 
 ## Case setup tools (S series, decision 0119)
 

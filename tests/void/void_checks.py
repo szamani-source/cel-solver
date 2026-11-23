@@ -116,6 +116,48 @@ def run(path, nProcs=1):
     return time.perf_counter() - t0
 
 
+def latest_time(path):
+    """Latest complete written time (> 0) of a case, serial or decomposed;
+    0 if none (decision 0117: the checkpoints of celVoidCheck). A time is
+    complete when every processor has its fields and restart state; newer
+    incomplete times (a write cut off by a lost container) are removed."""
+    import re
+    import shutil
+
+    roots = sorted(d for d in (os.path.join(path, x) for x in (os.listdir(path) if os.path.isdir(path) else []))
+                   if os.path.basename(d).startswith("processor")) or [path]
+
+    def times(d):
+        return {t for t in os.listdir(d) if re.fullmatch(r"[0-9.eE+-]+", t) and float(t) > 0} \
+            if os.path.isdir(d) else set()
+    alls = set().union(*(times(r) for r in roots))
+    done = [t for t in alls if all(os.path.isfile(f"{r}/{t}/uniform/eulerianSolid")
+                                   and os.path.isfile(f"{r}/{t}/sigma") for r in roots)]
+    best = max((float(t) for t in done), default=0.0)
+    for t in alls:
+        if float(t) > best:
+            for r in roots:
+                shutil.rmtree(f"{r}/{t}", ignore_errors=True)
+    return best
+
+
+def resume(path, nProcs=1):
+    """Run celVoidCheck again from the case's latest written time (decision
+    0117); the history is kept up to that time and appended to."""
+    with open(f"{path}/system/controlDict", "a") as f:
+        f.write("startFrom latestTime;\n")
+    t0 = time.perf_counter()
+    env = dict(os.environ, PWD=os.path.abspath(path), OMPI_ALLOW_RUN_AS_ROOT="1",
+               OMPI_ALLOW_RUN_AS_ROOT_CONFIRM="1")
+    cmd = (["mpirun", "-np", str(nProcs), "--oversubscribe", "celVoidCheck", "-parallel"]
+           if nProcs > 1 else ["celVoidCheck"])
+    with open(f"{path}/log.driver", "a") as f:
+        r = subprocess.run(cmd, cwd=path, stdout=f, stderr=subprocess.STDOUT, env=env)
+    if r.returncode != 0:
+        raise RuntimeError(f"resume failed in {path}")
+    return time.perf_counter() - t0
+
+
 def history(path):
     return np.loadtxt(f"{path}/history.dat")
 
