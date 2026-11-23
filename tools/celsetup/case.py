@@ -9,9 +9,9 @@ import subprocess
 
 import numpy as np
 
-from . import conical, foam, schema, usermesh
+from . import conical, flat, foam, schema, usermesh
 
-TEMPLATES = {"conicalHopper": conical, "userMesh": usermesh}
+TEMPLATES = {"conicalHopper": conical, "flatBottom": flat, "userMesh": usermesh}
 TOOLS = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 

@@ -13,7 +13,8 @@
     celSetup --gui [case.yaml]      the setup GUI in your browser (local, offline);
                                     --port N, --no-browser
 
-Templates: conicalHopper, userMesh (your own mesh, G.3). Examples: tools/celsetup/examples/.
+Templates: conicalHopper (axisymmetric or plane), flatBottom (silo or tank),
+userMesh (your own mesh). Examples: tools/celsetup/examples/.
 """
 import os
 import sys

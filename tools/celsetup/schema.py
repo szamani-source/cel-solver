@@ -85,6 +85,8 @@ SECTION_TEXT = {
     "material": "Material",
     "run": "Run control",
     # template-specific texts: "template.section"
+    "flatBottom.walls": "Silo walls (the mesh sides and floor) and their friction",
+    "flatBottom.mesh": "Mesh: cell sizes and grading (fine at the outlet, growing away from it)",
     "userMesh.mesh": "Your mesh: the file and its format (2D one cell thick, or a wedge about y)",
     "userMesh.geometry": "Where the material starts: the cells inside this box",
 }

@@ -31,7 +31,12 @@ SCHEMA = {
         E("hopperAngle", R_, "deg", "hopper wall angle from the vertical (0 to 89)"),
         E("outletDiameter", R_, "m", "outlet diameter"),
         E("fillHeight", "top", "m", "material fill height above the outlet, or top"),
+        E("shape", "axisymmetric", "", "axisymmetric: a conical hopper on a wedge; plane: a "
+          "plane (wedge-shaped) hopper in plane strain, diameters read as widths, half of it "
+          "meshed with a symmetry plane", ["axisymmetric", "plane"]),
         E("wedgeAngle", 5.0, "deg", "whole angle of the axisymmetric wedge (5 is tested)",
+          level="advanced"),
+        E("depth", 0.01, "m", "thickness of a plane mesh (one cell); results are per metre",
           level="advanced"),
     ],
     "walls": [
@@ -98,7 +103,7 @@ class Geometry:
             raise ValueError("geometry: need 0 < outletDiameter < diameter")
         if not 0 < self.beta < math.radians(89):
             raise ValueError("geometry: hopperAngle is measured from the vertical, "
-                             "0 to 89 deg (use the flatBottomSilo template for 90)")
+                             "0 to 89 deg (use the flatBottom template for 90)")
         self.ht = (self.R - self.Ro) / math.tan(self.beta)
         self.H = self.ht + self.Hc
         tb = math.tan(self.beta)
@@ -172,12 +177,13 @@ class Geometry:
         pts += [(r_at, y_fill), (0.0, y_fill)]
         return np.array(pts)
 
-    def volume_below(self, y):
-        """Volume inside the inner wall from the mesh floor up to y (m^3)."""
+    def volume_below(self, y, plane=False):
+        """Volume inside the inner wall from the mesh floor up to y (m^3);
+        plane: the area of the whole (both halves) section, m^3 per metre."""
         prof = np.vstack([[self.Ro, self.Y0], self.inner_profile()])
         ys = np.linspace(self.Y0, y, 4001)
         r = np.interp(ys, prof[:, 1], prof[:, 0])
-        f = math.pi * r ** 2
+        f = 2 * r if plane else math.pi * r ** 2
         return float(np.sum(0.5 * (f[1:] + f[:-1]) * np.diff(ys)))
 
 
@@ -326,9 +332,10 @@ def block_mesh_dict(G, m, y_fill, src, depth=None):
     return txt, info
 
 
-def shell_stl(G, y_top, ext=6.0, seg_len=0.005):
+def shell_stl(G, y_top, ext=6.0, seg_len=0.005, depth=None):
     """The shell polygon extruded across the wedge (beyond both wedge sides,
-    decision 0093), caps by ear clipping."""
+    decision 0093), or across a plane mesh (beyond both sides), caps by ear
+    clipping."""
     poly = G.shell_polygon(y_top=y_top)
     dense = []
     n = len(poly)
@@ -336,6 +343,8 @@ def shell_stl(G, y_top, ext=6.0, seg_len=0.005):
         a, bb = poly[i], poly[(i + 1) % n]
         k = max(1, int(math.ceil(np.linalg.norm(bb - a) / seg_len)))
         dense += [tuple(a + (bb - a) * j / k) for j in range(k)]
+    if depth:
+        return extruded_stl("shell", dense, G.theta, wedge=False, depth=depth)
     return extruded_stl("shell", dense, G.theta, ext)
 
 
@@ -412,28 +421,33 @@ def build(cfg, src):
     y_fill = G.H if g["fillHeight"] in ("top", None) else float(g["fillHeight"])
     if not G.Y0 < y_fill <= G.H + 1e-9:
         raise ValueError(f"geometry: fillHeight must be between 0 and the silo top {G.H:.4f} m")
-    bmd, info = block_mesh_dict(G, m, y_fill, src)
-    files = {"constant/triSurface/shell.stl": shell_stl(G, info["Hm"] + 0.05)}
+    plane = g.get("shape", "axisymmetric") == "plane"
+    depth = float(g.get("depth") or 0.01) if plane else None
+    bmd, info = block_mesh_dict(G, m, y_fill, src, depth=depth)
+    files = {"constant/triSurface/shell.stl": shell_stl(G, info["Hm"] + 0.05, depth=depth)}
     if m.get("mesher", "blockMesh") == "gmsh":
         from . import gmsh_mesh
         if m.get("outletColumns", "shared") != "shared":
             raise ValueError("mesh: outletColumns needs mesher: blockMesh")
-        files["system/mesh.geo"] = gmsh_mesh.geo_script(layout(G, m, y_fill), G)
+        files["system/mesh.geo"] = gmsh_mesh.geo_script(layout(G, m, y_fill), G, depth)
     else:
         files["system/blockMeshDict"] = bmd
     return dict(
         files=files,
-        wedge=True,
-        theta=G.theta,
+        wedge=not plane,
+        theta=None if plane else G.theta,
+        plane=dict(depth=depth, mirror=2.0) if plane else None,
+        massUnit="kg/m" if plane else "kg",
         mesher=m.get("mesher", "blockMesh"),
-        patchTypes={"front": "wedge", "back": "wedge"},
+        patchTypes=({"front": "empty", "back": "empty", "axis": "symmetryPlane"} if plane
+                    else {"front": "wedge", "back": "wedge"}),
         bodies={"shell": dict(surface="shell.stl", friction=float(w["friction"]))},
         walls={"outer": 0.0, "bottom": 0.0, "top": 0.0},
         wallsNote="domain sides outside the STL wall: frictionless",
         outlets={"outlet": float(w["friction"])},
         fill=G.fill_polygon(y_fill).tolist(),
         solids=[G.shell_polygon(y_top=info["Hm"] + 0.05).tolist()],
-        volume=G.volume_below(y_fill),
+        volume=G.volume_below(y_fill, plane),
         decompose="(1 {n} 1)",
         notes=dict(
             template="conicalHopper",
@@ -442,8 +456,11 @@ def build(cfg, src):
             siloTop=G.H, fillTop=y_fill, hopperHeight=G.ht,
             mesh=info,
         ),
-        summary=(f"conical hopper: D {2 * G.R:g} m, outlet {2 * G.Ro:g} m, hopper "
-                 f"{math.degrees(G.beta):g} deg from vertical ({G.ht:.3f} m tall), cylinder "
+        summary=((f"plane hopper (per metre, half meshed): width {2 * G.R:g} m, outlet "
+                  f"{2 * G.Ro:g} m, hopper " if plane else
+                  f"conical hopper: D {2 * G.R:g} m, outlet {2 * G.Ro:g} m, hopper ") +
+                 f"{math.degrees(G.beta):g} deg from vertical ({G.ht:.3f} m tall), "
+                 f"{'upper part' if plane else 'cylinder'} "
                  f"{G.Hc:g} m; fill to {y_fill:.3f} m; mesh {info['ncols']}+"
                  f"{int(m['bufferColumns'])} columns x {info['nRows']} rows "
                  f"= {info['nCells']} cells"),

@@ -32,6 +32,11 @@ reports the mesh against the cell-size rules before a run. Decision 0119.
 
 ## Log
 
+- 2026-11-23: G.5 done. `flat.py` (blockMesh + own .geo writer for the two blocks),
+  conical `shape: plane` (block_mesh_dict depth path, extruded STL, plane volume x2
+  per metre). Note: the axisymmetric flat silo's step is set by the axis column (1.86
+  mm effective at r 2.8 mm), the G.6 subject. celCheck's outlet rule (about 40 cells
+  across) is the Couto rule and reads FAIL on small outlets; worth revisiting with Sia.
 - 2026-11-23: G.4 done. `/api/open` (path or example; a relative mesh file becomes
   absolute), examples in init, applyConfig shared by start and Open, beforeunload
   guard, boundary errors marked. Next: G.5 templates.
