@@ -1,0 +1,35 @@
+# celSetup input: a plane tank with a small bottom opening (template
+# flatBottom, shape plane): the material settles with the outlet closed, then
+# it opens and discharges. Placeholder sand values, zero cohesion.
+#   ./Allrun        (writes the case with celSetup, then runs it)
+case: case
+template: flatBottom
+
+geometry:
+  shape: plane            # plane strain; half of the tank is meshed
+  diameter: 1.0           # m, tank width
+  height: 1.2             # m
+  outletDiameter: 0.1     # m, opening width
+  fillHeight: 1.0         # m
+
+walls:
+  friction: 20            # deg
+
+mesh:
+  preset: standard        # 4 mm at the outlet growing to 20 mm
+
+material:
+  model: mohrCoulomb
+  rho: 1500               # kg/m^3
+  E: 5e6                  # Pa
+  nu: 0.3
+  phi: 30                 # deg
+  psi: 1                  # deg
+  c: 0
+  d: 0.001                # m
+
+run:
+  openTime: 0.5           # s
+  endTime: 2.0            # s
+  writeInterval: 0.05     # s
+  nProcs: 1

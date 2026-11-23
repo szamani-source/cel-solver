@@ -32,6 +32,10 @@ reports the mesh against the cell-size rules before a run. Decision 0119.
 
 ## Log
 
+- 2026-11-23: G.7 done. Manual page setup-tool.html (+ check_manual REQUIRED terms),
+  meshing guide links it, tutorial setupPlaneTank. G series complete except G.0 (merge
+  after v1.0.0). Open question for Sia: celCheck's outlet rule (about 40 cells across,
+  from Couto) marks small outlets FAIL (plane tank: 6 cells of 4.2 mm across 25 mm).
 - 2026-11-23: G.6 done (decision 0122): schema entries for the existing edgeGrading
   options, flatBottom axisColumn, table of gains. Open: a Couto run with axisColumn 2
   to show pressures and rate unchanged, only if Sia wants the speed-up. Next: G.7.
