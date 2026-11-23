@@ -32,6 +32,12 @@ reports the mesh against the cell-size rules before a run. Decision 0118.
 
 ## Log
 
+- 2026-11-23: G.3 done (decision 0120). `usermesh.py` (import, suggestions, BTYPES,
+  build, finish_import), case.py inlets and per-outlet openTime, miniyaml inline
+  mappings, schema boundaries section in YAML and --describe, GUI Load mesh and
+  boundaries panel (fieldset min-width 0 or the form scrolls sideways). Test fixture
+  `tests/celsetup/data/tank2d.msh` (from examples/tank2d.geo) so CI tests the import
+  without Gmsh. Next: G.4 polish.
 - 2026-11-23: G.2 done. GUI toolbar Mesher select and "compare with the other":
   `/api/init` lists the meshers (ok + note), `/api/compare` meshes the case with the
   other mesher in its own scratch folder; overlay lines only when cells are 4 px or

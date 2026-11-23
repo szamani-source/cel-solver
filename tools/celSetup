@@ -13,7 +13,7 @@
     celSetup --gui [case.yaml]      the setup GUI in your browser (local, offline);
                                     --port N, --no-browser
 
-Templates: conicalHopper. Examples: tools/celsetup/examples/.
+Templates: conicalHopper, userMesh (your own mesh, G.3). Examples: tools/celsetup/examples/.
 """
 import os
 import sys
@@ -41,9 +41,20 @@ def main(argv):
         if name not in case.TEMPLATES:
             print(f"celSetup: templates are {', '.join(case.TEMPLATES)}", file=sys.stderr)
             return 2
-        sch = case.TEMPLATES[name].SCHEMA
-        txt = (schema.template_yaml(name, sch) if "--template" in flags
-               else f"Template {name}:" + schema.table(sch)) + "\n"
+        mod = case.TEMPLATES[name]
+        sch, bt = mod.SCHEMA, getattr(mod, "BTYPES", None)
+        if "--template" in flags:
+            txt = schema.template_yaml(name, sch, boundary_types=bt) + "\n"
+        else:
+            txt = f"Template {name}:" + schema.table(sch, name) + "\n"
+            if bt:
+                txt += "\nboundaries: one entry per patch, with a type and its entries\n"
+                for t, (text, entries) in bt.items():
+                    txt += f"  {t:<10} {text}\n"
+                    for e in entries:
+                        d = "REQUIRED" if e.default == schema.REQUIRED else (
+                            schema._yaml_value(e.default) or "(off)")
+                        txt += f"      {e.key:<14} {d:<10} {e.unit:<8} {e.text}\n"
         if len(args) > 1:
             open(args[1], "w").write(txt)
         else:
@@ -55,11 +66,15 @@ def main(argv):
         return 0 if ok else 3
     if "--fill" in flags:
         r = case.fill(args[0])
-        print(f"celSetup: filled {r['cells']} cells, {r['mass']:.1f} {r['unit']} placed "
-              f"(geometry {r['target']:.1f} {r['unit']})")
+        print("celSetup: " + case.fill_message(r))
         return 0
     try:
-        cfg = case.resolve(miniyaml.load(args[0]))
+        raw = miniyaml.load(args[0])
+        f = (raw.get("mesh") or {}).get("file")
+        if isinstance(f, str) and not os.path.isabs(os.path.expanduser(f)):
+            # a user mesh is found relative to the YAML file
+            raw["mesh"]["file"] = os.path.join(os.path.dirname(os.path.abspath(args[0])), f)
+        cfg = case.resolve(raw)
     except (ValueError, OSError) as e:
         print(f"celSetup: {e}", file=sys.stderr)
         return 2

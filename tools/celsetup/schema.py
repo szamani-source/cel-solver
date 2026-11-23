@@ -84,7 +84,14 @@ SECTION_TEXT = {
     "mesh": "Mesh: cell sizes and grading (the rules of the manual's meshing guide)",
     "material": "Material",
     "run": "Run control",
+    # template-specific texts: "template.section"
+    "userMesh.mesh": "Your mesh: the file and its format (2D one cell thick, or a wedge about y)",
+    "userMesh.geometry": "Where the material starts: the cells inside this box",
 }
+
+
+def section_text(sec, name=None):
+    return SECTION_TEXT.get(f"{name}.{sec}", SECTION_TEXT.get(sec, ""))
 
 
 OMIT = object()
@@ -145,7 +152,7 @@ def _yaml_value(v):
     return str(_word(v))
 
 
-def template_yaml(name, template_schema, values=None, advanced=True):
+def template_yaml(name, template_schema, values=None, advanced=True, boundary_types=None):
     """A commented YAML file with every entry: given values, else defaults.
     Required entries without a value are left for the user to fill in;
     advanced entries not given are commented out."""
@@ -156,7 +163,7 @@ def template_yaml(name, template_schema, values=None, advanced=True):
              "# with # are advanced options at their defaults.",
              f"case: {values.get('case', name + 'Case')}", f"template: {name}", ""]
     for sec, entries in sections(template_schema).items():
-        lines.append(f"{sec + ':':<27}# {SECTION_TEXT.get(sec, '')}")
+        lines.append(f"{sec + ':':<27}# {section_text(sec, name)}")
         given = values.get(sec) or {}
         for e in entries:
             v = given.get(e.key, e.default)
@@ -171,14 +178,40 @@ def template_yaml(name, template_schema, values=None, advanced=True):
             else:
                 lines.append(f"  {(e.key + ': ' + _yaml_value(v)):<24} # {text}")
         lines.append("")
+    if boundary_types is not None:
+        lines += boundaries_yaml(values.get("boundaries"), boundary_types)
     return "\n".join(lines)
 
 
-def table(template_schema):
+def boundaries_yaml(given, btypes):
+    """The boundaries section: one block per patch, or (none given yet) a
+    commented list of the conditions and their entries."""
+    out = [f"{'boundaries:':<27}# one entry per patch of the mesh: type and its entries"]
+    if given:
+        for p, d in given.items():
+            d = d if isinstance(d, dict) else {"type": d}
+            out.append(f"  {p}:")
+            t = d.get("type")
+            out.append(f"    {('type: ' + str(t)):<22} # {btypes[t][0] if t in btypes else ''}")
+            for e in (btypes[t][1] if t in btypes else []):
+                if d.get(e.key) not in (None, ""):
+                    unit = f" [{e.unit}]" if e.unit else ""
+                    out.append(f"    {(e.key + ': ' + _yaml_value(d[e.key])):<22} # {e.text}{unit}")
+    else:
+        out.append("  # patchName:")
+        out.append("  #   type: wall            # then the entries of that type:")
+    for t, (text, entries) in btypes.items():
+        ent = ", ".join(e.key + ("" if e.default != REQUIRED else " (required)") for e in entries)
+        out.append(f"  # {t}: {text}" + (f"; entries: {ent}" if ent else ""))
+    out.append("")
+    return out
+
+
+def table(template_schema, name=None):
     """Plain-text listing for celSetup --describe."""
     out = []
     for sec, entries in sections(template_schema).items():
-        out.append(f"\n{sec}: {SECTION_TEXT.get(sec, '')}")
+        out.append(f"\n{sec}: {section_text(sec, name)}")
         for e in entries:
             d = "REQUIRED" if e.default == REQUIRED else (_yaml_value(e.default) or "(off)")
             out.append(f"  {e.key:<18} {d:<14} {e.unit:<8} {e.text}")

@@ -5,7 +5,11 @@ const $ = (id) => document.getElementById(id);
 const S = {
   init: null, template: null, values: {}, geom: null, mesh: null, colour: "size",
   view: null, meshReq: 0, geomReq: 0, runCase: null, other: null, otherReq: 0,
+  user: null, hl: null,
 };
+// G.3: boundary condition colours on the drawing
+const BCOL = { wall: "#3a3f45", outlet: "#d62728", inlet: "#1f77b4", symmetry: "#2ca02c",
+  free: "#9467bd", none: "#ff9800" };
 const NAMES = { blockMesh: "blockMesh", gmsh: "Gmsh" };
 
 async function api(path, body) {
@@ -36,7 +40,7 @@ function buildForm() {
   form.innerHTML = "";
   for (const [sec, entries] of Object.entries(sch)) {
     const fs = document.createElement("fieldset");
-    fs.innerHTML = `<legend>${sec}</legend><div class="sectext">${S.init.sections[sec] || ""}</div>`;
+    fs.innerHTML = `<legend>${sec}</legend><div class="sectext">${S.init.sections[S.template + "." + sec] || S.init.sections[sec] || ""}</div>`;
     const adv = document.createElement("details");
     adv.innerHTML = "<summary>Advanced</summary>";
     let nAdv = 0;
@@ -45,8 +49,95 @@ function buildForm() {
       if (e.level === "advanced") { adv.appendChild(el); nAdv++; } else fs.appendChild(el);
     }
     if (nAdv) fs.appendChild(adv);
+    if (S.template === "userMesh" && sec === "mesh") {
+      const b = document.createElement("div");
+      b.className = "field";
+      b.innerHTML = `<button id="loadMesh" class="primary">Load mesh</button> <span id="meshInfo" class="desc"></span>`;
+      b.querySelector("button").onclick = loadMesh;
+      fs.appendChild(b);
+    }
     form.appendChild(fs);
+    if (S.template === "userMesh" && sec === "mesh") {
+      const bs = document.createElement("fieldset");
+      bs.id = "bndSet";
+      form.appendChild(bs);
+      buildBoundaries();
+    }
   }
+}
+
+// the mesher choice belongs to templates that make their own mesh
+function meshToolbar() {
+  const own = S.template !== "userMesh";
+  $("mesher").closest("label").hidden = !own;
+  $("compare").closest("label").hidden = !own;
+  if (!own) $("compare").checked = false;
+}
+
+// ---------- user mesh (G.3) ------------------------------------------------
+async function loadMesh() {
+  $("meshInfo").textContent = "loading…";
+  const r = await api("/api/loadmesh", { config: config() });
+  if (r.error) { $("meshInfo").textContent = ""; showError(r.error); return; }
+  S.user = r; S.mesh = null; S.other = null;
+  S.values.boundaries = S.values.boundaries || {};
+  for (const p of r.patches) {
+    if (!S.values.boundaries[p.name] && p.suggest) S.values.boundaries[p.name] = { type: p.suggest };
+  }
+  $("meshInfo").textContent = `${r.format}: ${r.nCells.toLocaleString()} cells, ${r.patches.length} patches, ` +
+    (r.kind === "3D" ? "3D (not supported yet: give the front and back patches type empty)" : r.kind);
+  buildBoundaries();
+  S.moved = false; fit();
+  changed();
+}
+
+function buildBoundaries() {
+  const bs = $("bndSet");
+  if (!bs) return;
+  bs.innerHTML = `<legend>boundaries</legend><div class="sectext">A condition for every patch of the mesh. ` +
+    `Point at a patch to see it on the drawing.</div>`;
+  if (!S.user) { bs.innerHTML += `<div class="desc">Give the mesh file above and press Load mesh.</div>`; return; }
+  const bt = S.init.btypes;
+  for (const p of S.user.patches) {
+    const cur = (S.values.boundaries || {})[p.name] || {};
+    const div = document.createElement("div");
+    div.className = "field bnd" + (cur.type ? "" : " bad");
+    div.dataset.patch = p.name;
+    const sel = `<select id="b_${p.name}"><option value="">choose…</option>` + Object.keys(bt).map((t) =>
+      `<option ${cur.type === t ? "selected" : ""}>${t}</option>`).join("") + "</select>";
+    div.innerHTML = `<div class="row"><label for="b_${p.name}" title="${p.foamType}, ${p.nFaces} faces">` +
+      `<span class="swatch" style="background:${cur.type === "wedge" || cur.type === "empty" ? "transparent" : (BCOL[cur.type] || BCOL.none)}"></span>${p.name}</label>${sel}<span class="unit">${p.nFaces}</span></div>` +
+      `<div class="desc">${cur.type ? bt[cur.type].text : "no condition yet"}</div>`;
+    for (const e of (cur.type ? bt[cur.type].entries : [])) {
+      const req = e.default === "required";
+      const ph = req ? "required" : (e.default === null ? "off" : fmtDefault(e.default));
+      const row = document.createElement("div");
+      row.className = "row sub";
+      row.innerHTML = `<label title="${e.text}">${e.key}</label><input value="${cur[e.key] ?? ""}" placeholder="${ph}" ` +
+        `title="${e.text}" spellcheck="false"><span class="unit">${e.unit || ""}</span>`;
+      row.querySelector("input").addEventListener("input", (ev) => {
+        const v = ev.target.value.trim();
+        if (v === "") delete S.values.boundaries[p.name][e.key]; else S.values.boundaries[p.name][e.key] = v;
+        changed();
+      });
+      div.appendChild(row);
+    }
+    div.querySelector("select").addEventListener("change", (ev) => {
+      S.values.boundaries = S.values.boundaries || {};
+      const t = ev.target.value;
+      if (!t) delete S.values.boundaries[p.name];
+      else S.values.boundaries[p.name] = { type: t };
+      buildBoundaries(); changed();
+    });
+    div.addEventListener("mouseenter", () => { S.hl = p.name; draw(); });
+    div.addEventListener("mouseleave", () => { S.hl = null; draw(); });
+    bs.appendChild(div);
+  }
+}
+
+function missingBoundaries() {
+  if (!S.user) return null;
+  return S.user.patches.filter((p) => !((S.values.boundaries || {})[p.name] || {}).type).map((p) => p.name);
 }
 
 function fieldEl(sec, e) {
@@ -82,6 +173,7 @@ function fieldEl(sec, e) {
 function config() {
   const c = { case: S.values.case || "celCase", template: S.template };
   for (const sec of Object.keys(S.init.schema[S.template])) c[sec] = { ...(S.values[sec] || {}) };
+  if (S.template === "userMesh") c.boundaries = JSON.parse(JSON.stringify(S.values.boundaries || {}));
   return c;
 }
 
@@ -102,7 +194,7 @@ async function updateGeometry() {
   if (id !== S.geomReq) return;
   if (g.error) { showError(g.error); return; }
   S.geom = g;
-  $("summary").innerHTML = `<b>${g.summary}</b>; material ${Math.round(g.mass).toLocaleString()} kg`;
+  $("summary").innerHTML = `<b>${g.summary}</b>` + (g.mass != null ? `; material ${Math.round(g.mass).toLocaleString()} kg` : "");
   if (!S.view) fit();
   draw();
 }
@@ -112,6 +204,15 @@ async function updateMesh() {
     $("checks").innerHTML = `<div class="error">OpenFOAM is not loaded (blockMesh not found): ` +
       `the mesh preview and checks need it. Source OpenFOAM's bashrc and start celSetup --gui again.</div>`;
     return;
+  }
+  if (S.template === "userMesh") {
+    const miss = missingBoundaries();
+    if (miss === null || miss.length) {
+      S.meshReq++;
+      $("checks").innerHTML = `<div class="error">${miss === null ? "Load the mesh first (Mesh: file, then Load mesh)."
+        : "Give a condition for every patch: " + miss.join(", ")}. The checks run once every patch has one.</div>`;
+      return;
+    }
   }
   const id = ++S.meshReq;
   $("busy").hidden = false;
@@ -189,6 +290,7 @@ function ramp(stops, t) {
 }
 
 function bounds() {
+  if (S.user) { const [[x0, y0], [x1, y1]] = S.user.box; return [x0, y0, x1, y1]; }
   const pts = [];
   if (S.geom) { for (const s of S.geom.solids) pts.push(...s); pts.push(...S.geom.fill); }
   if (!pts.length) return [0, 0, 1, 1];
@@ -253,15 +355,49 @@ function draw() {
     const lx = L.r ?? L.centre[0], ly = L.y ?? L.centre[1];
     g.strokeStyle = dark ? "#fff" : "#000"; g.lineWidth = 2;
     g.beginPath(); g.arc(X(lx), Y(ly), 9, 0, 2 * Math.PI); g.stroke();
-  } else if (S.geom) {
+  } else if (S.user) {
+    g.lineWidth = 0.5; g.strokeStyle = dark ? "rgba(200,210,220,.5)" : "rgba(60,70,80,.45)";
+    g.fillStyle = dark ? "#262c33" : "#eef1f4";
+    for (const q of S.user.polys) { poly(g, q, X, Y); g.fill(); if (s * 0.004 > 3) g.stroke(); }
+    if (S.geom && S.geom.fill) {
+      g.fillStyle = dark ? "rgba(214,160,70,.45)" : "rgba(214,160,70,.55)";
+      poly(g, S.geom.fill, X, Y); g.fill();
+    }
+    $("legend").innerHTML = "<div>your mesh (checks run when every patch has a condition)</div>";
+  } else if (S.geom && S.geom.fill) {
     g.fillStyle = dark ? "rgba(214,160,70,.45)" : "rgba(214,160,70,.55)";
     poly(g, S.geom.fill, X, Y); g.fill();
     $("legend").innerHTML = "<div>geometry (mesh building…)</div>";
   }
+  if (S.user) drawPatches(g, X, Y, dark);
   if (S.geom) {
     g.strokeStyle = dark ? "#ef6f61" : "#c0392b"; g.lineWidth = 1.5;
     for (const sp of S.geom.solids) { poly(g, sp, X, Y); g.stroke(); }
   }
+}
+
+function drawPatches(g, X, Y, dark) {
+  const segs = {};
+  if (S.mesh && S.mesh.patches) Object.assign(segs, S.mesh.patches);
+  else for (const p of S.user.patches) segs[p.name] = p.segments;
+  const used = new Set();
+  for (const [name, list] of Object.entries(segs)) {
+    const t = ((S.values.boundaries || {})[name] || {}).type;
+    if (t === "wedge" || t === "empty") continue;
+    const hl = S.hl === name;
+    let col = BCOL[t] || BCOL.none;
+    if (t === "wall" && dark) col = "#d0d6dd";
+    used.add(t || "none");
+    g.strokeStyle = hl ? (dark ? "#ffff66" : "#ffbf00") : col;
+    g.lineWidth = hl ? 6 : 3;
+    g.setLineDash(t === "symmetry" ? [6, 4] : []);
+    g.beginPath();
+    for (const sg of list) { g.moveTo(X(sg[0][0]), Y(sg[0][1])); for (const q of sg.slice(1)) g.lineTo(X(q[0]), Y(q[1])); }
+    g.stroke();
+  }
+  g.setLineDash([]);
+  $("legend").innerHTML += [...used].map((t) =>
+    `<div><span class="swatch" style="background:${BCOL[t]}"></span>${t === "none" ? "no condition yet" : t}</div>`).join("");
 }
 
 function poly(g, pts, X, Y) {
@@ -378,7 +514,13 @@ function setupButtons() {
   $("compare").onchange = () => {
     if ($("compare").checked) updateCompare(); else { S.other = null; S.otherReq++; showChecks(); draw(); }
   };
-  $("template").onchange = () => { S.template = $("template").value; S.values = {}; buildForm(); changed(); };
+  $("template").onchange = () => {
+    // keep the material and run entries; the template's own sections start afresh
+    S.template = $("template").value;
+    S.values = { case: S.values.case, material: S.values.material, run: S.values.run };
+    S.user = null; S.mesh = null; S.other = null; S.geom = null; S.view = null;
+    buildForm(); meshToolbar(); changed(); setTimeout(fit, 300);
+  };
 }
 
 async function poll() {
@@ -401,14 +543,23 @@ async function main() {
     S.values[sec] = {};
     for (const [k, v] of Object.entries(cfg[sec] || {})) S.values[sec][k] = fmtDefault(v);
   }
+  if (cfg.boundaries) {
+    S.values.boundaries = {};
+    for (const [p, d] of Object.entries(cfg.boundaries)) {
+      S.values.boundaries[p] = {};
+      for (const [k, v] of Object.entries(typeof d === "object" ? d : { type: d })) S.values.boundaries[p][k] = fmtDefault(v);
+    }
+  }
   buildForm();
   for (const o of $("mesher").options) {
     const info = (S.init.meshers || {})[o.value];
     if (info && !info.ok) { o.disabled = true; o.textContent += " (not found)"; o.title = info.note; }
   }
   $("mesher").value = mesherNow();
+  meshToolbar();
   setupCanvas();
   setupButtons();
+  if (S.template === "userMesh" && (S.values.mesh || {}).file) { await loadMesh(); return; }
   await updateGeometry();
   fit();
   updateMesh();

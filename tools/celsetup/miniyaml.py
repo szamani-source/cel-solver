@@ -1,7 +1,8 @@
 """A small YAML reader for celSetup input files.
 
 It reads the subset celSetup files need: nested mappings by indentation, scalars (numbers, yes/no,
-true/false, strings), inline lists [a, b] and comments. Always this reader,
+true/false, strings), inline lists [a, b], inline mappings {a: 1, b: 2}
+(one level) and comments. Always this reader,
 never PyYAML (which reads 1e-3 as a string), so the tools behave the same
 everywhere and run on a bare OpenFOAM image with only numpy.
 """
@@ -13,6 +14,14 @@ def _scalar(s):
         return None
     if s[0] in "\"'" and s[-1] == s[0]:
         return s[1:-1]
+    if s.startswith("{") and s.endswith("}"):
+        out = {}
+        for item in filter(None, (x.strip() for x in s[1:-1].split(","))):
+            if ":" not in item:
+                raise ValueError(f"inline mapping {s}: '{item}' has no ':'")
+            k, v = item.split(":", 1)
+            out[k.strip()] = _scalar(v)
+        return out
     if s.startswith("[") and s.endswith("]"):
         inner = s[1:-1].strip()
         return [_scalar(x) for x in inner.split(",")] if inner else []

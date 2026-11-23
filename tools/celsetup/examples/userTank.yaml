@@ -1,0 +1,46 @@
+# celSetup input: your own mesh (template userMesh, WP G.3). The mesh here
+# is tank2d.geo next to this file (meshed with Gmsh); any OpenFOAM case or
+# polyMesh folder, .msh (Gmsh or Fluent), .unv, .neu or .ans works too.
+#   tools/celSetup tools/celsetup/examples/userTank.yaml /path/to/case
+case: userTank
+template: userMesh
+
+mesh:
+  file: tank2d.geo        # relative to this file
+  scale: 1
+
+geometry:
+  fillYMax: 0.5           # m, material up to 0.5 m; the box is open on the other sides
+
+boundaries:               # one entry per patch of the mesh
+  outlet:
+    type: outlet
+    friction: 20          # deg, while closed
+  bottom:
+    type: wall
+    friction: 20
+  wall:
+    type: wall
+    friction: 20
+  top:
+    type: free
+  axis:
+    type: symmetry
+  frontAndBack:
+    type: empty
+
+material:
+  model: mohrCoulomb
+  rho: 1500               # kg/m^3, dry sand (placeholder values)
+  E: 5e6                  # Pa
+  nu: 0.3
+  phi: 30                 # deg
+  psi: 1                  # deg
+  c: 0
+  d: 0.001                # m
+
+run:
+  openTime: 0.5           # s
+  endTime: 1.5            # s
+  writeInterval: 0.05     # s
+  nProcs: 1

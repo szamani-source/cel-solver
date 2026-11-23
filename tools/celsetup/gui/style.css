@@ -29,7 +29,7 @@ select, input { font: inherit; color: var(--text); background: var(--field); bor
 main { flex: 1; display: flex; min-height: 0; }
 aside { width: 440px; overflow-x: hidden; min-width: 300px; overflow-y: auto; padding: 8px 14px 40px;
   border-right: 1px solid var(--line); background: var(--panel); }
-fieldset { border: none; padding: 0; margin: 14px 0 4px; }
+fieldset { border: none; padding: 0; margin: 14px 0 4px; min-width: 0; }
 legend { font-weight: 600; font-size: 15px; padding: 0; margin-bottom: 2px; }
 .sectext { color: var(--muted); font-size: 12px; margin-bottom: 6px; }
 .field { padding: 6px 0; border-top: 1px solid var(--line); }
@@ -39,7 +39,7 @@ legend { font-weight: 600; font-size: 15px; padding: 0; margin-bottom: 2px; }
 .field .unit { flex: 0 0 48px; color: var(--muted); font-size: 12px; }
 .field .desc { color: var(--muted); font-size: 12px; margin: 2px 0 0 0; overflow-wrap: anywhere; }
 .field.required label::after { content: " *"; color: var(--fail); }
-.field.bad input { border-color: var(--fail); }
+.field.bad input, .field.bad select { border-color: var(--fail); }
 .field.changed label { color: var(--accent); }
 details { margin-top: 6px; }
 summary { cursor: pointer; color: var(--muted); font-size: 13px; }
@@ -87,3 +87,8 @@ table.cmp th, table.cmp td { padding: 3px 10px; border-bottom: 1px solid var(--l
 table.cmp .badge { display: inline-block; width: 46px; }
 .otherline { color: #c2187a; font-weight: 600; }
 @media (prefers-color-scheme: dark) { .otherline { color: #ff7bd5; } }
+
+.swatch { display: inline-block; width: 12px; height: 12px; border-radius: 2px; margin-right: 6px;
+  vertical-align: -1px; }
+.field.bnd .row.sub { margin-left: 18px; margin-top: 3px; }
+.field.bnd .row.sub label { font-size: 12px; }

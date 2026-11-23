@@ -23,7 +23,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import numpy as np
 
-from . import case, check, miniyaml, schema
+from . import case, check, foam, miniyaml, schema, usermesh
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 STATIC = os.path.join(HERE, "gui")
@@ -38,6 +38,7 @@ class State:
         self.scratch = tempfile.mkdtemp(prefix="celSetupGui-")
         self.lock = threading.Lock()
         self.runs = {}
+        self.user = None            # the loaded user mesh (G.3): description
 
 
 def initial_config(path):
@@ -51,7 +52,11 @@ def clean(cfg):
     reads them; empty means not given."""
     out = {}
     for k, v in cfg.items():
-        if isinstance(v, dict):
+        if k == "boundaries" and isinstance(v, dict):
+            out[k] = {p: {kk: miniyaml._scalar(vv) if isinstance(vv, str) else vv
+                          for kk, vv in d.items() if vv not in ("", None)}
+                      for p, d in v.items()}
+        elif isinstance(v, dict):
             out[k] = {kk: miniyaml._scalar(vv) if isinstance(vv, str) else vv
                       for kk, vv in v.items() if vv not in ("", None)}
         else:
@@ -59,13 +64,69 @@ def clean(cfg):
     return out
 
 
-def geometry(cfg):
+def abs_mesh_file(state, cfg):
+    """A relative user-mesh path is taken from the YAML file's folder (or
+    the folder celSetup --gui started in)."""
+    f = (cfg.get("mesh") or {}).get("file")
+    if isinstance(f, str) and f and not os.path.isabs(os.path.expanduser(f)):
+        base = os.path.dirname(state.yaml_path) if state.yaml_path else os.getcwd()
+        cfg["mesh"]["file"] = os.path.join(base, f)
+    elif isinstance(f, str):
+        cfg["mesh"]["file"] = os.path.expanduser(f)
+    return cfg
+
+
+def geometry(cfg, state=None):
     """Fast outline (no mesh): fill, walls, domain."""
     c = case.resolve(cfg)
     t = case.TEMPLATES[c["template"]]
     b = t.build(c, "gui")
-    return dict(fill=b["fill"], solids=b["solids"], summary=b["summary"],
-                wall=b["notes"].get("wall"), mass=b["volume"] * float(c["material"]["rho"]))
+    fill = b["fill"]
+    if c["template"] == "userMesh":
+        # the fill box, clipped to the loaded mesh
+        u = state.user if state else None
+        if u is None:
+            fill = None
+        else:
+            (x0, y0), (x1, y1) = u["box"]
+            fx0, fy0 = max(fill[0][0], x0), max(fill[0][1], y0)
+            fx1, fy1 = min(fill[2][0], x1), min(fill[2][1], y1)
+            fill = [[fx0, fy0], [fx1, fy0], [fx1, fy1], [fx0, fy1]] if fx1 > fx0 and fy1 > fy0 \
+                else None
+    mass = None if b["volume"] is None else b["volume"] * float(c["material"]["rho"])
+    return dict(fill=fill, solids=b["solids"], summary=b["summary"],
+                wall=b["notes"].get("wall"), mass=mass)
+
+
+def load_user_mesh(state, cfg):
+    """Import the user's mesh into a scratch case and describe it: patches
+    with a suggested condition and their edges, cell polygons (2D or wedge),
+    bounds. Nothing about the boundaries needs to be known yet."""
+    cfg = dict(cfg, boundaries={})
+    c = case.resolve(cfg)
+    with state.lock:
+        d = os.path.join(state.scratch, "usermesh")
+        if os.path.isdir(d):
+            shutil.rmtree(d)
+        case.write_case(c, d, src="celSetup GUI")
+        fmt = usermesh.import_mesh(d, c["mesh"])
+        desc = usermesh.describe_mesh(d)
+        # front polygons need the 2D or wedge sides typed: the suggestions
+        from . import gmsh_mesh
+        gmsh_mesh.set_patch_types(d, {p["name"]: p["suggest"] for p in desc["patches"]
+                                      if p["suggest"] in ("wedge", "empty")})
+        m = foam.PolyMesh(d)
+        cells, polys, wedge = m.front_polygons()
+    if len(cells):
+        allp = np.vstack(polys)
+        box = [allp.min(0).tolist(), allp.max(0).tolist()]
+    else:
+        lo, hi = desc["bounds"]
+        box = [lo[:2], hi[:2]]
+    desc.update(format=fmt, file=c["mesh"]["file"], box=box, wedge=wedge,
+                polys=[np.round(q, 6).tolist() for q in polys])
+    state.user = desc
+    return desc
 
 
 def meshers():
@@ -93,8 +154,8 @@ def other_mesher(cfg):
 
 
 def mesh_preview(state, cfg, sub="preview"):
-    """Write the case in a scratch folder, mesh (blockMesh or Gmsh), fill,
-    celCheck."""
+    """Write the case in a scratch folder, mesh (blockMesh or Gmsh, or
+    import the user's mesh), fill, celCheck."""
     c = case.resolve(cfg)
     with state.lock:
         d = os.path.join(state.scratch, sub)
@@ -116,7 +177,26 @@ def mesh_preview(state, cfg, sub="preview"):
             solids=res.get("solids", []),
             checks=res["checks"], verdict=worst, nCells=res["nCells"], dt=res["dt"],
             hours=res["hours"], limit=res["limit"], fill=msg, wedge=wedge,
-            mesher=c["mesh"].get("mesher", "blockMesh"), nonOrth=res["nonOrth"]["max"])
+            mesher=c["mesh"].get("mesher", "blockMesh"), nonOrth=res["nonOrth"]["max"],
+            patches=patch_segments(d, wedge) if c["template"] == "userMesh" else None)
+
+
+def patch_segments(d, wedge):
+    """Edges of every non-side patch in the (x, y) section, for drawing."""
+    m = foam.PolyMesh(d)
+    out = {}
+    for name in m.patches:
+        if name in m.patches_of_type("wedge") + m.patches_of_type("empty"):
+            continue
+        segs = []
+        for fi in m.patch_faces(name):
+            q = m.points[m.faces[fi]]
+            r = np.hypot(q[:, 0], q[:, 2]) if wedge else q[:, 0]
+            xy = np.unique(np.round(np.column_stack([r, q[:, 1]]), 9), axis=0)
+            if len(xy) >= 2:
+                segs.append(xy[[0, -1]].tolist())
+        out[name] = segs
+    return out
 
 
 def read_alpha(d, n):
@@ -131,7 +211,8 @@ def save(state, cfg, yaml_path, case_dir):
     yaml_path = os.path.abspath(os.path.expanduser(yaml_path))
     case_dir = os.path.abspath(os.path.expanduser(case_dir))
     with open(yaml_path, "w") as f:
-        f.write(schema.template_yaml(c["template"], t.SCHEMA, cfg, advanced=True) + "\n")
+        f.write(schema.template_yaml(c["template"], t.SCHEMA, cfg, advanced=True,
+                                     boundary_types=getattr(t, "BTYPES", None)) + "\n")
     b = case.write_case(c, case_dir, src=os.path.basename(yaml_path))
     ok, msg = case.run_mesh_and_fill(case_dir)
     state.yaml_path = yaml_path
@@ -197,7 +278,10 @@ def make_handler(state):
                                             caseDir=os.path.join(os.path.dirname(base),
                                                                  cfg.get("case", "celCase")),
                                             openfoam=shutil.which("blockMesh") is not None,
-                                            meshers=meshers()))
+                                            meshers=meshers(),
+                                            btypes={k: dict(text=v[0], entries=[
+                                                e._asdict() for e in v[1]])
+                                                for k, v in usermesh.BTYPES.items()}))
             if path == "/api/status":
                 q = dict(p.split("=", 1) for p in self.path.split("?", 1)[1].split("&")) \
                     if "?" in self.path else {}
@@ -213,9 +297,11 @@ def make_handler(state):
             n = int(self.headers.get("Content-Length", 0))
             try:
                 body = json.loads(self.rfile.read(n) or b"{}")
-                cfg = clean(body.get("config", {}))
+                cfg = abs_mesh_file(state, clean(body.get("config", {})))
                 if self.path == "/api/geometry":
-                    return self._send(200, geometry(cfg))
+                    return self._send(200, geometry(cfg, state))
+                if self.path == "/api/loadmesh":
+                    return self._send(200, load_user_mesh(state, cfg))
                 if self.path == "/api/mesh":
                     return self._send(200, mesh_preview(state, cfg))
                 if self.path == "/api/compare":

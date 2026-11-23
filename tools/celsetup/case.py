@@ -9,9 +9,9 @@ import subprocess
 
 import numpy as np
 
-from . import conical, foam, schema
+from . import conical, foam, schema, usermesh
 
-TEMPLATES = {"conicalHopper": conical}
+TEMPLATES = {"conicalHopper": conical, "userMesh": usermesh}
 TOOLS = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
@@ -37,6 +37,12 @@ def resolve(cfg):
             raise ValueError(f"{sec}: unknown entr{'y' if len(extra) == 1 else 'ies'} "
                              f"{', '.join(sorted(extra))} (celSetup --describe {t} lists them)")
         out[sec] = schema.apply_defaults(given, sec, entries)
+    if getattr(mod, "BOUNDARIES", False):
+        b = given.get("boundaries") or {}
+        if not isinstance(b, dict):
+            raise ValueError("boundaries: give one entry per patch (patch: {type: ...})")
+        out["boundaries"] = {k: (dict(v) if isinstance(v, dict) else {"type": v})
+                             for k, v in b.items()}
     w = out.get("walls", {})
     if "frictionCoefficient" in w and w.get("friction") is None:
         if w.get("frictionCoefficient") is None:
@@ -90,6 +96,8 @@ MESH_STEP = {
                  'exit 1; }',
     # Gmsh on system/mesh.geo, gmshToFoam, then the patch types
     "gmsh": '    python3 "$CELSETUP" --mesh . || exit 1',
+    # the user's mesh: copied or converted, patch types set
+    "import": '    python3 "$CELSETUP" --mesh . || exit 1',
 }
 
 
@@ -97,21 +105,26 @@ def write_case(cfg, out_dir, src="celSetup"):
     """Write every file of the case. Returns the template's build result."""
     t = TEMPLATES[cfg["template"]]
     b = t.build(cfg, src)
-    run, mat, w = cfg["run"], cfg["material"], cfg["walls"]
+    run, mat = cfg["run"], cfg["material"]
     os.makedirs(out_dir, exist_ok=True)
     for rel, txt in b["files"].items():
         foam.write(os.path.join(out_dir, rel), txt)
     H = lambda cls, obj: foam.header(cls, obj, src)  # noqa: E731
     walls = "".join(f"    {p:<10}{{ friction {f!r}; }}\n" for p, f in b["walls"].items())
-    outlets = "".join(f"    {p} {{ friction {f!r}; openTime {float(run['openTime'])!r}; }}\n"
-                      for p, f in b["outlets"].items())
+    def outlet(p, f):
+        d = f if isinstance(f, dict) else dict(friction=f, openTime=float(run["openTime"]))
+        return f"    {p} {{ friction {float(d['friction'])!r}; openTime {float(d['openTime'])!r}; }}\n"
+    outlets = "".join(outlet(p, f) for p, f in b["outlets"].items())
+    inlets = "".join(f"    {p}\n    {{\n" + "".join(f"        {k:<12}{v!r};\n" for k, v in d.items())
+                     + "    }\n" for p, d in b.get("inlets", {}).items())
     foam.write(f"{out_dir}/constant/materialProperties",
                H("dictionary", "materialProperties")
                + f"rho             {float(mat['rho'])!r};\nfreeSurface     yes;\n\n"
                + material_text(mat)
                + f"\n// {b.get('wallsNote', 'walls: mesh patches with their friction (deg)')}\n"
                + "walls\n{\n" + walls + "}\n"
-               + ("outlets\n{\n" + outlets + "}\n" if outlets else ""))
+               + ("outlets\n{\n" + outlets + "}\n" if outlets else "")
+               + ("inlets\n{\n" + inlets + "}\n" if inlets else ""))
     if b["bodies"]:
         bodies = "".join(f"    {n}\n    {{\n" + "".join(f"        {k:<12}{v};\n" for k, v in d.items())
                          + "    }\n" for n, d in b["bodies"].items())
@@ -155,9 +168,9 @@ dampingStart    {float(run['dampingStart'])!r};
                    "    \".*\" { type zeroGradient; }\n}\n")
     meta = dict(b["notes"], wedge=b["wedge"], theta=b["theta"], fill=b["fill"],
                 solids=b["solids"], volume=b["volume"], rho=float(mat["rho"]),
-                mass=b["volume"] * float(mat["rho"]), massUnit=b.get("massUnit", "kg"),
+                mass=None if b["volume"] is None else b["volume"] * float(mat["rho"]), massUnit=b.get("massUnit", "kg"),
                 plane=b.get("plane"), mesher=b.get("mesher", "blockMesh"),
-                patchTypes=b.get("patchTypes", {}),
+                patchTypes=b.get("patchTypes", {}), importSpec=b.get("importSpec"),
                 d=None if mat.get("d") is None else float(mat["d"]),
                 nonlocalA=mat.get("nonlocalA"), E=float(mat["E"]), nu=float(mat["nu"]),
                 maxCo=float(run["maxCo"]), endTime=float(run["endTime"]), nProcs=n,
@@ -283,6 +296,12 @@ def mesh(case):
     """Mesh a written case with its mesher (system/celSetup.json).
     Returns (ok, message)."""
     meta = json.load(open(os.path.join(case, "system", "celSetup.json")))
+    if meta.get("mesher") == "import":
+        try:
+            usermesh.import_mesh(case, meta["importSpec"])
+            return True, usermesh.finish_import(case)
+        except ValueError as e:
+            return False, str(e)
     if meta.get("mesher", "blockMesh") == "gmsh":
         from . import gmsh_mesh
         return gmsh_mesh.mesh_case(case, meta.get("patchTypes", {}))
@@ -302,5 +321,9 @@ def run_mesh_and_fill(case):
     if not ok:
         return False, msg
     res = fill(case)
-    return True, (f"filled {res['cells']} cells: {res['mass']:.1f} {res['unit']} placed "
-                  f"(geometry {res['target']:.1f} {res['unit']})")
+    return True, fill_message(res)
+
+
+def fill_message(res):
+    geo = "" if res["target"] is None else f" (geometry {res['target']:.1f} {res['unit']})"
+    return f"filled {res['cells']} cells: {res['mass']:.1f} {res['unit']} placed{geo}"
