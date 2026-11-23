@@ -246,8 +246,13 @@ function showError(msg) {
   $("busy").hidden = true;
   $("checks").innerHTML = `<div class="error">${msg}</div>`;
   for (const el of document.querySelectorAll(".field")) el.classList.remove("bad");
-  const m = /^(\w+): '(\w+)'/.exec(msg) || /^(\w+): unknown entr\w+ (\w+)/.exec(msg);
+  const m = /^(\w+): '(\w+)'/.exec(msg) || /^(\w+): unknown entr\w+ (\w+)/.exec(msg)
+    || /^(\w+): (\w+) must be/.exec(msg);
   if (m) { const el = $(`f_${m[1]}_${m[2]}`); if (el) el.closest(".field").classList.add("bad"); }
+  // a boundary condition: "boundaries: patch: ..." or "give a condition for a, b"
+  const b = /^boundaries: ([\w.:-]+):/.exec(msg);
+  const names = b ? [b[1]] : ((/give a condition for (.*)$/.exec(msg) || [])[1] || "").split(", ").filter(Boolean);
+  for (const n of names) { const el = document.querySelector(`[data-patch="${n}"]`); if (el) el.classList.add("bad"); }
 }
 
 function showChecks() {
@@ -472,6 +477,16 @@ function inside(x, y, q) {
 
 // ---------- save and run ---------------------------------------------------
 function setupButtons() {
+  $("openBtn").onclick = () => {
+    $("openPath").value = S.init.yamlPath || "";
+    $("exampleList").innerHTML = (S.init.examples || []).map((e) =>
+      `<li><a href="#" data-ex="${e.name}">${e.name}</a> <span class="note">${e.text}</span></li>`).join("");
+    for (const a of $("exampleList").querySelectorAll("a")) {
+      a.onclick = (ev) => { ev.preventDefault(); openYaml({ example: a.dataset.ex }); };
+    }
+    $("openDlg").showModal();
+  };
+  $("openGo").onclick = (ev) => { ev.preventDefault(); openYaml({ path: $("openPath").value }); };
   $("saveBtn").onclick = () => {
     $("yamlPath").value = $("yamlPath").value || S.init.yamlPath;
     $("caseDir").value = $("caseDir").value || S.init.caseDir;
@@ -483,7 +498,7 @@ function setupButtons() {
     toast("Saving and meshing…");
     const r = await api("/api/save", { config: config(), yamlPath: $("yamlPath").value, caseDir: $("caseDir").value });
     toast(r.error ? "Not saved: " + r.error : `Saved ${r.yaml}\nCase ${r.case}\n${r.mesh}`, 9000);
-    if (!r.error) S.runCase = r.case;
+    if (!r.error) { S.runCase = r.case; S.saved = JSON.stringify(config()); }
   };
   $("runBtn").onclick = async () => {
     const dir = S.runCase || $("caseDir").value || S.init.caseDir;
@@ -523,6 +538,18 @@ function setupButtons() {
   };
 }
 
+async function openYaml(body) {
+  if (S.saved !== undefined && S.saved !== JSON.stringify(config()) &&
+      !confirm("Open another file? Changes not saved are lost.")) return;
+  const r = await api("/api/open", body);
+  if (r.error) { toast("Not opened: " + r.error, 9000); return; }
+  $("openDlg").close();
+  S.init.yamlPath = r.yamlPath; S.init.caseDir = r.caseDir;
+  $("yamlPath").value = r.yamlPath; $("caseDir").value = r.caseDir; S.runCase = null;
+  await applyConfig(r.config);
+  toast(`Opened ${r.yamlPath}`);
+}
+
 async function poll() {
   const r = await api("/api/status?case=" + encodeURIComponent(S.runCase));
   const frac = r.time && r.endTime ? r.time / r.endTime : 0;
@@ -532,12 +559,11 @@ async function poll() {
 }
 
 // ---------- start ------------------------------------------------------------
-async function main() {
-  S.init = await api("/api/init");
-  const cfg = S.init.config;
+// G.4: a configuration (from the start, or Open) into the form
+async function applyConfig(cfg) {
   S.template = cfg.template || Object.keys(S.init.schema)[0];
-  $("template").innerHTML = Object.keys(S.init.schema).map((t) => `<option>${t}</option>`).join("");
   $("template").value = S.template;
+  S.user = null; S.mesh = null; S.other = null; S.geom = null; S.view = null; S.moved = false;
   S.values = { case: cfg.case };
   for (const sec of Object.keys(S.init.schema[S.template])) {
     S.values[sec] = {};
@@ -551,17 +577,27 @@ async function main() {
     }
   }
   buildForm();
-  for (const o of $("mesher").options) {
-    const info = (S.init.meshers || {})[o.value];
-    if (info && !info.ok) { o.disabled = true; o.textContent += " (not found)"; o.title = info.note; }
-  }
   $("mesher").value = mesherNow();
   meshToolbar();
-  setupCanvas();
-  setupButtons();
+  S.saved = JSON.stringify(config());
   if (S.template === "userMesh" && (S.values.mesh || {}).file) { await loadMesh(); return; }
   await updateGeometry();
   fit();
   updateMesh();
+}
+
+async function main() {
+  S.init = await api("/api/init");
+  $("template").innerHTML = Object.keys(S.init.schema).map((t) => `<option>${t}</option>`).join("");
+  for (const o of $("mesher").options) {
+    const info = (S.init.meshers || {})[o.value];
+    if (info && !info.ok) { o.disabled = true; o.textContent += " (not found)"; o.title = info.note; }
+  }
+  setupCanvas();
+  setupButtons();
+  window.addEventListener("beforeunload", (ev) => {
+    if (S.saved !== undefined && S.saved !== JSON.stringify(config())) { ev.preventDefault(); ev.returnValue = ""; }
+  });
+  await applyConfig(S.init.config);
 }
 main();

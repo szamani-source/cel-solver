@@ -32,6 +32,9 @@ reports the mesh against the cell-size rules before a run. Decision 0119.
 
 ## Log
 
+- 2026-11-23: G.4 done. `/api/open` (path or example; a relative mesh file becomes
+  absolute), examples in init, applyConfig shared by start and Open, beforeunload
+  guard, boundary errors marked. Next: G.5 templates.
 - 2026-11-23: G.3 done (decision 0121). `usermesh.py` (import, suggestions, BTYPES,
   build, finish_import), case.py inlets and per-outlet openTime, miniyaml inline
   mappings, schema boundaries section in YAML and --describe, GUI Load mesh and

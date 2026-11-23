@@ -92,3 +92,6 @@ table.cmp .badge { display: inline-block; width: 46px; }
   vertical-align: -1px; }
 .field.bnd .row.sub { margin-left: 18px; margin-top: 3px; }
 .field.bnd .row.sub label { font-size: 12px; }
+ul.examples { margin: 4px 0 10px; padding-left: 18px; }
+ul.examples li { margin: 3px 0; }
+ul.examples .note { color: var(--muted); font-size: 12px; }

@@ -12,6 +12,7 @@
   <label class="tpl">Template <select id="template"></select></label>
   <div class="spacer"></div>
   <span id="busy" class="busy" hidden>building mesh…</span>
+  <button id="openBtn">Open…</button>
   <button id="saveBtn" class="primary">Save case</button>
   <button id="runBtn">Run</button>
 </header>
@@ -47,6 +48,15 @@
       mesh, STL wall, dictionaries, material fill and Allrun. Allrun resumes from the last write
       when run again.</p>
     <menu><button value="cancel">Cancel</button><button id="saveGo" value="ok" class="primary">Save</button></menu>
+  </form>
+</dialog>
+<dialog id="openDlg">
+  <form method="dialog">
+    <h3>Open an input file</h3>
+    <label>Input file (YAML)<input id="openPath" size="60"></label>
+    <p class="note">Or start from an example:</p>
+    <ul id="exampleList" class="examples"></ul>
+    <menu><button value="cancel">Cancel</button><button id="openGo" value="ok" class="primary">Open</button></menu>
   </form>
 </dialog>
 <div id="toast" class="toast" hidden></div>

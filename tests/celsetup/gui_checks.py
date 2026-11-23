@@ -105,6 +105,16 @@ def main(work):
                   "with blockMesh")
         else:
             print("SKIPPED: Gmsh not available, the comparison is not checked here")
+        # G.4: examples and Open
+        ex = {e["name"] for e in init.get("examples", [])}
+        check({"coutoHopper.yaml", "userTank.yaml"} <= ex, f"init lists the examples: {sorted(ex)}")
+        o = post("/api/open", {"example": "userTank.yaml"})
+        f = o.get("config", {}).get("mesh", {}).get("file", "")
+        check(o.get("config", {}).get("template") == "userMesh" and os.path.isabs(f)
+              and os.path.exists(f) and o.get("yamlPath", "").startswith(work),
+              f"open an example: {o.get('yamlPath')}, mesh {f}")
+        e = post("/api/open", {"path": os.path.join(work, "nothing.yaml")})
+        check("not found" in e.get("error", ""), f"open a missing file: {e.get('error')}")
         bad = json.loads(json.dumps(form))
         bad["material"]["phi"] = ""
         e = post("/api/geometry", {"config": bad})

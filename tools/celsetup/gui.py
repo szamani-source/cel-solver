@@ -41,6 +41,41 @@ class State:
         self.user = None            # the loaded user mesh (G.3): description
 
 
+def examples():
+    """The example input files, with their first comment line."""
+    out = []
+    for f in sorted(os.listdir(EXAMPLES)):
+        if f.endswith(".yaml"):
+            first = open(os.path.join(EXAMPLES, f)).readline().lstrip("# ").strip()
+            out.append(dict(name=f, text=first))
+    return out
+
+
+def open_yaml(state, body):
+    """Read an input file (a path, or an example by name) for the form. A
+    relative user-mesh path becomes absolute, from the file's folder."""
+    if body.get("example"):
+        name = os.path.basename(body["example"])
+        path = os.path.join(EXAMPLES, name)
+    else:
+        path = os.path.abspath(os.path.expanduser(body.get("path", "")))
+    if not os.path.isfile(path):
+        raise ValueError(f"{path} not found")
+    cfg = miniyaml.load(path)
+    if not isinstance(cfg, dict) or cfg.get("template") not in case.TEMPLATES:
+        raise ValueError(f"{path} is not a celSetup input (template: one of "
+                         f"{', '.join(case.TEMPLATES)})")
+    f = (cfg.get("mesh") or {}).get("file")
+    if isinstance(f, str) and not os.path.isabs(os.path.expanduser(f)):
+        cfg["mesh"]["file"] = os.path.join(os.path.dirname(path), f)
+    if body.get("example"):
+        # save a copy in the working folder, not over the example
+        path = os.path.join(os.getcwd(), name)
+    state.yaml_path = path
+    return dict(config=cfg, yamlPath=path,
+                caseDir=os.path.join(os.path.dirname(path), cfg.get("case", "celCase")))
+
+
 def initial_config(path):
     if path and os.path.exists(path):
         return miniyaml.load(path)
@@ -278,7 +313,7 @@ def make_handler(state):
                                             caseDir=os.path.join(os.path.dirname(base),
                                                                  cfg.get("case", "celCase")),
                                             openfoam=shutil.which("blockMesh") is not None,
-                                            meshers=meshers(),
+                                            meshers=meshers(), examples=examples(),
                                             btypes={k: dict(text=v[0], entries=[
                                                 e._asdict() for e in v[1]])
                                                 for k, v in usermesh.BTYPES.items()}))
@@ -308,6 +343,8 @@ def make_handler(state):
                     return self._send(200, mesh_preview(state, other_mesher(cfg), "compare"))
                 if self.path == "/api/save":
                     return self._send(200, save(state, cfg, body["yamlPath"], body["caseDir"]))
+                if self.path == "/api/open":
+                    return self._send(200, open_yaml(state, body))
                 if self.path == "/api/run":
                     return self._send(200, start_run(state, body["caseDir"]))
                 return self._send(404, dict(error="not found"))
