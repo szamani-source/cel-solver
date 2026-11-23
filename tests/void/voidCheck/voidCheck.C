@@ -72,6 +72,8 @@ Description
 #include "immersedWalls.H"
 #include "OFstream.H"
 #include "boundBox.H"
+#include "IFstream.H"
+#include "IStringStream.H"
 #include <cmath>
 
 using namespace Foam;
@@ -106,126 +108,136 @@ int main(int argc, char *argv[])
     const scalar rho0 = solid.rho0();
     const scalar gMag = mag(solid.g());
 
-    // Initial state
-    const scalarList box(dict.get<scalarList>("fill"));
-    const vector U0(dict.get<vector>("U0"));
-    scalarField& alpha = solid.alphaRef().primitiveFieldRef();
-    scalarField& rho = solid.rhoRef().primitiveFieldRef();
-    vectorField& U = solid.URef().primitiveFieldRef();
-    symmTensorField& s = solid.sigmaRef().primitiveFieldRef();
-    const labelListList& cp = mesh.cellPoints();
-    // Points in the fill frame (WP G.3): x' = x cos a + y sin a,
-    // y' = -x sin a + y cos a, a = fillAngle
-    pointField fillPts(mesh.points());
-    if (dict.found("fillAngle"))
+    // Restart (decision 0116): started from a written time (controlDict
+    // startFrom latestTime), the fields come from that time; no fill
+    const bool restart = runTime.value() > 0;
+    if (restart)
     {
-        const scalar fa =
-            dict.get<scalar>("fillAngle")*constant::mathematical::pi/180;
-        const scalar ca = Foam::cos(fa), sa = Foam::sin(fa);
-        forAll(fillPts, pi)
-        {
-            const point& q = mesh.points()[pi];
-            fillPts[pi] =
-                point(q.x()*ca + q.y()*sa, -q.x()*sa + q.y()*ca, q.z());
-        }
+        Info<< "Restart from t = " << runTime.timeName() << nl;
     }
-    if (dict.found("fillSlope"))
+    else
     {
-        const scalar ts = Foam::tan
-        (
-            dict.get<scalar>("fillSlope")*constant::mathematical::pi/180
-        );
-        forAll(fillPts, pi)
+        // Initial state
+        const scalarList box(dict.get<scalarList>("fill"));
+        const vector U0(dict.get<vector>("U0"));
+        scalarField& alpha = solid.alphaRef().primitiveFieldRef();
+        scalarField& rho = solid.rhoRef().primitiveFieldRef();
+        vectorField& U = solid.URef().primitiveFieldRef();
+        symmTensorField& s = solid.sigmaRef().primitiveFieldRef();
+        const labelListList& cp = mesh.cellPoints();
+        // Points in the fill frame (WP G.3): x' = x cos a + y sin a,
+        // y' = -x sin a + y cos a, a = fillAngle
+        pointField fillPts(mesh.points());
+        if (dict.found("fillAngle"))
         {
-            fillPts[pi].y() += fillPts[pi].x()*ts;
-        }
-    }
-    forAll(alpha, celli)
-    {
-        const boundBox bb(fillPts, cp[celli], false);
-        const scalar hx = bb.max().x() - bb.min().x();
-        const scalar hy = bb.max().y() - bb.min().y();
-        scalar fx =
-            min(max((min(bb.max().x(), box[2]) - max(bb.min().x(), box[0]))/hx, 0), 1);
-        const scalar fy =
-            min(max((min(bb.max().y(), box[3]) - max(bb.min().y(), box[1]))/hy, 0), 1);
-        if (dict.found("fillRight"))
-        {
-            const List<vector2D> xr(dict.get<List<vector2D>>("fillRight"));
-            const scalar yc = 0.5*(bb.min().y() + bb.max().y());
-            scalar xl = xr.last().y();
-            if (yc <= xr.first().x())
+            const scalar fa =
+                dict.get<scalar>("fillAngle")*constant::mathematical::pi/180;
+            const scalar ca = Foam::cos(fa), sa = Foam::sin(fa);
+            forAll(fillPts, pi)
             {
-                xl = xr.first().y();
+                const point& q = mesh.points()[pi];
+                fillPts[pi] =
+                    point(q.x()*ca + q.y()*sa, -q.x()*sa + q.y()*ca, q.z());
             }
-            for (label k = 1; k < xr.size(); ++k)
-            {
-                if (yc >= xr[k-1].x() && yc <= xr[k].x())
-                {
-                    const scalar w =
-                        (yc - xr[k-1].x())/max(xr[k].x() - xr[k-1].x(), SMALL);
-                    xl = xr[k-1].y() + w*(xr[k].y() - xr[k-1].y());
-                    break;
-                }
-            }
-            fx *= min(max((xl - bb.min().x())/hx, 0), 1);
         }
-        scalar a = fx*fy;
-        // round-off of the fill frame (fillAngle, fillSlope: turned points)
-        // leaves slivers of 1e-9 next to the fill; treat them as empty/full
-        const scalar tol = (dict.found("fillAngle") || dict.found("fillSlope")) ? 1e-6 : 1e-12;
-        a = a >= 1 - tol ? 1 : (a > tol ? a : 0);
-        alpha[celli] = a;
-        rho[celli] = rho0*a;
-        U[celli] = a > 0 ? U0 : Zero;
-        if (a > 0 && dict.found("xSplit") && C[celli].x() < dict.get<scalar>("xSplit"))
+        if (dict.found("fillSlope"))
         {
-            U[celli] = dict.get<vector>("Uleft");
-        }
-        s[celli] = Zero;
-        if (a > 0 && dict.found("initK0"))
-        {
-            // weight above the centre per area over alpha (material stress)
-            const scalar K0 = dict.get<scalar>("initK0");
-            const scalar above =
-                rho0*max(box[3] - bb.max().y(), 0) + 0.5*rho[celli]*hy;
-            const scalar syy = -gMag*above/a;
-            s[celli] = symmTensor(K0*syy, 0, 0, syy, 0, K0*syy);
-        }
-        if (a > 0 && dict.found("sigma0"))
-        {
-            // uniform initial material stress (WP 4.4b): a confining
-            // pressure in weightless runs
-            s[celli] = dict.get<symmTensor>("sigma0");
-        }
-        if (a > 0 && dict.found("layer"))
-        {
-            // Steady inclined layer (WP 3.6b): x down the slope, y normal
-            // to it, surface at y1, gravity (g sin theta, -g cos theta).
-            // Normal stresses equal in plane (s_xx = s_yy = sn), s_zz =
-            // kzz sn, shear rho g sin theta (y1 - y); velocity
-            // Us (1 - (1 - y/y1)^1.5) along x (Bagnold, cell centre).
-            const dictionary& ld = dict.subDict("layer");
-            const scalar th =
-                ld.get<scalar>("theta")*constant::mathematical::pi/180;
-            const scalar depth = max(box[3] - C[celli].y(), 0);
-            const scalar sn = -rho0*gMag*Foam::cos(th)*depth;
-            const scalar tau = rho0*gMag*Foam::sin(th)*depth;
-            s[celli] =
-                symmTensor(sn, tau, 0, sn, 0, ld.get<scalar>("kzz")*sn);
-            U[celli] = vector
+            const scalar ts = Foam::tan
             (
-                ld.get<scalar>("Us")
-               *(1 - Foam::pow(max(1 - C[celli].y()/box[3], 0), 1.5)),
-                0,
-                0
+                dict.get<scalar>("fillSlope")*constant::mathematical::pi/180
             );
+            forAll(fillPts, pi)
+            {
+                fillPts[pi].y() += fillPts[pi].x()*ts;
+            }
         }
+        forAll(alpha, celli)
+        {
+            const boundBox bb(fillPts, cp[celli], false);
+            const scalar hx = bb.max().x() - bb.min().x();
+            const scalar hy = bb.max().y() - bb.min().y();
+            scalar fx =
+                min(max((min(bb.max().x(), box[2]) - max(bb.min().x(), box[0]))/hx, 0), 1);
+            const scalar fy =
+                min(max((min(bb.max().y(), box[3]) - max(bb.min().y(), box[1]))/hy, 0), 1);
+            if (dict.found("fillRight"))
+            {
+                const List<vector2D> xr(dict.get<List<vector2D>>("fillRight"));
+                const scalar yc = 0.5*(bb.min().y() + bb.max().y());
+                scalar xl = xr.last().y();
+                if (yc <= xr.first().x())
+                {
+                    xl = xr.first().y();
+                }
+                for (label k = 1; k < xr.size(); ++k)
+                {
+                    if (yc >= xr[k-1].x() && yc <= xr[k].x())
+                    {
+                        const scalar w =
+                            (yc - xr[k-1].x())/max(xr[k].x() - xr[k-1].x(), SMALL);
+                        xl = xr[k-1].y() + w*(xr[k].y() - xr[k-1].y());
+                        break;
+                    }
+                }
+                fx *= min(max((xl - bb.min().x())/hx, 0), 1);
+            }
+            scalar a = fx*fy;
+            // round-off of the fill frame (fillAngle, fillSlope: turned points)
+            // leaves slivers of 1e-9 next to the fill; treat them as empty/full
+            const scalar tol = (dict.found("fillAngle") || dict.found("fillSlope")) ? 1e-6 : 1e-12;
+            a = a >= 1 - tol ? 1 : (a > tol ? a : 0);
+            alpha[celli] = a;
+            rho[celli] = rho0*a;
+            U[celli] = a > 0 ? U0 : Zero;
+            if (a > 0 && dict.found("xSplit") && C[celli].x() < dict.get<scalar>("xSplit"))
+            {
+                U[celli] = dict.get<vector>("Uleft");
+            }
+            s[celli] = Zero;
+            if (a > 0 && dict.found("initK0"))
+            {
+                // weight above the centre per area over alpha (material stress)
+                const scalar K0 = dict.get<scalar>("initK0");
+                const scalar above =
+                    rho0*max(box[3] - bb.max().y(), 0) + 0.5*rho[celli]*hy;
+                const scalar syy = -gMag*above/a;
+                s[celli] = symmTensor(K0*syy, 0, 0, syy, 0, K0*syy);
+            }
+            if (a > 0 && dict.found("sigma0"))
+            {
+                // uniform initial material stress (WP 4.4b): a confining
+                // pressure in weightless runs
+                s[celli] = dict.get<symmTensor>("sigma0");
+            }
+            if (a > 0 && dict.found("layer"))
+            {
+                // Steady inclined layer (WP 3.6b): x down the slope, y normal
+                // to it, surface at y1, gravity (g sin theta, -g cos theta).
+                // Normal stresses equal in plane (s_xx = s_yy = sn), s_zz =
+                // kzz sn, shear rho g sin theta (y1 - y); velocity
+                // Us (1 - (1 - y/y1)^1.5) along x (Bagnold, cell centre).
+                const dictionary& ld = dict.subDict("layer");
+                const scalar th =
+                    ld.get<scalar>("theta")*constant::mathematical::pi/180;
+                const scalar depth = max(box[3] - C[celli].y(), 0);
+                const scalar sn = -rho0*gMag*Foam::cos(th)*depth;
+                const scalar tau = rho0*gMag*Foam::sin(th)*depth;
+                s[celli] =
+                    symmTensor(sn, tau, 0, sn, 0, ld.get<scalar>("kzz")*sn);
+                U[celli] = vector
+                (
+                    ld.get<scalar>("Us")
+                   *(1 - Foam::pow(max(1 - C[celli].y()/box[3], 0), 1.5)),
+                    0,
+                    0
+                );
+            }
+        }
+        solid.alphaRef().correctBoundaryConditions();
+        solid.rhoRef().correctBoundaryConditions();
+        solid.URef().correctBoundaryConditions();
+        solid.sigmaRef().correctBoundaryConditions();
     }
-    solid.alphaRef().correctBoundaryConditions();
-    solid.rhoRef().correctBoundaryConditions();
-    solid.URef().correctBoundaryConditions();
-    solid.sigmaRef().correctBoundaryConditions();
 
     // STL walls (WP 4.3c): fixed bodies as cut-cell walls
     rigidBodies bodies(runTime);
@@ -276,10 +288,39 @@ int main(int argc, char *argv[])
     const label bottom = mesh.boundary().findPatchID("bottom");
 
     autoPtr<OFstream> hist;
+    label restartStep = 0;
     if (Pstream::master())
     {
+        // on a restart keep the lines up to the restart time and append
+        DynamicList<string> keep;
+        label step0 = 0;
+        if (restart && isFile("history.dat"))
+        {
+            IFstream is("history.dat");
+            string line;
+            while (is.getLine(line) && is.good())
+            {
+                if (line.empty()) continue;
+                if (line[0] != '#')
+                {
+                    IStringStream ls(line);
+                    label st;
+                    scalar tl;
+                    ls >> st >> tl;
+                    if (tl > runTime.value() + 1e-12) break;
+                    step0 = st;
+                }
+                keep.append(line);
+            }
+        }
+        restartStep = step0;
         hist.reset(new OFstream("history.dat"));
         hist().precision(17);
+        for (const string& l : keep)
+        {
+            hist() << l.c_str() << nl;
+        }
+        if (keep.empty())
         hist() << "# step t mass px py cx cy smax smaxEmpty Umax FyBottom snMax"
             << " KE nCapped discharged FxBodies FyBodies massBelow"
             << " FxWalls FyWalls lostMass maxRhoRatio charged"
@@ -423,7 +464,10 @@ int main(int argc, char *argv[])
         }
     };
 
-    record(0);
+    if (!dict.found("maxCo"))
+    {
+        record(0);
+    }
     if (dict.found("maxCo"))
     {
         // Variable step (WP 3.2b): the stable dt of each step at maxCo,
@@ -431,8 +475,23 @@ int main(int argc, char *argv[])
         const scalar tEnd = dict.get<scalar>("tEnd");
         const scalar co = dict.get<scalar>("maxCo");
         const scalarList wt(dict.getOrDefault<scalarList>("writeTimes", scalarList()));
+        // Checkpoints (decision 0116): every checkpointEvery seconds the
+        // fields and the solid's restart state are written as a time
+        // directory, from which the run restarts (startFrom latestTime)
+        const scalar ckEvery = dict.getOrDefault<scalar>("checkpointEvery", 0);
         label next = 0;
-        label step = 0;
+        while (next < wt.size() && wt[next] <= runTime.value() + 1e-12)
+        {
+            ++next;
+        }
+        label nextCk =
+            ckEvery > 0 ? label(std::floor(runTime.value()/ckEvery + 1e-9)) + 1 : 0;
+        Pstream::broadcast(restartStep);
+        label step = restartStep;
+        if (!restart)
+        {
+            record(0);
+        }
         while (runTime.value() < tEnd - 1e-12)
         {
             scalar dtk = co/solid.maxCo()*solid.stableDeltaT();
@@ -440,6 +499,10 @@ int main(int argc, char *argv[])
             if (next < wt.size())
             {
                 target = min(target, wt[next]);
+            }
+            if (ckEvery > 0)
+            {
+                target = min(target, nextCk*ckEvery);
             }
             dtk = min(dtk, target - runTime.value());
             runTime.setDeltaT(dtk);
@@ -450,6 +513,17 @@ int main(int argc, char *argv[])
             {
                 writeCells("cells_" + Foam::name(wt[next]));
                 ++next;
+            }
+            if (ckEvery > 0 && runTime.value() >= nextCk*ckEvery - 1e-12)
+            {
+                runTime.writeNow();
+                solid.writeState();
+                if (Pstream::master())
+                {
+                    hist().flush();
+                }
+                Info<< "Checkpoint t = " << runTime.timeName() << endl;
+                ++nextCk;
             }
         }
         Info<< step << " steps to t = " << runTime.value() << " s" << nl;

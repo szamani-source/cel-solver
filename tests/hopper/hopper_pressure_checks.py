@@ -98,43 +98,58 @@ def main():
     blend = "fullBlend yes;\n" if mesh != "cut" else ""
     os.environ.setdefault("CEL_HOPPER_RULES", MU_I + RULES + blend)
     check = dict(tEnd=T_END, maxCo=0.4, writeTimes=WRITES, tOpen=T_OPEN)
-    if mesh == "aligned":
-        # grading (Sia): CEL_OUTLET_RATIO (outlet row over top row, 1/3),
-        # CEL_WALL_RATIO (wall column over axis column, 1), CEL_NCOLS
-        p, c = hc.aligned_case(
-            work, f"couto_{model}_{mesh}", model, CELL, check, nProcs=NP,
-            outlet_ratio=float(os.environ.get("CEL_OUTLET_RATIO", 1 / 3)),
-            wall_ratio=float(os.environ.get("CEL_WALL_RATIO", 1.0)),
-            ncols=int(os.environ["CEL_NCOLS"]) if "CEL_NCOLS" in os.environ else None)
-    elif mesh == "aligned_buffered":
-        # STL shell inside a wall-aligned mesh (Sia, 2026-11-20; WP G.5)
-        import buffered_case as bc
-        CELL = 0.012
-        # mesh knobs as in gap_case.py (decision 0115 addendum, 0116):
-        # CEL_H_TOP, CEL_NCOLS, CEL_WALL_RATIO, CEL_H_HOP, CEL_OUTLET_WALL_RATIO
-        e = os.environ
-        h_top = float(e.get("CEL_H_TOP", 0.025))
-        mesh_kw = dict(h_top=h_top, head_rows=int(round(3 * 0.025 / h_top)),
-                       ncols=int(e.get("CEL_NCOLS", 44)),
-                       wall_ratio=float(e.get("CEL_WALL_RATIO", 0.6)),
-                       h_hop=float(e.get("CEL_H_HOP", 0.012)))
-        if "CEL_OUTLET_WALL_RATIO" in e:
-            mesh_kw["outlet_wall_ratio"] = float(e["CEL_OUTLET_WALL_RATIO"])
-        p, c = bc.aligned_buffered_case(work, f"couto_{model}_{mesh}", model, check,
-                                        nProcs=NP, **mesh_kw)
-    elif mesh == "buffered":
-        # STL shell inside a larger mesh, rounded corners (Sia, 2026-11-20)
-        import buffered_case as bc
-        CELL = 0.007
-        p, c = bc.buffered_case(work, f"couto_{model}_{mesh}", model, check, nProcs=NP)
+    # Checkpoints and resume (decision 0116): CEL_CHECKPOINT (s) writes a
+    # restart time every that many seconds; CEL_RESUME=1 restarts an
+    # existing case from its latest checkpoint instead of building it anew
+    ckpt = float(os.environ.get("CEL_CHECKPOINT", 0))
+    if ckpt > 0:
+        check["checkpointEvery"] = ckpt
+    p0 = os.path.join(work, f"couto_{model}_{mesh}")
+    ck = vc.latest_time(p0) if os.environ.get("CEL_RESUME") == "1" else 0.0
+    if ck > 0:
+        print(f"resuming {p0} from t = {ck:g} s", flush=True)
+        p, c = p0, dict(hc.COUTO)
+        CELL = {"aligned_buffered": 0.012, "buffered": 0.007}.get(mesh, CELL)
+        wall = vc.resume(p, NP)
     else:
-        p, c = hc.couto_case(work, f"couto_{model}_{mesh}", model, CELL, check,
-                             nProcs=NP)
-    dp = f"{p}/system/decomposeParDict"
-    txt = open(dp).read().replace(f"n ({NP} 1 1)", f"n (1 {NP} 1)")
-    open(dp, "w").write(txt)
-    open(f"{p}/system/controlDict", "a").write("gravityRamp 0.1;\ndamping 100;\n")
-    wall = vc.run(p, NP)
+        if mesh == "aligned":
+            # grading (Sia): CEL_OUTLET_RATIO (outlet row over top row, 1/3),
+            # CEL_WALL_RATIO (wall column over axis column, 1), CEL_NCOLS
+            p, c = hc.aligned_case(
+                work, f"couto_{model}_{mesh}", model, CELL, check, nProcs=NP,
+                outlet_ratio=float(os.environ.get("CEL_OUTLET_RATIO", 1 / 3)),
+                wall_ratio=float(os.environ.get("CEL_WALL_RATIO", 1.0)),
+                ncols=int(os.environ["CEL_NCOLS"]) if "CEL_NCOLS" in os.environ else None)
+        elif mesh == "aligned_buffered":
+            # STL shell inside a wall-aligned mesh (Sia, 2026-11-20; WP G.5)
+            import buffered_case as bc
+            CELL = 0.012
+            # mesh knobs as in gap_case.py (decision 0115 addendum, 0116):
+            # CEL_H_TOP, CEL_NCOLS, CEL_WALL_RATIO, CEL_H_HOP, CEL_OUTLET_WALL_RATIO
+            e = os.environ
+            h_top = float(e.get("CEL_H_TOP", 0.025))
+            mesh_kw = dict(h_top=h_top, head_rows=int(round(3 * 0.025 / h_top)),
+                           ncols=int(e.get("CEL_NCOLS", 44)),
+                           wall_ratio=float(e.get("CEL_WALL_RATIO", 0.6)),
+                           h_hop=float(e.get("CEL_H_HOP", 0.012)))
+            if "CEL_OUTLET_WALL_RATIO" in e:
+                mesh_kw["outlet_wall_ratio"] = float(e["CEL_OUTLET_WALL_RATIO"])
+            p, c = bc.aligned_buffered_case(work, f"couto_{model}_{mesh}", model, check,
+                                            nProcs=NP, **mesh_kw)
+        elif mesh == "buffered":
+            # STL shell inside a larger mesh, rounded corners (Sia, 2026-11-20)
+            import buffered_case as bc
+            CELL = 0.007
+            p, c = bc.buffered_case(work, f"couto_{model}_{mesh}", model, check, nProcs=NP)
+        else:
+            p, c = hc.couto_case(work, f"couto_{model}_{mesh}", model, CELL, check,
+                                 nProcs=NP)
+        dp = f"{p}/system/decomposeParDict"
+        txt = open(dp).read().replace(f"n ({NP} 1 1)", f"n (1 {NP} 1)")
+        open(dp, "w").write(txt)
+        open(f"{p}/system/controlDict", "a").write(
+            "gravityRamp 0.1;\ndamping 100;\n" + ("writeFormat binary;\n" if ckpt else ""))
+        wall = vc.run(p, NP)
     rows = table()
     fails = []
 
