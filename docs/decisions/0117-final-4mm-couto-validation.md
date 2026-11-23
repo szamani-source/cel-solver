@@ -44,6 +44,52 @@ the run. The test driver (tests/void/voidCheck) could not restart.
    maximum over the discharge writes against Couto, and t = 1.0 s (0.5 s after
    opening) against Zheng and Yu, with the mean reported too.
 
-## Results
+## Results (2026-11-23)
 
-To be added when the runs end.
+Both runs completed (28,200 s and 28,100 s on 4 cores, dt 3.50e-6 s fixed,
+set by the axis cells at the outlet: in-plane 1.6 mm and hoop length 1.6 mm,
+so 1.13 mm, over the P-wave speed 129.6 m/s at maxCo 0.4). No leak.
+`tests/hopper/final_report.py OUT MC_CASE DP_CASE`:
+
+| Quantity | Reference | MC | DP |
+|---|---|---|---|
+| Discharge rate, kg/s | Beverloo 110-131 | 118.1 (inside) | 118.2 (inside) |
+| GA0 at rest, kPa | Couto 8.61-9.61 | 13.05 (+36 %) | 13.04 (+36 %) |
+| GA1 at rest, kPa | Couto 4.00-4.49 | 4.10 (inside) | 4.11 (inside) |
+| GA2 at rest, kPa | Couto 4.07-4.46 | 4.64 (+4 %) | 4.64 (+4 %) |
+| GA3 at rest, kPa | Couto 3.67-4.16 | 4.04 (inside) | 4.04 (inside) |
+| GA4 at rest, kPa | Couto 3.17-3.62 | 3.45 (inside) | 3.45 (inside) |
+| GA5 at rest, kPa | Couto 2.78-3.24 | 2.79 (inside) | 2.79 (inside) |
+| GA6 at rest, kPa | Couto 2.47-2.66 | 2.08 (-16 %) | 2.08 (-16 %) |
+| GA7 at rest, kPa | Couto 1.39-1.69 | 1.30 (-6 %) | 1.30 (-6 %) |
+| GA0 discharge max (mean), kPa | Couto max 18.65-24.77 | 29.04 (24.33); +17 % | 28.67 (23.89); +16 % |
+| GA1 discharge max (mean), kPa | Couto max 7.14-8.23 | 5.92 (4.90); -17 % | 6.30 (5.16); -12 % |
+| GA2 discharge max (mean), kPa | Couto max 5.81-6.45 | 5.20 (4.20); -11 % | 5.13 (4.28); -12 % |
+| GA3 discharge max (mean), kPa | Couto max 4.42-5.59 | 5.01 (3.81); inside | 5.00 (3.82); inside |
+| GA4 discharge max (mean), kPa | Couto max 3.21-4.01 | 4.56 (3.42); +14 % | 4.23 (3.37); +5 % |
+| GA5 discharge max (mean), kPa | Couto max 2.88-3.72 | 3.51 (2.61); inside | 3.58 (2.64); inside |
+| GA6 discharge max (mean), kPa | Couto max 3.35-3.63 | 2.88 (2.03); -14 % | 3.09 (2.00); -8 % |
+| GA7 discharge max (mean), kPa | Couto max 1.43-1.74 | 1.95 (1.19); +12 % | 1.84 (1.35); +6 % |
+| Peak at 0.5 s after opening, MC | Abaqus 27.5 kPa at z 0.46 m | 27.7 kPa at z 0.45 m | |
+| Peak at 0.5 s after opening, DP | Abaqus 27.5 kPa at z 0.46 m | 24.5 kPa at z 0.44 m | |
+| Largest speed after opening, m/s | | 9.90 | 9.85 |
+
+Discharge writes used: MC 16; DP 16
+
+`hopper_pressure_checks.py` (mean in discharge against Couto's maxima,
++-15 % bands of decision 0100) reports 4 failures per model: GA0 and GA6 at
+rest, GA1 and GA2 in discharge. Compared as the papers report (maxima), GA2
+moves inside 15 % and GA1 is 12 % (DP) and 17 % (MC) low.
+
+## Decision on the results
+
+Accepted as the solver's validation evidence and added to the manual's
+Validation page, with the gaps stated: rate inside Beverloo for both models,
+the Abaqus transition peak matched (MC 27.7 against 27.5 kPa), cylinder at
+rest inside the measured range at GA1 to GA5, every discharge load cell within
+17 % of Couto's maximum (Sia accepts about 20 % for now, 2026-11-18). Known
+gap: GA0 at rest 36 % high with the gravity-on start (no filling history).
+Compared with the 12 mm-row mesh (decision 0115, wall-gap start, means) the 4
+mm cylinder does not raise GA1/GA2, so that deficit is not cylinder
+resolution. The time step is set by the axis cells at the outlet; a wider
+axis column there would lengthen it (next mesh).

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Final validation of the Couto silo on the fine 4 mm mesh (decision 0116):
+# Final validation of the Couto silo on the fine 4 mm mesh (decision 0117):
 # gravity-on start, outlet opens at 0.5 s, run to 1.5 s, 4 MPI ranks.
 #
 #     tests/hopper/run_final_4mm.sh mc|dp      (about 6 h each on 4 cores)
@@ -8,7 +8,7 @@
 # Work directory: $CEL_WORK (default /tmp/cel_final); the report is
 # $CEL_WORK/<model>.out (hopper_pressure_checks.py output).
 #
-# Checkpoints (decision 0116): a restart time every $CEL_CHECKPOINT s of
+# Checkpoints (decision 0117): a restart time every $CEL_CHECKPOINT s of
 # simulated time (default 0.05). Run the script again after a lost
 # container and it resumes from the latest checkpoint. While it runs, the
 # case (latest two checkpoints only) is mirrored every 5 min to
