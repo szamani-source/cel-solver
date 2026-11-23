@@ -309,6 +309,10 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
     (
         materialProperties_.getOrDefault<Switch>("spreadLayers", false)
     ),
+    filmFriction_
+    (
+        materialProperties_.getOrDefault<Switch>("filmFriction", false)
+    ),
     nCapped_(0),
     nNormalCapped_(0),
     outletOpenTime_(readOutlets(mesh, materialProperties_, wallFriction_)),
@@ -436,6 +440,11 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
         FatalIOErrorInFunction(materialProperties_)
             << "spreadLayers needs freeSurface yes" << exit(FatalIOError);
     }
+    if (filmFriction_ && !freeSurface_)
+    {
+        FatalIOErrorInFunction(materialProperties_)
+            << "filmFriction needs freeSurface yes" << exit(FatalIOError);
+    }
     if (shearCap_)
     {
         Info<< "Shear cap at Mohr-Coulomb yield (rule 8): sin(phi) "
@@ -495,6 +504,11 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
     if (spreadLayers_)
     {
         Info<< "Top layers spread sideways (rule 9)" << nl;
+    }
+    if (filmFriction_)
+    {
+        Info<< "Wall friction of partly filled cells from their weight "
+            << "(WP N.3b)" << nl;
     }
     if (material_->nonlocal())
     {

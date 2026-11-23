@@ -782,7 +782,8 @@ inline void wallFace
     const scalar zp, const scalar zs, const scalar mu,
     vector& v, vector& t,
     const scalar kj = -1,
-    const scalar adh = 0
+    const scalar adh = 0,
+    const scalar pMin = 0
 )
 {
     const vector tL(sL & n);
@@ -799,8 +800,10 @@ inline void wallFace
         return;
     }
     vector tt(ttL - (kj < 0 ? zs : kj)*vtL);
-    // Coulomb with adhesion (rough walls, WP 4.3e): |tt| <= adh - tn mu
-    const scalar limit = adh - tn*mu;
+    // Coulomb with adhesion (rough walls, WP 4.3e): |tt| <= adh - tn mu;
+    // a partly filled cell presses with at least its weight pMin
+    // (filmFriction, WP N.3b, decision 0119)
+    const scalar limit = adh + max(-tn, pMin)*mu;
     const scalar magTt = mag(tt);
     v = Zero;
     if (magTt > limit)
@@ -1800,6 +1803,20 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
     // the material (density rho/alpha, bounded), mass rho V. The face
     // states and forces use seff = alpha sigma.
     const bool fs = freeSurface_;
+    // Weight per wall area of a partly filled cell's material pressing on
+    // a wall with outward normal nw (filmFriction, WP N.3b, decision 0119)
+    auto filmP = [&](const label c, const vector& nw, const scalar area)
+    {
+        if
+        (
+            !filmFriction_ || alpha_[c] >= alphaFull
+         || alpha_[c] <= alphaEmpty || area <= 0
+        )
+        {
+            return scalar(0);
+        }
+        return max(scalar(0), m[c]*(g & nw)/area);
+    };
     List<boundaryKind> kinds(mesh.boundary().size());
     forAll(mesh.boundary(), patchi)
     {
@@ -2173,7 +2190,8 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                                 teta()[P]
                                *deltaCoeffs.boundaryField()[patchi][i]
                             )
-                          : -1
+                          : -1,
+                            0, filmP(P, pS[i]/pmS[i], pmS[i])
                         );
                     }
                     const scalar fo =
@@ -2222,7 +2240,8 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                     (
                         A/mA, U_[celli] - wallU_[celli], sref[celli],
                         zp[celli], zs[celli], bodyMu_[wallBody_[celli]], v, t,
-                        -1, bodyAdhesion(wallBody_[celli])
+                        -1, bodyAdhesion(wallBody_[celli]),
+                        filmP(celli, A/mA, mA)
                     );
                     v += wallU_[celli];
                 }
@@ -2696,7 +2715,8 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                     v, t,
                     fi && teta()[P] > 0
                   ? min(zs[P], teta()[P]*deltaCoeffs.boundaryField()[patchi][i])
-                  : -1
+                  : -1,
+                    0, filmP(P, n, pmS[i])
                 );
             }
             else if (kind == boundaryKind::symmetry)
@@ -2899,7 +2919,8 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
             wallFace
             (
                 A/mA, Uwall[celli] - wallU_[celli], Swall[celli],
-                zp[celli], zs[celli], bodyMu_[b], v, t, -1, bodyAdhesion(b)
+                zp[celli], zs[celli], bodyMu_[b], v, t, -1, bodyAdhesion(b),
+                filmP(celli, A/mA, mA)
             );
             v += wallU_[celli];
             force[celli] += t*mA;
