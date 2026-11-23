@@ -30,8 +30,9 @@ SCHEMA = {
         E("fillHeight", "top", "m", "material fill height above the floor, or top"),
         E("wedgeAngle", 5.0, "deg", "whole angle of the axisymmetric wedge (5 is tested)",
           level="advanced"),
-        E("depth", 0.01, "m", "thickness of a plane mesh (one cell); results are per metre",
-          level="advanced"),
+        E("depth", "auto", "m", "thickness of a plane mesh (one cell); auto: outletCell, as "
+          "the manual's meshing guide asks (the step uses the cube root of the cell volume on "
+          "rectangular cells); results are per metre", level="advanced"),
     ],
     "walls": [
         E("frictionCoefficient", None, "", "wall friction coefficient mu_w (or give friction)"),
@@ -67,7 +68,7 @@ class Geometry:
         self.Ro = 0.5 * float(g["outletDiameter"])
         self.H = float(g["height"])
         self.theta = math.radians(0.5 * float(g["wedgeAngle"]))
-        self.depth = float(g.get("depth") or 0.01)
+        self.depth = g.get("depth") if g.get("depth") not in (None, "auto") else None
         if not 0 < self.Ro < self.R:
             raise ValueError("geometry: need 0 < outletDiameter < diameter")
         if self.H <= 0:
@@ -206,6 +207,9 @@ def geo_script(G, L):
 def build(cfg, src):
     g, w, m = cfg["geometry"], cfg["walls"], cfg["mesh"]
     G = Geometry(g)
+    if G.depth is None:
+        G.depth = float(m["outletCell"])
+    G.depth = float(G.depth)
     y_fill = G.H if g["fillHeight"] in ("top", None) else float(g["fillHeight"])
     if not 0 < y_fill <= G.H + 1e-9:
         raise ValueError(f"geometry: fillHeight must be between 0 and the height {G.H:g} m")

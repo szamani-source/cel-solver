@@ -36,8 +36,8 @@ SCHEMA = {
           "meshed with a symmetry plane", ["axisymmetric", "plane"]),
         E("wedgeAngle", 5.0, "deg", "whole angle of the axisymmetric wedge (5 is tested)",
           level="advanced"),
-        E("depth", 0.01, "m", "thickness of a plane mesh (one cell); results are per metre",
-          level="advanced"),
+        E("depth", "auto", "m", "thickness of a plane mesh (one cell); auto: outletCell; "
+          "results are per metre", level="advanced"),
     ],
     "walls": [
         E("frictionCoefficient", None, "", "wall friction coefficient mu_w (or give friction)"),
@@ -430,7 +430,9 @@ def build(cfg, src):
     if not G.Y0 < y_fill <= G.H + 1e-9:
         raise ValueError(f"geometry: fillHeight must be between 0 and the silo top {G.H:.4f} m")
     plane = g.get("shape", "axisymmetric") == "plane"
-    depth = float(g.get("depth") or 0.01) if plane else None
+    depth = None
+    if plane:
+        depth = float(m["outletCell"]) if g.get("depth") in (None, "auto") else float(g["depth"])
     bmd, info = block_mesh_dict(G, m, y_fill, src, depth=depth)
     files = {"constant/triSurface/shell.stl": shell_stl(G, info["Hm"] + 0.05, depth=depth)}
     if m.get("mesher", "blockMesh") == "gmsh":
