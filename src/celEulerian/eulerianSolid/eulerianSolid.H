@@ -269,13 +269,6 @@ class eulerianSolid
         //  than along a horizontal axis is spread along that axis
         Switch spreadLayers_;
 
-        //- WP N.3b (decision 0123): materialProperties filmFriction yes
-        //  (freeSurface only); at a wall the friction of a partly filled
-        //  cell is at least mu times the weight of its material pressing
-        //  on the wall (a film has no stress of its own, so its wall
-        //  friction was only the impact term)
-        Switch filmFriction_;
-
         //- Top-fill fix, step 2 (decision 0114): materialProperties
         //  restRelax { time T; speed v; K0 k; }. In full cells slower than
         //  v the horizontal stress block relaxes towards K0 times the
