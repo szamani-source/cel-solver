@@ -4,9 +4,12 @@
 # filled, checked with celCheck and run. Run again to resume.
 #   ./Allrun            # 2 s simulated, about 1 h on one core
 #   ./Allrun 0.1        # a short check: 0.1 s simulated
-# Open planeTank.yaml in the setup page instead: ../../tools/celSetup --gui planeTank.yaml
+# Open planeTank.yaml in the setup page instead: celfoam setup --gui planeTank.yaml
+# (in the source tree: ../../tools/celSetup --gui planeTank.yaml)
 cd "${0%/*}" || exit
 tools=../../tools
+# an installed copy (celfoam tutorials) runs the installed tools
+[ -d "$tools" ] || tools="$CELFOAM_DIR/tools"
 if [ ! -d case ]; then
     python3 "$tools/celSetup" planeTank.yaml case || exit 1
     if [ -n "$1" ]; then

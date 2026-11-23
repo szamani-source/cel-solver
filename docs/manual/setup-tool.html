@@ -21,7 +21,11 @@ whether its mesh follows the rules of the <a href="meshing.html">meshing guide</
 you spend hours on a run.</p>
 
 <h2 id="start">Starting the setup page</h2>
-<pre><code>source /usr/lib/openfoam/openfoam2512/etc/bashrc
+<pre><code>celfoam setup --gui                       # installed (version 1.1): opens http://127.0.0.1:8765/
+celfoam setup --gui my.yaml               # starts from your input file
+
+# from the source tree
+source /usr/lib/openfoam/openfoam2512/etc/bashrc
 tools/celSetup --gui                      # opens http://127.0.0.1:8765/ in your browser
 tools/celSetup --gui my.yaml              # starts from your input file
 tools/celSetup --gui --no-browser --port 8800</code></pre>
@@ -114,6 +118,8 @@ condition; the outlet is highlighted.</figcaption>
 </figure>
 
 <h2 id="command-line">From the command line</h2>
+<p>Installed, write <code>celfoam setup</code> for <code>tools/celSetup</code> and
+<code>celfoam check</code> for <code>tools/celCheck</code>.</p>
 <pre><code>tools/celSetup --template conicalHopper my.yaml   # a commented input file with every entry
 tools/celSetup --describe flatBottom              # every entry: default, unit, meaning
 tools/celSetup my.yaml myCase                     # write, mesh and fill the case

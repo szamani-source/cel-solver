@@ -156,9 +156,10 @@ anything that cannot be undone outside this repository.
 
 ## Next
 
-Version 1.0.0 released (decision 0118): installation for any Linux, known limitations
-listed in `docs/release-notes/v1.0.0.md`. Next per Sia's order: version 2 (gas in the
-void, fluid coupling). Open and held: PR #77 (setup tool draft, waits for Sia). For a
+Version 1.0.0 released (decision 0118); version 1.1.0 adds the case setup tools
+(`celfoam setup`, `celfoam check`, setup page in the browser, Gmsh, user meshes; PR #77,
+decisions 0119-0122). Known limitations in `docs/release-notes/v1.1.0.md`. Next per
+Sia's order: version 2 (gas in the void, fluid coupling). For a
 new version, bump `VERSION`, add `docs/release-notes/v<version>.md` and a CHANGELOG entry;
 merging to main publishes the release.
 
