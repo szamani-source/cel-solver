@@ -269,7 +269,7 @@ class eulerianSolid
         //  than along a horizontal axis is spread along that axis
         Switch spreadLayers_;
 
-        //- WP N.3b (decision 0119): materialProperties filmFriction yes
+        //- WP N.3b (decision 0123): materialProperties filmFriction yes
         //  (freeSurface only); at a wall the friction of a partly filled
         //  cell is at least mu times the weight of its material pressing
         //  on the wall (a film has no stress of its own, so its wall

@@ -802,7 +802,7 @@ inline void wallFace
     vector tt(ttL - (kj < 0 ? zs : kj)*vtL);
     // Coulomb with adhesion (rough walls, WP 4.3e): |tt| <= adh - tn mu;
     // a partly filled cell presses with at least its weight pMin
-    // (filmFriction, WP N.3b, decision 0119)
+    // (filmFriction, WP N.3b, decision 0123)
     const scalar limit = adh + max(-tn, pMin)*mu;
     const scalar magTt = mag(tt);
     v = Zero;
@@ -1804,7 +1804,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
     // states and forces use seff = alpha sigma.
     const bool fs = freeSurface_;
     // Weight per wall area of a partly filled cell's material pressing on
-    // a wall with outward normal nw (filmFriction, WP N.3b, decision 0119)
+    // a wall with outward normal nw (filmFriction, WP N.3b, decision 0123)
     auto filmP = [&](const label c, const vector& nw, const scalar area)
     {
         if

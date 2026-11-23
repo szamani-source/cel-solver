@@ -1,6 +1,6 @@
 #!/bin/bash
 # Mesh refinement of the Couto silo with and without the nonlocal law
-# (WP N.4, decision 0119): the decision 0117 set-up (gravity-on start,
+# (WP N.4, decision 0123): the decision 0117 set-up (gravity-on start,
 # outlet opens at 0.5 s, run to 1.5 s, 4 MPI ranks) on three meshes of one
 # blockMesh family, hopper cells 8, 5.7 and 4 mm (outlet about 6.2, 4.4 and
 # 3.1 mm; 6,204, 11,250 and 20,398 cells).
