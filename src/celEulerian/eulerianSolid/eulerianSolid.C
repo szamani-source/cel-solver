@@ -531,12 +531,6 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
     }
     if (material_->cap())
     {
-        if (immersed_)
-        {
-            FatalErrorInFunction
-                << "capLambda (WP K.2) is not yet remapped with immersed "
-                << "bodies" << exit(FatalError);
-        }
         wordList types(mesh.boundary().size(), "zeroGradient");
         forAll(mesh.boundary(), patchi)
         {
