@@ -19,6 +19,11 @@
   <aside id="form" aria-label="Inputs"></aside>
   <section class="view">
     <div class="toolbar">
+      <label title="the program that builds the mesh">Mesher <select id="mesher">
+        <option value="blockMesh">blockMesh</option><option value="gmsh">Gmsh</option></select></label>
+      <label title="mesh with the other mesher too and draw its cell edges on top">
+        <input type="checkbox" id="compare"> compare with the other</label>
+      <span class="sep"></span>
       <span>Colour by</span>
       <label><input type="radio" name="colour" value="size" checked> cell size</label>
       <label><input type="radio" name="colour" value="alpha"> material at the start</label>

@@ -80,3 +80,10 @@ dialog menu { display: flex; justify-content: flex-end; gap: 8px; padding: 0; }
   aside { width: 100%; border-right: none; border-bottom: 1px solid var(--line); max-height: 50vh; }
   .field .desc { margin-left: 0; }
 }
+
+.toolbar .sep { width: 1px; align-self: stretch; background: var(--line, #ccc); margin: 0 4px; }
+table.cmp { border-collapse: collapse; margin: 4px 0 10px; font-size: 13px; }
+table.cmp th, table.cmp td { padding: 3px 10px; border-bottom: 1px solid var(--line, #ddd); text-align: left; }
+table.cmp .badge { display: inline-block; width: 46px; }
+.otherline { color: #c2187a; font-weight: 600; }
+@media (prefers-color-scheme: dark) { .otherline { color: #ff7bd5; } }

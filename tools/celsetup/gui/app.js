@@ -4,8 +4,9 @@
 const $ = (id) => document.getElementById(id);
 const S = {
   init: null, template: null, values: {}, geom: null, mesh: null, colour: "size",
-  view: null, meshReq: 0, geomReq: 0, runCase: null,
+  view: null, meshReq: 0, geomReq: 0, runCase: null, other: null, otherReq: 0,
 };
+const NAMES = { blockMesh: "blockMesh", gmsh: "Gmsh" };
 
 async function api(path, body) {
   const r = await fetch(path, body === undefined ? {} : {
@@ -87,9 +88,13 @@ function config() {
 let tGeom = null, tMesh = null;
 function changed() {
   clearTimeout(tGeom); clearTimeout(tMesh);
+  $("mesher").value = mesherNow();
+  S.other = null; S.otherReq++;
   tGeom = setTimeout(updateGeometry, 150);
   tMesh = setTimeout(updateMesh, 1200);
 }
+
+function mesherNow() { return (S.values.mesh || {}).mesher || "blockMesh"; }
 
 async function updateGeometry() {
   const id = ++S.geomReq;
@@ -117,6 +122,23 @@ async function updateMesh() {
   S.mesh = m;
   showChecks();
   draw();
+  if ($("compare").checked) updateCompare();
+}
+
+// G.2: the same case meshed with the other mesher, drawn on top
+async function updateCompare() {
+  const id = ++S.otherReq;
+  const other = mesherNow() === "gmsh" ? "blockMesh" : "gmsh";
+  const info = (S.init.meshers || {})[other];
+  if (info && !info.ok) { toast(`Cannot compare: ${info.note}`); $("compare").checked = false; return; }
+  $("busy").textContent = `building the ${NAMES[other]} mesh…`; $("busy").hidden = false;
+  const m = await api("/api/compare", { config: config() });
+  $("busy").hidden = true; $("busy").textContent = "building mesh…";
+  if (id !== S.otherReq) return;
+  if (m.error) { toast(`${NAMES[other]}: ${m.error}`, 9000); return; }
+  S.other = m;
+  showChecks();
+  draw();
 }
 
 function showError(msg) {
@@ -135,8 +157,24 @@ function showChecks() {
     `${m.nCells.toLocaleString()} cells, time step ${m.dt.toExponential(3)} s, about ` +
     `${h4 >= 1 ? h4.toFixed(1) + " h" : Math.round(h4 * 60) + " min"} on 4 cores. ${m.fill}. ` +
     `Verdict: <span class="badge ${m.verdict}" style="display:inline-block;width:46px">${m.verdict}</span>`;
-  $("checks").innerHTML = m.checks.map((c) =>
+  $("checks").innerHTML = compareTable() + m.checks.map((c) =>
     `<div class="check"><span class="badge ${c.status}">${c.status}</span><span><b>${c.name}</b>: ${c.text}</span></div>`).join("");
+}
+
+function compareTable() {
+  const a = S.mesh, b = S.other;
+  if (!a || !b || !$("compare").checked) return "";
+  const h = (m) => { const v = m.hours["4"] ?? m.hours[4]; return v >= 1 ? v.toFixed(1) + " h" : Math.round(v * 60) + " min"; };
+  const rows = [
+    ["cells", (m) => m.nCells.toLocaleString()],
+    ["time step (s)", (m) => m.dt.toExponential(4)],
+    ["non-orthogonality max (deg)", (m) => m.nonOrth.toFixed(1)],
+    ["run time on 4 cores", h],
+    ["verdict", (m) => `<span class="badge ${m.verdict}">${m.verdict}</span>`],
+  ];
+  return `<table class="cmp"><tr><th></th><th>${NAMES[a.mesher]} (colours)</th>` +
+    `<th>${NAMES[b.mesher]} (<span class="otherline">lines</span>)</th></tr>` +
+    rows.map(([k, f]) => `<tr><td>${k}</td><td>${f(a)}</td><td>${f(b)}</td></tr>`).join("") + "</table>";
 }
 
 // ---------- drawing -------------------------------------------------------
@@ -201,6 +239,16 @@ function draw() {
       if (edges) g.stroke();
     }
     legend(lo, hi);
+    if (S.other && $("compare").checked) {
+      // only when the cells are big enough on screen to tell the lines apart
+      const visible = s * (S.other.size[0] / 1000) > 4;
+      if (visible) {
+        g.strokeStyle = dark ? "#ff7bd5" : "#c2187a"; g.lineWidth = 0.9;
+        for (const q of S.other.polys) { poly(g, q, X, Y); g.stroke(); }
+      }
+      $("legend").innerHTML += `<div><span class="otherline">━</span> ${NAMES[S.other.mesher]} cell edges` +
+        (visible ? "" : " (zoom in to see them)") + "</div>";
+    }
     const L = mesh.limit;
     const lx = L.r ?? L.centre[0], ly = L.y ?? L.centre[1];
     g.strokeStyle = dark ? "#fff" : "#000"; g.lineWidth = 2;
@@ -323,6 +371,13 @@ function setupButtons() {
     S.view = { s, ox: c.clientWidth * 0.35 - lx * s, oy: c.clientHeight * 0.7 + ly * s };
     S.moved = true; draw();
   };
+  $("mesher").onchange = () => {
+    const f = $("f_mesh_mesher");
+    if (f) { f.value = $("mesher").value; f.dispatchEvent(new Event("input")); }
+  };
+  $("compare").onchange = () => {
+    if ($("compare").checked) updateCompare(); else { S.other = null; S.otherReq++; showChecks(); draw(); }
+  };
   $("template").onchange = () => { S.template = $("template").value; S.values = {}; buildForm(); changed(); };
 }
 
@@ -347,6 +402,11 @@ async function main() {
     for (const [k, v] of Object.entries(cfg[sec] || {})) S.values[sec][k] = fmtDefault(v);
   }
   buildForm();
+  for (const o of $("mesher").options) {
+    const info = (S.init.meshers || {})[o.value];
+    if (info && !info.ok) { o.disabled = true; o.textContent += " (not found)"; o.title = info.note; }
+  }
+  $("mesher").value = mesherNow();
   setupCanvas();
   setupButtons();
   await updateGeometry();

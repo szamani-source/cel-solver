@@ -5,9 +5,10 @@
 The page (gui/index.html, app.js, style.css; no internet needed) shows a
 form built from the schema (every entry with its default, unit and
 description), draws the geometry at once as values change, and builds the
-real mesh in the background (blockMesh, the fill and celCheck in a scratch
-folder) to show it coloured by cell size or material, with the checker's
-verdict. Save writes the YAML file and the case; Run starts ./Allrun and
+real mesh in the background (blockMesh or Gmsh, the fill and celCheck in a
+scratch folder) to show it coloured by cell size or material, with the
+checker's verdict; Compare meshes with the other mesher too and draws its
+cell edges over the first (WP G.2). Save writes the YAML file and the case; Run starts ./Allrun and
 shows its progress. Only 127.0.0.1 is served.
 """
 
@@ -67,11 +68,36 @@ def geometry(cfg):
                 wall=b["notes"].get("wall"), mass=b["volume"] * float(c["material"]["rho"]))
 
 
-def mesh_preview(state, cfg):
-    """Write the case in the scratch folder, blockMesh, fill, celCheck."""
+def meshers():
+    """Which meshers can run here, with a note for the ones that cannot."""
+    from . import gmsh_mesh
+    bm = shutil.which("blockMesh") is not None
+    out = {"blockMesh": dict(ok=bm, note="" if bm else "blockMesh not found: source "
+                             "OpenFOAM's bashrc and start celSetup --gui again")}
+    g = gmsh_mesh.available()
+    if g is None:
+        out["gmsh"] = dict(ok=False, note="Gmsh not found: pip install gmsh (or apt install gmsh)")
+    elif shutil.which("gmshToFoam") is None:
+        out["gmsh"] = dict(ok=False, note="gmshToFoam not found: source OpenFOAM's bashrc")
+    else:
+        out["gmsh"] = dict(ok=True, note=f"Gmsh ({'Python module' if g == 'python' else 'command'})")
+    return out
+
+
+def other_mesher(cfg):
+    """The configuration with the other mesher (for the comparison)."""
+    c = {k: dict(v) if isinstance(v, dict) else v for k, v in cfg.items()}
+    m = c.setdefault("mesh", {})
+    m["mesher"] = "blockMesh" if m.get("mesher", "blockMesh") == "gmsh" else "gmsh"
+    return c
+
+
+def mesh_preview(state, cfg, sub="preview"):
+    """Write the case in a scratch folder, mesh (blockMesh or Gmsh), fill,
+    celCheck."""
     c = case.resolve(cfg)
     with state.lock:
-        d = os.path.join(state.scratch, "preview")
+        d = os.path.join(state.scratch, sub)
         if os.path.isdir(d):
             shutil.rmtree(d)
         case.write_case(c, d, src="celSetup GUI")
@@ -89,7 +115,8 @@ def mesh_preview(state, cfg):
             alpha=np.round(a[cells], 4).tolist(),
             solids=res.get("solids", []),
             checks=res["checks"], verdict=worst, nCells=res["nCells"], dt=res["dt"],
-            hours=res["hours"], limit=res["limit"], fill=msg, wedge=wedge)
+            hours=res["hours"], limit=res["limit"], fill=msg, wedge=wedge,
+            mesher=c["mesh"].get("mesher", "blockMesh"), nonOrth=res["nonOrth"]["max"])
 
 
 def read_alpha(d, n):
@@ -169,7 +196,8 @@ def make_handler(state):
                                             sections=schema.SECTION_TEXT, yamlPath=base,
                                             caseDir=os.path.join(os.path.dirname(base),
                                                                  cfg.get("case", "celCase")),
-                                            openfoam=shutil.which("blockMesh") is not None))
+                                            openfoam=shutil.which("blockMesh") is not None,
+                                            meshers=meshers()))
             if path == "/api/status":
                 q = dict(p.split("=", 1) for p in self.path.split("?", 1)[1].split("&")) \
                     if "?" in self.path else {}
@@ -190,6 +218,8 @@ def make_handler(state):
                     return self._send(200, geometry(cfg))
                 if self.path == "/api/mesh":
                     return self._send(200, mesh_preview(state, cfg))
+                if self.path == "/api/compare":
+                    return self._send(200, mesh_preview(state, other_mesher(cfg), "compare"))
                 if self.path == "/api/save":
                     return self._send(200, save(state, cfg, body["yamlPath"], body["caseDir"]))
                 if self.path == "/api/run":

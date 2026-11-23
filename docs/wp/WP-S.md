@@ -32,6 +32,11 @@ reports the mesh against the cell-size rules before a run. Decision 0118.
 
 ## Log
 
+- 2026-11-23: G.2 done. GUI toolbar Mesher select and "compare with the other":
+  `/api/init` lists the meshers (ok + note), `/api/compare` meshes the case with the
+  other mesher in its own scratch folder; overlay lines only when cells are 4 px or
+  more on screen (else they hide the colours). Screenshots
+  /mnt/project-files/setup/G2-gui-compare-*.png. Next: G.3 user meshes.
 - 2026-11-23: G.1 done (decision 0119). Sia resumed the work as the G series (GUI,
   Gmsh or blockMesh, user meshes). `gmsh_mesh.py`: .geo from `conical.layout()`,
   Gmsh (Python module or command), gmshToFoam, patch types. Revolving drops the axis

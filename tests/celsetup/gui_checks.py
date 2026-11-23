@@ -5,6 +5,8 @@ its scripts, then: init (schema, presets, the example), geometry (fast
 outline), mesh (blockMesh, fill and celCheck in a scratch folder: 7,584
 cells, celCheck's verdicts), an error for a missing required entry, and save
 (YAML with every entry, which celSetup reads back to the same case).
+G.2: the meshers are listed, and (with Gmsh) compare meshes the case with
+the other mesher.
 
     python3 tests/celsetup/gui_checks.py WORKDIR
 """
@@ -81,6 +83,28 @@ def main(work):
             st = {c["name"]: c["status"] for c in m["checks"]}
             check(st.get("outlet 'outlet'") == "PASS" and abs(m["dt"] / 5.85003e-6 - 1) < 1e-4,
                   "mesh preview carries celCheck's results")
+        # G.2: meshers listed; the other mesher meshes the same case
+        ms = init.get("meshers", {})
+        check(set(ms) == {"blockMesh", "gmsh"} and all("ok" in v and "note" in v
+                                                     for v in ms.values()),
+              f"init lists the meshers: {ms}")
+        check('id="mesher"' in page and 'id="compare"' in page and "/api/compare" in js,
+              "page has the mesher choice and the comparison")
+        if ms.get("gmsh", {}).get("ok") and ok:
+            c = post("/api/compare", {"config": form})
+            check(c.get("mesher") == "gmsh" and c.get("nCells") == 7584
+                  and abs(c["dt"] / m["dt"] - 1) < 0.01 and c["nonOrth"] < 45,
+                  f"compare: Gmsh mesh {c.get('nCells')} cells, dt {c.get('dt')}, "
+                  f"non-orth {c.get('nonOrth')}")
+            gform = json.loads(json.dumps(form))
+            gform["mesh"]["mesher"] = "gmsh"
+            gm = post("/api/mesh", {"config": gform})
+            c2 = post("/api/compare", {"config": gform})
+            check(gm.get("mesher") == "gmsh" and c2.get("mesher") == "blockMesh"
+                  and c2.get("dt") == m["dt"], "mesher gmsh previews with Gmsh, compares "
+                  "with blockMesh")
+        else:
+            print("SKIPPED: Gmsh not available, the comparison is not checked here")
         bad = json.loads(json.dumps(form))
         bad["material"]["phi"] = ""
         e = post("/api/geometry", {"config": bad})
