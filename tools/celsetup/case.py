@@ -182,6 +182,9 @@ rm -rf 0
 
 def _inside(pts, poly):
     """Even-odd point in polygon, vectorised: pts (n, 2), poly (m, 2)."""
+    if len(pts) > 20000:
+        return np.concatenate([_inside(pts[i:i + 20000], poly)
+                               for i in range(0, len(pts), 20000)])
     x, y = pts[:, 0][:, None], pts[:, 1][:, None]
     a = poly
     b = np.roll(poly, -1, axis=0)
@@ -207,29 +210,39 @@ def fill(case, nsub=8):
     U, Vv = U.ravel(), Vv.ravel()
     alpha = np.zeros(mesh.nCells)
     openf = np.ones(mesh.nCells)
-    fb = (fillp.min(0), fillp.max(0))
-    for c, q in zip(cells, polys):
-        if len(q) == 3:                     # wedge axis prism seen as a triangle
-            q = np.vstack([q, q[-1]])
-        lo, hi = q.min(0), q.max(0)
-        touches_fill = not (hi[0] < fb[0][0] or lo[0] > fb[1][0] or hi[1] < fb[0][1] or lo[1] > fb[1][1])
-        sb = [s for s in solids if not (hi[0] < s[:, 0].min() or lo[0] > s[:, 0].max()
-                                        or hi[1] < s[:, 1].min() or lo[1] > s[:, 1].max())]
-        if not touches_fill and not sb:
-            continue
-        # bilinear map of the quad (corner order as in the face)
-        p = ((1 - U) * (1 - Vv))[:, None] * q[0] + (U * (1 - Vv))[:, None] * q[1] \
-            + (U * Vv)[:, None] * q[2] + ((1 - U) * Vv)[:, None] * q[3]
+    Q = np.array([q if len(q) == 4 else np.vstack([q, q[-1:]]) for q in polys])   # (n, 4, 2)
+    lo, hi = Q.min(1), Q.max(1)
+
+    def near(poly):
+        return ~((hi[:, 0] < poly[:, 0].min()) | (lo[:, 0] > poly[:, 0].max())
+                 | (hi[:, 1] < poly[:, 1].min()) | (lo[:, 1] > poly[:, 1].max()))
+    todo = near(fillp)
+    for sp in solids:
+        todo |= near(sp)
+    idx = np.nonzero(todo)[0]
+    ns = len(U)
+    for k0 in range(0, len(idx), 2000):
+        kk = idx[k0:k0 + 2000]
+        q = Q[kk]                                              # (m, 4, 2)
+        # bilinear map of each quad (corner order as in the face)
+        p = (((1 - U) * (1 - Vv))[None, :, None] * q[:, None, 0]
+             + (U * (1 - Vv))[None, :, None] * q[:, None, 1]
+             + (U * Vv)[None, :, None] * q[:, None, 2]
+             + ((1 - U) * Vv)[None, :, None] * q[:, None, 3])  # (m, ns, 2)
+        p = p.reshape(-1, 2)
         w = np.maximum(p[:, 0], 0) if wedge else np.ones(len(p))
-        if w.sum() <= 0:
-            w = np.ones(len(p))
+        w = w.reshape(-1, ns)
+        w = np.where(w.sum(1, keepdims=True) > 0, w, 1.0)
         solid = np.zeros(len(p), bool)
-        for s in sb:
-            solid |= _inside(p, s)
-        mat = _inside(p, fillp) & ~solid if touches_fill else np.zeros(len(p), bool)
-        of = (w * ~solid).sum() / w.sum()
+        for sp in solids:
+            solid |= _inside(p, sp)
+        mat = _inside(p, fillp) & ~solid
+        solid, mat = solid.reshape(-1, ns), mat.reshape(-1, ns)
+        wo = (w * ~solid).sum(1)
+        of = wo / w.sum(1)
+        c = cells[kk]
         openf[c] = of
-        alpha[c] = (w * mat).sum() / (w * ~solid).sum() if of > 0 else 0.0
+        alpha[c] = np.where(wo > 0, (w * mat).sum(1) / np.where(wo > 0, wo, 1), 0.0)
     alpha = np.where(alpha > 1 - 1e-9, 1.0, np.where(alpha < 1e-9, 0.0, alpha))
     rho = meta["rho"] * alpha
     os.makedirs(os.path.join(case, "0"), exist_ok=True)

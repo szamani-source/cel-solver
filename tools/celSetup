@@ -9,6 +9,8 @@
     celSetup --template NAME [FILE] a commented input file with every entry
                                     and its default (to stdout or FILE)
     celSetup --describe NAME        list every entry: default, unit, meaning
+    celSetup --gui [case.yaml]      the setup GUI in your browser (local, offline);
+                                    --port N, --no-browser
 
 Templates: conicalHopper. Examples: tools/celsetup/examples/.
 """
@@ -20,8 +22,16 @@ from celsetup import case, miniyaml, schema  # noqa: E402
 
 
 def main(argv):
+    port = 8765
+    if "--port" in argv:
+        i = argv.index("--port")
+        port = int(argv[i + 1])
+        argv = argv[:i] + argv[i + 2:]
     args = [a for a in argv if not a.startswith("--")]
     flags = {a for a in argv if a.startswith("--")}
+    if "--gui" in flags:
+        from celsetup import gui
+        return gui.serve(args[0] if args else None, port, "--no-browser" not in flags)
     if "--help" in flags or "-h" in argv or not args:
         print(__doc__)
         return 0 if args or "--help" in flags else 1

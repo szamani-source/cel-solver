@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>celSetup</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <div class="brand">celSetup <span>case and mesh setup for celFoam</span></div>
+  <label class="tpl">Template <select id="template"></select></label>
+  <div class="spacer"></div>
+  <span id="busy" class="busy" hidden>building mesh…</span>
+  <button id="saveBtn" class="primary">Save case</button>
+  <button id="runBtn">Run</button>
+</header>
+<main>
+  <aside id="form" aria-label="Inputs"></aside>
+  <section class="view">
+    <div class="toolbar">
+      <span>Colour by</span>
+      <label><input type="radio" name="colour" value="size" checked> cell size</label>
+      <label><input type="radio" name="colour" value="alpha"> material at the start</label>
+      <label><input type="checkbox" id="edges" checked> cell edges</label>
+      <button id="fitBtn" class="small">Fit</button>
+      <button id="limBtn" class="small" title="zoom to the cell that sets the time step">Zoom to time-step cell</button>
+      <span class="hint">wheel: zoom · drag: pan</span>
+    </div>
+    <div class="canvasWrap"><canvas id="canvas"></canvas><div id="legend" class="legend"></div>
+      <div id="hover" class="hover" hidden></div></div>
+    <div class="summary" id="summary"></div>
+    <div class="checks" id="checks"></div>
+  </section>
+</main>
+<dialog id="saveDlg">
+  <form method="dialog">
+    <h3>Save the case</h3>
+    <label>Input file (YAML)<input id="yamlPath" size="60"></label>
+    <label>Case folder<input id="caseDir" size="60"></label>
+    <p class="note">Writes the YAML file with every entry and its description, then the case:
+      mesh, STL wall, dictionaries, material fill and Allrun. Allrun resumes from the last write
+      when run again.</p>
+    <menu><button value="cancel">Cancel</button><button id="saveGo" value="ok" class="primary">Save</button></menu>
+  </form>
+</dialog>
+<div id="toast" class="toast" hidden></div>
+<script src="app.js"></script>
+</body>
+</html>

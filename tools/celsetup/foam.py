@@ -116,16 +116,20 @@ class PolyMesh:
         nf = len(self.faces)
         Sf = np.zeros((nf, 3))
         Cf = np.zeros((nf, 3))
-        for i, f in enumerate(self.faces):
-            q = P[f]
-            c0 = q.mean(0)
+        sizes = np.array([len(f) for f in self.faces])
+        for n in np.unique(sizes):
+            idx = np.nonzero(sizes == n)[0]
+            q = P[np.array([self.faces[i] for i in idx])]          # (k, n, 3)
+            c0 = q.mean(1)
+            q1 = np.roll(q, -1, axis=1)
             # triangle fan about the point average (as OpenFOAM does)
-            a = np.cross(q - c0, np.roll(q, -1, axis=0) - c0)
-            tc = (q + np.roll(q, -1, axis=0) + c0) / 3.0
-            ma = np.linalg.norm(a, axis=1)
-            S = 0.5 * a.sum(0)
-            Sf[i] = S
-            Cf[i] = (tc * ma[:, None]).sum(0) / ma.sum() if ma.sum() > 0 else c0
+            a = np.cross(q - c0[:, None], q1 - c0[:, None])
+            tc = (q + q1 + c0[:, None]) / 3.0
+            ma = np.linalg.norm(a, axis=2)
+            Sf[idx] = 0.5 * a.sum(1)
+            tot = ma.sum(1)
+            Cf[idx] = np.where(tot[:, None] > 0,
+                               (tc * ma[:, :, None]).sum(1) / np.where(tot > 0, tot, 1)[:, None], c0)
         self.Sf, self.Cf = Sf, Cf
         self.magSf = np.linalg.norm(Sf, axis=1)
         nc = self.nCells

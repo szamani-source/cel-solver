@@ -32,6 +32,11 @@ reports the mesh against the cell-size rules before a run. Decision 0117.
 
 ## Log
 
+- 2026-11-23: S.4 done. `gui.py` + `gui/` (index.html, app.js, style.css). Endpoints
+  init, geometry (instant outline), mesh (scratch case: blockMesh, fill, celCheck), save,
+  run, status. Vectorised the polyMesh geometry and the fill (preview 7 s -> 2-4 s).
+  Playwright screenshots checked by eye; the server test covers every call. Next: S.5
+  templates.
 - 2026-11-23: S.3 done. `check.py`, `tools/celCheck`. Time step reproduces
   eulerianSolid::cellSize (angled V/Smax, wedge hoop length combined) exactly. Standard
   Couto mesh: dt 5.85e-6 s from the axis cell in the spout (in-plane 2.68 mm, hoop 2.68
