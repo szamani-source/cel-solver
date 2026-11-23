@@ -8,17 +8,34 @@ LS-DYNA multi-material ALE.
 - Lagrangian side: rigid bodies, then explicit hex8 finite elements.
 - Coupling: penalty contact between Lagrangian surfaces and Eulerian material.
 
-Status: Phase 0 (project setup). See [docs/STATUS.md](docs/STATUS.md).
+Version 1.0.0 (2026-11-23): release notes in
+[docs/release-notes/v1.0.0.md](docs/release-notes/v1.0.0.md), changes in
+[CHANGELOG.md](CHANGELOG.md), work status in [docs/STATUS.md](docs/STATUS.md).
 
-## Build and test
+## Install
+
+Any Linux with OpenFOAM v2512 (openfoam.com), or any Linux with Docker or Podman.
+Step by step, with the packages per distribution: **[INSTALL.md](INSTALL.md)**. Short form:
 
 ```bash
-source /path/to/OpenFOAM-v2512/etc/bashrc
+source /usr/lib/openfoam/openfoam2512/etc/bashrc   # OpenFOAM v2512 loaded
+./install.sh                                       # build, install, smoke test
+celfoam tutorials ~/cases && cd ~/cases/siloDischarge && celfoam ./Allrun
+```
+
+or `./install.sh --container` without OpenFOAM on the host.
+
+## Build and test (developers)
+
+```bash
+source /usr/lib/openfoam/openfoam2512/etc/bashrc
 ./Allwmake
 tests/run_tests.sh
 ```
 
 ## Documentation
+
+- [docs/manual/index.html](docs/manual/index.html): the user manual (HTML, works offline)
 
 - [docs/work-packages.md](docs/work-packages.md): the plan, split into 28 small packages
 - [docs/decisions/](docs/decisions/): why things are the way they are
@@ -27,4 +44,4 @@ tests/run_tests.sh
 
 ## Licence
 
-GPL-3.0, because the code links against OpenFOAM (GPL-3.0). See decision 0003.
+GPL-3.0 ([LICENSE](LICENSE)), because the code links against OpenFOAM (GPL-3.0). See decision 0003.

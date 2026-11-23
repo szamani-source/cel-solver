@@ -36,6 +36,7 @@ Cells are 10 mm unless stated.
 | 17 | Free body dropped onto T0 | its weight at rest; momentum | force / weight 1.0000, momentum 1e-5 | 2 % | Pass | CI `test_free_body.sh` |
 | 18 | MPI with bodies (1, 2, 4 processors) | serial run | first 100 steps 5e-15; outcomes within the round-off band | decision 0080 | Pass | CI `test_mpi_bodies.sh` |
 | 19 | Restart | continuous run | identical bit for bit (serial and 2 processors, with bodies) | exact | Pass | CI `test_restart.sh` |
+| 20 | Couto wheat silo, conical hopper, 4 mm wall-aligned mesh, MC and DP (decision 0117) | Couto et al. 2013 load cells GA0-GA7, Beverloo 110-131 kg/s, Zheng and Yu 2015 Abaqus peak 27.5 kPa | rate 118.1 / 118.2 kg/s; GA1-GA5 at rest inside or within 4 %; discharge maxima within 17 %; Abaqus peak 27.7 (MC) / 24.5 (DP) kPa; GA0 at rest +36 % | 15 % (Sia accepts about 20 %) | Pass except GA0 at rest (known gap) | `tutorials/coutoHopper`, `tests/hopper/run_final_4mm.sh` (8 h, not in CI) |
 
 ## Verification checks underneath
 

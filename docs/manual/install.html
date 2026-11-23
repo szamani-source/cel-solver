@@ -14,17 +14,28 @@
 <main>
 
 <h1>Installation</h1>
-<p class="lead">celFoam needs OpenFOAM v2512 from openfoam.com, a C++ compiler and Python 3.
-On Ubuntu 24.04 the whole setup, from a clean machine to a working solver, takes a few
-minutes.</p>
+<p class="lead">celFoam runs on any Linux. It needs OpenFOAM v2512 from openfoam.com, a C++
+compiler and Python 3 with numpy. On Ubuntu 24.04 the whole setup, from a clean machine to
+a working solver, takes a few minutes.</p>
+
+<div class="note">
+<p><strong>Version 1.0.</strong> <code>INSTALL.md</code> in the repository is the step-by-step
+reference, with the packages to install on each distribution family (Ubuntu and Debian,
+openSUSE, Fedora and RHEL, Arch, or OpenFOAM from source). Two shortcuts do the same steps:
+<code>./install.sh</code> builds and installs celFoam against an existing OpenFOAM v2512 and
+adds the <code>celfoam</code> command (<a href="#install-sh">below</a>), and
+<code>./install.sh --container</code> builds a Docker or Podman image for any Linux
+(<a href="#method-c">Method C</a>).</p>
+</div>
 
 <h2 id="requirements">Requirements</h2>
 
 <table>
 <thead><tr><th>Item</th><th>Needed</th><th>Notes</th></tr></thead>
 <tbody>
-<tr><td>Operating system</td><td>Linux, x86-64</td><td>Ubuntu 24.04 is tested (it is the system of the
-continuous-integration image). Other distributions work if OpenFOAM v2512 is installed by other means.</td></tr>
+<tr><td>Operating system</td><td>Linux, x86-64</td><td>Any distribution. Ubuntu 24.04 is tested natively
+(it is the system of the continuous-integration image), every other one through OpenFOAM's
+packages or source build (<code>INSTALL.md</code>) or the container.</td></tr>
 <tr><td>OpenFOAM</td><td>v2512 (openfoam.com)</td><td>Exactly this release. OpenFOAM from openfoam.org
 (OpenFOAM 11, 12, 13, ...) is a different code line and will not build celFoam.</td></tr>
 <tr><td>Compiler and MPI</td><td><code>g++</code>, <code>make</code>, Open MPI</td><td>Installed with OpenFOAM by the methods below.</td></tr>
@@ -74,9 +85,19 @@ Force a method with <code>CEL_OF_METHOD=registry</code> or <code>CEL_OF_METHOD=s
 sudo apt-get install openfoam2512-dev</code></pre>
 <p>This installs to the same path as Method A.</p>
 
-<h3 id="method-c">Method C: Docker</h3>
-<p>Run everything inside the image the project's tests use, with the repository mounted:</p>
-<pre><code>docker run -it --rm -v "$PWD":/work -w /work opencfd/openfoam-dev:2512 bash</code></pre>
+<p>openSUSE: <code>curl -s https://dl.openfoam.com/add-science-repo.sh | sudo bash</code>, then
+<code>sudo zypper install openfoam2512-devel</code>. Fedora, RHEL, Arch and others: build from
+source (<code>INSTALL.md</code> lists the system packages for each).</p>
+
+<h3 id="method-c">Method C: container (any Linux)</h3>
+<p>With Docker or Podman, one command builds an image with OpenFOAM v2512 and celFoam
+(from the pinned image the project's tests use) and installs a <code>celfoam</code> command
+that runs in it, with the current folder mounted:</p>
+<pre><code>./install.sh --container
+celfoam test</code></pre>
+<p>Steps 3 to 5 are then done; use <code>celfoam</code> as in <a href="#install-sh">step 4</a>.
+By hand: <code>docker build -t celfoam:1.0.0 .</code> and
+<code>docker run --rm -it -v "$PWD":/work celfoam:1.0.0</code>.</p>
 
 <div class="note">
 <p><strong>No root access?</strong> Build OpenFOAM v2512 from source in your home folder,
@@ -103,6 +124,21 @@ Mixing them gives errors such as missing libraries or the wrong <code>blockMesh<
 
 <h2 id="build">4. Build celFoam</h2>
 
+<h3 id="install-sh">Installed copy with <code>install.sh</code> (recommended for users)</h3>
+<pre><code>./install.sh                  # as root: /opt/celfoam-1.0.0; as a user: ~/celfoam-1.0.0
+./install.sh --openfoam DIR   # OpenFOAM v2512 in another place (the folder with etc/bashrc)
+./install.sh --get-openfoam   # Ubuntu 24.04 family: also installs OpenFOAM (Method A)</code></pre>
+<p>It finds OpenFOAM v2512, checks the compiler and numpy, copies the source to the prefix,
+builds there (including <code>celVoidCheck</code>, used by the <code>coutoHopper</code>
+tutorial), writes the environment file <code>&lt;prefix&gt;/etc/celfoam.sh</code> and links the
+<code>celfoam</code> command into <code>/usr/local/bin</code> or <code>~/.local/bin</code>:</p>
+<pre><code>celfoam                       # a shell with OpenFOAM v2512 and celFoam loaded
+celfoam ./Allrun              # one command with the environment loaded
+celfoam tutorials ~/cases     # copy the tutorials
+celfoam test                  # smoke test
+source /opt/celfoam-1.0.0/etc/celfoam.sh   # the environment in the current shell</code></pre>
+
+<h3 id="allwmake">In the source folder (developers)</h3>
 <pre><code>./Allwmake</code></pre>
 
 <p>This builds the four libraries (<code>celConstitutive</code>, <code>celEulerian</code>,

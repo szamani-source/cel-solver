@@ -11,3 +11,5 @@ __pycache__/
 tutorials/**/0/
 tutorials/**/processor*/
 __pycache__/
+tutorials/coutoHopper/run/
+tutorials/coutoHopper/mesh.png
