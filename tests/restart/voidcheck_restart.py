@@ -1,4 +1,4 @@
-"""Checkpoint and restart of the test driver celVoidCheck (decision 0116).
+"""Checkpoint and restart of the test driver celVoidCheck (decision 0117).
 
 The Couto silo on the coarse wall-aligned STL mesh (buffered_case,
 gravity-on start, nonlocal fluidity, fullBlend, outlet opening at 3 ms) on

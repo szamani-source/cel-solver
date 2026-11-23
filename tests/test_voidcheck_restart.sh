@@ -1,5 +1,5 @@
 #!/bin/bash
-# Decision 0116: the test driver celVoidCheck writes checkpoints
+# Decision 0117: the test driver celVoidCheck writes checkpoints
 # (voidCheckDict checkpointEvery) and restarts from the latest one
 # (controlDict startFrom latestTime). The coarse Couto silo (STL shell,
 # nonlocal fluidity, outlet opening at 3 ms) on 2 ranks, restarted at 4 ms,

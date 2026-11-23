@@ -98,7 +98,7 @@ def main():
     blend = "fullBlend yes;\n" if mesh != "cut" else ""
     os.environ.setdefault("CEL_HOPPER_RULES", MU_I + RULES + blend)
     check = dict(tEnd=T_END, maxCo=0.4, writeTimes=WRITES, tOpen=T_OPEN)
-    # Checkpoints and resume (decision 0116): CEL_CHECKPOINT (s) writes a
+    # Checkpoints and resume (decision 0117): CEL_CHECKPOINT (s) writes a
     # restart time every that many seconds; CEL_RESUME=1 restarts an
     # existing case from its latest checkpoint instead of building it anew
     ckpt = float(os.environ.get("CEL_CHECKPOINT", 0))
@@ -124,7 +124,7 @@ def main():
             # STL shell inside a wall-aligned mesh (Sia, 2026-11-20; WP G.5)
             import buffered_case as bc
             CELL = 0.012
-            # mesh knobs as in gap_case.py (decision 0115 addendum, 0116):
+            # mesh knobs as in gap_case.py (decision 0115 addendum, 0117):
             # CEL_H_TOP, CEL_NCOLS, CEL_WALL_RATIO, CEL_H_HOP, CEL_OUTLET_WALL_RATIO
             e = os.environ
             h_top = float(e.get("CEL_H_TOP", 0.025))

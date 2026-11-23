@@ -118,7 +118,7 @@ def run(path, nProcs=1):
 
 def latest_time(path):
     """Latest complete written time (> 0) of a case, serial or decomposed;
-    0 if none (decision 0116: the checkpoints of celVoidCheck). A time is
+    0 if none (decision 0117: the checkpoints of celVoidCheck). A time is
     complete when every processor has its fields and restart state; newer
     incomplete times (a write cut off by a lost container) are removed."""
     import re
@@ -143,7 +143,7 @@ def latest_time(path):
 
 def resume(path, nProcs=1):
     """Run celVoidCheck again from the case's latest written time (decision
-    0116); the history is kept up to that time and appended to."""
+    0117); the history is kept up to that time and appended to."""
     with open(f"{path}/system/controlDict", "a") as f:
         f.write("startFrom latestTime;\n")
     t0 = time.perf_counter()

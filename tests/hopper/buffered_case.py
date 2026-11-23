@@ -399,7 +399,7 @@ def aligned_buffered_mesh(path, c, ncols=44, wall_ratio=0.6, h_out=0.004, h_hop=
     hopper block's bottom edge, the outlet; the top edge keeps wall_ratio,
     so the columns match the cylinder block and blockMesh blends the two
     down the cone (edgeGrading). 1 keeps the outlet cells at the block
-    width over ncols (decision 0116: >= 3 mm with 58 columns)."""
+    width over ncols (decision 0117: >= 3 mm with 58 columns)."""
     b, ht = hc.hopper_geometry(c)
     R, Htop = c["R"], ht + c["Hc"]
     Hm = Htop + head_rows * h_top

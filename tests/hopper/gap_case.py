@@ -23,7 +23,7 @@ CEL_NCOLS (44), CEL_WALL_RATIO (0.6, wall column / axis column) and
 CEL_H_HOP (m, 0.012, row height at the top of the hopper block) set the
 rest of the grading (decision 0115 addendum: the fine "ideal" mesh).
 CEL_OUTLET_WALL_RATIO (default CEL_WALL_RATIO): the column grading at the
-outlet only (decision 0116: 1 keeps the outlet cells at 3 mm or more).
+outlet only (decision 0117: 1 keeps the outlet cells at 3 mm or more).
 """
 import math
 import os
@@ -47,7 +47,7 @@ H_TOP = float(os.environ.get("CEL_H_TOP", 0.025))
 NCOLS = int(os.environ.get("CEL_NCOLS", 44))
 WALL_RATIO = float(os.environ.get("CEL_WALL_RATIO", 0.6))
 H_HOP = float(os.environ.get("CEL_H_HOP", 0.012))
-OWR = os.environ.get("CEL_OUTLET_WALL_RATIO")      # decision 0116
+OWR = os.environ.get("CEL_OUTLET_WALL_RATIO")      # decision 0117
 HEAD_ROWS = int(round(12 * 0.025 / H_TOP))
 CELLS = ["GA0", "GA1", "GA2", "GA3", "GA4", "GA5", "GA6", "GA7"]
 

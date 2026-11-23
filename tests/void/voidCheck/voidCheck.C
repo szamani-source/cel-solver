@@ -108,7 +108,7 @@ int main(int argc, char *argv[])
     const scalar rho0 = solid.rho0();
     const scalar gMag = mag(solid.g());
 
-    // Restart (decision 0116): started from a written time (controlDict
+    // Restart (decision 0117): started from a written time (controlDict
     // startFrom latestTime), the fields come from that time; no fill
     const bool restart = runTime.value() > 0;
     if (restart)
@@ -475,7 +475,7 @@ int main(int argc, char *argv[])
         const scalar tEnd = dict.get<scalar>("tEnd");
         const scalar co = dict.get<scalar>("maxCo");
         const scalarList wt(dict.getOrDefault<scalarList>("writeTimes", scalarList()));
-        // Checkpoints (decision 0116): every checkpointEvery seconds the
+        // Checkpoints (decision 0117): every checkpointEvery seconds the
         // fields and the solid's restart state are written as a time
         // directory, from which the run restarts (startFrom latestTime)
         const scalar ckEvery = dict.getOrDefault<scalar>("checkpointEvery", 0);

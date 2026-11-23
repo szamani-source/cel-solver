@@ -517,7 +517,7 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
                     "g",
                     mesh.time().timeName(),
                     mesh,
-                    IOobject::READ_IF_PRESENT,      // restart (0116)
+                    IOobject::READ_IF_PRESENT,      // restart (0117)
                     IOobject::AUTO_WRITE
                 ),
                 mesh,
