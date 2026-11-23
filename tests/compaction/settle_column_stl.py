@@ -1,5 +1,5 @@
 """WP K.4 done-when checks: the compaction cap with immersed (STL) walls
-(decision 0122). The WP K.2 settling column (tests/compaction/settle_column.py)
+(decision 0124). The WP K.2 settling column (tests/compaction/settle_column.py)
 held between two frictionless STL walls instead of mesh walls. About 1 minute.
 
 Mesh: 3 columns of 20 mm, x from -15 to 45 mm. STL walls with faces at x = 0

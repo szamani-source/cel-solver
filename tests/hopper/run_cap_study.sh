@@ -1,12 +1,12 @@
 #!/bin/bash
-# Couto silo with and without the compaction cap (WP K.5/K.7, decision 0122):
+# Couto silo with and without the compaction cap (WP K.5/K.7, decision 0124):
 # the run_final_4mm.sh setup (gravity-on start, outlet opens at 0.5 s, run to
 # 1.5 s, T0 rules + fullBlend + nonlocal), checkpointed and mirrored.
 #
 #     tests/hopper/run_cap_study.sh mc|dp cap|nocap coarse|fine
 #
 # coarse: 12 mm cylinder rows, 12 mm hopper rows (decision 0115 mesh);
-# fine: the 4 mm mesh of decision 0117. Cap values (decision 0122):
+# fine: the 4 mm mesh of decision 0117. Cap values (decision 0124):
 # CEL_CAP_LAMBDA (default 0.023, wheat, Zeng and Wang 2019), CEL_CAP_P0 (100).
 # Work: $CEL_WORK (default /tmp/cel_cap); report $CEL_WORK/<tag>.out.
 # Mirror: $CEL_MIRROR (default /mnt/project-files/hopper/cap/ckpt). Run again

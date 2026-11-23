@@ -1,5 +1,5 @@
 #!/bin/bash
-# WP K.4: compaction cap with STL (immersed) walls (decision 0122): the K.2
+# WP K.4: compaction cap with STL (immersed) walls (decision 0124): the K.2
 # settling column held between frictionless STL walls lies on the line
 # and settles as the mesh-wall column within 1 %.
 # About 1 minute.

@@ -1,4 +1,4 @@
-# 0122 Compaction cap with STL (immersed) walls, and the plan K.4-K.7
+# 0124 Compaction cap with STL (immersed) walls, and the plan K.4-K.7
 
 Date: 2026-11-23. Status: accepted (Sia's pre-gas list item 2, "proceed",
 2026-11-23 22:50 UTC).
