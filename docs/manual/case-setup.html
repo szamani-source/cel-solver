@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Case setup reference · celFoam manual</title>
+<link rel="stylesheet" href="assets/katex/katex.min.css">
+<link rel="stylesheet" href="assets/manual.css">
+<script defer src="assets/katex/katex.min.js"></script>
+<script defer src="assets/katex/contrib/auto-render.min.js"></script>
+<script defer src="assets/manual.js"></script>
+</head>
+<body>
+<main>
+
+<h1>Case setup reference</h1>
+<p class="lead">Every file and keyword celFoam reads, what it does and its default. A
+celFoam case is an ordinary OpenFOAM case: a mesh, initial fields, and a few dictionaries.
+The physics is set in <code>constant/materialProperties</code>.</p>
+
+<div class="note"><p>This page is checked automatically: the manual's test fails if the code
+reads a keyword that is not described here. Unknown keywords in your files are ignored
+by celFoam, so a misspelt optional entry silently takes its default. Read the settings
+block at the top of <code>log.celFoam</code> to confirm what was understood.</p></div>
+
+<h2 id="layout">Case layout</h2>
+
+<table>
+<thead><tr><th>File</th><th>Needed</th><th>Contents</th></tr></thead>
+<tbody>
+<tr><td><code>system/controlDict</code></td><td>yes</td><td>time control, writing, <a href="#controldict">celFoam's time-step and settling entries</a></td></tr>
+<tr><td><code>system/blockMeshDict</code> (or another mesher)</td><td>yes</td><td>the mesh; see <a href="meshing.html">Meshing</a></td></tr>
+<tr><td><code>system/fvSchemes</code>, <code>system/fvSolution</code></td><td>yes</td><td>required by OpenFOAM to start; celFoam does not use their contents (copy them from a tutorial)</td></tr>
+<tr><td><code>system/setFieldsDict</code></td><td>usually</td><td>where the material starts, for <code>setFields</code></td></tr>
+<tr><td><code>system/decomposeParDict</code></td><td>for parallel runs</td><td><a href="#parallel">splitting the mesh</a></td></tr>
+<tr><td><code>constant/materialProperties</code></td><td>yes</td><td><a href="#material">material, boundaries, options</a></td></tr>
+<tr><td><code>constant/g</code></td><td>for gravity</td><td><a href="#gravity">gravity vector</a></td></tr>
+<tr><td><code>constant/rigidBodies</code>, <code>constant/triSurface/*.stl</code></td><td>for bodies and STL walls</td><td><a href="#bodies">Lagrangian bodies</a></td></tr>
+<tr><td><code>0/alpha</code>, <code>0/rho</code>, ...</td><td>see <a href="#fields">initial fields</a></td><td>initial state</td></tr>
+</tbody>
+</table>
+
+<h2 id="controldict">system/controlDict</h2>
+
+<p>The standard OpenFOAM entries apply (<code>startFrom</code>, <code>startTime</code>, <code>stopAt</code>,
+<code>endTime</code>, <code>writeFormat</code>, ...). celFoam sets the time step itself every step, so
+<code>deltaT</code> is only a starting value. Notes on the entries celFoam treats specially, and the
+entries it adds:</p>
+
+<table>
+<thead><tr><th>Keyword</th><th>Default</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>writeControl</code>, <code>writeInterval</code></td><td>&ndash;</td><td>With <code>writeControl adjustableRunTime</code>,
+celFoam shortens the steps before each write so that the run lands exactly on every multiple of
+<code>writeInterval</code> and on <code>endTime</code>. Use it: a restart from such a time takes the same steps as
+the run that wrote it.</td></tr>
+<tr><td><code>maxCo</code></td><td>0.4</td><td>Fraction of the stable explicit time step used (Courant number on the
+fastest wave). Must be positive. Values up to about 0.4 are tested; see <a href="theory-equations.html#time-step">Time step</a>.</td></tr>
+<tr><td><code>gravityRamp</code></td><td>0</td><td>Seconds over which gravity grows from zero to its full value (a half
+cosine). A ramp of about 0.1 s avoids a shock when a deposit is loaded at once.</td></tr>
+<tr><td><code>damping</code></td><td>0</td><td>Velocity damping rate in 1/s: after each momentum update
+\(\mathbf v \leftarrow \mathbf v/(1 + c\,\Delta t)\). Used to settle a deposit to rest. Switched off
+automatically when the first outlet opens. 100 to 250 1/s settles the tutorial silos.</td></tr>
+<tr><td><code>dampingStart</code></td><td>0</td><td>Time from which <code>damping</code> acts. Lets material fall freely while a silo is
+filled through an inlet, then settle.</td></tr>
+<tr><td><code>solveMomentum</code></td><td>yes</td><td><code>no</code> holds the velocity field fixed (prescribed motion). Only for kinematic tests of
+the remap and the stress update.</td></tr>
+<tr><td><code>secondOrder</code></td><td>yes</td><td><code>no</code> uses first-order face states in the Lagrange step. Only for tests.</td></tr>
+</tbody>
+</table>
+
+<h2 id="gravity">constant/g</h2>
+<p>The standard OpenFOAM gravity file. Without it there is no gravity.</p>
+<pre><code>dimensions      [0 1 -2 0 0 0 0];
+value           (0 -9.81 0);</code></pre>
+
+<h2 id="material">constant/materialProperties</h2>
+
+<h3 id="general">General entries</h3>
+<table>
+<thead><tr><th>Keyword</th><th>Default</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>rho</code></td><td>required</td><td>Density of the material, kg/m&sup3;. Also the default for cells without a
+<code>0/rho</code> field.</td></tr>
+<tr><td><code>freeSurface</code></td><td>no</td><td><code>yes</code>: each cell holds material plus void, tracked by the field <code>alpha</code>.
+Needed for anything with a free surface, outlets, inlets, moving bodies or empty space. <code>no</code>: the
+mesh is full of material everywhere (a closed box of solid).</td></tr>
+<tr><td><code>type</code></td><td>required</td><td>Material model: <code>linearElastic</code>, <code>vonMises</code>, <code>druckerPrager</code> or
+<code>mohrCoulomb</code>. The same word, inside a <code>material</code> sub-dictionary, selects the model of a
+deformable body.</td></tr>
+</tbody>
+</table>
+
+<h3 id="models">Material model parameters</h3>
+<p>Angles are in degrees, stresses in pascals. Theory: <a href="theory-materials.html">Material models</a>.</p>
+
+<table>
+<thead><tr><th>Model</th><th>Required</th><th>Optional</th></tr></thead>
+<tbody>
+<tr><td><code>linearElastic</code></td><td><code>E</code> Young's modulus, <code>nu</code> Poisson's ratio</td><td>&ndash;</td></tr>
+<tr><td><code>vonMises</code> (J2 plasticity)</td><td><code>E</code>, <code>nu</code>, <code>sigma_y</code> yield stress</td><td><code>H</code> linear hardening modulus (default 0, perfectly plastic)</td></tr>
+<tr><td><code>druckerPrager</code></td><td><code>E</code>, <code>nu</code>, <code>phi</code> friction angle, <code>c</code> cohesion,
+<code>psi</code> dilation angle</td><td><code>fit</code>: how the cone matches Mohr-Coulomb: <code>compression</code> (default, outer cone),
+<code>extension</code> (inner cone) or <code>plane_strain</code>; the friction, nonlocal and cap entries below</td></tr>
+<tr><td><code>mohrCoulomb</code></td><td><code>E</code>, <code>nu</code>, <code>phi</code>, <code>c</code>, <code>psi</code></td><td><code>sigmaT</code> tensile strength
+(tension cut-off, \(0 \le \sigma_T \le c\cot\phi\)); the friction, nonlocal and cap entries below</td></tr>
+</tbody>
+</table>
+
+<div class="warn"><p><strong>Drucker-Prager in plane strain and on the wedge.</strong> Use
+<code>fit plane_strain;</code> for silo and hopper flow. The default compression fit gave a third of
+the discharge rate of the Couto silo (45 against 110 kg/s).</p></div>
+
+<p><strong>Tension.</strong> With <code>freeSurface yes</code>, a material with <code>c 0</code> or <code>sigmaT 0</code>
+carries no tension: it separates instead. A cohesive Mohr-Coulomb or Drucker-Prager material
+carries tension up to <code>sigmaT</code> (default \(c\cot\phi\)) and tears beyond it.</p>
+
+<h3 id="mu-i">Rate-dependent friction \(\mu(I)\)</h3>
+<p>Adding these entries to <code>mohrCoulomb</code> or <code>druckerPrager</code> makes the friction coefficient
+rise with the inertial number \(I\), from \(\mu_s = \tan\phi\) at rest to <code>mu2</code> in fast flow
+<a class="cite" href="references.html#ref-jop2006">Jop et al. 2006</a>. Without <code>mu2</code> (or with
+<code>mu2</code> equal to \(\tan\phi\)) the model is rate independent.</p>
+<table>
+<thead><tr><th>Keyword</th><th>Default</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>mu2</code></td><td>off</td><td>Friction coefficient at high \(I\) (must be above \(\tan\phi\))</td></tr>
+<tr><td><code>I0</code></td><td>with <code>mu2</code></td><td>Reference inertial number (0.279 for glass beads)</td></tr>
+<tr><td><code>d</code></td><td>with <code>mu2</code></td><td>Grain diameter, m</td></tr>
+<tr><td><code>rhoS</code></td><td>with <code>mu2</code></td><td>Density of the grains, kg/m&sup3;</td></tr>
+<tr><td><code>muIAlpha</code></td><td>0</td><td>Barker-Gray regularisation of the law at small \(I\), in (0, 2); 0 = off
+<a class="cite" href="references.html#ref-barker2017">Barker and Gray 2017</a></td></tr>
+<tr><td><code>phi0</code>, <code>phiC</code>, <code>bPhi</code>, <code>KDil</code></td><td>off</td><td>Optional dilatancy: the dilation angle follows the
+solid fraction, \(\tan\psi = K_\text{dil}(\phi_s - \phi_\text{eq}(I))\) with \(\phi_\text{eq} = \phi_C - b_\phi I\),
+\(\phi_s = \phi_0\exp(-\operatorname{tr}\boldsymbol\varepsilon^p)\). All four or none. Experimental, off in all tutorials.</td></tr>
+</tbody>
+</table>
+
+<h3 id="nonlocal">Nonlocal friction law (mesh-independent shear bands)</h3>
+<table>
+<thead><tr><th>Keyword</th><th>Default</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>nonlocalA</code></td><td>0 (off)</td><td>Nonlocal amplitude \(A\) of the granular fluidity law
+<a class="cite" href="references.html#ref-kamrin2012">Kamrin and Koval 2012</a>. With it, the plastic flow
+spreads over a length of a few grain diameters <code>d</code>, so shear bands no longer shrink with the cells.
+Needs the \(\mu(I)\) entries (<code>mu2</code>, <code>I0</code>, <code>d</code>, <code>rhoS</code>), and <code>flowImpedance yes</code>.
+\(A = 0.48\) is the glass-bead value <a class="cite" href="references.html#ref-henann2013">Henann and Kamrin 2013</a>.
+Writes the fluidity field <code>g</code> (1/s).</td></tr>
+</tbody>
+</table>
+
+<h3 id="cap">Compaction cap</h3>
+<table>
+<thead><tr><th>Keyword</th><th>Default</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>capLambda</code></td><td>0 (off)</td><td>Modified compression index \(\lambda^* = \lambda/(1+e_0)\): loading along the cap
+follows \(\varepsilon_v = \lambda^*\ln(p/p_0)\). From an oedometer or isotropic compression test.
+Writes the preconsolidation pressure field <code>pc</code> (Pa). Not yet available together with STL walls or bodies.</td></tr>
+<tr><td><code>capP0</code></td><td>100</td><td>Pressure (Pa) at which material is first taken as normally consolidated: the cap
+starts at \(\max(p, p_0)\).</td></tr>
+</tbody>
+</table>
+
+<h3 id="rules">Granular flow rules</h3>
+<p>The cell-face rules below make frictional material flow and stop correctly on a fixed mesh.
+Their reasoning is in <a href="theory-equations.html#flow-rules">Theory: flow rules</a>. All default to
+<code>no</code>.</p>
+<table>
+<thead><tr><th>Keyword</th><th>Default</th><th>What it does</th></tr></thead>
+<tbody>
+<tr><td><code>shearCap</code></td><td>no</td><td>Caps the shear stress the Riemann solver passes across a face at the
+Mohr-Coulomb yield of <code>phi</code> and <code>c</code>; a capped face slips.</td></tr>
+<tr><td><code>normalCap</code></td><td>no</td><td>Caps the normal stress jump at faces at yield, as <code>shearCap</code> caps the shear jump.</td></tr>
+<tr><td><code>spreadLayers</code></td><td>no</td><td>A partly filled top cell whose material sits on its lower side spreads sideways
+along the surface. Needs <code>freeSurface yes</code>.</td></tr>
+<tr><td><code>flowImpedance</code></td><td>no</td><td>Between flowing cells the face uses the viscosity of the \(\mu(I)\) law instead of the
+elastic shear impedance, so the flow resistance no longer depends on \(E\). Needs <code>mohrCoulomb</code> or
+<code>druckerPrager</code> with <code>mu2</code>.</td></tr>
+<tr><td><code>fullBlend</code></td><td>no</td><td>Cells that are nearly full blend smoothly between the full-cell and the partly
+filled rules instead of switching. Removes speed spikes in partly filled cells; recommended for silo and
+hopper discharge and with <code>capLambda</code>.</td></tr>
+<tr><td><code>fullBlendVoid</code></td><td><code>(1e-4 1e-2)</code></td><td>Range of the void fraction over which <code>fullBlend</code> blends.</td></tr>
+<tr><td><code>voidPlasticFlow</code></td><td>no</td><td>In a partly filled cell, plastic expansion of the material goes into the cell's void
+instead of compressing the material. Lets surface cells of a dilatant material dilate.</td></tr>
+<tr><td><code>restRelax</code></td><td>off</td><td>Sub-dictionary <code>{ time T; speed v; K0 k; }</code>: in full cells slower than
+<code>speed</code> (m/s), the horizontal stress relaxes towards <code>K0</code> times the vertical stress with time constant
+<code>time</code> (s). Removes sideways stress locked in when a silo is filled from the top. <code>K0</code> defaults to
+\(1-\sin\phi\) <a class="cite" href="references.html#ref-jaky1944">Jaky 1944</a>. Needs gravity. Example:
+<code>restRelax { time 0.05; speed 0.01; }</code>.</td></tr>
+<tr><td><code>remapLimiters</code></td><td>see right</td><td>Sub-dictionary choosing the slope limiter of each field in the remap:
+<code>{ rho MC; U MC; sigma MC; epsP superbee; epsPEq superbee; }</code> (these are the defaults). Choices:
+<code>upwind</code>, <code>minmod</code>, <code>MC</code>, <code>superbee</code>.</td></tr>
+</tbody>
+</table>
+
+<h4 id="rule-sets">Recommended settings</h4>
+<table>
+<thead><tr><th>Problem</th><th>Settings</th><th>Source</th></tr></thead>
+<tbody>
+<tr><td>Granular flow: silo discharge, column collapse, inclined layer ("T0 rule set")</td><td><code>freeSurface yes</code>, Mohr-Coulomb with
+\(\mu(I)\), <code>shearCap</code>, <code>spreadLayers</code>, <code>flowImpedance</code>, <code>normalCap</code></td><td>decision 0050</td></tr>
+<tr><td>Silos and hoppers on graded meshes</td><td>T0 rule set plus <code>fullBlend yes</code>; add <code>nonlocalA</code> for mesh-independent shear bands</td><td>decisions 0105, 0111</td></tr>
+<tr><td>Clay (undrained, Tresca): footings, piles, projectiles</td><td><code>mohrCoulomb</code> with <code>phi 0</code>, <code>c</code> = undrained strength, <code>psi 0</code>; no granular rules</td><td>decisions 0055, 0056</td></tr>
+<tr><td>Metals (Taylor bar)</td><td><code>vonMises</code> with <code>sigma_y</code>, <code>H</code></td><td>decision 0063</td></tr>
+</tbody>
+</table>
+
+<h3 id="walls">Walls: <code>walls</code></h3>
+<p>One entry per mesh patch that is a rigid wall:</p>
+<pre><code>walls
+{
+    left       { friction 20; }   // wall friction angle, degrees, 0 to below 90
+    hopperWall { friction 11.3; }
+    top        { friction 0; }    // smooth lid
+}</code></pre>
+<p>A wall stops the normal velocity, carries no tension (material separates from it) and resists
+sliding with a Coulomb shear stress of at most \(\tan\delta\) times the wall pressure, where
+\(\delta\) is <code>friction</code>. The patch must exist in the mesh.</p>
+
+<h3 id="outlets">Outlets: <code>outlets</code></h3>
+<pre><code>outlets
+{
+    outlet { friction 20; openTime 0.3; }
+}</code></pre>
+<p>An outlet patch is a closed wall with friction <code>friction</code> until the first step at or after
+<code>openTime</code> (s; default: never), then a free outflow face: material that crosses it leaves the
+domain and is added to the discharged mass in the log. Opening the first outlet switches the
+damping off. Needs <code>freeSurface yes</code>. The patch must be a plain <code>patch</code> without a fixed
+velocity, and not also listed in <code>walls</code>.</p>
+
+<h3 id="inlets">Inlets: <code>inlets</code></h3>
+<pre><code>inlets
+{
+    inlet
+    {
+        speed       0.6;      // m/s into the domain, normal to the patch (Function1 of time)
+        startTime   0.3;      // s, default 0
+        endTime     2.0;      // s, default never
+        density     1800;     // kg/m^3 of the fed material, default rho
+        pressure    0;        // Pa, initial pressure of the fed material, default 0
+        friction    0;        // degrees, wall friction while closed, default 0
+    }
+}</code></pre>
+<p>Between <code>startTime</code> and <code>endTime</code> the patch feeds fresh material into the domain at
+<code>speed</code>; outside that time it is a closed wall. The fed mass is printed in the log.
+<code>speed</code> is an OpenFOAM <code>Function1</code>, so it can be a constant, a <code>table</code>, a <code>sine</code>, and so
+on. Needs <code>freeSurface yes</code>; the patch must be a plain patch, not also a wall or an outlet.</p>
+
+<h3 id="other-patches">Other boundaries</h3>
+<p>Patches not listed in <code>walls</code>, <code>outlets</code> or <code>inlets</code> behave according to their mesh type and
+the velocity boundary condition:</p>
+<table>
+<thead><tr><th>Patch</th><th>Behaviour</th></tr></thead>
+<tbody>
+<tr><td><code>empty</code></td><td>the unused direction of a 2D (one-cell-thick) mesh, and the axis of a wedge</td></tr>
+<tr><td><code>wedge</code></td><td>the two sides of an <a href="#wedge">axisymmetric wedge</a></td></tr>
+<tr><td><code>symmetry</code>, <code>symmetryPlane</code></td><td>mirror plane: no normal velocity, no shear</td></tr>
+<tr><td><code>cyclic</code></td><td>periodic</td></tr>
+<tr><td><code>patch</code> with a <code>fixedValue</code> condition in <code>0/U</code></td><td>prescribed velocity</td></tr>
+<tr><td>any other <code>patch</code></td><td>traction-free (an open boundary)</td></tr>
+</tbody>
+</table>
+
+<h2 id="fields">Initial fields</h2>
+<p>celFoam reads these fields from the start time folder if they are there, and otherwise
+creates them with the default:</p>
+<table>
+<thead><tr><th>Field</th><th>Default</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td><code>alpha</code></td><td>1</td><td>material volume fraction (with <code>freeSurface yes</code>); 0 in empty cells</td></tr>
+<tr><td><code>rho</code></td><td><code>rho</code> of materialProperties</td><td>with <code>freeSurface yes</code> the bulk density, cell mass over cell volume: set it to 0
+where <code>alpha</code> is 0</td></tr>
+<tr><td><code>U</code></td><td>0</td><td>m/s; a <code>fixedValue</code> patch here prescribes the boundary velocity</td></tr>
+<tr><td><code>sigma</code></td><td>0</td><td>Pa, positive in tension; the material usually starts stress-free and gravity loads it</td></tr>
+<tr><td><code>epsP</code>, <code>epsPEq</code></td><td>0</td><td>plastic strain and equivalent plastic strain</td></tr>
+<tr><td><code>pc</code></td><td>0</td><td>preconsolidation pressure of the cap (0 = not loaded yet)</td></tr>
+</tbody>
+</table>
+<p>The usual way to place material is <code>setFields</code> with boxes, cylinders or surfaces, as in
+the quick start: set <code>alpha 1</code> and <code>rho</code> to the density inside, <code>alpha 0</code> and <code>rho 0</code> outside.</p>
+
+<h3 id="starting-state">Starting at rest</h3>
+<p>Two ways to get a deposit at rest before anything moves:</p>
+<ul>
+<li><strong>Gravity on</strong> (default, recommended): place the material stress-free, ramp gravity in
+(<code>gravityRamp 0.1</code>), damp the motion (<code>damping 100</code> to <code>250</code>) and keep the outlet closed
+until it settles (<code>openTime</code>, typically 0.3 s for a small tank, about 1 s for a 2 m silo).
+This gave the best wall pressures for the Couto silo (Janssen coefficient \(K = 0.43\)).</li>
+<li><strong>Filling from the top</strong> through an inlet, as in reality, with <code>dampingStart</code> after the fill
+and <code>restRelax</code>. Impacts lock sideways stress into the deposit; <code>restRelax</code> removes it, but upper
+wall pressures still come out high (decisions 0108, 0114).</li>
+</ul>
+
+<h2 id="bodies">Lagrangian bodies and STL walls: constant/rigidBodies</h2>
+<p>Every body is an entry in <code>bodies</code>. Its surface is a closed triangulated surface (STL,
+OBJ, ...) in <code>constant/triSurface</code>, given in its position at time zero, with outward normals.</p>
+
+<pre><code>bodies
+{
+    leftWall                         // a fixed wall: no velocity, no mass
+    {
+        surface     leftWall.stl;
+        friction    20;              // wall friction angle, degrees, default 0
+        adhesion    0;               // wall shear strength at zero pressure, Pa, default 0
+    }
+    pile                             // prescribed motion
+    {
+        surface     pile.stl;
+        centre      (0.2 0.5 0.005); // reference point, default the surface centroid
+        velocity    constant (0 -0.1 0);   // Function1, m/s
+        omega       constant (0 0 0);      // Function1, rad/s
+    }
+    block                            // free body: moved by the material and gravity
+    {
+        surface     block.stl;
+        mass        0.75;            // kg (2D: of the one-cell-deep slice)
+        inertia     (1e-3 0 0 1e-3 0 1e-3);  // kg m^2 about the centre; without it no rotation
+        velocity    (0 0 0);         // initial velocity
+    }
+}</code></pre>
+
+<table>
+<thead><tr><th>Keyword</th><th>Default</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>surface</code></td><td>required (unless deformable)</td><td>file in <code>constant/triSurface</code></td></tr>
+<tr><td><code>centre</code></td><td>area-weighted centroid</td><td>point that <code>velocity</code> moves and <code>omega</code> rotates about</td></tr>
+<tr><td><code>velocity</code></td><td>zero</td><td>prescribed velocity of the centre (a <code>Function1</code> of time: <code>constant</code>, <code>table</code>,
+<code>sine</code>, ...); initial velocity (a plain vector) for a free body</td></tr>
+<tr><td><code>omega</code></td><td>zero</td><td>angular velocity, rad/s, the same way</td></tr>
+<tr><td><code>friction</code></td><td>0</td><td>friction angle between the material and the body, degrees</td></tr>
+<tr><td><code>adhesion</code></td><td>0</td><td>shear strength of the contact at zero pressure, Pa (a rough wall in clay: the undrained strength)</td></tr>
+<tr><td><code>mass</code></td><td>0 (not free)</td><td>makes the body free: its motion follows from the material's force and gravity</td></tr>
+<tr><td><code>inertia</code></td><td>none</td><td>rotational inertia of a free body (symmetric tensor <code>(xx xy xz yy yz zz)</code>)</td></tr>
+<tr><td><code>deformable</code></td><td>none</td><td>a deformable body instead of a rigid surface (below)</td></tr>
+</tbody>
+</table>
+
+<p>A body without <code>velocity</code>, <code>omega</code> and <code>mass</code> is a fixed wall. Fixed bodies give walls
+of any shape on a mesh that does not follow them: the cells they cut keep only their open part.
+The force of the material on every body is written every step to
+<code>postProcessing/bodyForces.dat</code>, and each body's motion to
+<code>postProcessing/rigidBodies/&lt;body&gt;.dat</code>. The utility <code>celBodyCells</code> shows which
+cells the bodies cover (fields <code>alphaBody</code>, <code>bodyFaceOpen</code>) without running the physics.</p>
+
+<h3 id="deformable">Deformable bodies</h3>
+<pre><code>footing
+{
+    deformable
+    {
+        min         (0.1 0.15 -0.01);     // box of hex8 elements, m
+        max         (0.2 0.25 0.02);
+        cells       (10 10 1);            // elements along x, y, z
+        density     7800;                 // kg/m^3
+        material    { type linearElastic; E 2e11; nu 0.3; }
+        planeStrain yes;                  // no z motion (2D runs), default no
+        hourglass   0.05;                 // hourglass stiffness, default 0.05
+        hourglassType stiffness;          // stiffness (default) or viscous
+        damping     0;                    // element damping, default 0
+        drive       (0.09 0.24 -1) (0.21 0.26 1);   // nodes in this box follow velocity
+    }
+    velocity    constant (0 -0.25 0);     // of the driven nodes
+    friction    20;
+}</code></pre>
+<table>
+<thead><tr><th>Keyword</th><th>Default</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>min</code>, <code>max</code>, <code>cells</code></td><td>required</td><td>the box and its number of elements in each direction</td></tr>
+<tr><td><code>density</code></td><td>required</td><td>kg/m&sup3;</td></tr>
+<tr><td><code>material</code></td><td>required</td><td>any material model above, in its own sub-dictionary</td></tr>
+<tr><td><code>planeStrain</code></td><td>no</td><td>no velocity along z (one element thick, 2D runs)</td></tr>
+<tr><td><code>hourglass</code></td><td>0.05</td><td>hourglass control coefficient; 0.3 for soft bodies</td></tr>
+<tr><td><code>hourglassType</code></td><td><code>stiffness</code></td><td><code>stiffness</code> (conserves energy; elastic bodies) or <code>viscous</code> (large plastic flow)</td></tr>
+<tr><td><code>damping</code></td><td>0</td><td>viscous damping of the elements, a fraction of critical; damps ringing of coupled bodies</td></tr>
+<tr><td><code>drive</code></td><td>none (free body)</td><td>box: nodes inside it move with the body's <code>velocity</code></td></tr>
+</tbody>
+</table>
+<p>Keep the elements close to the Eulerian cell size; much finer bodies pack the material under
+them (decision 0073).</p>
+
+<h2 id="wedge">Axisymmetric wedge</h2>
+<p>Round silos, hoppers and bars are run as a thin wedge: a slice of a few degrees about the axis,
+one cell thick, with its two sides of type <code>wedge</code> and the degenerate faces on the axis of type
+<code>empty</code>. celFoam detects the wedge from the patch types and adds the hoop terms; nothing else is
+set. The wedge is built with blockMesh (see <a href="meshing.html#wedge">Meshing</a>); the tested half
+angle is 2.5&deg;. Masses and forces in the log are those of the wedge slice: multiply by
+\(360/(2\theta)\) for the full body (\(2\theta\) the wedge angle).</p>
+
+<h2 id="parallel">Parallel runs</h2>
+<pre><code>decomposePar
+mpirun -np 4 celFoam -parallel
+reconstructPar</code></pre>
+<p>A standard <code>system/decomposeParDict</code> works; the tutorials use <code>simple</code> or <code>scotch</code>.
+Bodies, STL walls, outlets, inlets, the wedge and restart all work in parallel. Results agree with
+serial to round-off until a threshold in the flow rules switches differently on the two runs; after
+that the runs part like two serial runs with a tiny perturbation (decision 0080).</p>
+
+<h2 id="restart">Restart</h2>
+<p>To continue a run, set <code>startFrom latestTime;</code> and a later <code>endTime</code> in
+<code>system/controlDict</code>, and run celFoam again (on the processor folders for a parallel run).
+Besides the fields, celFoam writes the state it needs to restart in <code>&lt;time&gt;/uniform/eulerianSolid</code>
+and, with bodies, <code>&lt;time&gt;/uniform/rigidBodies</code>. The restarted run matches the continuous one
+bit for bit with <code>writeFormat binary;</code> (or <code>writePrecision 17;</code>). A free body cannot restart
+yet.</p>
+
+<h2 id="output">Output</h2>
+<table>
+<thead><tr><th>Output</th><th>Where</th></tr></thead>
+<tbody>
+<tr><td>Fields <code>alpha</code>, <code>rho</code>, <code>U</code>, <code>sigma</code>, <code>epsP</code>, <code>epsPEq</code> (and <code>g</code>, <code>pc</code>, <code>alphaBody</code> when used)</td><td>time folders</td></tr>
+<tr><td>Total mass, momentum, discharged and fed mass</td><td><code>log.celFoam</code> at each write time</td></tr>
+<tr><td>Force of the material on each body, every step</td><td><code>postProcessing/bodyForces.dat</code></td></tr>
+<tr><td>Position and velocity of each body</td><td><code>postProcessing/rigidBodies/&lt;body&gt;.dat</code></td></tr>
+<tr><td>Restart state</td><td><code>&lt;time&gt;/uniform/</code></td></tr>
+</tbody>
+</table>
+<p>The stress \(\boldsymbol\sigma\) is positive in tension; the pressure is
+\(p = -\tfrac13\operatorname{tr}\boldsymbol\sigma\). The wall pressure on a vertical wall
+normal to \(x\) is \(-\sigma_{xx}\) in the cells next to it.</p>
+
+</main>
+</body>
+</html>

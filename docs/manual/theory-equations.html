@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Equations and numerics · celFoam manual</title>
+<link rel="stylesheet" href="assets/katex/katex.min.css">
+<link rel="stylesheet" href="assets/manual.css">
+<script defer src="assets/katex/katex.min.js"></script>
+<script defer src="assets/katex/contrib/auto-render.min.js"></script>
+<script defer src="assets/manual.js"></script>
+</head>
+<body>
+<main>
+
+<h1>Theory I: equations and numerics</h1>
+<p class="lead">The equations of motion of a solid written on a fixed mesh, and how celFoam
+solves them: an explicit Lagrange step with a Riemann solver at every face, followed by a
+remap of the moved material back onto the mesh.</p>
+
+<h2 id="unknowns">Unknowns and conventions</h2>
+<p>Each cell holds the density \(\rho\), velocity \(\mathbf v\), Cauchy stress \(\boldsymbol\sigma\)
+(positive in tension), plastic history \(\mathbf h\) (plastic strain \(\boldsymbol\varepsilon^p\),
+equivalent plastic strain \(\bar\varepsilon^p\), and model variables such as the
+preconsolidation pressure \(p_c\)), and, for a free surface, the material volume fraction
+\(\alpha\); the rest of the cell is void. The pressure is \(p = -\tfrac13\operatorname{tr}\boldsymbol\sigma\).
+All quantities are cell averages (a cell-centred finite-volume method).</p>
+
+<h2 id="governing">Governing equations</h2>
+<p>In the fixed (Eulerian) frame the material obeys conservation of mass and momentum and a
+rate form of the constitutive law
+<a class="cite" href="references.html#ref-benson1992">Benson 1992</a>:</p>
+$$\frac{\partial \rho}{\partial t} + \nabla\cdot(\rho\mathbf v) = 0,$$
+$$\frac{\partial (\rho\mathbf v)}{\partial t} + \nabla\cdot(\rho\mathbf v\otimes\mathbf v) = \nabla\cdot\boldsymbol\sigma + \rho\,\mathbf g(t),$$
+$$\frac{\partial \boldsymbol\sigma}{\partial t} + \mathbf v\cdot\nabla\boldsymbol\sigma = \mathbf W\boldsymbol\sigma - \boldsymbol\sigma\mathbf W + \mathcal{M}(\mathbf D;\,\boldsymbol\sigma,\mathbf h),
+\qquad \mathbf D = \operatorname{sym}\nabla\mathbf v,\quad \mathbf W = \operatorname{skew}\nabla\mathbf v .$$
+<p class="eq-where">\(\mathcal M\) is the material model (<a href="theory-materials.html">Theory II</a>): an
+elastic response to the strain rate \(\mathbf D\), returned to the yield surface when the material
+yields. The terms with the spin \(\mathbf W\) make the stress rate objective (the Jaumann rate). The
+history and the volume fraction are carried with the material:</p>
+$$\frac{\partial (\rho\mathbf h)}{\partial t} + \nabla\cdot(\rho\mathbf h\otimes\mathbf v) = \rho\,\dot{\mathbf h}_{\text{model}},
+\qquad \frac{\partial \alpha}{\partial t} + \nabla\cdot(\alpha\mathbf v) = \dot\alpha_{\text{void}} .$$
+<p>There is no energy equation: the models are isothermal and rate-independent (apart from
+the \(\mu(I)\) friction, which depends on the strain rate but not on temperature).</p>
+
+<h2 id="split">Operator split: Lagrange step plus remap</h2>
+<p>Each time step solves these equations in two parts, the classical Lagrange-plus-remap
+approach of hydrocodes and of Abaqus/Explicit CEL
+<a class="cite" href="references.html#ref-benson1992">Benson 1992</a>:</p>
+<ol>
+<li><strong>Lagrange step.</strong> The cells are imagined to move with the material for one step
+\(\Delta t\). Only the material-derivative form is solved, with no convection:
+$$\frac{D\rho}{Dt} = -\rho\,\nabla\cdot\mathbf v,\qquad \rho\frac{D\mathbf v}{Dt} = \nabla\cdot\boldsymbol\sigma + \rho\mathbf g,\qquad \frac{D\boldsymbol\sigma}{Dt} = \mathbf W\boldsymbol\sigma - \boldsymbol\sigma\mathbf W + \mathcal M .$$</li>
+<li><strong>Remap.</strong> The moved cells are mapped back onto the fixed mesh. This is pure transport of the
+conserved quantities:
+$$\frac{\partial q}{\partial t} + \nabla\cdot(q\,\mathbf v) = 0,\qquad q \in \{\rho,\ \rho\mathbf v,\ \rho\boldsymbol\sigma,\ \rho\mathbf h,\ \alpha\}.$$</li>
+</ol>
+<p>The mesh never moves. The two steps share one face field, the Lagrangian volume flux
+\(\phi_{L,f} = \mathbf v^*_f\cdot\mathbf S_f\) (m&sup3;/s, positive out of the owner cell), where
+\(\mathbf v^*_f\) is the face velocity from the Riemann solver and \(\mathbf S_f\) the face area
+vector. Unlike a staggered (node-based) hydrocode, celFoam keeps every quantity at the cell
+centre and gets face values from a Riemann solver, in the spirit of Godunov methods for solids
+<a class="cite" href="references.html#ref-trangenstein1991">Trangenstein and Colella 1991</a>
+<a class="cite" href="references.html#ref-miller2001">Miller and Colella 2001</a>.</p>
+
+<h2 id="lagrange">The Lagrange step</h2>
+
+<h3 id="face-states">Face states</h3>
+<p>For each of the nine primitive components \(q\) (three of \(\mathbf v\), six of \(\boldsymbol\sigma\))
+a Gauss gradient \(\nabla q\) is formed. On each side of a face the state is the cell value plus
+half a limited slope along \(\mathbf d\), the vector between the two cell centres, with \(a\) the
+jump across the face (the monotonised-central limiter of
+<a class="cite" href="references.html#ref-vanleer1977">van Leer 1977</a>):</p>
+$$q_{f} = q_P + \tfrac12\,\operatorname{minmod}\!\big(2a,\ \mathbf d\cdot\nabla q,\ 2(2\,\mathbf d\cdot\nabla q - a)\big).$$
+<p>A half-step (Hancock) predictor then advances the face states of each cell from its own
+limited states:</p>
+$$\mathbf v \leftarrow \mathbf v + \tfrac{\Delta t}{2}\Big(\tfrac{1}{\rho}\nabla\cdot\boldsymbol\sigma + \mathbf g\Big),\qquad \boldsymbol\sigma \leftarrow \boldsymbol\sigma + \tfrac{\Delta t}{2}\,\mathbb C:\operatorname{sym}\nabla\mathbf v ,$$
+<p class="eq-where">with the elastic stiffness \(\mathbb C\). This makes the scheme second order in space
+and time for smooth elastic waves (measured orders 1.9 to 2.3). Boundary faces reconstruct towards
+the boundary value through a mirror cell.</p>
+
+<h3 id="gravity">Gravity in equilibrium</h3>
+<p>A column at rest under gravity has a stress that grows linearly with depth. A plain
+reconstruction would see that gradient as a jump and set the column moving. celFoam takes each
+cell's hydrostatic jump across a face,
+\(\mathbf e = -\rho\,(\mathbf g\cdot\mathbf d)\,\hat{\mathbf g}\hat{\mathbf g}\), out of the slope and
+adds it back at the face, so a column in discrete equilibrium has identical face states on both sides
+and stays at rest to round-off (\(3\times10^{-17}\) m/s; decision 0030). This is a well-balanced
+scheme in the sense of the shallow-water literature
+<a class="cite" href="references.html#ref-leveque1998">LeVeque 1998</a>. Gravity can be ramped in
+over a time \(T\) (<code>gravityRamp</code>):</p>
+$$\mathbf g(t) = \mathbf g\,\tfrac12\big(1-\cos(\pi t/T)\big),\qquad t&lt;T .$$
+
+<h3 id="riemann">Acoustic Riemann solver at each face</h3>
+<p>In the face-normal frame, with left and right states \((\mathbf v_L,\ \mathbf t_L = \boldsymbol\sigma_L\mathbf n)\)
+and \((\mathbf v_R,\ \mathbf t_R)\), and impedances \(z_p = \rho c_p\) for normal motion and
+\(z_s = \rho c_s\) for shear, the linearised (acoustic) Riemann problem of elastodynamics gives
+<a class="cite" href="references.html#ref-toro2009">Toro 2009</a>
+<a class="cite" href="references.html#ref-trangenstein1991">Trangenstein and Colella 1991</a>:</p>
+$$v_n^* = \frac{z_{pL}v_{nL} + z_{pR}v_{nR} + (t_{nR}-t_{nL})}{z_{pL}+z_{pR}},\qquad
+t_n^* = \frac{z_{pR}t_{nL} + z_{pL}t_{nR} + z_{pL}z_{pR}(v_{nR}-v_{nL})}{z_{pL}+z_{pR}},$$
+<p>and the same with \(z_s\) for the tangential velocity \(\mathbf v_t^*\) and shear traction \(\mathbf t_t^*\).
+Equivalently, each side lies on its own characteristic,
+\(\mathbf t^* = \mathbf t_L + z_L(\mathbf v^*-\mathbf v_L)\) and \(\mathbf t^* = \mathbf t_R - z_R(\mathbf v^*-\mathbf v_R)\),
+with wave speeds</p>
+$$c_p = \sqrt{\frac{M}{\rho}},\quad M = \frac{E(1-\nu)}{(1+\nu)(1-2\nu)},\qquad c_s = \sqrt{\frac{G}{\rho}},\quad G = \frac{E}{2(1+\nu)} .$$
+<p>The terms \(z(v_R-v_L)\) are the <strong>jump terms</strong>. They make the scheme stable and remove
+odd-even modes, but they also act as a numerical viscosity of order \(\rho c h|\nabla\mathbf v|\)
+(\(h\) the cell size). For a stiff granular material in slow plastic flow this viscosity can exceed
+the real stresses, which is why the flow rules below exist.</p>
+
+<h3 id="momentum">Momentum, strain and stress</h3>
+<p>With face forces \(\mathbf F_f = \mathbf t^*_f|\mathbf S_f|\) and cell mass \(m = \rho V\):</p>
+$$m\,\Delta\mathbf v = \Delta t\Big(\sum_f \mathbf F_f + m\,\mathbf g\Big),\qquad \mathbf v \leftarrow \frac{\mathbf v}{1+\gamma\,\Delta t}\quad\text{(optional damping } \gamma\text{)}.$$
+<p>The velocity gradient comes from the face velocities by the Gauss theorem over the mid-step volume
+\(V_\text{mid} = \tfrac12(V+V_L)\):</p>
+$$\mathbf L = \frac{1}{V_\text{mid}}\sum_f \mathbf S_f\otimes\mathbf v^*_f,\qquad \Delta\boldsymbol\varepsilon = \Delta t\,\operatorname{sym}\mathbf L,\qquad \Delta\boldsymbol\omega = \Delta t\,\operatorname{skew}\mathbf L .$$
+<p>Stress and plastic strain are first rotated with the incremental rotation of
+(the Hughes-Winget rotation) <a class="cite" href="references.html#ref-hughes1980">Hughes and Winget 1980</a>,</p>
+$$\mathbf Q = \big(\mathbf I - \tfrac12\Delta\boldsymbol\omega\big)^{-1}\big(\mathbf I + \tfrac12\Delta\boldsymbol\omega\big),\qquad \tilde{\boldsymbol\sigma} = \mathbf Q\,\boldsymbol\sigma_n\,\mathbf Q^{\mathsf T},$$
+<p>then the material model is called once per cell:
+\((\boldsymbol\sigma_{n+1},\mathbf h_{n+1}) = \mathcal M(\tilde{\boldsymbol\sigma}, \Delta\boldsymbol\varepsilon, \mathbf h_n)\).
+Finally the moved volume and density are</p>
+$$V_L = V + \Delta t\sum_f \phi_{L,f},\qquad \rho_L = m/V_L .$$
+
+<h2 id="remap">The remap</h2>
+<p>The volume swept through face \(f\) in the step, \(\delta V_f = \Delta t\,\phi_{L,f}\), is taken from the
+donor cell (the cell it leaves). For every cell</p>
+$$m^{n+1} = m - \sum_{f} \rho_{\text{don}}(\mathbf x_s)\,\delta V_f,\qquad (m q)^{n+1} = m\,q_L - \sum_f \delta m_f\, q_{\text{don}}(\mathbf x_s),$$
+<p class="eq-where">summed with outflow positive, where \(\mathbf x_s\) is the centroid of the swept region and
+\(q\) any per-mass quantity (\(\mathbf v\), \(\boldsymbol\sigma\), \(\mathbf h\)). Density is reconstructed per volume,
+the others per mass, from a least-squares gradient with a limiter chosen per field (<code>remapLimiters</code>):
+monotonised central (MC) for \(\rho\), \(\mathbf v\), \(\boldsymbol\sigma\) and superbee
+<a class="cite" href="references.html#ref-roe1985">Roe 1985</a> for the plastic strains, which keeps
+their sharp fronts. Mass, momentum and the volume of material are conserved to round-off
+(\(10^{-14}\) relative).</p>
+
+<h2 id="free-surface">Material and void</h2>
+<p>With <code>freeSurface yes</code> each cell holds one material plus void, \(\alpha\in[0,1]\). celFoam
+uses its own face-by-face rules rather than a fluid VOF scheme, because a solid can carry shear,
+separate in tension and close void under compression (decisions 0021, 0031):</p>
+<ul>
+<li><strong>Slab position.</strong> A partly filled cell holds its material as a slab leaning, along each
+mesh direction, towards its fuller neighbour. Walls mirror the cell; open boundaries count as empty.
+With <code>spreadLayers</code>, a top layer whose material sits on its lower side spreads sideways instead.</li>
+<li><strong>Homogenised cells.</strong> Partly filled cells use the traction \(\alpha\boldsymbol\sigma\) and impedance
+\(\alpha z\), so their wave speed is the material's. They are first order. Empty cells do not move.</li>
+<li><strong>Contact and free faces.</strong> A face where material touches both sides gets the Riemann solution,
+unless the material has no tensile strength and the solution pulls. Every other face is traction-free,
+with the velocity of the side holding material. This is how cohesionless material separates and how the
+free surface forms.</li>
+<li><strong>Void closure.</strong> Compression closes void first; expansion unloads the material to zero
+normal stress, then opens void. Shear goes to the material.</li>
+<li><strong>Remap of \(\alpha\).</strong> The material volume crossing a face is the donor's material within the
+swept slice, from its slab position; mass follows at the donor's material density.</li>
+<li><strong>Small cells.</strong> Nearly empty cells and slivers next to walls are mixed with a neighbour so that
+their tiny mass does not limit stability (decisions 0092, 0094).</li>
+</ul>
+<p>On wall-aligned meshes the slab and closure rules work along the mesh lines rather than along
+\(x, y, z\) (decisions 0104, 0106).</p>
+
+<h2 id="flow-rules">Flow rules for granular material</h2>
+<p>A frictional material with \(E\) of order 10 MPa flowing at 1 m/s has elastic wave speeds of
+about 100 m/s. The jump terms of the Riemann solver then act as a viscosity far larger than the
+granular stresses, and early runs showed a discharge rate that depended on \(E\), which a real
+granular flow does not (decisions 0034, 0036). The following options, all off by default and
+together called the T0 rule set (decision 0050), remove that dependence:</p>
+<table>
+<thead><tr><th>Option</th><th>Rule</th></tr></thead>
+<tbody>
+<tr><td><code>shearCap</code></td><td>The shear jump term at a contact face is scaled back by the largest factor
+\(\beta\in[0,1]\) that keeps the face stress within the Mohr-Coulomb surface. A capped face slips: each side
+keeps its own tangential velocity. One-cell shear bands can then form, as in granular material.</td></tr>
+<tr><td><code>normalCap</code></td><td>The same cap on the normal jump term; the full cell strains with its own
+characteristic velocity at capped faces, keeping its volume.</td></tr>
+<tr><td><code>flowImpedance</code></td><td>Between flowing cells (stress within 3 % of the yield surface), the shear jump
+uses the tangent viscosity of the \(\mu(I)\) law,
+\(\eta = \partial\tau/\partial\dot\gamma\), in place of \(z_s\): each side contributes \(\min(z_s, 2\eta/\delta)\), \(\delta\)
+the distance between cell centres. The predictor drops the elastic stress rate along the plastic flow
+direction (decision 0040). With the nonlocal law the face viscosity comes from the nonlocal law's tangent
+(decision 0111).</td></tr>
+<tr><td><code>spreadLayers</code></td><td>Partly filled top cells spread sideways along the surface instead of leaning down
+(decisions 0024, 0032).</td></tr>
+<tr><td><code>fullBlend</code></td><td>Cells with a void fraction between \(10^{-4}\) and \(10^{-2}\) blend the full-cell and
+partly filled rules with a weight falling from 1 to 0 in \(\log(\text{void})\), instead of switching (decision 0049).</td></tr>
+</tbody>
+</table>
+<p>With the T0 rule set the inclined-layer flow matches the Bagnold profile of the \(\mu(I)\) law within
+5 %, the column collapse lies in the experimental band, and the discharge rate varies by about 20 %
+between \(E\) of 0.1 and 10 MPa (accepted for now). See <a href="validation.html">Validation</a>.</p>
+
+<h2 id="boundaries">Boundary conditions</h2>
+<p>A boundary face uses a one-sided Riemann solution: the interior characteristic
+\(\mathbf t^* = \mathbf t_I + z_I(\mathbf v^* - \mathbf v_I)\) plus one condition from the boundary.</p>
+<p><strong>Frictional walls</strong> (decision 0030). Normal: \(v_n^* = 0\), giving \(t_n^* = t_{nI} - z_p v_{nI}\); if
+that is tension (\(t_n^* > 0\)) the material separates and the face is traction-free. Tangential: the
+sticking shear \(\mathbf t_t^\text{stick} = \mathbf t_{tI} - z_s\mathbf v_{tI}\) is allowed up to Coulomb's limit
+with the wall friction angle \(\delta_w\) and, on STL bodies, the adhesion \(a\),</p>
+$$|\mathbf t_t^*| \le a + \tan\delta_w\,|t_n^*| ;$$
+<p>beyond it the shear is clipped and the wall slips, with \(\mathbf v_t^*\) from the interior characteristic.
+On wedge meshes the wall stress is extrapolated to second order to keep the hoop balance at the wall.</p>
+<p><strong>Outlets</strong> (decision 0033). Before <code>openTime</code> a frictional wall. Afterwards a traction-free
+outflow face, \(\mathbf t^* = \mathbf 0\), \(\mathbf v^* = \mathbf v_I - \mathbf t_I/z_I\); the swept material leaves and is
+counted as discharged. If the outlet cell's material does not touch the face, the face still takes the
+free velocity so that void underneath passes out first.</p>
+<p><strong>Inlets</strong> (decision 0060). While open, the face moves into the domain at the given speed and the
+swept volume is filled with fresh material at the inlet density, stress \(-p_\text{in}\mathbf I\) and no plastic history.</p>
+<p><strong>Other patches.</strong> Symmetry planes (no normal velocity, no shear), prescribed velocity, traction-free,
+<code>empty</code> (2D), <code>wedge</code>, and <code>cyclic</code>/<code>processor</code> faces, which are solved once on the owner side and
+copied, so momentum crosses processor boundaries exactly.</p>
+
+<h2 id="wedge">Axisymmetric wedge</h2>
+<p>On a wedge mesh the two side faces carry the cell's own predicted velocity and traction, turned
+onto the face plane, with no volume flux and no Riemann jump. Together they supply the hoop strain
+rate \(u_r/r\) and the hoop force \(-\sigma_{\theta\theta}V/r\) of axisymmetric continuum mechanics
+(decision 0061). A thick cylinder under pressure matches Lam&eacute;'s solution within 1 to 2 %.</p>
+
+<h2 id="time-step">Time step</h2>
+<p>The scheme is explicit, so the step is limited by the fastest wave crossing the smallest cell
+(the Courant-Friedrichs-Lewy condition <a class="cite" href="references.html#ref-courant1928">Courant et al. 1928</a>):</p>
+$$\Delta t = \text{maxCo}\ \min_{\text{cells}}\frac{h}{c_p},\qquad c_p = \sqrt{\frac{M}{\rho_m}},$$
+<p class="eq-where">with the default \(\text{maxCo} = 0.4\) and \(\rho_m\) the material density of the cell.
+The length \(h\) is</p>
+<ul>
+<li>\(V^{1/3}\) on Cartesian meshes (in 2D the cell thickness enters: give a 2D mesh the thickness of its
+cells, as the tutorials do);</li>
+<li>the height between opposite faces, \(V\) over the largest face area, on angled meshes (decision 0103);</li>
+<li>on a wedge, the smallest in-plane length combined with the cell radius \(r\) as \(1/h^2 = 1/h_\text{in}^2 + 1/r^2\),
+because the hoop strain adds a spring of length \(r\) (decision 0061).</li>
+</ul>
+<p>For \(E = 10\) MPa, \(\nu = 0.3\) and \(\rho = 1800\) kg/m&sup3;, \(c_p \approx 87\) m/s, so 5 mm cells give
+\(\Delta t \approx 23\) &micro;s. A softer material takes longer steps; this is why a soft material is a cheap
+way to test a setup.</p>
+
+<h2 id="damping">Damping and settling</h2>
+<p>For settling only, the velocity is damped after each momentum update,
+\(\mathbf v\leftarrow\mathbf v/(1+\gamma\Delta t)\) with \(\gamma\) = <code>damping</code> (1/s), from
+<code>dampingStart</code> until the first outlet opens. With a gravity ramp of about 0.1 s and
+\(\gamma\) of 100 to 250 1/s, a silo comes to rest in a few tenths of a second. Apart from this, the only
+dissipation is numerical (the Riemann jump terms and the remap limiters) and the plastic work of the
+material.</p>
+
+<h2 id="cycle">One cycle</h2>
+<ol>
+<li>Compute \(\Delta t\) from the CFL condition (shortened to land on write times); open or close outlets and inlets.</li>
+<li>Nonlocal fluidity (if used): solve its field equation with the stress of the step's start.</li>
+<li>Lagrange step: face states and predictor, Riemann solutions with walls, outlets, inlets, body
+surfaces and flow rules, momentum and damping, rotation and material model, \(V_L\), \(\rho_L\), \(\phi_L\).</li>
+<li>Move the bodies with their prescribed motion or with the force of the material on them
+(<a href="theory-bodies.html">Theory III</a>), and update the cells they cut.</li>
+<li>Remap \(\rho\), \(\mathbf v\), \(\boldsymbol\sigma\), \(\mathbf h\), \(\alpha\) onto the fixed mesh; count discharged and fed mass.</li>
+<li>Write fields, restart state and body output at write times.</li>
+</ol>
+
+</main>
+</body>
+</html>
