@@ -384,7 +384,8 @@ def outer_path(c, D, y_top):
 
 
 def aligned_buffered_mesh(path, c, ncols=44, wall_ratio=0.6, h_out=0.004, h_hop=0.012,
-                          h_top=0.025, y_t=0.55, n_buf=4, head_rows=3):
+                          h_top=0.025, y_t=0.55, n_buf=4, head_rows=3,
+                          outlet_wall_ratio=None):
     """Four curved blocks in the wedge: inside the shell's mid-line M (the
     inner wall offset by TS/2) the hopper block (axis to M, its right edge
     follows the lip, both fillets and the cone, so the columns lean with the
@@ -393,7 +394,12 @@ def aligned_buffered_mesh(path, c, ncols=44, wall_ratio=0.6, h_out=0.004, h_hop=
     half and about 3 cells of buffer, aligned with the wall. Rows: h_out at
     the outlet growing to h_hop at y_t, then to h_top in the cylinder;
     head_rows rows of h_top above the silo top (room for a heap when the
-    silo is filled through an inlet)."""
+    silo is filled through an inlet). outlet_wall_ratio (default
+    wall_ratio): the column grading (wall column / axis column) along the
+    hopper block's bottom edge, the outlet; the top edge keeps wall_ratio,
+    so the columns match the cylinder block and blockMesh blends the two
+    down the cone (edgeGrading). 1 keeps the outlet cells at the block
+    width over ncols (decision 0117: >= 3 mm with 58 columns)."""
     b, ht = hc.hopper_geometry(c)
     R, Htop = c["R"], ht + c["Hc"]
     Hm = Htop + head_rows * h_top
@@ -419,7 +425,11 @@ def aligned_buffered_mesh(path, c, ncols=44, wall_ratio=0.6, h_out=0.004, h_hop=
     n1, g1 = graded(y_t - Y0, [seg(y_t - Y0, h_out, h_hop)])
     n2, g2 = graded(Hm - y_t, [seg(0.5, h_hop, h_top), seg(Hm - y_t - 0.5, h_top, h_top)])
     wr = f"{wall_ratio!r}"
-    blocks = (f"    hex (0 3 4 1 0 9 10 1) ({ncols} {n1} 1) simpleGrading ({wr} {g1} 1)\n"
+    owr = f"{(wall_ratio if outlet_wall_ratio is None else outlet_wall_ratio)!r}"
+    # x edges of hex (0 3 4 1 0 9 10 1): bottom front, top front, top back, bottom back
+    hop = (f"edgeGrading ({owr} {wr} {wr} {owr} {g1} {g1} {g1} {g1} 1 1 1 1)"
+           if owr != wr else f"simpleGrading ({wr} {g1} 1)")
+    blocks = (f"    hex (0 3 4 1 0 9 10 1) ({ncols} {n1} 1) {hop}\n"
               f"    hex (1 4 5 2 1 10 11 2) ({ncols} {n2} 1) simpleGrading ({wr} {g2} 1)\n"
               f"    hex (3 6 7 4 9 12 13 10) ({n_buf} {n1} 1) simpleGrading (1 {g1} 1)\n"
               f"    hex (4 7 8 5 10 13 14 11) ({n_buf} {n2} 1) simpleGrading (1 {g2} 1)\n")
