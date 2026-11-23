@@ -134,6 +134,21 @@ def main(work):
     subprocess.run(["./Allrun"], cwd=p, env=env)
     log = open(f"{p}/log.celFoam").read()
     check("restart state read from 0.0003" in log, "second Allrun resumes from the last write")
+    # S.3: celCheck's time step equals celFoam's stable step
+    sd = float(re.search(r"Stable time step\s+deltaT = (\S+)", log).group(1))
+    r = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "celCheck"), p, "--json",
+                        os.path.join(work, "check.json")], capture_output=True, text=True)
+    print(r.stdout + r.stderr)
+    import json
+    res = json.load(open(os.path.join(work, "check.json")))
+    check(abs(res["dt"] / sd - 1) < 1e-3,
+          f"celCheck time step {res['dt']:.6g} s, celFoam {sd:.6g} s")
+    names = {c["name"]: c["status"] for c in res["checks"]}
+    check(names.get("outlet 'outlet'") == "PASS" and names.get("walls") == "PASS"
+          and names.get("non-orthogonality") == "PASS" and r.returncode in (0, 1),
+          f"celCheck verdicts on the validated mesh: {names}")
+    check(abs(res["nonOrth"]["max"] - 34.74) < 0.2, f"non-orthogonality max "
+          f"{res['nonOrth']['max']:.2f} deg (checkMesh 34.74)")
     print("FAILED: " + "; ".join(fails) if fails else "ALL PASS")
     return 1 if fails else 0
 

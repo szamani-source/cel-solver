@@ -32,6 +32,12 @@ reports the mesh against the cell-size rules before a run. Decision 0117.
 
 ## Log
 
+- 2026-11-23: S.3 done. `check.py`, `tools/celCheck`. Time step reproduces
+  eulerianSolid::cellSize (angled V/Smax, wedge hoop length combined) exactly. Standard
+  Couto mesh: dt 5.85e-6 s from the axis cell in the spout (in-plane 2.68 mm, hoop 2.68
+  mm); fine preset: 3.748e-6 s from 1.21 mm columns at the outlet edge (the shared
+  columns squeeze there), not the axis. So S.6 needs both: a wider axis column and
+  uniform outlet columns (edgeGrading on the hopper block's bottom edge). Next: S.4 GUI.
 - 2026-11-23: S.2 done. `schema.py` holds every entry (key, default, unit, text,
   choices, basic/advanced); templates give geometry/walls/mesh, material and run are
   shared. Mesh numbers default to "preset" so `preset: fine` works from a template file.
