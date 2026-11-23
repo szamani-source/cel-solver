@@ -1,0 +1,41 @@
+# celSetup input: the Couto et al. (2013) wheat silo, the project's
+# validation case (docs/spec/conical-hopper.md). Gravity-on start, MC.
+#   tools/celSetup tools/celsetup/examples/coutoHopper.yaml /path/to/case
+case: coutoHopper
+template: conicalHopper
+
+geometry:
+  diameter: 1.0           # m, inner diameter of the cylinder
+  cylinderHeight: 2.0     # m, above the hopper
+  hopperAngle: 34.3       # deg, hopper wall from the vertical
+  outletDiameter: 0.35    # m
+  fillHeight: top         # m above the outlet, or top
+
+walls:
+  thickness: 0.02         # m, STL shell
+  filletTransition: 0.05  # m, rounded cylinder-hopper corner
+  filletOutlet: 0.015     # m, rounded outlet edge
+  spout: 0.02             # m, short vertical lip below the outlet
+  frictionCoefficient: 0.2
+
+mesh:
+  preset: standard        # standard (7,584 cells) or fine
+  columns: 44             # as the validated mesh (auto gives 46)
+
+material:
+  model: mohrCoulomb
+  rho: 856                # kg/m^3
+  E: 10.674e6             # Pa
+  nu: 0.3
+  phi: 30.17              # deg
+  psi: 1.0                # deg
+  c: 0
+  d: 0.004                # m, wheat grain
+  rhoS: 1380              # kg/m^3
+  mu2: 0.8412
+
+run:
+  openTime: 1.0           # s
+  endTime: 2.0            # s
+  writeInterval: 0.05     # s
+  nProcs: 4

@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-11-22 (user manual M series: decision 0116; Couto 12 mm cylinder rows and top fill at 1503 kg: decision 0115; accuracy pass A.7: decision 0098; A.6: 0097; A.5: 0096; A.4: decision 0095; A.3b: decision 0094; A.3a: 0093; A.2: 0092; A.1: decisions 0090, 0091; phase 6: WP 6.1 MPI with bodies, 6.2a restart, 6.3a scaling, 6.3b validation report; 2026-11-18: WP 2.6 Taylor bar on the wedge, WP 3.8c wedge silo, 3.8b, 3.8a wedge, WP 3.7b fed silo, WP 5.3a, 5.2, 5.1, 4.3e, 4.3d, WP 3.7a solid inlet; WP 4.4c, 4.4b, 4.4, 4.3b, WP 3.5 cohesion, tutorial T0 rule set, WP 4.5, 4.3c, 4.3a, 3.6e, 3.6h, 3.6g, 3.6f; 4.1, 4.0, 4.2; 2026-11-17: 3.6d, 3.6c2, 3.6c, 3.6b, 3.6s, validation references)
+Last updated: 2026-11-23 (case setup tools S.1: decision 0117; user manual M series: decision 0116; Couto 12 mm cylinder rows and top fill at 1503 kg: decision 0115; accuracy pass A.7: decision 0098; A.6: 0097; A.5: 0096; A.4: decision 0095; A.3b: decision 0094; A.3a: 0093; A.2: 0092; A.1: decisions 0090, 0091; phase 6: WP 6.1 MPI with bodies, 6.2a restart, 6.3a scaling, 6.3b validation report; 2026-11-18: WP 2.6 Taylor bar on the wedge, WP 3.8c wedge silo, 3.8b, 3.8a wedge, WP 3.7b fed silo, WP 5.3a, 5.2, 5.1, 4.3e, 4.3d, WP 3.7a solid inlet; WP 4.4c, 4.4b, 4.4, 4.3b, WP 3.5 cohesion, tutorial T0 rule set, WP 4.5, 4.3c, 4.3a, 3.6e, 3.6h, 3.6g, 3.6f; 4.1, 4.0, 4.2; 2026-11-17: 3.6d, 3.6c2, 3.6c, 3.6b, 3.6s, validation references)
 
 Plan doc: https://claude.ai/artifact/DTT6kSikz9ZUTBkUxY6Grr
 
@@ -115,6 +115,7 @@ Phase 2 (the C++ Eulerian solver: 2.1 to 2.5c, 2.4b and 2.6 done) and Phase 3 (s
 | H.7 | Couto on the graded wall-aligned mesh | Done (done-when partly met) | Decision 0105. Outlet rows 3x finer + fullBlend: MC 84.7 kg/s, DP (plane strain) 86.9 kg/s, largest speed 1.4 m/s (was 24-66 m/s spikes); discharge GA0 and GA1 pass both models, GA2 -32 % / -18 %; GA0 at rest +21 % / +17 %. Beverloo 115 kg/s; Sia's Abaqus closer to it |
 | M.0 | User manual skeleton, home page, checker (decision 0116) | Done | `docs/manual/`, `tests/test_manual.sh` (`docs/wp/WP-M.md`) |
 | M.1-M.9 | Manual pages: installation, quick start, case setup (all 71 keywords), meshing, theory (equations, materials, bodies), validation, FAQ and known issues, 43 references | Done | 11 pages, 438 equations typeset in strict mode; DOIs of the less familiar entries checked by web search (doi.org blocked); one PR with M.0 because CI takes 3 h |
+| S.1 | `celSetup case.yaml`: case generator, conical hopper template (decision 0117) | Done | `tools/celSetup`, `tools/celsetup/`, example `examples/coutoHopper.yaml`. The Couto example writes the validated 7,584-cell wall-aligned mesh and STL shell bit for bit, all dictionaries, the fill (1503.4 kg) and an Allrun that resumes. `tests/test_celsetup.sh` (about 15 s). Next S.2 (properties with descriptions), S.3 celCheck, S.4 GUI; all before the Linux package (Sia) |
 
 ## Validation references
 

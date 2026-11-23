@@ -1,0 +1,53 @@
+#!/usr/bin/env python3
+"""celSetup: write a complete celFoam case from a short YAML file.
+
+    celSetup case.yaml [CASE_DIR]   write the case (default: the 'case' name
+                                    next to the YAML file), mesh and fill it
+                                    if OpenFOAM is loaded
+    celSetup --fill CASE_DIR        (re)write 0/alpha and 0/rho on the mesh
+    celSetup --no-mesh ...          write the files only
+
+Templates: conicalHopper. Examples: tools/celsetup/examples/.
+"""
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from celsetup import case, miniyaml  # noqa: E402
+
+
+def main(argv):
+    args = [a for a in argv if not a.startswith("--")]
+    flags = {a for a in argv if a.startswith("--")}
+    if "--help" in flags or "-h" in argv or not args:
+        print(__doc__)
+        return 0 if args or "--help" in flags else 1
+    if "--fill" in flags:
+        r = case.fill(args[0])
+        print(f"celSetup: filled {r['cells']} cells, {r['mass']:.1f} kg placed "
+              f"(geometry {r['target']:.1f} kg)")
+        return 0
+    try:
+        cfg = case.resolve(miniyaml.load(args[0]))
+    except (ValueError, OSError) as e:
+        print(f"celSetup: {e}", file=sys.stderr)
+        return 2
+    out = args[1] if len(args) > 1 else os.path.join(
+        os.path.dirname(os.path.abspath(args[0])), cfg["case"])
+    try:
+        b = case.write_case(cfg, out, src=os.path.basename(args[0]))
+    except ValueError as e:
+        print(f"celSetup: {e}", file=sys.stderr)
+        return 2
+    print(f"celSetup: wrote {out}\n  {b['summary']}")
+    if "--no-mesh" not in flags:
+        ok, msg = case.run_mesh_and_fill(out)
+        print("  " + msg)
+        if not ok and "not found" not in msg:
+            return 3
+    print(f"  next: cd {out} && ./Allrun")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
