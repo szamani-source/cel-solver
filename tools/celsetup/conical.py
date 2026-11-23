@@ -20,47 +20,60 @@ import math
 
 import numpy as np
 
-from . import foam
+from . import foam, schema
+from .schema import E
 
-DEFAULTS = dict(
-    geometry=dict(
-        diameter=None,           # m, inner diameter of the cylinder
-        cylinderHeight=None,     # m, cylinder height above the hopper
-        hopperAngle=None,        # deg, hopper wall from the vertical
-        outletDiameter=None,     # m
-        fillHeight="top",        # m above the outlet, or "top"
-        wedgeAngle=5.0,          # deg, whole wedge (half angle 2.5)
-    ),
-    walls=dict(
-        thickness=0.02,          # m, STL shell
-        filletTransition=0.05,   # m, cylinder-hopper corner radius
-        filletOutlet=0.015,      # m, outlet edge radius
-        spout=0.02,              # m, vertical lip below the outlet
-        friction=None,           # deg (or frictionCoefficient)
-        frictionCoefficient=None,
-    ),
-    mesh=dict(
-        preset="standard",
-        outletCell=0.004,        # m, row height at the outlet
-        hopperTopCell=0.012,     # m, row height at the top of the hopper block
-        topCell=0.025,           # m, row height in the upper cylinder
-        growthLength=0.5,        # m, rows grow from hopperTopCell to topCell over this
-        columns="auto",          # columns from the axis to the shell middle
-        wallRatio=0.6,           # wall column / axis column
-        bufferCell=0.007,        # m, buffer columns outside the shell
-        bufferColumns=4,         # columns from the shell middle to the domain side
-        bufferCells=3,           # buffer width outside the shell, in bufferCell
-        headroom=None,           # m above the fill top (default 3 top rows)
-        transitionMargin=0.05,   # m, hopper block ends this far above the fillet
-    ),
-)
+R_ = schema.REQUIRED
+SCHEMA = {
+    "geometry": [
+        E("diameter", R_, "m", "inner diameter of the cylinder"),
+        E("cylinderHeight", R_, "m", "height of the cylinder above the hopper"),
+        E("hopperAngle", R_, "deg", "hopper wall angle from the vertical (0 to 89)"),
+        E("outletDiameter", R_, "m", "outlet diameter"),
+        E("fillHeight", "top", "m", "material fill height above the outlet, or top"),
+        E("wedgeAngle", 5.0, "deg", "whole angle of the axisymmetric wedge (5 is tested)",
+          level="advanced"),
+    ],
+    "walls": [
+        E("frictionCoefficient", None, "", "wall friction coefficient mu_w (or give friction)"),
+        E("friction", None, "deg", "wall friction angle, instead of frictionCoefficient"),
+        E("thickness", 0.02, "m", "thickness of the STL shell that forms the wall"),
+        E("filletTransition", 0.05, "m", "radius of the rounded cylinder-hopper corner "
+          "(rounded corners raised the rate without changing wall pressures)"),
+        E("filletOutlet", 0.015, "m", "radius of the rounded outlet edge"),
+        E("spout", 0.02, "m", "short vertical lip below the outlet; the outlet patch is its end"),
+    ],
+    "mesh": [
+        E("preset", "standard", "", "standard: the validated 7,584-cell Couto mesh numbers; fine: "
+          "cells near the nonlocal length (decision 0115); entries below set to a value override it",
+          ["standard", "fine"]),
+        E("outletCell", "preset", "m", "row height at the outlet: 3 to 5 mm sets the discharge rate; preset: from the mesh preset"),
+        E("hopperTopCell", "preset", "m", "row height at the top of the hopper block; preset: from the mesh preset"),
+        E("topCell", "preset", "m", "row height in the upper cylinder; preset: from the mesh preset"),
+        E("columns", "preset", "", "columns from the axis to the wall; auto: outlet radius / outletCell; preset: from the mesh preset"),
+        E("wallRatio", "preset", "", "wall column width / axis column width (smaller: finer at the wall); preset: from the mesh preset"),
+        E("growthLength", 0.5, "m", "rows grow from hopperTopCell to topCell over this height",
+          level="advanced"),
+        E("bufferCell", 0.007, "m", "size of the buffer cells outside the shell", level="advanced"),
+        E("bufferCells", 3, "", "buffer width outside the shell, in bufferCell (leak monitor)",
+          level="advanced"),
+        E("bufferColumns", 4, "", "columns from the shell middle to the domain side",
+          level="advanced"),
+        E("headroom", None, "m", "empty space above the fill; default 3 top rows",
+          level="advanced"),
+        E("transitionMargin", 0.05, "m", "the hopper block ends this far above the transition "
+          "fillet", level="advanced"),
+    ],
+}
 
 # Mesh presets (overridden by any entry given in the YAML file)
 PRESETS = {
     # the 7,584-cell Couto mesh: MC 124 kg/s, Beverloo 110-131 (decision 0107)
-    "standard": {},
+    "standard": dict(outletCell=0.004, hopperTopCell=0.012, topCell=0.025, columns="auto",
+                     wallRatio=0.6),
     # decision 0115 addendum: cells near the nonlocal length (about 12 mm)
-    "fine": dict(columns=58, wallRatio=0.25, hopperTopCell=0.004, topCell=0.012),
+    "fine": dict(outletCell=0.004, hopperTopCell=0.004, topCell=0.012, columns=58,
+                 wallRatio=0.25),
 }
 
 

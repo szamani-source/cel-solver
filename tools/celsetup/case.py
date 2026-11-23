@@ -15,14 +15,6 @@ TEMPLATES = {"conicalHopper": conical}
 TOOLS = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
-def _merge(defaults, given):
-    out = {}
-    for sec, d in defaults.items():
-        out[sec] = dict(d)
-        out[sec].update(given.get(sec) or {})
-    return out
-
-
 def resolve(cfg):
     """Defaults, presets and derived values filled in; raises ValueError
     with a readable message on a missing or wrong entry."""
@@ -35,15 +27,16 @@ def resolve(cfg):
     preset = mesh.get("preset", "standard")
     if preset not in mod.PRESETS:
         raise ValueError(f"mesh: preset must be one of {', '.join(mod.PRESETS)}")
-    given["mesh"] = dict(mod.PRESETS[preset], **mesh)
-    out = _merge(mod.DEFAULTS, given)
-    out["template"] = t
-    out["case"] = cfg.get("case", "celCase")
-    mat = schema.apply_defaults(given, "material", schema.MATERIAL)
-    out["material"] = mat
-    out["run"] = schema.apply_defaults(given, "run", schema.WALLS_RUN)
-    if mat["model"] not in ("mohrCoulomb", "druckerPrager"):
-        raise ValueError("material: model must be mohrCoulomb or druckerPrager")
+    given["mesh"] = dict(mod.PRESETS[preset],
+                         **{k: v for k, v in mesh.items() if v not in ("preset", None)})
+    out = {"template": t, "case": cfg.get("case", "celCase")}
+    for sec, entries in schema.sections(mod.SCHEMA).items():
+        known = {e.key for e in entries}
+        extra = set(given.get(sec) or {}) - known
+        if extra and sec != "material":       # material passes others verbatim
+            raise ValueError(f"{sec}: unknown entr{'y' if len(extra) == 1 else 'ies'} "
+                             f"{', '.join(sorted(extra))} (celSetup --describe {t} lists them)")
+        out[sec] = schema.apply_defaults(given, sec, entries)
     w = out["walls"]
     if w.get("friction") is None:
         if w.get("frictionCoefficient") is None:
@@ -70,17 +63,21 @@ def material_text(mat):
     rhoS = float(mat["rho"]) / 0.62 if rhoS == "auto" else float(rhoS)
     lines += [("mu2", round(mu2, 6)), ("I0", float(mat["I0"])), ("d", float(mat["d"])),
               ("rhoS", round(rhoS, 3))]
-    if mat.get("nonlocalA") is not None:
-        lines.append(("nonlocalA", float(mat["nonlocalA"])))
-    known = {k for k, *_ in schema.MATERIAL}
+    for k in ("muIAlpha", "nonlocalA", "capLambda"):
+        if mat.get(k) is not None:
+            lines.append((k, float(mat[k])))
+    if mat.get("capLambda") is not None:
+        lines.append(("capP0", float(mat["capP0"])))
+    known = {e.key for e in schema.MATERIAL}
     for k, v in mat.items():                       # anything else, verbatim
         if k not in known:
             lines.append((k, v))
-    if mat["rules"] == "recommended":
-        lines += [(k, True) for k in ("shearCap", "spreadLayers", "flowImpedance",
-                                       "normalCap", "fullBlend")]
-    elif mat["rules"] not in ("none", None, False):
-        raise ValueError("material: rules must be recommended or none")
+    on = mat["rules"] == "recommended"
+    for k in schema.SWITCHES:
+        v = mat[k]
+        lines.append((k, on if v == "auto" else v in (True, "yes")))
+    if mat["voidPlasticFlow"] in (True, "yes"):
+        lines.append(("voidPlasticFlow", True))
     return "".join(f"{k:<16}{foam.fmt(v)};\n" for k, v in lines)
 
 
@@ -108,7 +105,7 @@ def write_case(cfg, out_dir, src="celSetup"):
     foam.write(f"{out_dir}/constant/rigidBodies",
                H("dictionary", "rigidBodies") + "bodies\n{\n" + bodies + "}\n")
     foam.write(f"{out_dir}/constant/g", H("uniformDimensionedVectorField", "g")
-               + "dimensions      [0 1 -2 0 0 0 0];\nvalue           (0 -9.81 0);\n")
+               + f"dimensions      [0 1 -2 0 0 0 0];\nvalue           (0 {-float(run['gravity'])!r} 0);\n")
     foam.write(f"{out_dir}/system/controlDict", H("dictionary", "controlDict") + f"""
 application     celFoam;
 startFrom       latestTime;     // a second Allrun resumes from the last write
@@ -127,6 +124,7 @@ runTimeModifiable false;
 maxCo           {float(run['maxCo'])!r};
 gravityRamp     {float(run['gravityRamp'])!r};
 damping         {float(run['damping'])!r};
+dampingStart    {float(run['dampingStart'])!r};
 """)
     foam.write(f"{out_dir}/system/fvSchemes", H("dictionary", "fvSchemes")
                + "ddtSchemes { default Euler; }\ngradSchemes { default Gauss linear; }\n"

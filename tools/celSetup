@@ -6,6 +6,9 @@
                                     if OpenFOAM is loaded
     celSetup --fill CASE_DIR        (re)write 0/alpha and 0/rho on the mesh
     celSetup --no-mesh ...          write the files only
+    celSetup --template NAME [FILE] a commented input file with every entry
+                                    and its default (to stdout or FILE)
+    celSetup --describe NAME        list every entry: default, unit, meaning
 
 Templates: conicalHopper. Examples: tools/celsetup/examples/.
 """
@@ -13,7 +16,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from celsetup import case, miniyaml  # noqa: E402
+from celsetup import case, miniyaml, schema  # noqa: E402
 
 
 def main(argv):
@@ -22,6 +25,19 @@ def main(argv):
     if "--help" in flags or "-h" in argv or not args:
         print(__doc__)
         return 0 if args or "--help" in flags else 1
+    if "--template" in flags or "--describe" in flags:
+        name = args[0]
+        if name not in case.TEMPLATES:
+            print(f"celSetup: templates are {', '.join(case.TEMPLATES)}", file=sys.stderr)
+            return 2
+        sch = case.TEMPLATES[name].SCHEMA
+        txt = (schema.template_yaml(name, sch) if "--template" in flags
+               else f"Template {name}:" + schema.table(sch)) + "\n"
+        if len(args) > 1:
+            open(args[1], "w").write(txt)
+        else:
+            sys.stdout.write(txt)
+        return 0
     if "--fill" in flags:
         r = case.fill(args[0])
         print(f"celSetup: filled {r['cells']} cells, {r['mass']:.1f} kg placed "

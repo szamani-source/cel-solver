@@ -32,6 +32,11 @@ reports the mesh against the cell-size rules before a run. Decision 0117.
 
 ## Log
 
+- 2026-11-23: S.2 done. `schema.py` holds every entry (key, default, unit, text,
+  choices, basic/advanced); templates give geometry/walls/mesh, material and run are
+  shared. Mesh numbers default to "preset" so `preset: fine` works from a template file.
+  `celSetup --template`, `--describe`; unknown entries are errors (material passes extra
+  keywords through). Empty `key:` reads as no value. Next: S.3 celCheck.
 - 2026-11-23: S.1 done. `celSetup` with the conicalHopper template; the Couto example
   gives the validated 7,584-cell mesh and STL shell bit for bit, Mesh OK (non-orth max
   34.7 deg), 1503.4 kg placed, celFoam 52 steps at 5.77e-6 s, resume from the last write

@@ -55,6 +55,33 @@ def main(work):
     except ValueError as e:
         check("'d' is required" in str(e), f"missing material d is reported: {e}")
 
+    # S.2: the template file lists every entry; filled in, it resolves
+    from celsetup import schema, conical
+    tpl = schema.template_yaml("conicalHopper", conical.SCHEMA)
+    allkeys = [e.key for ents in schema.sections(conical.SCHEMA).values() for e in ents]
+    missing = [k for k in allkeys if not any(l.lstrip(" #").startswith(k + ":")
+                                            for l in tpl.splitlines())]
+    check(not missing, f"--template lists all {len(allkeys)} entries with descriptions"
+          + (f" (missing {missing})" if missing else ""))
+    t = miniyaml.loads(tpl)
+    t["geometry"].update(raw["geometry"])
+    t["walls"]["frictionCoefficient"] = 0.2
+    for k in ("rho", "E", "phi", "d"):
+        t["material"][k] = raw["material"][k]
+    cfg = case.resolve(t)
+    check(cfg["mesh"]["outletCell"] == 0.004 and cfg["material"]["fullBlend"] == "auto"
+          and abs(cfg["walls"]["friction"] - 11.3099) < 1e-3,
+          "filled-in template resolves (defaults, preset values, friction from mu_w)")
+    try:
+        case.resolve(dict(raw, mesh=dict(raw["mesh"], outletcell=0.003)))
+        check(False, "a misspelt entry is reported")
+    except ValueError as e:
+        check("outletcell" in str(e), f"a misspelt entry is reported: {e}")
+    t2 = dict(t, material=dict(t["material"], fullBlend="no", model="druckerPrager"))
+    mt = case.material_text(case.resolve(t2)["material"])
+    check("fullBlend       no;" in mt and "shearCap        yes;" in mt
+          and "fit             plane_strain;" in mt, "a single switch can be turned off; DP fit")
+
     # 2. same mesh and STL as the validated script
     p = os.path.join(work, "couto")
     r = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "celSetup"), ex, p],

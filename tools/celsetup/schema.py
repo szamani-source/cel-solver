@@ -1,60 +1,171 @@
-"""Every celSetup input with its default, unit and a one-line description.
+"""Every celSetup input with its default, unit and a one-line description
+(WP S.2).
 
 One list serves the YAML reader (defaults), `celSetup --template` (a
-commented starting file), the GUI (forms) and the manual. Each entry:
-(key, default, unit, description). A default of REQUIRED must be given; None means left out.
+commented starting file), `celSetup --describe`, the GUI (forms) and the
+manual. Each entry is E(key, default, unit, description, choices, level):
+- default REQUIRED must be given; None means left out (off);
+- choices, when given, are the allowed words;
+- level "basic" is shown by default, "advanced" in the GUI's advanced
+  part and commented out in a template file.
 
+The material and run sections are shared by all templates; geometry,
+walls and mesh come from the template module (its SCHEMA).
 """
 
+from collections import namedtuple
+
 REQUIRED = "required"
+AUTO = "auto"
+
+E = namedtuple("E", "key default unit text choices level")
+E.__new__.__defaults__ = (None, "basic")
 
 MATERIAL = [
-    ("model", "mohrCoulomb", "", "mohrCoulomb or druckerPrager"),
-    ("rho", REQUIRED, "kg/m^3", "bulk density of the material as placed"),
-    ("E", REQUIRED, "Pa", "Young's modulus"),
-    ("nu", 0.3, "", "Poisson's ratio"),
-    ("phi", REQUIRED, "deg", "internal friction angle"),
-    ("psi", 1.0, "deg", "dilation angle (Sia: low, 0.5 to 1 deg, for discharge)"),
-    ("c", 0.0, "Pa", "cohesion"),
-    ("sigmaT", "auto", "Pa", "tensile strength (MC); auto: 0 without cohesion, else c cot(phi)"),
-    ("fit", "plane_strain", "", "Drucker-Prager fit to Mohr-Coulomb: plane_strain (use this for silos), "
-     "compression or extension"),
-    ("d", REQUIRED, "m", "grain diameter: mu(I) law, flow impedance and the mesh checker's rules"),
-    ("rhoS", "auto", "kg/m^3", "grain (solid) density; auto: rho / 0.62"),
-    ("mu2", "auto", "", "mu(I) friction at high I; auto: tan(phi) + 0.26 (Jop et al. 2005)"),
-    ("I0", 0.279, "", "mu(I) reference inertial number (Jop et al. 2005)"),
-    ("nonlocalA", None, "", "nonlocal fluidity amplitude A (mesh-independent shear bands, "
-     "decision 0111); leave empty for the local law"),
-    ("rules", "recommended", "", "scheme options: recommended (shearCap, spreadLayers, flowImpedance, "
-     "normalCap, fullBlend all on, as in the validated silo runs) or none"),
+    E("model", "mohrCoulomb", "", "material model", ["mohrCoulomb", "druckerPrager"]),
+    E("rho", REQUIRED, "kg/m^3", "bulk density of the material as placed"),
+    E("E", REQUIRED, "Pa", "Young's modulus (sets the time step: stiffer is slower)"),
+    E("nu", 0.3, "", "Poisson's ratio"),
+    E("phi", REQUIRED, "deg", "internal friction angle"),
+    E("psi", 1.0, "deg", "dilation angle; keep it low (0.5 to 1 deg) for discharge"),
+    E("c", 0.0, "Pa", "cohesion (0 for dry sand and grain)"),
+    E("sigmaT", AUTO, "Pa", "tensile strength, Mohr-Coulomb only; auto: 0 without cohesion, "
+      "else c cot(phi)"),
+    E("fit", "plane_strain", "", "how the Drucker-Prager cone matches Mohr-Coulomb; plane_strain "
+      "for silos (compression gave far too slow a discharge)",
+      ["plane_strain", "compression", "extension"]),
+    E("d", REQUIRED, "m", "grain diameter: mu(I) law, flow impedance and the mesh checker's rules"),
+    E("rhoS", AUTO, "kg/m^3", "density of the grains themselves; auto: rho / 0.62"),
+    E("mu2", AUTO, "", "mu(I) friction coefficient at high inertial number, above tan(phi); "
+      "auto: tan(phi) + 0.26 (Jop et al. 2005)"),
+    E("I0", 0.279, "", "mu(I) reference inertial number (0.279 for glass beads, Jop et al. 2005)"),
+    E("nonlocalA", None, "", "nonlocal fluidity amplitude A (0.48 in the Couto runs): shear bands "
+      "a few grains wide whatever the mesh (decision 0111); empty for the local law"),
+    E("capLambda", None, "", "compaction cap: modified compression index lambda* from an "
+      "oedometer test (decision 0113); empty for no cap", level="advanced"),
+    E("capP0", 100.0, "Pa", "pressure at which the cap starts (with capLambda)", level="advanced"),
+    E("muIAlpha", None, "", "Barker-Gray regularisation of mu(I), 0 to 2; empty for off",
+      level="advanced"),
+    E("rules", "recommended", "", "scheme options: recommended turns on the five switches below, "
+      "as in the validated silo runs; none turns them off (each can still be set)",
+      ["recommended", "none"]),
+    E("shearCap", AUTO, "", "cap the face shear stress at yield; capped faces slip "
+      "(auto: follows rules)", ["auto", "yes", "no"], "advanced"),
+    E("normalCap", AUTO, "", "cap the face normal stress jump at yield (auto: follows rules)",
+      ["auto", "yes", "no"], "advanced"),
+    E("spreadLayers", AUTO, "", "partly filled top cells spread along the surface "
+      "(auto: follows rules)", ["auto", "yes", "no"], "advanced"),
+    E("flowImpedance", AUTO, "", "flowing faces use the mu(I) viscosity instead of the elastic "
+      "impedance (auto: follows rules)", ["auto", "yes", "no"], "advanced"),
+    E("fullBlend", AUTO, "", "nearly full cells blend smoothly into the partly filled rules; "
+      "removes speed spikes (auto: follows rules)", ["auto", "yes", "no"], "advanced"),
+    E("voidPlasticFlow", "no", "", "plastic expansion of a partly filled cell goes into its void "
+      "(needed for strongly dilating materials, decision 0095)", ["yes", "no"], "advanced"),
 ]
 
-WALLS_RUN = [
-    ("endTime", 2.0, "s", "simulated time"),
-    ("openTime", 1.0, "s", "outlet opens at this time (settling before it)"),
-    ("writeInterval", 0.05, "s", "write (and checkpoint) every this much simulated time"),
-    ("maxCo", 0.4, "", "fraction of the stable (CFL) time step used"),
-    ("gravityRamp", 0.1, "s", "gravity ramps in over this time at the start"),
-    ("damping", 100.0, "1/s", "velocity damping while settling (switched off when the outlet opens)"),
-    ("nProcs", 1, "", "processor cores for the run"),
+SWITCHES = ["shearCap", "normalCap", "spreadLayers", "flowImpedance", "fullBlend"]
+
+RUN = [
+    E("endTime", 2.0, "s", "simulated time"),
+    E("openTime", 1.0, "s", "the outlet opens at this time; the material settles before it"),
+    E("writeInterval", 0.05, "s", "write results (and a restart point) every this much simulated time"),
+    E("maxCo", 0.4, "", "fraction of the stable time step used (0.4 is tested)"),
+    E("gravityRamp", 0.1, "s", "gravity grows from zero over this time, no shock at the start"),
+    E("damping", 100.0, "1/s", "velocity damping while settling; switched off when the outlet opens"),
+    E("dampingStart", 0.0, "s", "damping acts from this time", level="advanced"),
+    E("nProcs", 1, "", "processor cores for the run (a few thousand cells per core or more)"),
+    E("gravity", 9.81, "m/s^2", "gravity, along -y", level="advanced"),
 ]
 
-SECTIONS = {"material": MATERIAL, "run": WALLS_RUN}
+SHARED = {"material": MATERIAL, "run": RUN}
+SECTION_TEXT = {
+    "geometry": "Shape and size",
+    "walls": "Silo wall (an STL shell inside the mesh) and its friction",
+    "mesh": "Mesh: cell sizes and grading (the rules of the manual's meshing guide)",
+    "material": "Material",
+    "run": "Run control",
+}
 
 
-def apply_defaults(cfg, section, entries):
-    d = dict(cfg.get(section) or {})
-    for key, default, _, _ in entries:
-        if d.get(key) is None:
-            if default == REQUIRED:
-                raise ValueError(f"{section}: '{key}' is required ({_desc(entries, key)})")
-            d[key] = default
-    cfg[section] = d
+def sections(template_schema):
+    """Ordered {section: entries} for a template."""
+    out = dict(template_schema)
+    out.update(SHARED)
+    return out
+
+
+def _word(v):
+    if v is True:
+        return "yes"
+    if v is False:
+        return "no"
+    return v
+
+
+def apply_defaults(given, section, entries):
+    d = dict(given.get(section) or {})
+    for e in entries:
+        if d.get(e.key) is None:
+            if e.default == REQUIRED:
+                raise ValueError(f"{section}: '{e.key}' is required ({describe(e)})")
+            d[e.key] = e.default
+        elif e.choices and str(_word(d[e.key])) not in e.choices:
+            raise ValueError(f"{section}: '{e.key}' must be one of {', '.join(e.choices)} "
+                             f"(got {d[e.key]!r})")
     return d
 
 
-def _desc(entries, key):
-    for k, _, unit, text in entries:
-        if k == key:
-            return f"{text}, {unit}" if unit else text
-    return ""
+def describe(e):
+    return f"{e.text}, {e.unit}" if e.unit else e.text
+
+
+def _yaml_value(v):
+    if v is None:
+        return ""
+    return str(_word(v))
+
+
+def template_yaml(name, template_schema, values=None, advanced=True):
+    """A commented YAML file with every entry: given values, else defaults.
+    Required entries without a value are left for the user to fill in;
+    advanced entries not given are commented out."""
+    values = values or {}
+    lines = [f"# celSetup input, template {name}. Every entry is listed with its",
+             "# default; edit what you need and run: celSetup THIS_FILE CASE_DIR",
+             "# REQUIRED entries must be filled in. Units are SI. Lines starting",
+             "# with # are advanced options at their defaults.",
+             f"case: {values.get('case', name + 'Case')}", f"template: {name}", ""]
+    for sec, entries in sections(template_schema).items():
+        lines.append(f"{sec + ':':<27}# {SECTION_TEXT.get(sec, '')}")
+        given = values.get(sec) or {}
+        for e in entries:
+            v = given.get(e.key, e.default)
+            unit = f" [{e.unit}]" if e.unit else ""
+            ch = f" ({' | '.join(e.choices)})" if e.choices else ""
+            text = f"{e.text}{unit}{ch}"
+            if v == REQUIRED:
+                lines.append(f"  {e.key + ':':<24} # REQUIRED: {text}")
+            elif e.level == "advanced" and e.key not in given:
+                if advanced:
+                    lines.append(f"  # {(e.key + ': ' + _yaml_value(v)):<22} # {text}")
+            else:
+                lines.append(f"  {(e.key + ': ' + _yaml_value(v)):<24} # {text}")
+        lines.append("")
+    return "\n".join(lines)
+
+
+def table(template_schema):
+    """Plain-text listing for celSetup --describe."""
+    out = []
+    for sec, entries in sections(template_schema).items():
+        out.append(f"\n{sec}: {SECTION_TEXT.get(sec, '')}")
+        for e in entries:
+            d = "REQUIRED" if e.default == REQUIRED else (_yaml_value(e.default) or "(off)")
+            out.append(f"  {e.key:<18} {d:<14} {e.unit:<8} {e.text}")
+    return "\n".join(out)
+
+
+def to_json(template_schema):
+    """The schema for the GUI."""
+    return {sec: [dict(e._asdict(), section=sec) for e in entries]
+            for sec, entries in sections(template_schema).items()}

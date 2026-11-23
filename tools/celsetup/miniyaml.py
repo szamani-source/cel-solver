@@ -69,7 +69,15 @@ def loads(text):
         else:
             parent[key] = {}
             stack.append((ind, parent[key]))
-    return root
+    return _empty_to_none(root)
+
+
+def _empty_to_none(d):
+    """'key:' with nothing under it is an empty value, not a mapping."""
+    for k, v in d.items():
+        if isinstance(v, dict):
+            d[k] = _empty_to_none(v) if v else None
+    return d
 
 
 def load(path):
