@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-11-23 (final Couto validation on the 4 mm mesh, checkpoint/restart for celVoidCheck: decision 0117; user manual M series: decision 0116; Couto 12 mm cylinder rows and top fill at 1503 kg: decision 0115; accuracy pass A.7: decision 0098; A.6: 0097; A.5: 0096; A.4: decision 0095; A.3b: decision 0094; A.3a: 0093; A.2: 0092; A.1: decisions 0090, 0091; phase 6: WP 6.1 MPI with bodies, 6.2a restart, 6.3a scaling, 6.3b validation report; 2026-11-18: WP 2.6 Taylor bar on the wedge, WP 3.8c wedge silo, 3.8b, 3.8a wedge, WP 3.7b fed silo, WP 5.3a, 5.2, 5.1, 4.3e, 4.3d, WP 3.7a solid inlet; WP 4.4c, 4.4b, 4.4, 4.3b, WP 3.5 cohesion, tutorial T0 rule set, WP 4.5, 4.3c, 4.3a, 3.6e, 3.6h, 3.6g, 3.6f; 4.1, 4.0, 4.2; 2026-11-17: 3.6d, 3.6c2, 3.6c, 3.6b, 3.6s, validation references)
+Last updated: 2026-11-23 (version 1.0.0 and the Linux install, L series: decision 0118; final Couto validation on the 4 mm mesh, checkpoint/restart for celVoidCheck: decision 0117; user manual M series: decision 0116; Couto 12 mm cylinder rows and top fill at 1503 kg: decision 0115; accuracy pass A.7: decision 0098; A.6: 0097; A.5: 0096; A.4: decision 0095; A.3b: decision 0094; A.3a: 0093; A.2: 0092; A.1: decisions 0090, 0091; phase 6: WP 6.1 MPI with bodies, 6.2a restart, 6.3a scaling, 6.3b validation report; 2026-11-18: WP 2.6 Taylor bar on the wedge, WP 3.8c wedge silo, 3.8b, 3.8a wedge, WP 3.7b fed silo, WP 5.3a, 5.2, 5.1, 4.3e, 4.3d, WP 3.7a solid inlet; WP 4.4c, 4.4b, 4.4, 4.3b, WP 3.5 cohesion, tutorial T0 rule set, WP 4.5, 4.3c, 4.3a, 3.6e, 3.6h, 3.6g, 3.6f; 4.1, 4.0, 4.2; 2026-11-17: 3.6d, 3.6c2, 3.6c, 3.6b, 3.6s, validation references)
 
 Plan doc: https://claude.ai/artifact/DTT6kSikz9ZUTBkUxY6Grr
 
@@ -115,6 +115,7 @@ Phase 2 (the C++ Eulerian solver: 2.1 to 2.5c, 2.4b and 2.6 done) and Phase 3 (s
 | H.7 | Couto on the graded wall-aligned mesh | Done (done-when partly met) | Decision 0105. Outlet rows 3x finer + fullBlend: MC 84.7 kg/s, DP (plane strain) 86.9 kg/s, largest speed 1.4 m/s (was 24-66 m/s spikes); discharge GA0 and GA1 pass both models, GA2 -32 % / -18 %; GA0 at rest +21 % / +17 %. Beverloo 115 kg/s; Sia's Abaqus closer to it |
 | M.0 | User manual skeleton, home page, checker (decision 0116) | Done | `docs/manual/`, `tests/test_manual.sh` (`docs/wp/WP-M.md`) |
 | M.1-M.9 | Manual pages: installation, quick start, case setup (all 71 keywords), meshing, theory (equations, materials, bodies), validation, FAQ and known issues, 43 references | Done | 11 pages, 438 equations typeset in strict mode; DOIs of the less familiar entries checked by web search (doi.org blocked); one PR with M.0 because CI takes 3 h |
+| L.1-L.5 | Version 1.0.0 for Linux (decision 0118) | Done | `INSTALL.md` (any Linux: OpenFOAM v2512 per distribution family, sourcing, build, run), `install.sh` (prefix install, `celfoam` command, `--get-openfoam` on Ubuntu 24.04, `--container` with Docker/Podman), `Dockerfile`, `tutorials/coutoHopper`, `VERSION`, `LICENSE`, `CHANGELOG.md`, `docs/release-notes/v1.0.0.md`, release workflow. `tests/test_install.sh`; `.github/workflows/install.yml` installs on a clean Ubuntu 24.04 (root and user) and in Docker |
 
 ## Validation references
 
@@ -143,6 +144,13 @@ anything that cannot be undone outside this repository.
 - Abaqus or LS-DYNA access for reference runs? Not needed for the silo problem.
 
 ## Next
+
+Version 1.0.0 released (decision 0118): installation for any Linux, known limitations
+listed in `docs/release-notes/v1.0.0.md`. Next per Sia's order: version 2 (gas in the
+void, fluid coupling). Open and held: PR #77 (setup tool draft, waits for Sia). For a
+new version, bump `VERSION`, add `docs/release-notes/v<version>.md` and a CHANGELOG entry;
+merging to main publishes the release.
+
 
 User manual (Sia, 2026-11-22, decision 0116): HTML pages in `docs/manual/`, packages
 M.0 to M.10 (`docs/work-packages.md`). M.0 to M.9 done; next M.10 (online preview, final review).

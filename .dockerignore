@@ -1,0 +1,10 @@
+.git
+**/Make/linux64*
+**/lnInclude
+**/*.o
+**/__pycache__
+tests/*.log
+tutorials/**/run
+tutorials/**/processor*
+tutorials/**/log.*
+platforms

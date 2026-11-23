@@ -1,0 +1,63 @@
+#!/bin/bash
+# celfoam: run celFoam and OpenFOAM v2512 commands with the environment loaded.
+# Installed by install.sh as <prefix>/bin/celfoam (INSTALL.md).
+#
+#   celfoam                        interactive shell with the environment loaded
+#   celfoam <command> [args]       run one command, e.g. `celfoam ./Allrun`, `celfoam celFoam`
+#   celfoam tutorials [DIR]        copy the tutorials to DIR (default ./celfoam-tutorials)
+#   celfoam manual                 print where the HTML manual is (opens it if it can)
+#   celfoam test                   smoke test: a 10x10x10 box, checks the time step
+#   celfoam version                print the version
+#   celfoam help                   this text
+set -eo pipefail
+
+self="$(readlink -f "$0")"
+prefix="$(cd "$(dirname "$self")/.." && pwd)"
+envFile="$prefix/etc/celfoam.sh"
+[ -f "$envFile" ] || { echo "celfoam: $envFile missing; run install.sh again" >&2; exit 1; }
+
+loadEnv()
+{
+    set +eu
+    # shellcheck disable=SC1090
+    . "$envFile"
+    set -e
+}
+
+case "${1:-}" in
+    help|-h|--help)
+        sed -n '2,12p' "$self" | sed 's/^# \{0,1\}//'
+        ;;
+    version|--version)
+        echo "celFoam $(cat "$prefix/VERSION") (OpenFOAM v2512) in $prefix"
+        ;;
+    tutorials)
+        dest="${2:-celfoam-tutorials}"
+        mkdir -p "$dest"
+        cp -r "$prefix"/tutorials/* "$dest"/
+        echo "tutorials copied to $dest. Each has a README.md; start with:"
+        echo "  cd $dest/siloDischarge && celfoam ./Allrun"
+        ;;
+    manual)
+        page="$prefix/docs/manual/index.html"
+        echo "$page"
+        if [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ] && command -v xdg-open > /dev/null; then
+            xdg-open "$page" > /dev/null 2>&1 || true
+        fi
+        ;;
+    test)
+        loadEnv
+        bash "$prefix/tests/test_smokeBox.sh"
+        echo "celfoam test: PASS (celFoam $(cat "$prefix/VERSION") runs)"
+        ;;
+    "")
+        loadEnv
+        echo "celFoam $(cat "$prefix/VERSION") with OpenFOAM $WM_PROJECT_VERSION loaded. Type exit to leave."
+        export PS1="(celfoam) \\w\\$ "
+        exec bash --norc -i
+        ;;
+    *)
+        loadEnv
+        exec "$@"
+        ;;
+esac
