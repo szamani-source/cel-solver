@@ -5,7 +5,8 @@ EXE_INC = \
     -I../../../src/celConstitutive/lnInclude \
     -I../../../src/celEulerian/lnInclude \
     -I../../../src/celLagrangian/lnInclude \
-    -I../../../src/celCoupling/lnInclude
+    -I../../../src/celCoupling/lnInclude \
+    -I../../../src/celFluid/lnInclude
 
 EXE_LIBS = \
     -lfiniteVolume \
@@ -15,4 +16,5 @@ EXE_LIBS = \
     -lcelConstitutive \
     -lcelEulerian \
     -lcelLagrangian \
-    -lcelCoupling
+    -lcelCoupling \
+    -lcelFluid

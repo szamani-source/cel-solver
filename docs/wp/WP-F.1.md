@@ -1,7 +1,7 @@
 # WP F.1: Gas fractions and the celFluid skeleton
 
-State: not started
-Branch: assigned by the thread
+State: done (decision 0126)
+Branch: claude/project-thread-0rpfg3
 
 ## Goal
 
@@ -31,5 +31,13 @@ Parallel: the fields match serial on 2 and 4 processors (already in the done-whe
 ## Log
 
 Newest first. Each entry: date, what was done, what was learned, exact next step.
+
+- 2026-11-24: done. `src/celFluid` (poreGas), celFoam calls it after the remap;
+  `tests/test_gas_fractions.sh` passes (about 80 s): packing 0.048 %, k 7e-16 against the
+  script, solid fields byte for byte with no file / `model none` / `model poreGas`,
+  2 processors 1e-13. In code phi_s = rho/rhoP because rho is already alpha times the
+  material density. The 2-processor check runs plain Mohr-Coulomb: with the T0 rule set
+  the solid itself parts by 1e-5 (known issue, decision 0080). `drag` keyword read,
+  only ergunWenYu accepted until F.2. Next: F.2 (pore pressure, dragModel selector).
 
 - 2026-11-24: brief written in WP F.0. Next: start when the package before it has merged.

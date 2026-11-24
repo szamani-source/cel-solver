@@ -6,5 +6,6 @@ wmake libso src/celConstitutive
 wmake libso src/celEulerian
 wmake libso src/celLagrangian
 wmake libso src/celCoupling
+wmake libso src/celFluid
 wmake applications/solvers/celFoam
 wmake applications/utilities/celBodyCells

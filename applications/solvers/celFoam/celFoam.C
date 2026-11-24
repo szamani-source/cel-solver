@@ -11,7 +11,10 @@ Description
     two together are checked by tests/test_eulerian_cycle.sh (WP 2.4b);
     rigid bodies from STL move on prescribed paths (WP 4.1); fixed bodies
     are cut-cell walls with friction (WP 4.3a, decision 0047); moving
-    bodies are coupled in WP 4.3b (see docs/work-packages.md).
+    bodies are coupled in WP 4.3b (see docs/work-packages.md). Version 2
+    (decision 0125): with constant/gasProperties the pore gas (library
+    celFluid, class poreGas) follows the solid; F.1 computes the gas
+    fractions and permeability after each remap.
 \*---------------------------------------------------------------------------*/
 
 #include "fvCFD.H"
@@ -19,6 +22,7 @@ Description
 #include "rigidBodies.H"
 #include "bodyCells.H"
 #include "immersedWalls.H"
+#include "poreGas.H"
 #include <cmath>
 
 // Print total mass and momentum with enough digits to compare runs
@@ -71,6 +75,10 @@ int main(int argc, char *argv[])
         cut.reset(new bodyCells(mesh, bodies));
         setImmersedWalls(solid, cut.ref(), bodies);
     }
+
+    // Pore gas (WP F.1, decision 0126): null without constant/gasProperties
+    // or with model none, and then nothing below changes (v1 bit for bit)
+    autoPtr<poreGas> gas(poreGas::New(solid));
 
     // Reaction output: force of the material on each body, every step
     autoPtr<OFstream> forceFile;
@@ -184,6 +192,11 @@ int main(int argc, char *argv[])
             {
                 forceFile() << nl;
             }
+        }
+
+        if (gas)
+        {
+            gas->correctFractions();    // WP F.1: phiS, phiG, k
         }
 
         if (runTime.write())

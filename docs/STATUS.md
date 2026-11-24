@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-11-24 (version 2 gas plan, F series: decision 0125, WP F.0 done; version 1.1.0 case setup tools: S.1-S.4 decision 0119, G.1-G.2 Gmsh mesher and GUI choice: 0120, G.3 user meshes: 0121, G.6 faster-step options: 0122; compaction K.4, K.5: decision 0124; version 1.0.0 and the Linux install, L series: decision 0118; final Couto validation on the 4 mm mesh, checkpoint/restart for celVoidCheck: decision 0117; user manual M series: decision 0116; Couto 12 mm cylinder rows and top fill at 1503 kg: decision 0115; accuracy pass A.7: decision 0098; A.6: 0097; A.5: 0096; A.4: decision 0095; A.3b: decision 0094; A.3a: 0093; A.2: 0092; A.1: decisions 0090, 0091; phase 6: WP 6.1 MPI with bodies, 6.2a restart, 6.3a scaling, 6.3b validation report; 2026-11-18: WP 2.6 Taylor bar on the wedge, WP 3.8c wedge silo, 3.8b, 3.8a wedge, WP 3.7b fed silo, WP 5.3a, 5.2, 5.1, 4.3e, 4.3d, WP 3.7a solid inlet; WP 4.4c, 4.4b, 4.4, 4.3b, WP 3.5 cohesion, tutorial T0 rule set, WP 4.5, 4.3c, 4.3a, 3.6e, 3.6h, 3.6g, 3.6f; 4.1, 4.0, 4.2; 2026-11-17: 3.6d, 3.6c2, 3.6c, 3.6b, 3.6s, validation references)
+Last updated: 2026-11-24 (WP F.1 gas fractions and celFluid skeleton: decision 0126; version 2 gas plan, F series: decision 0125, WP F.0 done; version 1.1.0 case setup tools: S.1-S.4 decision 0119, G.1-G.2 Gmsh mesher and GUI choice: 0120, G.3 user meshes: 0121, G.6 faster-step options: 0122; compaction K.4, K.5: decision 0124; version 1.0.0 and the Linux install, L series: decision 0118; final Couto validation on the 4 mm mesh, checkpoint/restart for celVoidCheck: decision 0117; user manual M series: decision 0116; Couto 12 mm cylinder rows and top fill at 1503 kg: decision 0115; accuracy pass A.7: decision 0098; A.6: 0097; A.5: 0096; A.4: decision 0095; A.3b: decision 0094; A.3a: 0093; A.2: 0092; A.1: decisions 0090, 0091; phase 6: WP 6.1 MPI with bodies, 6.2a restart, 6.3a scaling, 6.3b validation report; 2026-11-18: WP 2.6 Taylor bar on the wedge, WP 3.8c wedge silo, 3.8b, 3.8a wedge, WP 3.7b fed silo, WP 5.3a, 5.2, 5.1, 4.3e, 4.3d, WP 3.7a solid inlet; WP 4.4c, 4.4b, 4.4, 4.3b, WP 3.5 cohesion, tutorial T0 rule set, WP 4.5, 4.3c, 4.3a, 3.6e, 3.6h, 3.6g, 3.6f; 4.1, 4.0, 4.2; 2026-11-17: 3.6d, 3.6c2, 3.6c, 3.6b, 3.6s, validation references)
 
 Plan doc: https://claude.ai/artifact/DTT6kSikz9ZUTBkUxY6Grr
 
@@ -130,6 +130,7 @@ Phase 2 (the C++ Eulerian solver: 2.1 to 2.5c, 2.4b and 2.6 done) and Phase 3 (s
 | G.6 | Optional faster-time-step mesh options (decision 0122) | Done, not validated | `outletColumns: even` + `axisColumn: 2` (conicalHopper), `axisColumn` (flatBottom), off by default. Couto standard step 1.54x longer, fine 1.85x (axis 2) or 2.0x (axis 3). Effect on pressures and discharge needs a Couto settling + discharge run (not run: accuracy first). `tests/test_celsetup_fastdt.sh` |
 | G.7 | Manual page and tutorial | Done | `docs/manual/setup-tool.html` (in the manual's menu under Using celFoam; GUI, meshers, user meshes and boundary conditions, command line, celCheck rules, the off-by-default speed options, limits; three screenshots) and `tutorials/setupPlaneTank` (Allrun writes the case from planeTank.yaml with celSetup, checks and runs it). `tests/test_manual.sh` passes with the page |
 | F.0 | Version 2 plan, gas references | Done | Decision 0125 (Sia: Stage A then B, gas only, no temperature). `docs/spec/gas-references.md`, `tools/gas_reference.py`, `tests/test_gas_reference.sh` (Ergun, Ergun-Wen-Yu drag, Terzaghi, erfc, Wen-Yu, Di Felice, Richardson-Zaki). Several drag laws for users, `ergunWenYu` for all tests (Sia). Briefs `docs/wp/WP-F.1.md` to `WP-F.9.md`. Crewdson (1977) has no abstract online and Roche (2010) refused automated reading: read in F.5 and F.8. Next F.1 |
+| F.1 | Gas fractions and the `celFluid` skeleton | Done | Decision 0126. `src/celFluid` (class `poreGas`), `constant/gasProperties` (`model none|poreGas`, `rhoP`, `d`, `T`, `p0`, `drag ergunWenYu`); celFoam writes `phiS` = rho/rhoP (alpha rho_m/rho_p), `phiG`, `k` (zero-slip Ergun-Wen-Yu permeability of the filled part) after each remap. `tests/test_gas_fractions.sh` passes (about 80 s): packing 0.048 %, k 7e-16 against `tools/gas_reference.py`, solid fields byte for byte with no file, `model none` and `model poreGas`, 2 processors 1e-13 (plain MC; with the T0 rule set the solid itself parts by 1e-5, known issue). No pressure yet. Next F.2 (pore pressure, dragModel selector) |
 
 ## Validation references
 
@@ -162,8 +163,9 @@ anything that cannot be undone outside this repository.
 Version 1.0.0 released (decision 0118); version 1.1.0 adds the case setup tools
 (`celfoam setup`, `celfoam check`, setup page in the browser, Gmsh, user meshes; PR #77,
 decisions 0119-0122). Known limitations in `docs/release-notes/v1.1.0.md`. Version 2
-(gas in the pores and the void, decision 0125): F.0 done, next F.1 (gas fractions and
-the `celFluid` skeleton), then F.2 to F.9 in order (`docs/work-packages.md`). For a
+(gas in the pores and the void, decision 0125): F.0 and F.1 done (`celFluid`, gas
+fractions, decision 0126), next F.2 (pore pressure in a rigid bed, dragModel selector
+with `ergunWenYu`), then F.3 to F.9 in order (`docs/work-packages.md`). For a
 new version, bump `VERSION`, add `docs/release-notes/v<version>.md` and a CHANGELOG entry;
 merging to main publishes the release.
 
