@@ -5,8 +5,8 @@ changes when case files stop working unchanged.
 
 ## 1.1.0 (2026-11-23)
 
-Case setup tools. Release notes: `docs/release-notes/v1.1.0.md`. Case files from 1.0.0
-run unchanged.
+Case setup tools; compaction cap with STL walls. Release notes:
+`docs/release-notes/v1.1.0.md`. Case files from 1.0.0 run unchanged.
 
 - `celfoam setup` (celSetup): a complete case from a short YAML file or from a setup page
   in the browser (`celfoam setup --gui`); templates conicalHopper (wedge or plane),
@@ -16,6 +16,7 @@ run unchanged.
   diameters, walls, non-orthogonality, size jumps, run time.
 - Optional faster-time-step mesh options, off and not validated (decision 0122).
 - Manual page "Setup tool", tutorial `setupPlaneTank`.
+- The compaction cap runs with STL walls (decision 0124).
 
 ## 1.0.0 (2026-11-23)
 
