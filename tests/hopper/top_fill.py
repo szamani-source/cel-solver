@@ -20,7 +20,11 @@ shell inside it (buffered_case.aligned_buffered_case, WP G.5).
 
 Environment: CEL_RIN (m, 0.25), CEL_VIN (m/s, 3), CEL_HEAD (m, 0.40),
 CEL_SETTLE (s, 1.0), CEL_FILL_MASS (kg, the Couto mass): the mass the inlet
-feeds. The inlet time is set from the inlet patch's real radius on the mesh
+feeds. CEL_RHO (kg/m^3, the Couto 856): the density the wheat enters with
+(loose, for the compaction cap, decision 0124; the default fill mass stays
+the silo volume at 856). CEL_CHECKPOINT (s): restart times every that much
+simulated time; CEL_RESUME=1 continues an existing case from its latest one
+(decision 0117). The inlet time is set from the inlet patch's real radius on the mesh
 (the faces whose centre lies inside R_IN, so the outer edge of the last
 column): the nominal pi R_IN^2 put in 1541 kg for 1503 (decision 0114).
 """
@@ -117,6 +121,7 @@ def main():
     # the spout below the lip (Y0 to 0) is part of the Couto fill too
     vol += math.pi * c["Rout"] ** 2 * (-bc.Y0)
     mass = float(os.environ.get("CEL_FILL_MASS", vol * c["rho"]))
+    c["rho"] = float(os.environ.get("CEL_RHO", c["rho"]))
     # mesh once with a dummy time to read the inlet's real radius
     q, _ = bc.aligned_buffered_case(work, "inlet_probe", "mc",
                                     dict(tEnd=1e-6, fill=[-1.0, -1.0, 1.0, bc.Y0 - 1.0]),
@@ -131,6 +136,15 @@ def main():
     os.environ.setdefault("CEL_HOPPER_RULES", hp.MU_I + hp.RULES + "fullBlend yes;\n")
     check = dict(tEnd=t_end, maxCo=0.4, writeTimes=writes,
                  fill=[-1.0, -1.0, 1.0, bc.Y0 - 1.0])
+    ckpt = float(os.environ.get("CEL_CHECKPOINT", 0))
+    if ckpt > 0:
+        check["checkpointEvery"] = ckpt
+    p0 = os.path.join(work, "couto_mc_topfill")
+    if os.environ.get("CEL_RESUME") == "1" and vc.latest_time(p0) > 0:
+        print(f"resuming {p0} from t = {vc.latest_time(p0):g} s", flush=True)
+        vc.resume(p0, NP)
+        report(p0, c, mass, writes, t0, H)
+        return
     p, c = bc.aligned_buffered_case(work, "couto_mc_topfill", "mc", check, c, nProcs=NP,
                                     head_rows=int(round(R_HEAD / H_TOP)))
     mp = f"{p}/constant/materialProperties"
@@ -149,6 +163,11 @@ def main():
     print(f"inlet r < {R_IN} m (on the mesh {r_mesh:.4f} m) at {V_IN} m/s, closes at {t_fill:.3f} s "
           f"(fill mass {mass:.0f} kg); damping from {t_damp} s; end {t_end} s", flush=True)
     run(p)
+    report(p, c, mass, writes, t0, H)
+
+
+def report(p, c, mass, writes, t0, H):
+    t_end = writes[-1]
     h = vc.history(p)
     f = math.pi / (math.sin(math.radians(hc.THETA)) * math.cos(math.radians(hc.THETA)))
     print(f"run {time.perf_counter() - t0:.0f} s; mass in the silo {h[-1, vc.MASS] * f:.0f} kg "

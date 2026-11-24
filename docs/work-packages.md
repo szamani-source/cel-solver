@@ -230,8 +230,8 @@ Sia (2026-11-20): needed before the Linux install, with cohesion and compaction.
 | K.3a | Rest relaxation (decision 0114) | Top-filled box K mid-deposit 0.35-0.50 (0.87 without); gravity-on box unchanged (`tests/test_rest_relax.sh`) |
 | K.4 | Cap with STL walls (decision 0124) | The K.2 column between STL walls on the line within 2 %, settles as the mesh-wall column within 1 % (`tests/test_cap_stl.sh`) |
 | K.5 | Wheat compaction values; Couto at rest with the cap, coarse mesh | Published lambda* for wheat; GA0-GA7 cap on and off against Couto |
-| K.6 | Pressure-dependent stiffness (only if K.5 needs it) | Kernel and settling-column checks |
-| K.7 | 4 mm Couto with the cap, MC and DP | At rest GA0-GA5 against Couto; discharge inside 110-131 kg/s |
+| K.6 | Pressure-dependent stiffness (dropped 2026-11-24, decision 0124) | Kernel and settling-column checks |
+| K.7 | 4 mm Couto with the cap, MC and DP (dropped 2026-11-24, decision 0124) | At rest GA0-GA5 against Couto; discharge inside 110-131 kg/s |
 
 
 ## User manual (M series, decision 0116)
