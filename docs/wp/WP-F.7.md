@@ -21,6 +21,8 @@ Gas momentum in pores and void with implicit drag on both phases, and the user d
 
 - `tests/test_drag_laws.sh`: each law matches `tools/gas_reference.py` to 1e-10 over gas fraction 0.35 to 1 and Re 1e-3 to 1e3. `tests/test_fluidisation.sh` (with `ergunWenYu`): U_mf against Wen-Yu within 10 %; dilute settling against Richardson-Zaki within 10 %; F.2 to F.5 results within 1 % of Stage A.
 
+Parallel (Sia, 2026-11-24: the solver must be fully parallel): the done-when test also runs on 2 and 4 processors, with the cuts through the bed, the free surface and the outlet. Gas fields match serial to 1e-10 relative, with the pressure solve converged to 1e-12; total gas mass is conserved to 1e-12 on every processor count. Also report the cost per step with gas on against gas off.
+
 ## Out of scope
 
 - Collapse validation (F.8).

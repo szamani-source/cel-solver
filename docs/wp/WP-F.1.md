@@ -22,6 +22,8 @@ A `src/celFluid` library (class `poreGas`) built by Allwmake and called by celFo
 
 - `tests/test_gas_fractions.sh`: settled column, phi_s equals the set packing within 0.5 %; k equals `tools/gas_reference.py` to 1e-12; every v1 test unchanged bit for bit with no gasProperties; 2 processors match serial.
 
+Parallel: the fields match serial on 2 and 4 processors (already in the done-when test).
+
 ## Out of scope
 
 - Any pressure solve (F.2).

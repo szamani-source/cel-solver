@@ -22,6 +22,8 @@ Two-way coupling: constitutive models see sigma' = sigma + p I, momentum sees si
 
 - `tests/test_consolidation.sh`: gas-filled column loaded at the top, degree of consolidation against Terzaghi with c = k/(mu (e/p0 + 1/M)) within 3 %; column at rest stays at p0 to 1e-6 relative; 0.1 mm grains run at the v1 step without blow-up.
 
+Parallel (Sia, 2026-11-24: the solver must be fully parallel): the done-when test also runs on 2 and 4 processors, with the cuts through the bed, the free surface and the outlet. Gas fields match serial to 1e-10 relative, with the pressure solve converged to 1e-12; total gas mass is conserved to 1e-12 on every processor count. Also report the cost per step with gas on against gas off.
+
 Tests use the `ergunWenYu` drag law (Sia, 2026-11-24).
 
 ## Out of scope
