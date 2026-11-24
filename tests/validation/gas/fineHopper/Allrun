@@ -1,0 +1,7 @@
+#!/bin/bash
+# Gas validation pack test 4: fine-powder hopper discharge, gas on and gas
+# off on the same mesh (WP F.5). Runs both on 1, 2 and 4 processors,
+# checks that they match, writes times.csv and results.md. About 6 min.
+cd "$(dirname "$0")" || exit 1
+[ -n "${WM_PROJECT_DIR:-}" ] || { echo "Load OpenFOAM first: source /usr/lib/openfoam/openfoam2512/etc/bashrc"; exit 1; }
+python3 fine_hopper.py "$@"
