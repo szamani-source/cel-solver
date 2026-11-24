@@ -94,7 +94,10 @@ above; a permeameter with each law within 1.3e-7 of the law integrated up the co
   bed only sits) 3.8x. The inertial law keeps Ergun's closed-form slip (it is affine in
   u); on the Wen-Yu branch and the other laws every face calls the root finder. F.9.
 
-Validation pack test 2: `tests/validation/gas/fluidOnset` (see its results.md).
+Validation pack test 2, `tests/validation/gas/fluidOnset` (8 x 20 cells, 1, 2 (2 x 1) and 4
+(2 x 2) processors, about 71-74 s each): U_mf 0.03341 m/s, -3.05 % of Wen and Yu on every
+count; the processor counts agree to 1e-11 up to the onset and part by O(1) after lift (as
+above); gas mass 1e-15. Table in its results.md.
 
 ## Consequences
 
