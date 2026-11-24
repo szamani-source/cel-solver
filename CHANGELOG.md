@@ -17,6 +17,7 @@ Case setup tools; compaction cap with STL walls. Release notes:
 - Optional faster-time-step mesh options, off and not validated (decision 0122).
 - Manual page "Setup tool", tutorial `setupPlaneTank`.
 - The compaction cap runs with STL walls (decision 0124).
+- Fix: MPI_ERR_TRUNCATE in parallel free-surface runs with turned cells.
 
 ## 1.0.0 (2026-11-23)
 
