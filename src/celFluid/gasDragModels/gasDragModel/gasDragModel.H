@@ -106,8 +106,9 @@ public:
 
         //- Slip speed u >= 0 at which K(e, u) u / e = G (pressure gradient
         //  magnitude G [Pa/m]). The default brackets the root between 0
-        //  and the Darcy speed G e / K(e, 0) (K grows with u) and solves
-        //  it by the Illinois method to 1e-14 relative.
+        //  and the Darcy speed G e / K(e, 0), doubled until it brackets
+        //  (K may fall with u, WP F.7), and solves it by the Illinois
+        //  method to 1e-14 relative.
         virtual scalar slip
         (
             const scalar e,

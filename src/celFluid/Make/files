@@ -1,5 +1,10 @@
 gasDragModels/gasDragModel/gasDragModel.C
 gasDragModels/ergunWenYu/ergunWenYu.C
+gasDragModels/ergun/ergun.C
+gasDragModels/wenYu/wenYu.C
+gasDragModels/diFelice/diFelice.C
+gasDragModels/syamlalOBrien/syamlalOBrien.C
+gasDragModels/beetstra/beetstra.C
 poreGas/poreGas.C
 poreGas/poreGasFlow.C
 
