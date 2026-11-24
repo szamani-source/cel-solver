@@ -260,6 +260,31 @@ the velocity boundary condition:</p>
 </tbody>
 </table>
 
+<h2 id="gas">Gas in the pores (version 2, in progress): constant/gasProperties</h2>
+<p>Version 2 adds air in the pores of the granular material (decision 0125). So far celFoam only
+computes the gas fractions and the permeability; there is no gas pressure yet and the results of the
+solid are unchanged. Without this file, or with <code>model none</code>, celFoam runs exactly as version 1.</p>
+<pre><code>model   poreGas;        // none | poreGas
+rhoP    2650;           // density of the grains, kg/m^3
+d       0.001;          // grain diameter, m
+T       293.15;         // gas temperature, K
+p0      101325;         // ambient pressure, Pa
+drag    ergunWenYu;     // drag law</code></pre>
+<table>
+<thead><tr><th>Keyword</th><th>Default</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>model</code></td><td><code>poreGas</code></td><td><code>none</code> switches the gas off</td></tr>
+<tr><td><code>rhoP</code></td><td>required</td><td>Density of the grains (particles), kg/m&sup3;</td></tr>
+<tr><td><code>d</code></td><td>required</td><td>Grain diameter, m</td></tr>
+<tr><td><code>T</code></td><td>293.15</td><td>Gas temperature, K (air is an ideal gas with Sutherland viscosity)</td></tr>
+<tr><td><code>p0</code></td><td>101325</td><td>Ambient pressure, Pa</td></tr>
+<tr><td><code>drag</code></td><td><code>ergunWenYu</code></td><td>Gas-grain drag law: Ergun below gas fraction 0.8, Wen and Yu above (Gidaspow). More laws will follow</td></tr>
+</tbody>
+</table>
+<p>celFoam writes three more fields: <code>phiS</code>, the solids volume fraction
+\(\phi_s = \alpha\rho_m/\rho_p\) (cell density over grain density), <code>phiG</code> \(= 1 - \phi_s\), and
+<code>k</code>, the permeability of the filled part of each cell in m&sup2; (0 in empty cells).</p>
+
 <h2 id="fields">Initial fields</h2>
 <p>celFoam reads these fields from the start time folder if they are there, and otherwise
 creates them with the default:</p>
@@ -405,7 +430,7 @@ yet.</p>
 <table>
 <thead><tr><th>Output</th><th>Where</th></tr></thead>
 <tbody>
-<tr><td>Fields <code>alpha</code>, <code>rho</code>, <code>U</code>, <code>sigma</code>, <code>epsP</code>, <code>epsPEq</code> (and <code>g</code>, <code>pc</code>, <code>alphaBody</code> when used)</td><td>time folders</td></tr>
+<tr><td>Fields <code>alpha</code>, <code>rho</code>, <code>U</code>, <code>sigma</code>, <code>epsP</code>, <code>epsPEq</code> (and <code>g</code>, <code>pc</code>, <code>alphaBody</code>, and <code>phiS</code>, <code>phiG</code>, <code>k</code> with gas, when used)</td><td>time folders</td></tr>
 <tr><td>Total mass, momentum, discharged and fed mass</td><td><code>log.celFoam</code> at each write time</td></tr>
 <tr><td>Force of the material on each body, every step</td><td><code>postProcessing/bodyForces.dat</code></td></tr>
 <tr><td>Position and velocity of each body</td><td><code>postProcessing/rigidBodies/&lt;body&gt;.dat</code></td></tr>
