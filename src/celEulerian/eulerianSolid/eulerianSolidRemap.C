@@ -1391,6 +1391,9 @@ void Foam::eulerianSolid::remapFreeSurface(const scalar dt)
                 break;
             }
         }
+        // the same on every processor: the turn back ends with processor
+        // exchanges (correctBoundaryConditions), which must match
+        turned = returnReduceOr(turned);
     }
     auto turn = [&](const bool back)
     {
