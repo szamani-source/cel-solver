@@ -26,6 +26,11 @@ Formulas (sources in docs/spec/gas-references.md):
     Step at a face of a half-space:  p - p0 = dp erfc(x / (2 sqrt(c t)))
     Wen and Yu (1966):    Re_mf = sqrt(33.7^2 + 0.0408 Ar) - 33.7,
                           Ar = d^3 rho_g (rho_p - rho_g) g / mu^2,  U_mf = Re_mf mu / (rho_g d)
+    Ergun-Wen-Yu drag (Gidaspow 1994), the default and the law every F test uses.
+    Momentum exchange K in  phi_g grad p = -K (u_g - u_s), e = phi_g, u = |u_g - u_s|:
+        e <  0.8: K = 150 (1-e)^2 mu/(e d^2) + 1.75 (1-e) rho_g u/d          (Ergun)
+        e >= 0.8: K = 0.75 Cd e (1-e) rho_g u/d e^-2.65,                     (Wen and Yu)
+                  Cd = 24/Re (1 + 0.15 Re^0.687) (Re < 1000), 0.44 above, Re = e rho_g u d/mu
     Single sphere drag:   Cd = (0.63 + 4.8/sqrt(Re))^2  (Dallavalle, used by Di Felice)
     Di Felice (1994):     F = F_single(e) e^(-beta), beta = 3.7 - 0.65 exp(-(1.5 - log10 Re)^2 / 2)
     Richardson and Zaki (1954), exponent of Rowe (1987):
@@ -101,6 +106,18 @@ def wen_yu_umf(d, rho_p, rho_g, mu):
     return re * mu / (rho_g * d)
 
 
+def cd_schiller_naumann(re):
+    return 24.0 / re * (1.0 + 0.15 * re ** 0.687) if re < 1000.0 else 0.44
+
+
+def drag_ergun_wen_yu(e, u, d, mu, rho_g):
+    """Gidaspow momentum exchange coefficient K [kg/(m^3 s)], u = slip speed."""
+    if e < 0.8:
+        return 150.0 * (1 - e) ** 2 * mu / (e * d * d) + 1.75 * (1 - e) * rho_g * u / d
+    re = max(e * rho_g * u * d / mu, 1e-300)
+    return 0.75 * cd_schiller_naumann(re) * e * (1 - e) * rho_g * u / d * e ** -2.65
+
+
 def cd_dallavalle(re):
     return (0.63 + 4.8 / math.sqrt(re)) ** 2
 
@@ -161,6 +178,10 @@ def tables(out=sys.stdout):
         w("| %.1f | %.3e | %.3e | %.3e | %.3e | %.3e | %.3e | %.3f |\n" % (
             d * 1e3, k, c, H_BED ** 2 / c, wen_yu_umf(d, RHO_P, rg, mu),
             ergun_umf(d, RHO_P, rg, mu, E_BED), ut, rz_exponent(rg * ut * d / mu)))
+    w("\nErgun-Wen-Yu jump at e = 0.8 (known in Gidaspow's blend; d = 0.5 mm, slip 0.1 m/s):"
+      " K = %.4e below, %.4e above [kg/(m^3 s)]\n" % (
+          drag_ergun_wen_yu(0.8 - 1e-9, 0.1, 0.5e-3, mu, rg),
+          drag_ergun_wen_yu(0.8, 0.1, 0.5e-3, mu, rg)))
     w("\nTerzaghi degree of consolidation U(T):\n\n")
     w("| T | 0.01 | 0.05 | 0.1 | 0.2 | 0.5 | 1.0 |\n| --- | --- | --- | --- | --- | --- | --- |\n")
     w("| U | " + " | ".join("%.4f" % terzaghi_degree(T) for T in (0.01, 0.05, 0.1, 0.2, 0.5, 1.0))
@@ -251,6 +272,21 @@ def check():
         wy = wen_yu_umf(d, RHO_P, rg, mu)
         er = ergun_umf(d, RHO_P, rg, mu, E_BED)
         report("Wen-Yu vs Ergun (spheres, e 0.40) U_mf, d = %.1f mm" % (d * 1e3), abs(wy - er) / er, 0.2)
+
+    # Ergun-Wen-Yu (Gidaspow): dense branch is Ergun exactly (grad p = K U / e^2
+    # with superficial U = e u); dilute branch tends to one Schiller-Naumann sphere
+    # per particle volume as e -> 1.
+    d, e = 0.5e-3, 0.4
+    for U in (1e-4, 0.1, 1.0):
+        u = U / e
+        dpdx = drag_ergun_wen_yu(e, u, d, mu, rg) * u / e
+        report("Ergun-Wen-Yu dense branch vs Ergun, U = %g m/s" % U,
+               abs(dpdx - ergun_gradient(U, d, e, mu, rg)) / ergun_gradient(U, d, e, mu, rg), 1e-12)
+    e, u = 1.0 - 1e-9, 0.2
+    re = e * rg * u * d / mu
+    single = 0.75 * cd_schiller_naumann(re) * rg * u / d   # K / (1 - e) for one sphere
+    report("Ergun-Wen-Yu dilute limit vs Schiller-Naumann sphere",
+           abs(drag_ergun_wen_yu(e, u, d, mu, rg) / (1 - e) - single) / single, 1e-6)
 
     # Di Felice limits and Richardson-Zaki exponents.
     report("Di Felice beta at Re -> 0 vs 3.7", abs(di_felice_beta(1e-8) - 3.7), 1e-6)

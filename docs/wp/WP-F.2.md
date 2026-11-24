@@ -16,7 +16,8 @@ An implicit pore-pressure equation (decision 0125, item 4) with the solid frozen
 ## Build
 
 - `poreGas::solve(dt)`, fields p, qGas; boundary types fixedPressure and sealed
-- Ergun inertial term as a Picard correction of k
+- Run-time-selected `dragModel` (decision 0125, item 7) with `ergunWenYu` as the default; k = phi_g^2 / K, the inertial term as a Picard correction
+- Tests run with `ergunWenYu`
 
 ## Done when
 

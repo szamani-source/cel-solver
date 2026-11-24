@@ -34,8 +34,16 @@ temperature, both stages.
    stress sigma' - p I. The solid volume change enters the gas balance through u_s.
 6. **Stage B (F.6-F.8), gas momentum**: a gas velocity in void and pores, low-Mach
    with an implicit pressure (step set by the solid CFL, not by the 340 m/s sound
-   speed), Di Felice drag treated implicitly. Stage A must be reproduced within 1 %.
-7. **Tests**: each package one closed form or published experiment; with gas off,
+   speed), drag treated implicitly. Stage A must be reproduced within 1 %.
+7. **Drag laws, selectable** (Sia, 2026-11-24: "I want multiple drag laws to be
+   available to the user, but for testing, we should use ergun-wen-yu"): a
+   run-time-selected `dragModel` in `celFluid` (`drag ergunWenYu;` in
+   `constant/gasProperties`). F.2 adds the selector with `ergunWenYu` (Gidaspow:
+   Ergun below gas fraction 0.8, Wen and Yu above), the default; F.7 adds `ergun`,
+   `wenYu`, `diFelice`, `syamlalOBrien` and `beetstra`, each checked against its
+   closed form. Every validation test (F.2 to F.9) runs with `ergunWenYu`. In Stage A
+   the pore flux uses the same law (k = phi_g^2 / K).
+8. **Tests**: each package one closed form or published experiment; with gas off,
    every v1 result is unchanged bit for bit.
 
 ## Consequences

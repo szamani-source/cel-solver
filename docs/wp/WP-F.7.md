@@ -1,11 +1,11 @@
-# WP F.7: Gas through and around grains, Di Felice drag
+# WP F.7: Gas through and around grains; more drag laws
 
 State: not started
 Branch: assigned by the thread
 
 ## Goal
 
-Gas momentum in pores and void with implicit Di Felice drag on both phases.
+Gas momentum in pores and void with implicit drag on both phases, and the user drag laws beside the default `ergunWenYu`: `ergun`, `wenYu`, `diFelice`, `syamlalOBrien`, `beetstra` (Sia: several laws for users, `ergunWenYu` for testing).
 
 ## Read first
 
@@ -15,11 +15,11 @@ Gas momentum in pores and void with implicit Di Felice drag on both phases.
 
 ## Build
 
-- Drag model selectable (ergun, diFelice), implicit in both momentum updates
+- New `dragModel` types, implicit in both momentum updates; reference values added to `tools/gas_reference.py`
 
 ## Done when
 
-- `tests/test_fluidisation.sh`: U_mf against Wen-Yu within 10 %; dilute settling against Richardson-Zaki within 10 %; F.2 to F.5 results within 1 % of Stage A.
+- `tests/test_drag_laws.sh`: each law matches `tools/gas_reference.py` to 1e-10 over gas fraction 0.35 to 1 and Re 1e-3 to 1e3. `tests/test_fluidisation.sh` (with `ergunWenYu`): U_mf against Wen-Yu within 10 %; dilute settling against Richardson-Zaki within 10 %; F.2 to F.5 results within 1 % of Stage A.
 
 ## Out of scope
 

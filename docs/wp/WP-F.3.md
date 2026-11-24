@@ -22,6 +22,8 @@ Two-way coupling: constitutive models see sigma' = sigma + p I, momentum sees si
 
 - `tests/test_consolidation.sh`: gas-filled column loaded at the top, degree of consolidation against Terzaghi with c = k/(mu (e/p0 + 1/M)) within 3 %; column at rest stays at p0 to 1e-6 relative; 0.1 mm grains run at the v1 step without blow-up.
 
+Tests use the `ergunWenYu` drag law (Sia, 2026-11-24).
+
 ## Out of scope
 
 - Void and free surface (F.4).

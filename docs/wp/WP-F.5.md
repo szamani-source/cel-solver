@@ -22,6 +22,8 @@ Discharge with pore gas on: coarse grains match v1, fine grains slow down as pub
 
 - `tests/test_air_impeded.sh` (short) plus a manual long run: 1 mm and up within 5 % of the dry rate; fine grains slow with the published trend within 20 %; report the Muite N for each case.
 
+Tests use the `ergunWenYu` drag law (Sia, 2026-11-24).
+
 ## Out of scope
 
 - Gas momentum (Stage B).

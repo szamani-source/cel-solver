@@ -21,6 +21,8 @@ Initially fluidised dam break against Roche et al. (2010); read the paper first 
 
 - `tests/manual/test_fluidised_collapse.sh`: run-out and front speed within 20 % of the paper; dry collapse with gas off unchanged.
 
+Tests use the `ergunWenYu` drag law (Sia, 2026-11-24).
+
 ## Out of scope
 
 - Release (F.9).

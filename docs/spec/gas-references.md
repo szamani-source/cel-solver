@@ -15,7 +15,8 @@ the script and that the closed forms pass their checks. Plan: decision 0125.
 | 1D consolidation | Terzaghi series U(T), T = c t/H^2 | F.3 | closed form, checked against finite differences |
 | Step at a face | p - p0 = dp erfc(x/(2 sqrt(c t))) | F.2, F.4 | closed form, checked against finite differences |
 | Minimum fluidisation | Re_mf = sqrt(33.7^2 + 0.0408 Ar) - 33.7 | F.7 | Wen and Yu (1966), AIChE J. 12(3) 610-612 (not read); constants as written in [El Geitani et al. (2022)](https://arxiv.org/pdf/2206.02842), eq. 45 |
-| Drag, packed to dilute | Di Felice: F = F_single e^(-beta), beta = 3.7 - 0.65 exp(-(1.5 - log10 Re)^2/2), Cd = (0.63 + 4.8/sqrt(Re))^2 | F.7, F.8 | [Di Felice (1994), Int. J. Multiphase Flow 20(1) 153-159](https://www.scilit.net/publications/ce60d2e801ff2d196451c46a19d06d52) (paper not read); formula as written in [El Geitani et al. (2022)](https://arxiv.org/pdf/2206.02842), eq. 30 |
+| Drag, default and for every test (Sia, 2026-11-24) | Ergun-Wen-Yu (Gidaspow): Ergun below gas fraction 0.8, Wen and Yu with Schiller-Naumann Cd and e^-2.65 above | F.2 to F.9 | Gidaspow (1994), Multiphase Flow and Fluidization (not read; standard form); checked: dense branch equals Ergun to 1e-12, dilute limit one Schiller-Naumann sphere |
+| Drag, packed to dilute (user option) | Di Felice: F = F_single e^(-beta), beta = 3.7 - 0.65 exp(-(1.5 - log10 Re)^2/2), Cd = (0.63 + 4.8/sqrt(Re))^2 | F.7, F.8 | [Di Felice (1994), Int. J. Multiphase Flow 20(1) 153-159](https://www.scilit.net/publications/ce60d2e801ff2d196451c46a19d06d52) (paper not read); formula as written in [El Geitani et al. (2022)](https://arxiv.org/pdf/2206.02842), eq. 30 |
 | Hindered settling | Richardson and Zaki, U_s = U_t e^n, n from Rowe (1987) | F.7 | Richardson and Zaki (1954), Rowe (1987) (not read; standard form) |
 
 ## Experiments for validation
@@ -48,6 +49,8 @@ Quartz grains (rho_p = 2650 kg/m^3), packed bed e = 0.40, drainage length 0.5 m:
 | 0.5 | 2.963e-10 | 4.139e+00 | 6.040e-02 | 1.976e-01 | 2.227e-01 | 3.535e+00 | 2.668 |
 | 1.0 | 1.185e-09 | 1.656e+01 | 1.510e-02 | 5.593e-01 | 5.819e-01 | 6.188e+00 | 2.482 |
 | 4.0 | 1.896e-08 | 2.649e+02 | 9.437e-04 | 1.754e+00 | 1.683e+00 | 1.521e+01 | 2.369 |
+
+Ergun-Wen-Yu jump at e = 0.8 (known in Gidaspow's blend; d = 0.5 mm, slip 0.1 m/s): K = 6.2828e+02 below, 6.1010e+02 above [kg/(m^3 s)]
 
 Terzaghi degree of consolidation U(T):
 

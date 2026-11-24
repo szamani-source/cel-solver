@@ -21,6 +21,8 @@ A gas velocity field solved in the void (no grains yet): low-Mach, implicit pres
 
 - `tests/test_gas_flow.sh`: plane channel against Poiseuille within 1 %; still air in a closed box stays below 1e-10 m/s; time step unchanged from the solid one.
 
+Tests use the `ergunWenYu` drag law (Sia, 2026-11-24).
+
 ## Out of scope
 
 - Drag on grains (F.7).

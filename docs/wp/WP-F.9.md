@@ -21,6 +21,8 @@ Release version 2.0.0 with the gas model.
 
 - `tests/test_gas_parallel.sh`: restart and 2/4 processors match serial to 1e-12 on the F.5 and F.8 cases; `tests/test_manual.sh` passes with the gas chapter.
 
+Tests use the `ergunWenYu` drag law (Sia, 2026-11-24).
+
 ## Out of scope
 
 - Temperature, liquids (out of v2).

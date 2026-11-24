@@ -21,6 +21,8 @@ Void cells at the boundary pressure, partly filled cells with k from the filled 
 
 - `tests/test_gas_venting.sh`: over-pressured column with a free top vents within 3 % of the closed form; v1 tests test_void, test_outlet unchanged; outlet face holds p0.
 
+Tests use the `ergunWenYu` drag law (Sia, 2026-11-24).
+
 ## Out of scope
 
 - Gas flow inside the void (F.6).
