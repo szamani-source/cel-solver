@@ -1,6 +1,6 @@
 # WP F.7: Gas through and around grains; more drag laws
 
-State: not started
+State: done (decision 0132)
 Branch: assigned by the thread
 
 ## Goal
@@ -32,5 +32,16 @@ Validation pack (Sia, 2026-11-24): this package delivers pack test 2, onset of f
 ## Log
 
 Newest first. Each entry: date, what was done, what was learned, exact next step.
+
+- 2026-11-24: done (decision 0132). Drag laws ergun, wenYu, diFelice, syamlalOBrien,
+  beetstra (`tests/test_drag_laws.sh`, celDragTable); pore gas momentum in gasFlow
+  (poreInertia, inertialGasDrag in poreGasFlow.C); inflow as Function1;
+  `tests/test_fluidisation.sh` (relaxation, onset -2.2 % of Wen-Yu, settling +7.6 % of
+  Richardson-Zaki, Stage A 0.1 %, 2/4 processors 7e-11 up to the onset); pack test 2
+  `tests/validation/gas/fluidOnset`. Learned: the generic slip bracket assumed K grows
+  with u (Syamlal-O'Brien does not: 18 % error); boundary faces need the inertia too
+  (5 % fast relaxation without); the explicit reaction of the pore gas inertia destabilises
+  a lifting bed (left out, `inertiaForce`); a lifted bed parts serial from parallel
+  (round-off at the Mohr-Coulomb apex). Next: F.8.
 
 - 2026-11-24: brief written in WP F.0. Next: start when the package before it has merged.

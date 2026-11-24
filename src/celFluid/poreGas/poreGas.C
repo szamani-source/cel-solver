@@ -704,9 +704,19 @@ void Foam::poreGas::faceCoefficients
         }
         else
         {
-            // No pore inertia on non-coupled boundaries (WP F.7): a fixed
-            // pressure or inflow face keeps the Darcy-Ergun law
-            lawPtr = dragModel_.get();
+            // Pore inertia (WP F.7) on fixed-pressure faces; an inflow
+            // (fixed flux) or a wall keeps the Darcy-Ergun law
+            const bool inertiaB = inertia && pB.fixesValue();
+            if (!inertiaB)
+            {
+                lawPtr = dragModel_.get();
+            }
+            const vectorField gIB
+            (
+                inertiaB
+              ? vectorField(gInertia_->boundaryField()[patchi])
+              : vectorField(DS.size(), Zero)
+            );
             const scalarField gn(pB.snGrad());
             // Closed outlets are walls for the gas too (WP F.4)
             const word& pname = mesh.boundary()[patchi].name();
@@ -730,7 +740,7 @@ void Foam::poreGas::faceCoefficients
                 (
                     eM[P], k[P], eM[P], k[P], 1,
                     (p0_ + pB[i])/RT,
-                    mag3(gradP[P], n[i], gn[i]),
+                    mag3(gradP[P] - gIB[i], n[i], gn[i] - (n[i] & gIB[i])),
                     DS[i], DT[i]
                 );
             }

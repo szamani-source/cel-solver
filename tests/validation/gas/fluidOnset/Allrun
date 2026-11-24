@@ -1,0 +1,7 @@
+#!/bin/bash
+# Gas validation pack test 2: onset of fluidisation against Wen and Yu
+# (WP F.7). Runs on 1, 2 and 4 processors, checks them against the
+# correlation and each other, writes times.csv and results.md. About 5 min.
+cd "$(dirname "$0")" || exit 1
+[ -n "${WM_PROJECT_DIR:-}" ] || { echo "Load OpenFOAM first: source /usr/lib/openfoam/openfoam2512/etc/bashrc"; exit 1; }
+python3 fluid_onset.py run

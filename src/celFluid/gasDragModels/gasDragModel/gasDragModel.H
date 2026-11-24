@@ -17,8 +17,9 @@ Description
 
     Selected in constant/gasProperties by `drag <name>;` (default
     ergunWenYu, the law every test uses, Sia 2026-11-24); optional
-    coefficients in `<name>Coeffs`. F.2 has ergunWenYu; F.7 adds ergun,
-    wenYu, diFelice, syamlalOBrien and beetstra.
+    coefficients in `<name>Coeffs`. F.2 has ergunWenYu; F.7 (decision 0132)
+    adds ergun, wenYu, diFelice, syamlalOBrien and beetstra, each checked
+    against tools/gas_reference.py by tests/test_drag_laws.sh.
 
 SourceFiles
     gasDragModel.C
@@ -118,6 +119,22 @@ public:
             const scalar rhoG
         ) const;
 
+        //- True where K = K0 + K1 u exactly (an Ergun form), with K0 and
+        //  K1 set; the default is false (WP F.7: closed-form slip of the
+        //  pore gas momentum)
+        virtual bool affine
+        (
+            const scalar e,
+            const scalar d,
+            const scalar mu,
+            const scalar rhoG,
+            scalar& K0,
+            scalar& K1
+        ) const
+        {
+            return false;
+        }
+
         //- Zero-slip permeability mu e^2 / K(e, 0) [m^2]; 0 for e <= 0,
         //  GREAT for e >= 1 (no grains)
         scalar permeability
@@ -207,6 +224,44 @@ public:
     ) const
     {
         return base_.dKdu(e, u, d, mu, rhoG);
+    }
+
+    virtual bool affine
+    (
+        const scalar e,
+        const scalar d,
+        const scalar mu,
+        const scalar rhoG,
+        scalar& K0,
+        scalar& K1
+    ) const
+    {
+        if (base_.affine(e, d, mu, rhoG, K0, K1))
+        {
+            K0 += e*rhoG*rDt_;
+            return true;
+        }
+        return false;
+    }
+
+    //- Closed form where the law is affine in u (K u/e = G is then a
+    //  quadratic), else the default root finder
+    virtual scalar slip
+    (
+        const scalar e,
+        const scalar G,
+        const scalar d,
+        const scalar mu,
+        const scalar rhoG
+    ) const
+    {
+        scalar K0, K1;
+        if (G > 0 && e > 0 && e < 1 && affine(e, d, mu, rhoG, K0, K1))
+        {
+            const scalar a = K0/e, b = K1/e;
+            return 2*G/(a + Foam::sqrt(a*a + 4*b*G));
+        }
+        return gasDragModel::slip(e, G, d, mu, rhoG);
     }
 };
 

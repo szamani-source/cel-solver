@@ -84,6 +84,16 @@ Description
     patches (fixedValue p) are the atmosphere. Needs a freeSurface solid.
     Implementation in poreGasFlow.C.
 
+    WP F.7 (decision 0132): with model gasFlow the gas in the pores has
+    momentum too (poreInertia yes, the default): e rho_g (w - w_o)/dt =
+    -e grad p - K w for the slip w, the drag implicit, solved in the same
+    Newton iterations as the drag law K + e rho_g/dt against the gradient
+    less rho_g q_o/(e dt) plus the old flux's face mass flux (faces between
+    gas cells, gas and void, and fixed-pressure boundaries; inflow patches
+    keep Darcy). The grains feel -sum(p_f S_f) as before; the reaction of the
+    pore gas inertia (inertiaForce, default no) is left out.
+    Implementation in poreGasFlow.C.
+
     Boundaries, from 0/p (optional; without it p = 0 and every patch is
     sealed): fixedValue = fixed pressure, zeroGradient = sealed, and
     fixedGradient patches listed in `inflow` get the gradient that blows
@@ -97,8 +107,10 @@ Description
         d       0.001;          // grain diameter [m]
         T       293.15;         // gas temperature [K], default 293.15
         p0      101325;         // reference (ambient) pressure [Pa], default
-        drag    ergunWenYu;     // run-time selected drag law (gasDragModel);
-                                // F.7 adds the others (decision 0125 item 7)
+        drag    ergunWenYu;     // run-time selected drag law (gasDragModel):
+                                // ergunWenYu (default, every test), ergun,
+                                // wenYu, diFelice, syamlalOBrien, beetstra
+                                // (WP F.7, decision 0132)
 
         coupled yes;            // WP F.3: two-way with the grains
                                 // (no: F.2, the solid frozen for the gas)
@@ -120,6 +132,8 @@ Description
         nCorr           1;      // pressure corrections per step (PISO)
         poreInertia     yes;    // WP F.7: gas momentum in the pores (its
                                 // inertia, drag implicit; no = F.6 Darcy)
+        inertiaForce    no;     // WP F.7: its reaction on the grains
+                                // (unstable as a bed lifts, decision 0132)
         divUg           "Gauss upwind";     // convection of Ug
         USolver                 // linear solver of the gas momentum
         {

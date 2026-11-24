@@ -523,12 +523,17 @@ void Foam::poreGas::startInertia(const scalar dt)
     const dimensionedScalar eMin(dimless, 1e-12);
     const surfaceScalarField h(rhof/(max(ef, eMin)*dtD));
 
-    // Faces with the inertia: between gas cells or a gas and a void cell
-    // (not inside the void flow, not on non-coupled boundaries)
+    // Faces with the inertia: between gas cells or a gas and a void cell,
+    // and fixed-pressure boundaries of gas cells (not inside the void
+    // flow, not on inflow patches or walls)
     surfaceScalarField on(1 - tVoidNow());
     forAll(on.boundaryField(), patchi)
     {
-        if (!mesh.boundary()[patchi].coupled())
+        if
+        (
+            !mesh.boundary()[patchi].coupled()
+         && !p.boundaryField()[patchi].fixesValue()
+        )
         {
             on.boundaryFieldRef()[patchi] = 0;
         }
