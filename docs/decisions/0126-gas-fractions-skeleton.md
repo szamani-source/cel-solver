@@ -34,8 +34,9 @@ laws for users, with Ergun-Wen-Yu for every test (decision 0125 item 7).
    restart recomputes them from rho and alpha.
 6. **gasProperties** keys: `model` (none or poreGas, default poreGas), `rhoP` [kg/m^3],
    `d` [m], `T` [K, 293.15], `p0` [Pa, 101325], `drag` [ergunWenYu]. Air is ideal
-   (R 287.05) with Sutherland viscosity, as `tools/gas_reference.py`. The first
-   tutorial that uses gas (F.9, `gasHopper`) documents the dictionary for users.
+   (R 287.05) with Sutherland viscosity, as `tools/gas_reference.py`. Documented in
+   the manual (`docs/manual/case-setup.html#gas`, which `tests/test_manual.sh` requires
+   for every keyword the code reads); the first gas tutorial is F.9's `gasHopper`.
 
 ## Consequences
 
