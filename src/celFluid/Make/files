@@ -1,0 +1,3 @@
+poreGas/poreGas.C
+
+LIB = $(FOAM_USER_LIBBIN)/libcelFluid

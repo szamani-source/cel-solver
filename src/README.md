@@ -13,3 +13,6 @@ Libraries are added here by later work packages, one folder per library:
   (`rigidBody`, `rigidBodies`, decision 0041), later explicit hex8 FE.
 - `celCoupling/` (WP 4.2, then 4.3a, 4.3b): `bodyCells`, exact cells and faces covered by
   each rigid body (decision 0043); the cut-cell wall coupling comes in 4.3a (decision 0042).
+- `celFluid/` (WP F.1, then F.2 to F.9, version 2): gas in the pores and the void
+  (decisions 0125, 0126). `poreGas/` reads `constant/gasProperties` and writes the gas
+  fractions `phiS`, `phiG` and the permeability `k`; the pressure solve comes in F.2.
