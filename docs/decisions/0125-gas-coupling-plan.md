@@ -43,7 +43,17 @@ temperature, both stages.
    `wenYu`, `diFelice`, `syamlalOBrien` and `beetstra`, each checked against its
    closed form. Every validation test (F.2 to F.9) runs with `ergunWenYu`. In Stage A
    the pore flux uses the same law (k = phi_g^2 / K).
-8. **Tests**: each package one closed form or published experiment; with gas off,
+8. **Parallel and fast** (Sia, 2026-11-24): every gas field and solve runs under
+   MPI. Every F test from F.2 on also runs on 2 and 4 processors and must match serial
+   to 1e-10 (pressure solve converged to 1e-12) with gas mass conserved to 1e-12. F.9
+   adds a scaling test: gas on at most 1.5 times the cost of gas off per step, and at
+   least 2.5 times faster on 4 processors than serial.
+9. **Validation pack** (Sia, 2026-11-24): four tests, each on 1, 2 and 4 processors
+   with matching results and recorded run times: packed-bed pressure drop against
+   Ergun (F.2), pore-pressure decay against Terzaghi (F.3), fine-powder hopper
+   discharge against Crewdson et al. 1977 with gas on and off (F.5), onset of
+   fluidisation against Wen and Yu (F.7). F.9 runs them together.
+10. **Tests**: each package one closed form or published experiment; with gas off,
    every v1 result is unchanged bit for bit.
 
 ## Consequences

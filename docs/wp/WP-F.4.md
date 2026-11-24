@@ -21,6 +21,8 @@ Void cells at the boundary pressure, partly filled cells with k from the filled 
 
 - `tests/test_gas_venting.sh`: over-pressured column with a free top vents within 3 % of the closed form; v1 tests test_void, test_outlet unchanged; outlet face holds p0.
 
+Parallel (Sia, 2026-11-24: the solver must be fully parallel): the done-when test also runs on 2 and 4 processors, with the cuts through the bed, the free surface and the outlet. Gas fields match serial to 1e-10 relative, with the pressure solve converged to 1e-12; total gas mass is conserved to 1e-12 on every processor count. Also report the cost per step with gas on against gas off.
+
 Tests use the `ergunWenYu` drag law (Sia, 2026-11-24).
 
 ## Out of scope
