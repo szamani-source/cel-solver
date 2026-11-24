@@ -60,6 +60,20 @@ Description
     density. A compressed cell therefore squeezes its gas by exactly its
     Lagrangian volume change (undrained limit p0 dV/(phi_g V)).
 
+    WP F.4 (decision 0129): void, free surface and outlets. With a
+    freeSurface solid, cells with alpha below alphaVoid (1e-4) are void:
+    they hold the void pressure (p = 0 gauge, the ambient p0) and exchange
+    gas with the atmosphere, which the mass bookkeeping counts as inflow
+    (voidIn). A face between a gas cell and a void cell carries the
+    gas cell's mobility over the distance from its centre to the face (a
+    pressure face, like a fixedValue boundary), and the solid sees the
+    void pressure on it (pFace). Partly filled cells keep k of their filled
+    part and store the gas of the whole open volume. Gas crosses outlets
+    and inlets with the material (dt phiL - dm/rhoP, at the boundary
+    pressure when it comes in). Outlets (materialProperties outlets) must be
+    fixedValue in 0/p (without 0/p they are fixedValue 0) and are sealed
+    for the gas until they open.
+
     Boundaries, from 0/p (optional; without it p = 0 and every patch is
     sealed): fixedValue = fixed pressure, zeroGradient = sealed, and
     fixedGradient patches listed in `inflow` get the gradient that blows
@@ -77,6 +91,7 @@ Description
 
         coupled yes;            // WP F.3: two-way with the grains
                                 // (no: F.2, the solid frozen for the gas)
+        alphaVoid 1e-4;         // WP F.4: void below this alpha
 
         // WP F.2, all optional:
         inflow                  // fixedGradient patches of 0/p blowing gas
@@ -200,6 +215,26 @@ class poreGas
             scalarField pOldOld_;
             scalar dtOld_;
 
+        // WP F.4: void, free surface and outlets (decision 0129)
+
+            //- Free-surface solid: void cells hold the void pressure
+            bool freeSurface_;
+
+            //- Cells with alpha below this are void for the gas (default
+            //  1e-4, the v1 void threshold, decision 0129)
+            scalar alphaVoid_;
+
+            //- 1 in void cells (alpha below alphaVoid_), else 0; its
+            //  processor-neighbour values mark void across the cuts
+            volScalarField void_;
+
+            //- Gas pressure on the faces as the solid sees it: linear,
+            //  but the void pressure on faces between material and void
+            surfaceScalarField pf_;
+
+            //- Gas mass the void (atmosphere) gave this run [kg]
+            scalar voidIn_;
+
 
 public:
 
@@ -264,6 +299,16 @@ public:
         //- Two-way coupled with the solid (WP F.3)
         bool coupled() const noexcept { return coupled_; }
 
+        //- Face pressures for the solid (WP F.4): linear between cells,
+        //  the void pressure (0 gauge) on faces between material and void
+        const surfaceScalarField& pFace() const noexcept { return pf_; }
+
+        //- Void cell flag field (WP F.4)
+        const volScalarField& voidCells() const noexcept { return void_; }
+
+        //- Gas mass the void (atmosphere) gave so far [kg] (part of netIn)
+        scalar voidIn() const noexcept { return voidIn_; }
+
 
     // Cycle
 
@@ -285,6 +330,9 @@ public:
         //- Pore pressure over the step dt, solid frozen (WP F.2); call
         //  after correctFractions()
         void solve(const scalar dt);
+
+        //- Face pressures pFace() from p (WP F.4)
+        void correctFacePressure();
 };
 
 

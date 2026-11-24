@@ -1,7 +1,7 @@
 # WP F.4: Free surface, void and outlet for the pore gas
 
-State: not started
-Branch: assigned by the thread
+State: done (decision 0129)
+Branch: claude/project-thread-ajpkh4
 
 ## Goal
 
@@ -32,5 +32,15 @@ Tests use the `ergunWenYu` drag law (Sia, 2026-11-24).
 ## Log
 
 Newest first. Each entry: date, what was done, what was learned, exact next step.
+
+- 2026-11-24: done (decision 0129). Void cells (alpha < alphaVoid 1e-4) fixed at p0,
+  gas-void faces as pressure faces, the solid sees p0 there, outlets sealed until they
+  open, gas carried through open boundary faces. Learned: (1) count only the grains
+  crossing a free-surface face, not the mixture volume, or a creeping v1 surface cell
+  pumps void gas into the bed (14 to 31 % slow venting); (2) walls must carry no gas
+  (round-off wall velocities leaked 1e-9 kg); (3) zero void cells after the carried
+  gas, or processor faces see a different old pressure (5e-10 mass drift); (4) the
+  outlet box is three blocks: fill with setFields, not by cell index. Cost 1.9 to 2.7x
+  (profile in the decision). Next F.5.
 
 - 2026-11-24: brief written in WP F.0. Next: start when the package before it has merged.

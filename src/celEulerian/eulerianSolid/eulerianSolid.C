@@ -1275,6 +1275,17 @@ void Foam::eulerianSolid::setPorePressure(const volScalarField& p)
 }
 
 
+void Foam::eulerianSolid::setPorePressure
+(
+    const volScalarField& p,
+    const surfaceScalarField& pf
+)
+{
+    setPorePressure(p);
+    porePf_ = &pf;
+}
+
+
 Foam::scalar Foam::eulerianSolid::loadPressure
 (
     const word& patch,
