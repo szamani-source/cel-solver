@@ -62,28 +62,26 @@ next coarser mesh.
 Mass balance 4e-14 on runs without a restart, 2e-7 on runs resumed after
 a container restart (the discharged-mass counter, as decision 0117).
 
-Findings:
+Verdict (Sia, 2026-11-24): **the nonlocal law is not shown to reduce mesh
+dependence in this box test.**
 
-- The flow field over the outlet converges with the nonlocal law (5 to
-  2.5 mm: 2 % and 0 %) and does not with the local law (12 % and 3 %, still
-  rising). The nonlocal law also concentrates the flow: the centreline is
-  about 55 % faster than with the local law on the same mesh.
-- The rate is not strongly mesh dependent here with either law: 5 to
-  2.5 mm moves both by 4 to 5 %, within the run-to-run scatter of this tank
-  (decision 0046, about 15 % at 10 mm). The local rates go up and down
-  (62.5, 65.2, 62.4). The nonlocal rate is 5 to 7 % above the local one on
-  the meshes that resolve d.
-- On 10 mm cells (2 d) the two laws give the same rate: the law's length
-  is not resolved and it acts as the local law, as N.2 found (cells of
-  about 1 d near the band).
+- Rate, the quantity that matters: the local law spreads 4.4 % over the
+  three meshes (62.4 to 65.2 kg/s/m), the nonlocal law 12 % (62.4 to
+  70.1). On this measure the local law is the better of the two here.
+- The centreline speed over the outlet changes less with the nonlocal law
+  from 5 to 2.5 mm (2 % against 12 %), but that rests on one pair of meshes;
+  from 10 to 5 mm the nonlocal law changed far more (46 %). Two meshes do
+  not show convergence.
+- In this box the rate is not strongly mesh dependent with either law, so
+  the test cannot show a cure; and on 10 mm cells (2 d) the law's length is
+  not resolved at all.
 
 ## Consequences
 
-- Item 1 of Sia's pre-gas list (mesh dependence) closes with the law as it
-  is: use `nonlocalA` with cells of about one grain diameter or finer where
-  the material shears, and check a second mesh. Manual FAQ and STATUS say so.
+- Item 1 of Sia's pre-gas list (mesh dependence) is NOT closed by this
+  test. What next is Sia's choice (no new runs until then).
 - The collapse toe (run-out growing with refinement) stays a known issue
   under the free-surface stress of partly filled cells and the parked rate
-  effect (decisions 0024, 0096), not under the friction law.
+  effect (decisions 0024, 0096).
 - The Couto hopper refinement script (`tests/hopper/run_refine.sh`) stays in
-  the repository for a later check on the hopper; not run.
+  the repository; not run.
