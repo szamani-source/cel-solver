@@ -245,14 +245,6 @@ velocity, and not also listed in <code>walls</code>.</p>
 <code>speed</code> is an OpenFOAM <code>Function1</code>, so it can be a constant, a <code>table</code>, a <code>sine</code>, and so
 on. Needs <code>freeSurface yes</code>; the patch must be a plain patch, not also a wall or an outlet.</p>
 
-<h3 id="loads">Surface loads: <code>loads</code></h3>
-<pre><code>loads
-{
-    top { pressure 2000; startTime 0; }   // Pa on the patch from startTime (s)
-}</code></pre>
-<p>A normal pressure on a traction patch (one not listed in <code>walls</code>), from <code>startTime</code>
-on. The patch moves as a free surface does under it (version 2, WP F.3).</p>
-
 <h3 id="other-patches">Other boundaries</h3>
 <p>Patches not listed in <code>walls</code>, <code>outlets</code> or <code>inlets</code> behave according to their mesh type and
 the velocity boundary condition:</p>
@@ -297,35 +289,6 @@ This gave the best wall pressures for the Couto silo (Janssen coefficient \(K = 
 and <code>restRelax</code>. Impacts lock sideways stress into the deposit; <code>restRelax</code> removes it, but upper
 wall pressures still come out high (decisions 0108, 0114).</li>
 </ul>
-
-<h2 id="gas">Pore gas: constant/gasProperties</h2>
-<p>Version 2 (decisions 0125 to 0129). Without this file, or with <code>model none</code>, nothing
-changes. With it, the gas in the pores is solved each step: gauge pressure <code>p</code> (absolute
-less <code>p0</code>), superficial flux <code>qGas</code>, fractions <code>phiS</code>, <code>phiG</code> and
-permeability <code>k</code> are written with the other fields.</p>
-<pre><code>model       poreGas;        // none | poreGas
-rhoP        2650;           // grain density, kg/m^3
-d           0.0001;         // grain diameter, m
-T           293.15;         // gas temperature, K (default 293.15)
-p0          101325;         // ambient pressure, Pa (default 101325)
-drag        ergunWenYu;     // drag law (default ergunWenYu)
-coupled     yes;            // gas acts on the solid and moves with it (default yes)
-alphaVoid   1e-4;           // free surface: cells below this alpha are void at p0
-inflow                      // optional: fixedGradient patches of 0/p blowing gas in
-{
-    bottom  0.05;           // superficial velocity at p0, m/s
-}
-nOuter      50;             // Newton iterations per step, at most
-nAnderson   5;              // Anderson acceleration depth (0 off)
-pTolerance  1e-9;           // Pa, converged when the error left is below this
-laplacian   "Gauss linear corrected";
-solver      { solver PCG; preconditioner DIC; relTol 1e-3; }</code></pre>
-<p><code>0/p</code> sets the gas boundaries: <code>fixedValue</code> is a fixed pressure,
-<code>zeroGradient</code> sealed. Without <code>0/p</code> every patch is sealed except outlets.
-With <code>coupled yes</code> the material's stress is the effective stress and the gas pressure acts
-on it. With <code>freeSurface yes</code>, void cells hold <code>p0</code>, the free surface vents to
-them, walls carry no gas, and outlets must be <code>fixedValue</code> in <code>0/p</code>; they are
-sealed for the gas until they open.</p>
 
 <h2 id="bodies">Lagrangian bodies and STL walls: constant/rigidBodies</h2>
 <p>Every body is an entry in <code>bodies</code>. Its surface is a closed triangulated surface (STL,
