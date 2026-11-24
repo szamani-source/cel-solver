@@ -1,0 +1,21 @@
+#!/bin/sh
+# Plane tank with a small bottom opening, set up with celSetup (WP G.7):
+# the case is written from planeTank.yaml into ./case, meshed (blockMesh),
+# filled, checked with celCheck and run. Run again to resume.
+#   ./Allrun            # 2 s simulated, about 1 h on one core
+#   ./Allrun 0.1        # a short check: 0.1 s simulated
+# Open planeTank.yaml in the setup page instead: celfoam setup --gui planeTank.yaml
+# (in the source tree: ../../tools/celSetup --gui planeTank.yaml)
+cd "${0%/*}" || exit
+tools=../../tools
+# an installed copy (celfoam tutorials) runs the installed tools
+[ -d "$tools" ] || tools="$CELFOAM_DIR/tools"
+if [ ! -d case ]; then
+    python3 "$tools/celSetup" planeTank.yaml case || exit 1
+    if [ -n "$1" ]; then
+        foamDictionary -entry endTime -set "$1" case/system/controlDict > /dev/null
+    fi
+    python3 "$tools/celCheck" case
+fi
+./case/Allrun
+tail -n 5 case/log.celFoam

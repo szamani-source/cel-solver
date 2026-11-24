@@ -6,6 +6,8 @@
 #   celfoam <command> [args]       run one command, e.g. `celfoam ./Allrun`, `celfoam celFoam`
 #   celfoam tutorials [DIR]        copy the tutorials to DIR (default ./celfoam-tutorials)
 #   celfoam manual                 print where the HTML manual is (opens it if it can)
+#   celfoam setup [args]           case setup: celSetup, e.g. `celfoam setup --gui`
+#   celfoam check CASE [args]      mesh and time-step checks: celCheck
 #   celfoam test                   smoke test: a 10x10x10 box, checks the time step
 #   celfoam version                print the version
 #   celfoam help                   this text
@@ -26,7 +28,7 @@ loadEnv()
 
 case "${1:-}" in
     help|-h|--help)
-        sed -n '2,12p' "$self" | sed 's/^# \{0,1\}//'
+        sed -n '2,14p' "$self" | sed 's/^# \{0,1\}//'
         ;;
     version|--version)
         echo "celFoam $(cat "$prefix/VERSION") (OpenFOAM v2512) in $prefix"
@@ -44,6 +46,16 @@ case "${1:-}" in
         if [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ] && command -v xdg-open > /dev/null; then
             xdg-open "$page" > /dev/null 2>&1 || true
         fi
+        ;;
+    setup)
+        loadEnv
+        shift
+        exec python3 "$prefix/tools/celSetup" "$@"
+        ;;
+    check)
+        loadEnv
+        shift
+        exec python3 "$prefix/tools/celCheck" "$@"
         ;;
     test)
         loadEnv

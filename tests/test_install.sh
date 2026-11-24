@@ -23,4 +23,7 @@ cd "$work"
 (cd cases/smokeBox && "$cf" ./Allrun > /dev/null && grep -q '^End' log.celFoam)
 (cd cases/coutoHopper && "$cf" ./Allrun mc mesh > mesh.log 2>&1 \
     && grep -q "Mesh OK" mesh.log && grep -q "cells: *7584" mesh.log)
+(cd cases/setupPlaneTank && "$cf" setup planeTank.yaml case > setup.log 2>&1 \
+    && { "$cf" check case > check.log 2>&1 || true; } && grep -q "PASS  time step" check.log)
+"$cf" setup --describe flatBottom | grep -q outletDiameter
 echo "install test: PASS"

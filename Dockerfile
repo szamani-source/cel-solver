@@ -1,8 +1,8 @@
 # celFoam in a container: works on any Linux with Docker or Podman (INSTALL.md, route C).
 #
-#   docker build -t celfoam:1.0.0 .                 # or: ./install.sh --container
-#   docker run --rm -it -v "$PWD":/work celfoam:1.0.0            # shell, environment loaded
-#   docker run --rm -v "$PWD":/work celfoam:1.0.0 ./Allrun       # one command in /work
+#   docker build -t celfoam:1.1.0 .                 # or: ./install.sh --container
+#   docker run --rm -it -v "$PWD":/work celfoam:1.1.0            # shell, environment loaded
+#   docker run --rm -v "$PWD":/work celfoam:1.1.0 ./Allrun       # one command in /work
 #
 # Base: the OpenFOAM v2512 image that CI and tools/setup_openfoam.sh use, pinned to the
 # same amd64 manifest (decision 0006), so the container has the same OpenFOAM bits.

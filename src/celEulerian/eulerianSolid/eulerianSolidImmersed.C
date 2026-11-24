@@ -441,11 +441,15 @@ void Foam::eulerianSolid::fillCovered()
     symmTensorField& sigma = sigma_.primitiveFieldRef();
     symmTensorField& epsP = epsP_.primitiveFieldRef();
     scalarField& epsPEq = epsPEq_.primitiveFieldRef();
+    // compaction cap history (WP K.4): handled as epsPEq; a dummy without cap
+    scalarField pcNone(pc_.valid() ? 0 : mesh.nCells(), Zero);
+    scalarField& pcf = pc_.valid() ? pc_().primitiveFieldRef() : pcNone;
 
     const bool fs = freeSurface_;
     scalarField& alpha = alpha_.primitiveFieldRef();
 
     scalarField n(nCells, Zero), r(nCells, Zero), q(nCells, Zero);
+    scalarField pq(nCells, Zero), npq(nCells, Zero);
     scalarField al(nCells, Zero);
     vectorField u(nCells, Zero);
     symmTensorField s(nCells, Zero), e(nCells, Zero);
@@ -457,7 +461,8 @@ void Foam::eulerianSolid::fillCovered()
     (
         const label c,
         const scalar rk, const vector& uk, const symmTensor& sk,
-        const symmTensor& ek, const scalar qk, const vector& d,
+        const symmTensor& ek, const scalar qk, const scalar pk,
+        const vector& d,
         const scalar ak
     )
     {
@@ -468,6 +473,11 @@ void Foam::eulerianSolid::fillCovered()
         s[c] += sk + equilibriumJump<symmTensor>(rk, d, g);
         e[c] += ek;
         q[c] += qk;
+        if (pk > 0)
+        {
+            pq[c] += pk;
+            npq[c] += 1;
+        }
     };
 
     forAll(own, facei)
@@ -480,7 +490,8 @@ void Foam::eulerianSolid::fillCovered()
         {
             add
             (
-                N, rho[P], U[P], sigma[P], epsP[P], epsPEq[P], C[N] - C[P],
+                N, rho[P], U[P], sigma[P], epsP[P], epsPEq[P], pcf[P],
+                C[N] - C[P],
                 fs ? alpha[P] : 1
             );
         }
@@ -488,7 +499,8 @@ void Foam::eulerianSolid::fillCovered()
         {
             add
             (
-                P, rho[N], U[N], sigma[N], epsP[N], epsPEq[N], C[P] - C[N],
+                P, rho[N], U[N], sigma[N], epsP[N], epsPEq[N], pcf[N],
+                C[P] - C[N],
                 fs ? alpha[N] : 1
             );
         }
@@ -502,6 +514,7 @@ void Foam::eulerianSolid::fillCovered()
         tmp<volSymmTensorField> ts(work<symmTensor>(mesh, "s", sigma));
         tmp<volSymmTensorField> te(work<symmTensor>(mesh, "e", epsP));
         tmp<volScalarField> tq(work<scalar>(mesh, "q", epsPEq));
+        tmp<volScalarField> tpc(work<scalar>(mesh, "pc", pcf));
         tmp<volScalarField> ta(work<scalar>(mesh, "a", alpha));
         forAll(mesh.boundary(), patchi)
         {
@@ -515,6 +528,10 @@ void Foam::eulerianSolid::fillCovered()
             const symmTensorField sn(ts().boundaryField()[patchi].patchNeighbourField());
             const symmTensorField en(te().boundaryField()[patchi].patchNeighbourField());
             const scalarField qn(tq().boundaryField()[patchi].patchNeighbourField());
+            const scalarField pn
+            (
+                tpc().boundaryField()[patchi].patchNeighbourField()
+            );
             const scalarField an(ta().boundaryField()[patchi].patchNeighbourField());
             forAll(fc, i)
             {
@@ -522,7 +539,7 @@ void Foam::eulerianSolid::fillCovered()
                 {
                     add
                     (
-                        fc[i], rn[i], un[i], sn[i], en[i], qn[i], -d[i],
+                        fc[i], rn[i], un[i], sn[i], en[i], qn[i], pn[i], -d[i],
                         fs ? an[i] : 1
                     );
                 }
@@ -540,6 +557,7 @@ void Foam::eulerianSolid::fillCovered()
             sigma[celli] = s[celli]/n[celli];
             epsP[celli] = e[celli]/n[celli];
             epsPEq[celli] = q[celli]/n[celli];
+            pcf[celli] = npq[celli] > 0 ? pq[celli]/npq[celli] : 0;
             if (fs)
             {
                 alpha[celli] = al[celli]/n[celli];
@@ -554,6 +572,7 @@ void Foam::eulerianSolid::fillCovered()
             sigma[celli] = Zero;
             epsP[celli] = Zero;
             epsPEq[celli] = 0;
+            pcf[celli] = 0;
         }
         else
         {
@@ -562,6 +581,7 @@ void Foam::eulerianSolid::fillCovered()
             sigma[celli] = Zero;
             epsP[celli] = Zero;
             epsPEq[celli] = 0;
+            pcf[celli] = 0;
         }
     }
     rho_.correctBoundaryConditions();
@@ -569,6 +589,10 @@ void Foam::eulerianSolid::fillCovered()
     sigma_.correctBoundaryConditions();
     epsP_.correctBoundaryConditions();
     epsPEq_.correctBoundaryConditions();
+    if (pc_.valid())
+    {
+        pc_().correctBoundaryConditions();
+    }
     if (fs)
     {
         alpha_.correctBoundaryConditions();
@@ -591,6 +615,9 @@ void Foam::eulerianSolid::mixSmallCells()
     symmTensorField& sigma = sigma_.primitiveFieldRef();
     symmTensorField& epsP = epsP_.primitiveFieldRef();
     scalarField& epsPEq = epsPEq_.primitiveFieldRef();
+    // compaction cap history (WP K.4): handled as epsPEq; a dummy without cap
+    scalarField pcNone(pc_.valid() ? 0 : mesh.nCells(), Zero);
+    scalarField& pcf = pc_.valid() ? pc_().primitiveFieldRef() : pcNone;
 
     // Group of each target: the target and the small cells mixed into it.
     // Stress is mixed less its hydrostatic part relative to the target's
@@ -598,6 +625,7 @@ void Foam::eulerianSolid::mixSmallCells()
     const bool fs = freeSurface_;
     scalarField& alpha = alpha_.primitiveFieldRef();
     scalarField gm(nCells, Zero), gV(nCells, Zero), gq(nCells, Zero);
+    scalarField gpc(nCells, Zero), gpm(nCells, Zero);
     scalarField ga(nCells, Zero);       // material volume (freeSurface)
     scalarField gas(nCells, Zero);      // of it, in the small cells
     boolList full(nCells, false);       // target full before mixing
@@ -626,6 +654,12 @@ void Foam::eulerianSolid::mixSmallCells()
         gs[t] += mk*(sigma[k] - equilibriumJump<symmTensor>(rho[k], C[k] - C[t], g));
         ge[t] += mk*epsP[k];
         gq[t] += mk*epsPEq[k];
+        if (pcf[k] > 0)
+        {
+            // only loaded material (pc 0: not yet loaded)
+            gpc[t] += mk*pcf[k];
+            gpm[t] += mk;
+        }
     };
 
     forAll(mixTo_, celli)
@@ -651,6 +685,7 @@ void Foam::eulerianSolid::mixSmallCells()
             sigma[k] = Zero;
             epsP[k] = Zero;
             epsPEq[k] = 0;
+            pcf[k] = 0;
             return;
         }
         scalar r = gm[t]/gV[t];
@@ -674,6 +709,7 @@ void Foam::eulerianSolid::mixSmallCells()
                 sigma[k] = Zero;
                 epsP[k] = Zero;
                 epsPEq[k] = 0;
+                pcf[k] = 0;
                 return;
             }
             r = gm[t]/(V[t]*cellOpen_[t]);
@@ -684,6 +720,7 @@ void Foam::eulerianSolid::mixSmallCells()
             gs[t]/gm[t] + equilibriumJump<symmTensor>(r, C[k] - C[t], g);
         epsP[k] = ge[t]/gm[t];
         epsPEq[k] = gq[t]/gm[t];
+        pcf[k] = gpm[t] > 0 ? gpc[t]/gpm[t] : 0;
         if (fs)
         {
             const scalar a = r*ga[t]/gm[t];
@@ -712,6 +749,10 @@ void Foam::eulerianSolid::mixSmallCells()
     sigma_.correctBoundaryConditions();
     epsP_.correctBoundaryConditions();
     epsPEq_.correctBoundaryConditions();
+    if (pc_.valid())
+    {
+        pc_().correctBoundaryConditions();
+    }
     if (fs)
     {
         alpha_.correctBoundaryConditions();
@@ -820,6 +861,12 @@ void Foam::eulerianSolid::moveImmersedWalls
     const symmTensorField sig(sigma_.primitiveField());
     const symmTensorField eP(epsP_.primitiveField());
     const scalarField eQ(epsPEq_.primitiveField());
+    const scalarField ePc
+    (
+        pc_.valid()
+      ? scalarField(pc_().primitiveField())
+      : scalarField(nCells, Zero)
+    );
     const labelList oldMix(mixTo_);
     vTarget_.clear();
 
@@ -837,12 +884,16 @@ void Foam::eulerianSolid::moveImmersedWalls
     symmTensorField& sigma = sigma_.primitiveFieldRef();
     symmTensorField& epsP = epsP_.primitiveFieldRef();
     scalarField& epsPEq = epsPEq_.primitiveFieldRef();
+    // compaction cap history (WP K.4): handled as epsPEq; a dummy without cap
+    scalarField pcNone(pc_.valid() ? 0 : mesh.nCells(), Zero);
+    scalarField& pcf = pc_.valid() ? pc_().primitiveFieldRef() : pcNone;
 
     // Open cells keep their content; a cell the body leaves starts empty
     scalarField gm(m), gmV(mV);
     vectorField gp(p);
     symmTensorField gs(m*sig), ge(m*eP);
-    scalarField gq(m*eQ);
+    scalarField gq(m*eQ), gpc(m*ePc);
+    scalarField gpm(m*pos(ePc - SMALL));   // mass of loaded material
     forAll(Vo, celli)
     {
         if (Vo[celli] > 0) continue;
@@ -852,6 +903,8 @@ void Foam::eulerianSolid::moveImmersedWalls
         gs[celli] = Zero;
         ge[celli] = Zero;
         gq[celli] = 0;
+        gpc[celli] = 0;
+        gpm[celli] = 0;
     }
 
     // A cell the body now covers hands its content to an open neighbour:
@@ -903,6 +956,8 @@ void Foam::eulerianSolid::moveImmersedWalls
         gs[r] += m[celli]*sig[celli];
         ge[r] += m[celli]*eP[celli];
         gq[r] += m[celli]*eQ[celli];
+        gpc[r] += m[celli]*ePc[celli];
+        gpm[r] += ePc[celli] > 0 ? m[celli] : 0;
     }
 
     // Members of a mixing group are clipped only after mixing
@@ -929,6 +984,7 @@ void Foam::eulerianSolid::moveImmersedWalls
                 sigma[celli] = gs[celli]/mk;
                 epsP[celli] = ge[celli]/mk;
                 epsPEq[celli] = gq[celli]/mk;
+                pcf[celli] = gpm[celli] > 0 ? gpc[celli]/gpm[celli] : 0;
             }
             else
             {
@@ -936,6 +992,7 @@ void Foam::eulerianSolid::moveImmersedWalls
                 sigma[celli] = Zero;
                 epsP[celli] = Zero;
                 epsPEq[celli] = 0;
+                pcf[celli] = 0;
             }
             continue;
         }
@@ -947,6 +1004,7 @@ void Foam::eulerianSolid::moveImmersedWalls
             sigma[celli] = Zero;
             epsP[celli] = Zero;
             epsPEq[celli] = 0;
+            pcf[celli] = 0;
             continue;
         }
         rho[celli] = mk/Vo[celli];
@@ -958,6 +1016,7 @@ void Foam::eulerianSolid::moveImmersedWalls
         sigma[celli] = gs[celli]/mk;
         epsP[celli] = ge[celli]/mk;
         epsPEq[celli] = gq[celli]/mk;
+        pcf[celli] = gpm[celli] > 0 ? gpc[celli]/gpm[celli] : 0;
     }
     alphaL_ = alpha;
 
@@ -967,6 +1026,10 @@ void Foam::eulerianSolid::moveImmersedWalls
     sigma_.correctBoundaryConditions();
     epsP_.correctBoundaryConditions();
     epsPEq_.correctBoundaryConditions();
+    if (pc_.valid())
+    {
+        pc_().correctBoundaryConditions();
+    }
 
     mixSmallCells();
     fillCovered();

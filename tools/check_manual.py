@@ -49,6 +49,8 @@ REQUIRED = {
                         "inlets", "wedge", "decomposePar", "startFrom latestTime"],
     "meshing.html": ["blockMesh", "simpleGrading", "checkMesh", "wedge", "STL", "3 to 5 mm",
                      "shear band"],
+    "setup-tool.html": ["celSetup", "celCheck", "--gui", "gmshToFoam", "userMesh", "flatBottom",
+                        "axisColumn", "boundaries"],
     "theory-equations.html": ["Lagrange step", "remap", "Riemann", "Hughes-Winget", "maxCo",
                               "well-balanced"],
     "theory-materials.html": ["Mohr-Coulomb", "Drucker-Prager", "plane_strain", "mu(I)",

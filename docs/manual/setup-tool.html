@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Setup tool · celFoam manual</title>
+<link rel="stylesheet" href="assets/katex/katex.min.css">
+<link rel="stylesheet" href="assets/manual.css">
+<script defer src="assets/katex/katex.min.js"></script>
+<script defer src="assets/katex/contrib/auto-render.min.js"></script>
+<script defer src="assets/manual.js"></script>
+</head>
+<body>
+<main>
+
+<h1>Setup tool: celSetup and celCheck</h1>
+<p class="lead">celSetup writes a complete, runnable case from a short input file or from a
+form in your browser: the mesh (blockMesh or Gmsh, or a mesh you bring), every dictionary,
+the material at the start and an Allrun that resumes. celCheck reads a case and says
+whether its mesh follows the rules of the <a href="meshing.html">meshing guide</a> before
+you spend hours on a run.</p>
+
+<h2 id="start">Starting the setup page</h2>
+<pre><code>celfoam setup --gui                       # installed (version 1.1): opens http://127.0.0.1:8765/
+celfoam setup --gui my.yaml               # starts from your input file
+
+# from the source tree
+source /usr/lib/openfoam/openfoam2512/etc/bashrc
+tools/celSetup --gui                      # opens http://127.0.0.1:8765/ in your browser
+tools/celSetup --gui my.yaml              # starts from your input file
+tools/celSetup --gui --no-browser --port 8800</code></pre>
+<p>The page is served by a small Python program on your own computer (127.0.0.1 only) and
+needs no internet connection. It needs Python 3 with numpy; meshing needs OpenFOAM loaded
+(blockMesh, gmshToFoam) and, for the Gmsh mesher, Gmsh (<code>pip install gmsh</code> or
+<code>apt install gmsh</code>). Close it with Ctrl+C in the terminal.</p>
+
+<h2 id="page">The page</h2>
+<ul>
+<li><strong>Template</strong> (top): the kind of case. <code>conicalHopper</code> (a cylinder on a
+conical hopper, axisymmetric, or a plane hopper), <code>flatBottom</code> (a flat-bottomed silo, or a
+plane tank with a small bottom opening) and <code>userMesh</code> (your own mesh).</li>
+<li><strong>Form</strong> (left): every input with its default, unit and a one-line description.
+Entries you change are marked; required ones have a star; advanced ones are folded under
+"Advanced". An entry with an error is outlined in red and the error is shown under the
+drawing.</li>
+<li><strong>Drawing</strong> (right): the geometry as you type, then the real mesh about a second
+later, coloured by cell size or by the material at the start. Wheel to zoom, drag to pan;
+"Zoom to time-step cell" shows the cell that sets the time step (circled).</li>
+<li><strong>Checks</strong> (below the drawing): the celCheck verdicts for this mesh (next section),
+the time step and the run time on 1 to 8 cores.</li>
+<li><strong>Open…</strong> reads an input file or starts from an example. <strong>Save case</strong> writes the
+input file (every entry with its description) and the case folder. <strong>Run</strong> starts
+<code>./Allrun</code> in the background and shows its progress; closing the page does not stop it.</li>
+</ul>
+
+<figure>
+<img src="figures/setup-gui-planetank.png" alt="The setup page with the flatBottom template: a form on the left, the plane tank mesh coloured by the material at the start on the right, and the checker's verdicts below">
+<figcaption>The plane tank example (<code>examples/planeTank.yaml</code>): half of a 1 m wide tank with a
+0.1 m opening, 3,500 cells, material up to 1 m. The checks below the drawing come from
+celCheck.</figcaption>
+</figure>
+
+<h2 id="meshers">blockMesh or Gmsh</h2>
+<p>The templates build the same wall-aligned block layout with either mesher
+(<code>mesh: mesher: blockMesh</code> or <code>gmsh</code>): curved columns that follow the hopper wall,
+rows fine at the outlet and growing upwards. blockMesh is the default and gives the validated
+Couto mesh exactly. Gmsh (GPL, open source) builds transfinite quadrilaterals on the same
+blocks and turns them into a one-cell wedge or plane mesh, converted with OpenFOAM's
+<code>gmshToFoam</code>: the same cells and boundaries, with interior points placed a little
+differently (decision 0120). On the Couto silo both give 7,584 cells and the same time step
+(5.850 and 5.851 µs).</p>
+<p>The "compare with the other" box meshes the case with both and draws the second mesh's
+lines over the first, with cells, time step, non-orthogonality and run time side by side.</p>
+
+<figure>
+<img src="figures/setup-gui-compare.png" alt="Zoom on the cylinder-to-hopper corner of the Couto mesh: blockMesh cells coloured by size, Gmsh cell edges drawn on top in magenta, and a table comparing the two meshes">
+<figcaption>Couto silo, cylinder-to-hopper corner: blockMesh (colours) and Gmsh (lines).</figcaption>
+</figure>
+
+<h2 id="user-mesh">Your own mesh</h2>
+<p>With the <code>userMesh</code> template give <code>mesh: file</code> and press <strong>Load mesh</strong>. It takes an
+OpenFOAM case or <code>polyMesh</code> folder, or a file OpenFOAM converts: <code>.msh</code> (Gmsh or
+Fluent), <code>.geo</code> (meshed with Gmsh first), <code>.unv</code> (I-DEAS), <code>.neu</code> (Gambit),
+<code>.ans</code> (ANSYS). <code>scale</code> multiplies the coordinates (0.001 for a mesh drawn in mm).
+The mesh must be 2D (one cell thick, front and back patches <code>empty</code>) or an axisymmetric
+wedge about the y axis.</p>
+<p>Every boundary patch of the mesh is then listed. Give each one a condition; pointing at a
+patch shows it on the drawing. Patches whose faces show they are wedge sides, 2D sides or a
+symmetry plane at x = 0 are filled in for you.</p>
+<table>
+<tr><th>Condition</th><th>Entries</th><th>Meaning</th></tr>
+<tr><td><code>wall</code></td><td>friction (deg)</td><td>the material slides along it with Coulomb friction</td></tr>
+<tr><td><code>outlet</code></td><td>friction, openTime</td><td>a wall until openTime, then open: material leaves and is counted</td></tr>
+<tr><td><code>inlet</code></td><td>speed, startTime, endTime, density, pressure, friction</td><td>feeds fresh material at a set speed</td></tr>
+<tr><td><code>symmetry</code></td><td></td><td>no normal velocity, no shear</td></tr>
+<tr><td><code>wedge</code>, <code>empty</code></td><td></td><td>the sides of a wedge or of a 2D mesh</td></tr>
+<tr><td><code>free</code></td><td></td><td>open and traction-free</td></tr>
+</table>
+<p>The material fills the cells inside a box (<code>geometry: fillXMin</code> … <code>fillYMax</code>; a side
+left empty has no limit). In an input file the boundaries look like this:</p>
+<pre><code>template: userMesh
+mesh:
+  file: tank2d.geo
+geometry:
+  fillYMax: 0.5
+boundaries:
+  outlet: {type: outlet, friction: 20}
+  bottom: {type: wall, friction: 20}
+  wall:   {type: wall, friction: 20}
+  top:    {type: free}
+  axis:   {type: symmetry}
+  frontAndBack: {type: empty}</code></pre>
+
+<figure>
+<img src="figures/setup-gui-usermesh.png" alt="The setup page with a user mesh loaded: the list of boundary patches with a condition chosen for each on the left, the mesh with its boundaries coloured by condition on the right">
+<figcaption>A 2D tank meshed with Gmsh (<code>examples/userTank.yaml</code>), each boundary with its
+condition; the outlet is highlighted.</figcaption>
+</figure>
+
+<h2 id="command-line">From the command line</h2>
+<p>Installed, write <code>celfoam setup</code> for <code>tools/celSetup</code> and
+<code>celfoam check</code> for <code>tools/celCheck</code>.</p>
+<pre><code>tools/celSetup --template conicalHopper my.yaml   # a commented input file with every entry
+tools/celSetup --describe flatBottom              # every entry: default, unit, meaning
+tools/celSetup my.yaml myCase                     # write, mesh and fill the case
+tools/celCheck myCase                             # the checks; --png for a picture, --json
+cd myCase &amp;&amp; ./Allrun                           # run; run again to resume</code></pre>
+<p>Units are SI. The input file is a small YAML file: <code>section:</code> then indented
+<code>key: value</code> lines, <code># comments</code>, and <code>{a: 1, b: 2}</code> for short groups.</p>
+
+<h2 id="checks">What celCheck checks</h2>
+<ul>
+<li><strong>Time step</strong>: computed exactly as celFoam does, with the cell that sets it. A warning
+when a few cells make it much shorter than the rest.</li>
+<li><strong>Outlet</strong>: the outlet cells in grain diameters d: about 1 d or less passes. In the
+Couto silo (d 4 mm) cells of 3 to 5 mm gave 106 to 124 kg/s, while cells of 2 to 6 d gave
+rates 30 to 80 % low. The number of cells across the outlet is shown as a note (about 40
+across the Couto radius). Without a grain size the rule is 3 to 5 mm.</li>
+<li><strong>Walls</strong>: cells across a shear band of 10 grain diameters next to the walls.</li>
+<li><strong>Grain size</strong>, <strong>non-orthogonality</strong> (as checkMesh), <strong>size jumps</strong> between
+neighbouring cells, and a <strong>run time</strong> estimate.</li>
+</ul>
+
+<h2 id="faster">Options for a longer time step (off)</h2>
+<p>On a wedge the cell on the axis often sets the step (its hoop length is its distance from
+the axis). <code>mesh: outletColumns: even</code> with <code>axisColumn: 2</code> (conicalHopper) or
+<code>axisColumn: 2</code> (flatBottom) widens that column: the Couto step becomes 1.5 times longer
+(standard mesh) to 2 times (fine mesh). These options are off by default and are not
+validated yet: whether they change the wall pressures or the discharge has not been run
+(decision 0122). They work with blockMesh only.</p>
+
+<h2 id="limits">Limits</h2>
+<ul>
+<li>User meshes: 2D and wedge only for now; 3D meshes are refused with a message.</li>
+<li>Plane cases report masses per metre of the whole tank (both halves).</li>
+<li>Templates write the material and run sections shared by all cases (see the
+<a href="case-setup.html">case setup reference</a> for every keyword they set).</li>
+</ul>
+
+</main>
+</body>
+</html>

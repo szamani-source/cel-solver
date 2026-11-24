@@ -96,8 +96,8 @@ that runs in it, with the current folder mounted:</p>
 <pre><code>./install.sh --container
 celfoam test</code></pre>
 <p>Steps 3 to 5 are then done; use <code>celfoam</code> as in <a href="#install-sh">step 4</a>.
-By hand: <code>docker build -t celfoam:1.0.0 .</code> and
-<code>docker run --rm -it -v "$PWD":/work celfoam:1.0.0</code>.</p>
+By hand: <code>docker build -t celfoam:1.1.0 .</code> and
+<code>docker run --rm -it -v "$PWD":/work celfoam:1.1.0</code>.</p>
 
 <div class="note">
 <p><strong>No root access?</strong> Build OpenFOAM v2512 from source in your home folder,
@@ -125,7 +125,7 @@ Mixing them gives errors such as missing libraries or the wrong <code>blockMesh<
 <h2 id="build">4. Build celFoam</h2>
 
 <h3 id="install-sh">Installed copy with <code>install.sh</code> (recommended for users)</h3>
-<pre><code>./install.sh                  # as root: /opt/celfoam-1.0.0; as a user: ~/celfoam-1.0.0
+<pre><code>./install.sh                  # as root: /opt/celfoam-1.1.0; as a user: ~/celfoam-1.1.0
 ./install.sh --openfoam DIR   # OpenFOAM v2512 in another place (the folder with etc/bashrc)
 ./install.sh --get-openfoam   # Ubuntu 24.04 family: also installs OpenFOAM (Method A)</code></pre>
 <p>It finds OpenFOAM v2512, checks the compiler and numpy, copies the source to the prefix,
@@ -136,7 +136,7 @@ tutorial), writes the environment file <code>&lt;prefix&gt;/etc/celfoam.sh</code
 celfoam ./Allrun              # one command with the environment loaded
 celfoam tutorials ~/cases     # copy the tutorials
 celfoam test                  # smoke test
-source /opt/celfoam-1.0.0/etc/celfoam.sh   # the environment in the current shell</code></pre>
+source /opt/celfoam-1.1.0/etc/celfoam.sh   # the environment in the current shell</code></pre>
 
 <h3 id="allwmake">In the source folder (developers)</h3>
 <pre><code>./Allwmake</code></pre>

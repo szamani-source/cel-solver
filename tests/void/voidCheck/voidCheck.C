@@ -62,7 +62,8 @@ Description
                      bottom on the material; discharged: mass that
                      left through outlets, WP 3.3)
         cells.dat    (cells.dat.procN in parallel) at the end:
-                     x y alpha rho Ux Uy s_xx s_yy s_xy
+                     x y alpha rho Ux Uy s_xx s_yy s_xy s_zz open
+                     [pc, with the compaction cap, WP K.4]
 \*---------------------------------------------------------------------------*/
 
 #include "fvCFD.H"
@@ -448,7 +449,11 @@ int main(int argc, char *argv[])
         );
         OFstream os(runTime.globalPath()/name);
         os.precision(17);
-        os << "# x y alpha rho Ux Uy sxx syy sxy szz open" << nl;
+        // compaction cap (WP K.4): consolidation pressure pc last, if any
+        const volScalarField* pc =
+            mesh.findObject<volScalarField>("pc");
+        os << "# x y alpha rho Ux Uy sxx syy sxy szz open"
+            << (pc ? " pc" : "") << nl;
         const scalarField open(solid.cellOpen());
         const scalarField& r = solid.rho().primitiveField();
         const scalarField& a = solid.alpha().primitiveField();
@@ -460,7 +465,12 @@ int main(int argc, char *argv[])
                 << r[celli] << ' ' << u[celli].x() << ' ' << u[celli].y()
                 << ' ' << sg[celli].xx() << ' ' << sg[celli].yy() << ' '
                 << sg[celli].xy() << ' ' << sg[celli].zz() << ' '
-                << open[celli] << nl;
+                << open[celli];
+            if (pc)
+            {
+                os << ' ' << pc->primitiveField()[celli];
+            }
+            os << nl;
         }
     };
 

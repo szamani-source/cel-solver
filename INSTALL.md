@@ -136,7 +136,7 @@ for you.
 ## Step 3. Get and build celFoam
 
 ```bash
-git clone https://github.com/szamani-source/cel-solver.git   # or unpack celfoam-1.0.0.tar.gz
+git clone https://github.com/szamani-source/cel-solver.git   # or unpack celfoam-1.1.0.tar.gz
 cd cel-solver
 ```
 
@@ -144,8 +144,8 @@ cd cel-solver
 environment file, the `celfoam` command and a smoke test:
 
 ```bash
-./install.sh                       # as root: /opt/celfoam-1.0.0, celfoam in /usr/local/bin
-                                   # as a user: ~/celfoam-1.0.0, celfoam in ~/.local/bin
+./install.sh                       # as root: /opt/celfoam-1.1.0, celfoam in /usr/local/bin
+                                   # as a user: ~/celfoam-1.1.0, celfoam in ~/.local/bin
 ./install.sh --openfoam DIR        # OpenFOAM v2512 somewhere it does not look
 ./install.sh --prefix DIR          # install somewhere else
 ./install.sh --help
@@ -173,10 +173,12 @@ After route B or C:
 ```bash
 celfoam                            # a shell with OpenFOAM v2512 and celFoam loaded
 celfoam <command>                  # one command, e.g. celfoam ./Allrun
-source /opt/celfoam-1.0.0/etc/celfoam.sh    # the same in the current shell (your prefix)
+source /opt/celfoam-1.1.0/etc/celfoam.sh    # the same in the current shell (your prefix)
 celfoam test                       # smoke test, under a second
 celfoam version
 celfoam manual                     # path of the HTML manual (opens it on a desktop)
+celfoam setup --gui                # the case setup page in your browser (manual: Setup tool)
+celfoam check myCase               # mesh and time-step checks of a case
 ```
 
 `etc/celfoam.sh` sources OpenFOAM's `etc/bashrc` and puts `<prefix>/platforms/bin` and
@@ -202,6 +204,7 @@ celfoam python3 plot.py                    # snapshots.png, mass.png (needs matp
 | `stlTank`, `stlSilo`, `stlHopper` | walls from STL files | 2 to 10 min |
 | `rigidBodyMotion` | a rigid body in the material | minutes |
 | `coutoHopper` | the validated Couto wheat silo (axisymmetric, MC or DP) | 2 h (standard) or 8 h (fine) on 4 cores |
+| `setupPlaneTank` | a plane tank written by `celfoam setup` from a short YAML file | about 1 h (`./Allrun 0.1`: minutes) |
 
 Most tutorial folders have a `README.md`. Results are standard OpenFOAM time folders: open
 them in ParaView with `touch case.foam && paraview case.foam`.
@@ -215,7 +218,7 @@ OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1`; with more ranks than cores add `--oversubscri
 Any Linux with Docker or Podman (no OpenFOAM on the host):
 
 ```bash
-./install.sh --container           # builds image celfoam:1.0.0, installs a celfoam command
+./install.sh --container           # builds image celfoam:1.1.0, installs a celfoam command
 celfoam tutorials cases            # same commands as above
 cd cases/coutoHopper && celfoam ./Allrun mc mesh
 ```
@@ -227,11 +230,11 @@ id, so results land in your folder. Paths outside the current folder are not vis
 inside; run from the case folder or a parent of it. By hand:
 
 ```bash
-docker build -t celfoam:1.0.0 .
-docker run --rm -it -u "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD":/work celfoam:1.0.0
+docker build -t celfoam:1.1.0 .
+docker run --rm -it -u "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD":/work celfoam:1.1.0
 ```
 
-Apptainer / Singularity (HPC clusters): `apptainer build celfoam.sif docker-daemon://celfoam:1.0.0`
+Apptainer / Singularity (HPC clusters): `apptainer build celfoam.sif docker-daemon://celfoam:1.1.0`
 on a machine with Docker, then `apptainer exec celfoam.sif /opt/celfoam/bin/celfoam ./Allrun`.
 
 ## Troubleshooting

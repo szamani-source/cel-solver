@@ -1,0 +1,100 @@
+#!/usr/bin/env python3
+"""celSetup: write a complete celFoam case from a short YAML file.
+
+    celSetup case.yaml [CASE_DIR]   write the case (default: the 'case' name
+                                    next to the YAML file), mesh and fill it
+                                    if OpenFOAM is loaded
+    celSetup --mesh CASE_DIR        mesh a written case with its mesher
+    celSetup --fill CASE_DIR        (re)write 0/alpha and 0/rho on the mesh
+    celSetup --no-mesh ...          write the files only
+    celSetup --template NAME [FILE] a commented input file with every entry
+                                    and its default (to stdout or FILE)
+    celSetup --describe NAME        list every entry: default, unit, meaning
+    celSetup --gui [case.yaml]      the setup GUI in your browser (local, offline);
+                                    --port N, --no-browser
+
+Templates: conicalHopper (axisymmetric or plane), flatBottom (silo or tank),
+userMesh (your own mesh). Examples: tools/celsetup/examples/.
+"""
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from celsetup import case, miniyaml, schema  # noqa: E402
+
+
+def main(argv):
+    port = 8765
+    if "--port" in argv:
+        i = argv.index("--port")
+        port = int(argv[i + 1])
+        argv = argv[:i] + argv[i + 2:]
+    args = [a for a in argv if not a.startswith("--")]
+    flags = {a for a in argv if a.startswith("--")}
+    if "--gui" in flags:
+        from celsetup import gui
+        return gui.serve(args[0] if args else None, port, "--no-browser" not in flags)
+    if "--help" in flags or "-h" in argv or not args:
+        print(__doc__)
+        return 0 if args or "--help" in flags else 1
+    if "--template" in flags or "--describe" in flags:
+        name = args[0]
+        if name not in case.TEMPLATES:
+            print(f"celSetup: templates are {', '.join(case.TEMPLATES)}", file=sys.stderr)
+            return 2
+        mod = case.TEMPLATES[name]
+        sch, bt = mod.SCHEMA, getattr(mod, "BTYPES", None)
+        if "--template" in flags:
+            txt = schema.template_yaml(name, sch, boundary_types=bt) + "\n"
+        else:
+            txt = f"Template {name}:" + schema.table(sch, name) + "\n"
+            if bt:
+                txt += "\nboundaries: one entry per patch, with a type and its entries\n"
+                for t, (text, entries) in bt.items():
+                    txt += f"  {t:<10} {text}\n"
+                    for e in entries:
+                        d = "REQUIRED" if e.default == schema.REQUIRED else (
+                            schema._yaml_value(e.default) or "(off)")
+                        txt += f"      {e.key:<14} {d:<10} {e.unit:<8} {e.text}\n"
+        if len(args) > 1:
+            open(args[1], "w").write(txt)
+        else:
+            sys.stdout.write(txt)
+        return 0
+    if "--mesh" in flags:
+        ok, msg = case.mesh(args[0])
+        print("celSetup: " + msg)
+        return 0 if ok else 3
+    if "--fill" in flags:
+        r = case.fill(args[0])
+        print("celSetup: " + case.fill_message(r))
+        return 0
+    try:
+        raw = miniyaml.load(args[0])
+        f = (raw.get("mesh") or {}).get("file")
+        if isinstance(f, str) and not os.path.isabs(os.path.expanduser(f)):
+            # a user mesh is found relative to the YAML file
+            raw["mesh"]["file"] = os.path.join(os.path.dirname(os.path.abspath(args[0])), f)
+        cfg = case.resolve(raw)
+    except (ValueError, OSError) as e:
+        print(f"celSetup: {e}", file=sys.stderr)
+        return 2
+    out = args[1] if len(args) > 1 else os.path.join(
+        os.path.dirname(os.path.abspath(args[0])), cfg["case"])
+    try:
+        b = case.write_case(cfg, out, src=os.path.basename(args[0]))
+    except ValueError as e:
+        print(f"celSetup: {e}", file=sys.stderr)
+        return 2
+    print(f"celSetup: wrote {out}\n  {b['summary']}")
+    if "--no-mesh" not in flags:
+        ok, msg = case.run_mesh_and_fill(out)
+        print("  " + msg)
+        if not ok and "not found" not in msg:
+            return 3
+    print(f"  next: cd {out} && ./Allrun")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

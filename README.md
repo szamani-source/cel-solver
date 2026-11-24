@@ -8,8 +8,8 @@ LS-DYNA multi-material ALE.
 - Lagrangian side: rigid bodies, then explicit hex8 finite elements.
 - Coupling: penalty contact between Lagrangian surfaces and Eulerian material.
 
-Version 1.0.0 (2026-11-23): release notes in
-[docs/release-notes/v1.0.0.md](docs/release-notes/v1.0.0.md), changes in
+Version 1.1.0 (2026-11-23, adds the case setup tools `celfoam setup` and `celfoam check`): release notes in
+[docs/release-notes/v1.1.0.md](docs/release-notes/v1.1.0.md), changes in
 [CHANGELOG.md](CHANGELOG.md), work status in [docs/STATUS.md](docs/STATUS.md).
 
 ## Install
