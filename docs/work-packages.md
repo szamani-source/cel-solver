@@ -221,6 +221,7 @@ Sia (2026-11-20): needed before the Linux install, with cohesion and compaction.
 | N.1 | Fluidity field and the point update | `tests/test_nonlocal.sh`: homogeneous simple shear gives the local law mu_s + b I to 1e-6; steady fluidity across a 1D layer with a stress gradient matches an independent Python solution to 1 % |
 | N.2 | Coupled into the Eulerian step: sheared layer | A granular layer sheared between a moving lid and a rough base, under gravity, on 3 meshes (cells 2, 1, 0.5 d; the band is about 3 d, decision 0111): the shear band width converges (in d) and the velocity profile matches the 1D nonlocal solution within 5 % |
 | N.3 | Mesh convergence of the column collapse | Collapse a = 0.5 on 10 / 5 / 2.5 mm with the T0 set plus nonlocal: band width and run-out converge (5 and 2.5 mm within 5 %; now 0.30 / 0.33 / 0.43, decision 0038) |
+| N.4 | Box discharge refinement, local against nonlocal (Sia, 2026-11-23, in place of a Couto hopper refinement) | T0 tank, d 5 mm, 10 / 5 / 2.5 mm, both laws on every mesh: the nonlocal flow over the outlet changes less from 5 to 2.5 mm than the local one (decision 0123, met: 2 % against 12 %) |
 | C.1 | Cohesion in the nonlocal law | Homogeneous shear with c = 500 Pa: mu* = tau/(P + c cot phi) = mu_s + b I* (decision 0112) |
 | C.2 | Vertical cut (cohesive column) | Critical c of the a = 0.5 column inside Terzaghi's limits (230 to 344 Pa) on 5 and 2.5 mm, MC and DP |
 | C.3 | Cohesion in the sheared layer | N.2 with c: band and profile within 5 % of the 1D nonlocal solution with P* |

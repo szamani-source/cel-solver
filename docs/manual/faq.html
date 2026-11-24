@@ -125,7 +125,11 @@ switches full cells to the partly filled rules. Silo runs avoid it with <code>fl
 <ul>
 <li><strong>Mesh dependence</strong> (decision 0038). Without the nonlocal law, shear bands are one to
 four cells wide and collapse run-out grows with refinement. The nonlocal law gives them a width set by
-the grain size.</li>
+the grain size. In a box discharge on 10, 5 and 2.5 mm cells with 5 mm grains (decision 0123) the flow
+above the outlet changed by 2 % or less from 5 to 2.5 mm with the nonlocal law, and by up to 12 % with the
+local law; the rate moved by 4 to 5 % with either. The law only helps on cells of about one grain diameter
+or finer where the material shears; on 2 d cells it behaves like the local law. Check a second mesh.
+Column-collapse run-out still grows with refinement: the deposit surface creeps (decision 0123).</li>
 <li><strong>Turned and sheared cells</strong> (decision 0106). On meshes whose lines are turned away from
 the walls, a layer sliding along a wall lifts off slightly (normal speed 0.033 m/s against a limit of
 0.0145). Keep mesh lines along the walls, as in the <a href="meshing.html">Meshing guide</a>.</li>
