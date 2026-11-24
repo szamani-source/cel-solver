@@ -23,6 +23,8 @@ Release version 2.0.0 with the gas model.
 
 Tests use the `ergunWenYu` drag law (Sia, 2026-11-24).
 
+Validation pack: `tests/manual/test_gas_validation_pack.sh` runs the four pack tests (F.2, F.7, F.3, F.5) on 1, 2 and 4 processors, checks each against its reference and the processor counts against each other, and writes one table of results and run times to `docs/results/gas-validation.md`.
+
 ## Out of scope
 
 - Temperature, liquids (out of v2).

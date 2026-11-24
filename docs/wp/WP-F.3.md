@@ -26,6 +26,8 @@ Parallel (Sia, 2026-11-24: the solver must be fully parallel): the done-when tes
 
 Tests use the `ergunWenYu` drag law (Sia, 2026-11-24).
 
+Validation pack (Sia, 2026-11-24): this package delivers pack test 3, pore-pressure decay in a suddenly loaded fine-powder column against the exact diffusion (Terzaghi) solution, as `tests/validation/gas/<name>/` with an `Allrun` that runs it on 1, 2 and 4 processors, checks that they match and writes the run times to `times.csv`.
+
 ## Out of scope
 
 - Void and free surface (F.4).
