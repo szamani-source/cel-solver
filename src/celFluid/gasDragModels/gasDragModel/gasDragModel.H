@@ -154,6 +154,63 @@ public:
 };
 
 
+/*---------------------------------------------------------------------------*\
+                      Class inertialGasDrag Declaration
+\*---------------------------------------------------------------------------*/
+
+//- A drag law with the inertia of the pore gas over a step dt added (WP
+//  F.7, decision 0132): K + e rhoG/dt. The gas momentum in the pores,
+//  e rhoG (w - w_o)/dt = -e grad p - K w (w the slip), is then
+//  K~ w = e rhoG w_o/dt - e grad p, a drag law in K~ against the gradient
+//  less the old slip's part. Not run-time selectable; poreGas makes it.
+class inertialGasDrag
+:
+    public gasDragModel
+{
+    const gasDragModel& base_;
+
+    //- 1/dt [1/s]
+    scalar rDt_;
+
+public:
+
+    TypeName("inertialGasDrag");
+
+    inertialGasDrag(const gasDragModel& base, const scalar dt)
+    :
+        gasDragModel(dictionary::null),
+        base_(base),
+        rDt_(1/dt)
+    {}
+
+    virtual ~inertialGasDrag() = default;
+
+    virtual scalar K
+    (
+        const scalar e,
+        const scalar u,
+        const scalar d,
+        const scalar mu,
+        const scalar rhoG
+    ) const
+    {
+        return base_.K(e, u, d, mu, rhoG) + e*rhoG*rDt_;
+    }
+
+    virtual scalar dKdu
+    (
+        const scalar e,
+        const scalar u,
+        const scalar d,
+        const scalar mu,
+        const scalar rhoG
+    ) const
+    {
+        return base_.dKdu(e, u, d, mu, rhoG);
+    }
+};
+
+
 } // End namespace Foam
 
 #endif

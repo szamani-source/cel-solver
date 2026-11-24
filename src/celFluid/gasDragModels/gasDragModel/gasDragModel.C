@@ -10,6 +10,7 @@
 namespace Foam
 {
     defineTypeNameAndDebug(gasDragModel, 0);
+    defineTypeNameAndDebug(inertialGasDrag, 0);
     defineRunTimeSelectionTable(gasDragModel, dictionary);
 }
 

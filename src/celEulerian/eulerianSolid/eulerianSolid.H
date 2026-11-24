@@ -315,6 +315,10 @@ class eulerianSolid
         //  material and void; null: linear interpolation of poreP_ (F.3)
         const surfaceScalarField* porePf_ = nullptr;
 
+        //- Extra force of the pore gas on each cell's grains [N] (WP F.7:
+        //  the reaction of the pore gas inertia); null: none
+        const volVectorField* gasForce_ = nullptr;
+
         //- Mass carried across each face by the last remap [kg], out of
         //  the owner (internal and coupled faces; WP F.3, for the gas
         //  carried with the grains). Only kept with gas.
@@ -625,6 +629,10 @@ public:
             const volScalarField& p,
             const surfaceScalarField& pf
         );
+
+        //- An extra force of the gas on the grains of each cell [N],
+        //  added with the pore pressure's (WP F.7)
+        void setGasForce(const volVectorField& f) { gasForce_ = &f; }
 
         //- Surface load on a traction patch at time t [Pa] (0 if none)
         scalar loadPressure(const word& patch, const scalar t) const;

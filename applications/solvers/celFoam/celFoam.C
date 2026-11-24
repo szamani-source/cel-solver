@@ -95,6 +95,11 @@ int main(int argc, char *argv[])
         {
             solid.setPorePressure(gas->p());
         }
+        // WP F.7 (decision 0132): the reaction of the pore gas inertia
+        if (gas->gasForcePtr())
+        {
+            solid.setGasForce(*gas->gasForcePtr());
+        }
     }
 
     // Reaction output: force of the material on each body, every step

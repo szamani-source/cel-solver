@@ -9,6 +9,7 @@
 #include "gaussGrad.H"
 #include "laplacianScheme.H"
 #include "fixedGradientFvPatchFields.H"
+#include "Function1.H"
 #include "IStringStream.H"
 #include "scalarMatrices.H"
 #include "DynamicList.H"
@@ -245,7 +246,8 @@ Foam::poreGas::poreGas(const eulerianSolid& solid, const IOobject& io)
     flow_(dict_.getOrDefault<word>("model", "poreGas") == "gasFlow"),
     nCorr_(dict_.getOrDefault<label>("nCorr", 1)),
     divUg_(dict_.getOrDefault<string>("divUg", "Gauss upwind")),
-    USolverDict_()
+    USolverDict_(),
+    poreInertia_(flow_ && dict_.getOrDefault<Switch>("poreInertia", true))
 {
     if (rhoP_ <= 0 || d_ <= 0 || T_ <= 0 || p0_ <= 0)
     {
@@ -308,10 +310,12 @@ Foam::poreGas::poreGas(const eulerianSolid& solid, const IOobject& io)
                     << " must exist and be fixedGradient in p"
                     << exit(FatalIOError);
             }
-            inflow_.set(e.keyword(), e.get<scalar>());
+            // A number or, WP F.7, any Function1 of time (a ramp: table)
+            inflow_.set(e.keyword(), Function1<scalar>::New(e.keyword(), *in));
+            const scalar U0 = inflow_[e.keyword()]->value(0);
             Info<< "Pore gas inflow on " << e.keyword() << ": "
-                << e.get<scalar>() << " m/s at p0 ("
-                << e.get<scalar>()*rhoG_ << " kg/(m^2 s))" << endl;
+                << U0 << " m/s at p0 at t = 0 ("
+                << U0*rhoG_ << " kg/(m^2 s))" << endl;
         }
     }
 
@@ -492,7 +496,12 @@ void Foam::poreGas::faceCoefficients
     const labelUList& nei = mesh.neighbour();
     const scalarField& eM = eM_.primitiveField();
     const scalarField& k = k_.primitiveField();
-    const gasDragModel& drag = *dragModel_;
+    // WP F.7: with the pore gas inertia, the drag law K + e rhoG/dt and the
+    // gradient less the old flux's part, rho_g q_o/(e dt), on the faces
+    // between gas cells (and gas and void); plain on non-coupled boundaries
+    const gasDragModel* lawPtr =
+        inertialDrag_ ? inertialDrag_.get() : dragModel_.get();
+    const bool inertia = bool(inertialDrag_);
 
     // Harmonic mean of the two sides at gradient magnitude G
     auto face =
@@ -510,6 +519,7 @@ void Foam::poreGas::faceCoefficients
             dT = 0;
             return;
         }
+        const gasDragModel& drag = *lawPtr;
         const scalar sP = drag.mobility(eP, G, d_, mu_, rho);
         const scalar sN = drag.mobility(eN, G, d_, mu_, rho);
         const scalar tP = drag.tangentMobility(eP, G, d_, mu_, rho);
@@ -537,6 +547,7 @@ void Foam::poreGas::faceCoefficients
             return;
         }
         const scalar rho = (flow_ ? p0_ + pV : p0_)/RT;
+        const gasDragModel& drag = *lawPtr;
         dS = rho*drag.mobility(eP, G, d_, mu_, rho)/fP;
         dT = rho*drag.tangentMobility(eP, G, d_, mu_, rho)/fP;
     };
@@ -551,6 +562,10 @@ void Foam::poreGas::faceCoefficients
         return mag(g + n*(gn - (n & g)));
     };
 
+    const vectorField gI_
+    (
+        inertia ? vectorField(gInertia_->primitiveField()) : vectorField()
+    );
     {
         scalarField& DS = DfS.primitiveFieldRef();
         scalarField& DT = DfT.primitiveFieldRef();
@@ -577,15 +592,20 @@ void Foam::poreGas::faceCoefficients
                 const scalar fC = ownGas ? 1 - wf : wf;
                 // The void side is at 0 without gas flow (F.4)
                 const scalar gn = (p[N] - p[P])*dc[facei]/max(fC, SMALL);
+                const vector gI = inertia ? gI_[facei] : Zero;
                 faceVoid
                 (
-                    eM[C], k[C], fC, mag3(gradP[C], nf[facei], gn),
+                    eM[C], k[C], fC,
+                    mag3(gradP[C] - gI, nf[facei], gn - (nf[facei] & gI)),
                     DS[facei], DT[facei], ownGas ? p[N] : p[P]
                 );
                 continue;
             }
-            const vector g = wf*gradP[P] + (1 - wf)*gradP[N];
-            const scalar gn = dc[facei]*(p[N] - p[P]) + (corr[facei] & g);
+            const vector gI = inertia ? gI_[facei] : Zero;
+            const vector g = wf*gradP[P] + (1 - wf)*gradP[N] - gI;
+            const scalar gn =
+                dc[facei]*(p[N] - p[P]) + (corr[facei] & (g + gI))
+              - (nf[facei] & gI);
             face
             (
                 eM[P], k[P], eM[N], k[N], wf,
@@ -598,6 +618,7 @@ void Foam::poreGas::faceCoefficients
 
     forAll(DfS.boundaryField(), patchi)
     {
+        lawPtr = inertia ? inertialDrag_.get() : dragModel_.get();
         const fvPatchScalarField& pB = p.boundaryField()[patchi];
         const fvPatchVectorField& gB = gradP.boundaryField()[patchi];
         const labelUList& fc = mesh.boundary()[patchi].faceCells();
@@ -619,6 +640,12 @@ void Foam::poreGas::faceCoefficients
                 fs ? void_.boundaryField()[patchi].patchNeighbourField()
                    : tmp<scalarField>::New(DS.size(), Zero)
             );
+            const vectorField gIB
+            (
+                inertia
+              ? vectorField(gInertia_->boundaryField()[patchi])
+              : vectorField()
+            );
             forAll(DS, i)
             {
                 const label P = fc[i];
@@ -634,6 +661,7 @@ void Foam::poreGas::faceCoefficients
                         DT[i] = DS[i];
                         continue;
                     }
+                    const vector gI = inertia ? gIB[i] : Zero;
                     if (vd[P] > 0.5)
                     {
                         // The gas side is across the cut: the neighbour
@@ -643,7 +671,8 @@ void Foam::poreGas::faceCoefficients
                         const scalar gn = (pN[i] - p[P])*dcB[i]/max(fC, SMALL);
                         faceVoid
                         (
-                            eN[i], kN[i], fC, mag3(gN[i], n[i], gn),
+                            eN[i], kN[i], fC,
+                            mag3(gN[i] - gI, n[i], gn - (n[i] & gI)),
                             DS[i], DT[i], p[P]
                         );
                     }
@@ -653,14 +682,17 @@ void Foam::poreGas::faceCoefficients
                         const scalar gn = (pN[i] - p[P])*dcB[i]/max(fC, SMALL);
                         faceVoid
                         (
-                            eM[P], k[P], fC, mag3(gradP[P], n[i], gn),
+                            eM[P], k[P], fC,
+                            mag3(gradP[P] - gI, n[i], gn - (n[i] & gI)),
                             DS[i], DT[i], pN[i]
                         );
                     }
                     continue;
                 }
-                const vector g = wf[i]*gradP[P] + (1 - wf[i])*gN[i];
-                const scalar gn = dcB[i]*(pN[i] - p[P]) + (cB[i] & g);
+                const vector gI = inertia ? gIB[i] : Zero;
+                const vector g = wf[i]*gradP[P] + (1 - wf[i])*gN[i] - gI;
+                const scalar gn =
+                    dcB[i]*(pN[i] - p[P]) + (cB[i] & (g + gI)) - (n[i] & gI);
                 face
                 (
                     eM[P], k[P], eN[i], kN[i], wf[i],
@@ -672,6 +704,9 @@ void Foam::poreGas::faceCoefficients
         }
         else
         {
+            // No pore inertia on non-coupled boundaries (WP F.7): a fixed
+            // pressure or inflow face keeps the Darcy-Ergun law
+            lawPtr = dragModel_.get();
             const scalarField gn(pB.snGrad());
             // Closed outlets are walls for the gas too (WP F.4)
             const word& pname = mesh.boundary()[patchi].name();
@@ -945,6 +980,9 @@ void Foam::poreGas::solve(const scalar dt)
     }
     const label nCorr = flow_ ? max(nCorr_, label(1)) : 1;
 
+    // Pore gas momentum (WP F.7): the old relative fluxes of this step
+    startInertia(dt);
+
     for (label corr = 0; corr < nCorr; ++corr)
     {
     if (flow_)
@@ -984,9 +1022,10 @@ void Foam::poreGas::solve(const scalar dt)
             );
             const scalarField& D = DfS.boundaryField()[patchi];
             scalarField& g = pB.gradient();
+            const scalar Uin = iter.val()->value(mesh.time().value());
             forAll(g, i)
             {
-                g[i] = D[i] > 0 ? rhoG0*iter.val()/D[i] : 0;
+                g[i] = D[i] > 0 ? rhoG0*Uin/D[i] : 0;
             }
             pB.evaluate();
         }
@@ -1003,6 +1042,14 @@ void Foam::poreGas::solve(const scalar dt)
             // Gas carried by H/A through faces of void cells (WP F.6)
             eqnS.source() -=
                 fvc::surfaceIntegrate(mHbyAPtr_())().primitiveField()
+               *mesh.V().field();
+        }
+        if (poreInertia_)
+        {
+            // Gas carried by the old pore-gas momentum (WP F.7)
+            inertiaFlux(DfS);
+            eqnS.source() -=
+                fvc::surfaceIntegrate(mInertia_())().primitiveField()
                *mesh.V().field();
         }
 
@@ -1264,6 +1311,11 @@ void Foam::poreGas::solve(const scalar dt)
     }
     nOuterAll += outer;
 
+    if (poreInertia_)
+    {
+        // The old pore-gas momentum's part (WP F.7)
+        massFlux_ += mInertia_();
+    }
     if (flow_)
     {
         // Total gas mass flux: the pressure part and H/A (WP F.6)
@@ -1339,6 +1391,7 @@ void Foam::poreGas::solve(const scalar dt)
         qGas_ = fvc::reconstruct(volFlux);
         qGas_.correctBoundaryConditions();
     }
+    endInertia(dt);     // WP F.7
     if (flow_)
     {
         correctVelocity();

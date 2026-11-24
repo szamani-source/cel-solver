@@ -106,8 +106,9 @@ Description
 
         // WP F.2, all optional:
         inflow                  // fixedGradient patches of 0/p blowing gas
-        {                       // in: superficial velocity [m/s] at p0, T
-            bottom  0.05;
+        {                       // in: superficial velocity [m/s] at p0, T,
+            bottom  0.05;       // or a Function1 of time (WP F.7), e.g.
+                                // bottom table ((0 0) (1 0.05));
         }
         nOuter          50;     // Newton iterations per step, at most
         nAnderson       5;      // Anderson acceleration depth (0 off)
@@ -117,6 +118,8 @@ Description
 
         // WP F.6, model gasFlow only, all optional:
         nCorr           1;      // pressure corrections per step (PISO)
+        poreInertia     yes;    // WP F.7: gas momentum in the pores (its
+                                // inertia, drag implicit; no = F.6 Darcy)
         divUg           "Gauss upwind";     // convection of Ug
         USolver                 // linear solver of the gas momentum
         {
@@ -155,6 +158,8 @@ SourceFiles
 #include "autoPtr.H"
 #include "surfaceFields.H"
 #include "HashTable.H"
+#include "HashPtrTable.H"
+#include "Function1.H"
 #include "gasDragModel.H"
 #include "Switch.H"
 #include "fvMatrices.H"
@@ -208,8 +213,9 @@ class poreGas
             //- Gas mass flux through the faces of the last solve [kg/s]
             surfaceScalarField massFlux_;
 
-            //- Inflow patches: superficial velocity at p0 [m/s]
-            HashTable<scalar> inflow_;
+            //- Inflow patches: superficial velocity at p0 [m/s], a
+            //  Function1 of time (WP F.7: ramps)
+            HashPtrTable<Function1<scalar>> inflow_;
 
             //- Newton iterations at most; converged when the largest
             //  correction is below pTol [Pa]
@@ -294,6 +300,43 @@ class poreGas
             autoPtr<volVectorField> Uold_;
             autoPtr<surfaceScalarField> phiOld_;
 
+        // WP F.7: gas momentum in the pores, drag on the grains (decision
+        // 0132)
+
+            //- Inertia of the pore gas (gasFlow only; default yes there)
+            Switch poreInertia_;
+
+            //- The drag law with the pore gas inertia of this step
+            //  (K + e rhoG/dt); null when off
+            autoPtr<gasDragModel> inertialDrag_;
+
+            //- Superficial flux relative to the grains through each face
+            //  at the end of the last step, q.n [m/s], and 1 on the faces
+            //  that were void flow faces then (their flux is absolute)
+            autoPtr<surfaceScalarField> qnOld_;
+            autoPtr<surfaceScalarField> voidFaceOld_;
+
+            //- This step's old momentum at the faces: rho_g q_o.n/(e dt)
+            //  |Sf| [kg/(m^2 s^2)], which times the face coefficient is
+            //  its mass flux, and the old flux as a pressure gradient,
+            //  rho_g q_o/(e dt) [Pa/m] (normal part from the face flux)
+            autoPtr<surfaceScalarField> sInertia_;
+            autoPtr<surfaceVectorField> gInertia_;
+
+            //- Old relative flux per cell (qGas at the start of the step)
+            //  and the void flag then
+            vectorField qCellOld_;
+            scalarField voidOld_;
+
+            //- Mass flux the old pore-gas momentum carries through the
+            //  faces at the current face coefficients [kg/s]
+            autoPtr<surfaceScalarField> mInertia_;
+
+            //- Reaction of the pore gas inertia on the grains, per cell
+            //  [N]: -V (rho_g/dt) (q - q_o); the drag K w is the pressure
+            //  part -phi_g grad p less this (decision 0132)
+            autoPtr<volVectorField> gasForce_;
+
 
     // Private Member Functions (WP F.6, poreGasFlow.C)
 
@@ -318,6 +361,17 @@ class poreGas
         //- Void-cell velocities from H/A and the pressure gradient; the
         //  others from the grains and the pore flux
         void correctVelocity();
+
+    // Private Member Functions (WP F.7, poreGasFlow.C)
+
+        //- Old relative face fluxes and the inertial drag law of the step
+        void startInertia(const scalar dt);
+
+        //- mInertia_ at the face coefficients DfS
+        void inertiaFlux(const surfaceScalarField& DfS);
+
+        //- Store this step's face fluxes and the force on the grains
+        void endInertia(const scalar dt);
 
 
 public:
@@ -398,6 +452,16 @@ public:
 
         //- Gas velocity (WP F.6; gasFlow only)
         const volVectorField& Ug() const noexcept { return *UgPtr_; }
+
+        //- Pore gas inertia on (WP F.7)
+        bool poreInertia() const noexcept { return bool(inertialDrag_); }
+
+        //- Force of the pore gas inertia on the grains per cell [N] (WP
+        //  F.7; null without pore inertia)
+        const volVectorField* gasForcePtr() const noexcept
+        {
+            return gasForce_.get();
+        }
 
 
     // Cycle
