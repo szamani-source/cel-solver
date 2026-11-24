@@ -245,6 +245,14 @@ velocity, and not also listed in <code>walls</code>.</p>
 <code>speed</code> is an OpenFOAM <code>Function1</code>, so it can be a constant, a <code>table</code>, a <code>sine</code>, and so
 on. Needs <code>freeSurface yes</code>; the patch must be a plain patch, not also a wall or an outlet.</p>
 
+<h3 id="loads">Surface loads: <code>loads</code></h3>
+<pre><code>loads
+{
+    top { pressure 2000; startTime 0; }   // Pa on the patch from startTime (s, default 0)
+}</code></pre>
+<p>A uniform pressure on a plain patch from <code>startTime</code> on (version 2, decision 0128), for
+example the load of a consolidation test.</p>
+
 <h3 id="other-patches">Other boundaries</h3>
 <p>Patches not listed in <code>walls</code>, <code>outlets</code> or <code>inlets</code> behave according to their mesh type and
 the velocity boundary condition:</p>
@@ -259,6 +267,33 @@ the velocity boundary condition:</p>
 <tr><td>any other <code>patch</code></td><td>traction-free (an open boundary)</td></tr>
 </tbody>
 </table>
+
+<h2 id="gas">constant/gasProperties (version 2, in development)</h2>
+<p>Optional. Without this file, or with <code>model none</code>, the solver behaves as version 1. With it,
+air in the pores and the void is solved together with the grains (decisions 0125 to 0131). All
+tests use the <code>ergunWenYu</code> drag law.</p>
+<pre><code>model       poreGas;    // none | poreGas | gasFlow (gas velocity in the void, needs freeSurface)
+rhoP        2650;       // grain (particle) density, kg/m^3
+d           0.0001;     // grain diameter, m
+T           293.15;     // gas temperature, K (default)
+p0          101325;     // ambient pressure, Pa (default)
+drag        ergunWenYu; // drag law (default)
+coupled     yes;        // gas pressure acts on the grains, grains carry the gas (default)
+alphaVoid   1e-4;       // cells below this alpha are void for the gas (default)
+inflow      { bottom 0.05; }   // fixedGradient patches of 0/p blowing gas in, m/s at p0
+nOuter      50;         // Newton iterations per step, at most (default)
+nAnderson   5;          // Anderson acceleration depth (default)
+pTolerance  1e-9;       // Pa, converged when the correction is below this (default 1e-14 p0)
+laplacian   "Gauss linear corrected";
+solver      { solver PCG; preconditioner DIC; relTol 1e-3; }   // pressure corrections
+nCorr       1;          // gasFlow: pressure corrections per step (default)
+divUg       "Gauss upwind";   // gasFlow: convection of the gas velocity (default)
+USolver     { solver PBiCGStab; preconditioner DILU; relTol 1e-10; }   // gasFlow momentum</code></pre>
+<p>The gauge gas pressure is the field <code>0/p</code> (optional): <code>fixedValue</code> patches are open at that
+pressure, <code>zeroGradient</code> patches are sealed. Outlets must be <code>fixedValue</code>. With
+<code>model gasFlow</code> the field <code>0/Ug</code> (optional) is the gas velocity; without it walls are no-slip
+and open patches zeroGradient. Written: <code>p</code>, <code>phiS</code>, <code>phiG</code>, <code>k</code>, <code>qGas</code> and, with gasFlow,
+<code>Ug</code>.</p>
 
 <h2 id="fields">Initial fields</h2>
 <p>celFoam reads these fields from the start time folder if they are there, and otherwise
