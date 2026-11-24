@@ -266,3 +266,33 @@ read-me listing what is needed and how to source OpenFOAM. One thread, one PR.
 | L.3 | Install tests | `tests/test_install.sh` passes; `.github/workflows/install.yml` passes on a clean Ubuntu 24.04 and with Docker |
 | L.4 | Version 1.0.0: VERSION, LICENSE, CHANGELOG, release notes, release workflow | merging to main publishes the v1.0.0 release |
 | L.5 | Decision, STATUS, manual page | `tests/test_manual.sh` passes |
+
+## Case setup tools (S series, decision 0119)
+
+Sia (2026-11-23): setting up cases, above all the mesh, is the hard part. A
+parametric case generator, a pre-run mesh checker and a setup GUI, all before
+the Linux installation package. Brief and log: `docs/wp/WP-S.md`.
+
+| WP | Title | Done when |
+| --- | --- | --- |
+| S.1 | `celSetup case.yaml`, conical hopper template | `tests/test_celsetup.sh`: the Couto example gives the validated mesh and STL exactly, Mesh OK, 1503 kg placed, celFoam runs and resumes |
+| S.2 | Every property with default, unit and description | `celSetup --template` writes a commented file with every entry; the GUI and manual read the same list |
+| S.3 | `celCheck` mesh checker | Reports the time step to within 1 % of celFoam's first step, cell sizes against d and the nonlocal length, non-orthogonality, run time, picture |
+| S.4 | Setup GUI (local browser page) | Forms from the schema, live geometry and mesh, checker verdict, save and run |
+| S.5 | Templates: flat-bottom silo, plane hopper, plane tank, footing | Each writes a case that passes checkMesh and runs 50 steps |
+| S.6 | Wider axis column near the outlet | Time step gain shown by celCheck, Couto at-rest pressures unchanged in a short check |
+| S.7 | Manual pages and tutorial | `tests/test_manual.sh` passes with the setup pages |
+
+G series (Sia 2026-11-23 18:08 UTC, after v1.0.0): the HTML setup GUI, meshing with
+Gmsh or blockMesh, and user-provided meshes. Replaces S.5-S.7 above.
+
+| WP | Title | Done when |
+| --- | --- | --- |
+| G.0 | Setup tools up to date with v1.0.0, merged | PR #77 merged on green CI |
+| G.1 | Gmsh mesher for the conical hopper (decision 0120) | `tests/test_celsetup_gmsh.sh`: same cells and patches as blockMesh, Mesh OK, time step within 1 %, celFoam runs |
+| G.2 | GUI: mesher choice and comparison | GUI test meshes with either and shows both |
+| G.3 | GUI: load a user mesh, pick patches, assign boundary conditions | A polyMesh and a .msh load, patches listed, a case written that runs 50 steps |
+| G.4 | Polish: load/save, examples, field errors | GUI test covers each |
+| G.5 | More templates (flat-bottom silo, plane tank, plane hopper, footing), both meshers | Each passes checkMesh and runs 50 steps |
+| G.6 | Optional faster-time-step mesh options (off by default) | Gain shown by celCheck; at-rest pressures unchanged in a short check |
+| G.7 | Manual page and tutorial | `tests/test_manual.sh` passes with the setup pages |

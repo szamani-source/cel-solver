@@ -12,7 +12,8 @@ var NAV = [
     ]},
     { group: "Using celFoam", pages: [
         ["case-setup.html", "Case setup reference"],
-        ["meshing.html", "Meshing guide"]
+        ["meshing.html", "Meshing guide"],
+        ["setup-tool.html", "Setup tool (celSetup)"]
     ]},
     { group: "Theory", pages: [
         ["theory-equations.html", "Equations and numerics"],
