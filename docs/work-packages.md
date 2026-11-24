@@ -296,3 +296,22 @@ Gmsh or blockMesh, and user-provided meshes. Replaces S.5-S.7 above.
 | G.5 | More templates (flat-bottom silo, plane tank, plane hopper, footing), both meshers | Each passes checkMesh and runs 50 steps |
 | G.6 | Optional faster-time-step mesh options (off by default) | Gain shown by celCheck; at-rest pressures unchanged in a short check |
 | G.7 | Manual page and tutorial | `tests/test_manual.sh` passes with the setup pages |
+
+## Version 2: gas in the pores and the void (F series, decision 0125)
+
+Sia, 2026-11-24: version 2 couples a fluid (air) to the solver; Stage A then B,
+gas only, no temperature. One thread and one PR per package; Sia gets a report after
+each. Briefs: `docs/wp/WP-F.x.md`. References: `docs/spec/gas-references.md`.
+
+| WP | Title | Done when | ETA |
+| --- | --- | --- | --- |
+| F.0 | Plan in the repo, references, gas and grain data | `tests/test_gas_reference.sh` passes; decision 0125; briefs F.1-F.9 | 2 h |
+| F.1 | Gas fractions and the `celFluid` skeleton | phi_s, phi_g, k written for a settled column; phi_s equals the set packing within 0.5 %; v1 unchanged bit for bit with gas off; 2 processors match serial | 2 h |
+| F.2 | Pore pressure in a rigid bed | Permeameter against Ergun within 1 %; step diffusion against erfc within 2 %; gas mass to 1e-12 | 3 h |
+| F.3 | Effective stress and volume-change source | Gas-filled column against Terzaghi within 3 %; column at rest stays at p0; stable with 0.1 mm grains at the v1 step | 5 h |
+| F.4 | Free surface, void and outlet for the pore gas | Venting through a free top within 3 % of the closed form; v1 void tests pass; outlet face carries the gas boundary | 3 h |
+| F.5 | Air-impeded discharge (end of Stage A) | Coarse grains within 5 % of the dry rate; fine grains slow with the published trend within 20 %; checkpointed runs | 2 h + 3 h runs |
+| F.6 | Gas momentum in the void | Channel flow against Poiseuille within 1 %; still air stays still to 1e-10 m/s; step set by the solid | 4 h |
+| F.7 | Gas through and around grains, Di Felice drag | U_mf against Wen-Yu within 10 %; settling against Richardson-Zaki within 10 %; Stage A within 1 % | 5 h |
+| F.8 | Collapse in gas (end of Stage B) | Fluidised dam break against Roche et al. (2010) within 20 % (fall-back Rondon et al. 2011); mesh shown to Sia first | 2 h + 2 h runs |
+| F.9 | Restart, MPI, tutorial, manual, v2.0.0 | Restart and 2/4 processors match serial to 1e-12 on F.5 and F.8; `tutorials/gasHopper`; manual chapter; release | 4 h |
