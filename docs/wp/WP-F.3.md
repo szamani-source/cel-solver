@@ -1,6 +1,6 @@
 # WP F.3: Effective stress and volume-change source
 
-State: not started
+State: done (decision 0128)
 Branch: assigned by the thread
 
 ## Goal
@@ -35,5 +35,14 @@ Validation pack (Sia, 2026-11-24): this package delivers pack test 3, pore-press
 ## Log
 
 Newest first. Each entry: date, what was done, what was learned, exact next step.
+
+- 2026-11-24: done (decision 0128). Effective stress (sigma is sigma'; cell force
+  -sum(p_f S_f)), gas carried with the grains matched to the remap's face masses,
+  surface `loads`, `coupled yes|no`. `tests/test_consolidation.sh` passes (Terzaghi
+  within 0.8 % from T = 0.05, at rest 2e-17, 2/4 processors 5e-13, mass 1e-15); pack
+  test 3 `tests/validation/gas/terzaghiColumn`. Cost 1.4 to 1.5x on 2,000 cells, 2.5x on 50
+  cells. Learned: the sudden load starts elastic waves the quasi-static theory leaves out
+  (compare from T = 0.05 with damping, or make the column tall); F.2's inner relTol 0.1
+  made 8 to 10 outer iterations per step, 1e-3 plus the error estimate makes 3. Next: F.4.
 
 - 2026-11-24: brief written in WP F.0. Next: start when the package before it has merged.

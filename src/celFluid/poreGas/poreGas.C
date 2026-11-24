@@ -190,7 +190,11 @@ Foam::poreGas::poreGas(const eulerianSolid& solid, const IOobject& io)
         dict_.getOrDefault<string>("laplacian", "Gauss linear corrected")
     ),
     solverDict_(),
-    netIn_(0)
+    netIn_(0),
+    coupled_(dict_.getOrDefault<Switch>("coupled", true)),
+    phiG0_(),
+    pOldOld_(),
+    dtOld_(-1)
 {
     if (rhoP_ <= 0 || d_ <= 0 || T_ <= 0 || p0_ <= 0)
     {
@@ -214,11 +218,13 @@ Foam::poreGas::poreGas(const eulerianSolid& solid, const IOobject& io)
     Info().precision(oldPrecision);
 
     // Linear solver controls for each Newton correction (defaults: PCG/DIC,
-    // residual down by 0.1: inexact Newton, the outer loop converges)
+    // residual down by 1e-3: with 0.1 (F.2) each outer iteration gained
+    // one digit and a step took 8 to 10 of them, each with the face
+    // coefficients; 1e-3 needs 3 per step at a few more PCG sweeps, WP F.3)
     solverDict_.add("solver", "PCG");
     solverDict_.add("preconditioner", "DIC");
     solverDict_.add("tolerance", 1e-30);
-    solverDict_.add("relTol", 0.1);
+    solverDict_.add("relTol", 1e-3);
     solverDict_.add("maxIter", 1000);
     solverDict_.add("log", 0);
     if (const dictionary* sd = dict_.findDict("solver"))
@@ -258,7 +264,22 @@ Foam::poreGas::poreGas(const eulerianSolid& solid, const IOobject& io)
         }
     }
 
+    if (coupled_ && solid.freeSurface())
+    {
+        // The void at the boundary pressure and partly filled cells come in
+        // WP F.4; until then the gas would be trapped in the void cells
+        FatalIOErrorInFunction(dict_)
+            << "coupled yes needs a solid without freeSurface until WP F.4 "
+            << "(void and free surface); set coupled no" << exit(FatalIOError);
+    }
+
     correctFractions();
+    phiG0_ = phiG_.primitiveField();
+
+    Info<< "Pore gas coupling (WP F.3): "
+        << (coupled_ ? "two-way (effective stress, gas carried by the grains)"
+                     : "none (solid frozen for the gas, F.2)")
+        << nl << endl;
 }
 
 
@@ -294,6 +315,9 @@ void Foam::poreGas::correctFractions()
     const scalarField& alpha = solid_.alpha().primitiveField();
     const tmp<scalarField> tOpen(solid_.cellOpen());
     const scalarField& open = tOpen();
+
+    // Gas fraction of the last solve (WP F.3): the old gas mass
+    phiG0_ = phiG_.primitiveField();
 
     scalarField& phiS = phiS_.primitiveFieldRef();
     scalarField& phiG = phiG_.primitiveFieldRef();
@@ -503,6 +527,76 @@ void Foam::poreGas::solve(const scalar dt)
     }
     const scalarField pOld(p.primitiveField());
 
+    // Gas carried and squeezed by the grains (WP F.3, decision 0128): per
+    // cell the gas mass X [kg] that the solid's step would add to the gas
+    // stored at the old pressure,
+    //   X = (phiG - phiG0) Vo rho_g,P + sum_f rho_g,donor G_f,
+    //   G_f = dt phiL_f - dm_f/rhoP (gas volume out across the face),
+    // with rho_g at the start of the step. The p0 part and the gauge part
+    // are summed apart (round-off of p0). The balance below is then
+    //   S Vo/dt (p - pOld) + X/dt + sum(Darcy flux out) = 0.
+    scalarField X(p.size(), Zero);
+    if (coupled_ && solid_.mesh().time().timeIndex() > 0)
+    {
+        const scalarField Vo(open*mesh.V().field());
+        const labelUList& own = mesh.owner();
+        const labelUList& nei = mesh.neighbour();
+        const scalarField& phiL = solid_.phiL().primitiveField();
+        const scalarField& dm = solid_.remapMass().primitiveField();
+
+        scalarField vol((phiG - phiG0_)*Vo);    // p0 part, volumes
+        scalarField gauge(vol*pOld);            // gauge part, volume x Pa
+        forAll(own, facei)
+        {
+            const scalar G = dt*phiL[facei] - dm[facei]/rhoP_;
+            const scalar pd = G > 0 ? pOld[own[facei]] : pOld[nei[facei]];
+            vol[own[facei]] += G;
+            vol[nei[facei]] -= G;
+            gauge[own[facei]] += G*pd;
+            gauge[nei[facei]] -= G*pd;
+        }
+        forAll(mesh.boundary(), patchi)
+        {
+            if (!mesh.boundary()[patchi].coupled())
+            {
+                // Non-coupled boundaries: no mixture volume crosses them in
+                // the remap of full cells (outlets, inlets and the void:
+                // F.4, F.5)
+                continue;
+            }
+            const labelUList& fc = mesh.boundary()[patchi].faceCells();
+            const scalarField& pPhi = solid_.phiL().boundaryField()[patchi];
+            const scalarField& pdm =
+                solid_.remapMass().boundaryField()[patchi];
+            const scalarField pN
+            (
+                p.boundaryField()[patchi].patchNeighbourField()
+            );
+            forAll(fc, i)
+            {
+                const scalar G = dt*pPhi[i] - pdm[i]/rhoP_;
+                const scalar pd = G > 0 ? pOld[fc[i]] : pN[i];
+                vol[fc[i]] += G;
+                gauge[fc[i]] += G*pd;
+            }
+        }
+        forAll(X, celli)
+        {
+            X[celli] = (p0_*vol[celli] + gauge[celli])/RT;
+        }
+    }
+
+    // First guess (WP F.3): the pressure extrapolated linearly from the
+    // last two steps, so a smooth evolution needs fewer iterations. The
+    // converged result does not depend on it beyond pTolerance.
+    if (dtOld_ > 0 && pOldOld_.size() == pOld.size())
+    {
+        p.primitiveFieldRef() += (pOld - pOldOld_)*(dt/dtOld_);
+        p.correctBoundaryConditions();
+    }
+    pOldOld_ = pOld;
+    dtOld_ = dt;
+
     volScalarField::Internal SdtV
     (
         IOobject("gasStorage", mesh.time().timeName(), mesh),
@@ -533,7 +627,7 @@ void Foam::poreGas::solve(const scalar dt)
 
     const scalar rhoG0 = rhoG_;
     label outer = 0;
-    scalar change = GREAT, prevChange = GREAT;
+    scalar change = GREAT, prevChange = GREAT, errorEst = GREAT;
     label nNewton = 0;
 
     // Anderson history
@@ -578,9 +672,9 @@ void Foam::poreGas::solve(const scalar dt)
             fvm::Sp(SdtV, p)
           - tLap.ref().fvmLaplacian(DfS, p)
         );
-        eqnS.source() += SdtV.field()*mesh.V().field()*pOld;
+        eqnS.source() += SdtV.field()*mesh.V().field()*pOld - X/dt;
 
-        if (outer > 0 && change <= pTol_)
+        if (outer > 0 && errorEst <= pTol_)
         {
             massFlux_ = eqnS.flux();
             break;
@@ -668,6 +762,15 @@ void Foam::poreGas::solve(const scalar dt)
 
         prevChange = change;
         change = gMax(mag(delta)());
+
+        // Error left after this correction (WP F.3): the next correction,
+        // estimated from the contraction of the last two when they shrink
+        // fast (linear convergence of the lagged gas density); without
+        // that estimate, the correction itself
+        {
+            const scalar rate = outer > 0 ? change/prevChange : 1;
+            errorEst = rate < 0.1 ? rate*change : change;
+        }
 
         // Anderson acceleration (depth nAnderson) of the fixed-point map
         // p -> p + delta: p_new = g_k - dG gamma, gamma minimising
@@ -792,7 +895,9 @@ void Foam::poreGas::solve(const scalar dt)
         scalarField& pc = p.primitiveFieldRef();
         forAll(pc, celli)
         {
-            pc[celli] = pOld[celli] - netOut[celli]/SdtV[celli];
+            pc[celli] =
+                pOld[celli]
+              - (netOut[celli] + X[celli]/(dt*mesh.V()[celli]))/SdtV[celli];
         }
         p.correctBoundaryConditions();
     }

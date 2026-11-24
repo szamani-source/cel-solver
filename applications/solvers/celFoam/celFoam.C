@@ -15,7 +15,8 @@ Description
     (decision 0125): with constant/gasProperties the pore gas (library
     celFluid, class poreGas) follows the solid; F.1 computes the gas
     fractions and permeability after each remap, F.2 solves the pore
-    pressure with the solid frozen (decision 0127).
+    pressure with the solid frozen (decision 0127); F.3 couples the two
+    both ways (effective stress, gas carried by the grains, decision 0128).
 \*---------------------------------------------------------------------------*/
 
 #include "fvCFD.H"
@@ -80,6 +81,12 @@ int main(int argc, char *argv[])
     // Pore gas (WP F.1, decision 0126): null without constant/gasProperties
     // or with model none, and then nothing below changes (v1 bit for bit)
     autoPtr<poreGas> gas(poreGas::New(solid));
+    if (gas && gas->coupled())
+    {
+        // WP F.3 (decision 0128): sigma is the effective stress and the gas
+        // pressure acts on the material
+        solid.setPorePressure(gas->p());
+    }
 
     // Reaction output: force of the material on each body, every step
     autoPtr<OFstream> forceFile;
@@ -198,7 +205,7 @@ int main(int argc, char *argv[])
         if (gas)
         {
             gas->correctFractions();    // WP F.1: phiS, phiG, k
-            gas->solve(dt);             // WP F.2: pore pressure, solid frozen
+            gas->solve(dt);             // WP F.2, F.3: pore pressure
         }
 
         if (runTime.write())

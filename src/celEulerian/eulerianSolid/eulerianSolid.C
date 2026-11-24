@@ -351,6 +351,39 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
     }
     readInlets();
 
+    // Surface loads (WP F.3, decision 0128)
+    if (const dictionary* ld = materialProperties_.findDict("loads"))
+    {
+        for (const entry& e : *ld)
+        {
+            const label patchi = mesh.boundaryMesh().findPatchID(e.keyword());
+            if
+            (
+                patchi < 0
+             || mesh.boundary()[patchi].coupled()
+             || isA<emptyFvPatch>(mesh.boundary()[patchi])
+             || wallFriction_.found(e.keyword())
+             || outletOpenTime_.found(e.keyword())
+             || inletOfPatch_[patchi] >= 0
+             || U_.boundaryField()[patchi].fixesValue()
+            )
+            {
+                FatalIOErrorInFunction(*ld)
+                    << "loads: " << e.keyword() << " must be a plain patch "
+                    << "(not a wall, outlet, inlet or fixed velocity)"
+                    << exit(FatalIOError);
+            }
+            loadPressure_.set(e.keyword(), e.dict().get<scalar>("pressure"));
+            loadStart_.set
+            (
+                e.keyword(), e.dict().getOrDefault<scalar>("startTime", 0)
+            );
+            Info<< "Load on " << e.keyword() << ": pressure "
+                << loadPressure_[e.keyword()] << " Pa from t = "
+                << loadStart_[e.keyword()] << " s" << nl;
+        }
+    }
+
     // Restart (WP 6.2, decision 0081): counters and wall face velocities
     // written with the fields of the start time
     {
@@ -1214,6 +1247,47 @@ Foam::scalar Foam::eulerianSolid::stableDeltaT() const
 
 
 // remap(dt): eulerianSolidRemap.C (WP 2.4)
+
+
+void Foam::eulerianSolid::setPorePressure(const volScalarField& p)
+{
+    poreP_ = &p;
+    if (!remapMass_)
+    {
+        remapMass_.reset
+        (
+            new surfaceScalarField
+            (
+                IOobject
+                (
+                    "remapMass",
+                    mesh_.time().timeName(),
+                    mesh_,
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE,
+                    IOobject::NO_REGISTER
+                ),
+                mesh_,
+                dimensionedScalar(dimMass, Zero)
+            )
+        );
+    }
+}
+
+
+Foam::scalar Foam::eulerianSolid::loadPressure
+(
+    const word& patch,
+    const scalar t
+) const
+{
+    const auto iter = loadPressure_.cfind(patch);
+    if (!iter.good() || t < loadStart_[patch] - SMALL)
+    {
+        return 0;
+    }
+    return iter.val();
+}
 
 
 Foam::scalar Foam::eulerianSolid::totalMass() const

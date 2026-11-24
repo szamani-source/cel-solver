@@ -35,12 +35,13 @@ def write(path, text):
 
 def make_case(path, *, size, cells, e, d, end, write_interval, p_patches,
               inflow=None, p_set=None, skew=0.0, decomp=(1, 1, 1), E=1.0e6,
-              extra_gas=""):
+              extra_gas="", coupled=False):
     """2D box size = (Lx, Ly), cells = (nx, ny), packing gas fraction e,
     grain diameter d. p_patches maps left/right/bottom/top to a 0/p entry
     body. inflow: dict patch -> superficial velocity at p0. p_set: setFields
     box for p, ((x0, y0), (x1, y1), value). skew shifts the top edge in x
-    (non-orthogonal cells)."""
+    (non-orthogonal cells). coupled: gas acts on the solid (WP F.3); the
+    F.2 cases keep the solid frozen (coupled no)."""
     Lx, Ly = size
     nx, ny = cells
     rho = (1.0 - e) * RHOP
@@ -132,6 +133,7 @@ d       {d!r};
 T       {T!r};
 p0      {P0!r};
 drag    ergunWenYu;
+coupled {'yes' if coupled else 'no'};
 {inl}{extra_gas}""")
 
 

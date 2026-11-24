@@ -77,6 +77,12 @@ Description
       filled with material at density (default rho), stress -pressure I
       (default 0) and no plastic history, counted in charged(). Outside
       that time the patch is a closed wall with friction (default 0).
+    - constant/materialProperties, optional subdictionary loads (WP F.3,
+      decision 0128): patch name -> { pressure <Pa>; startTime <s>; }
+      puts a uniform normal pressure (compression) on that traction patch
+      from startTime (default 0) on; the patch moves with the material as
+      a free surface does. With pore gas it acts on the effective stress
+      where the gas is drained (p = 0 on that patch).
     - Immersed STL walls (WP 4.3a, decision 0047): setImmersedWalls() hands
       over the cut-cell geometry of fixed rigid bodies (constant/rigidBodies,
       friction <deg> per body; see celCoupling setImmersedWalls). Material
@@ -293,6 +299,22 @@ class eulerianSolid
         //- Mass that left through non-coupled boundary faces (this
         //  processor) [kg]
         scalar discharged_;
+
+        //- Surface loads (WP F.3, decision 0128): traction patch name ->
+        //  normal pressure [Pa] and the time it is applied from [s]
+        HashTable<scalar> loadPressure_;
+        HashTable<scalar> loadStart_;
+
+        //- Pore gas pressure (gauge) acting on the material (WP F.3,
+        //  decision 0128): null without gas (v1). sigma is then the
+        //  effective stress; the momentum gets minus the pressure on the
+        //  faces of each cell, so sigma - p I acts in total.
+        const volScalarField* poreP_ = nullptr;
+
+        //- Mass carried across each face by the last remap [kg], out of
+        //  the owner (internal and coupled faces; WP F.3, for the gas
+        //  carried with the grains). Only kept with gas.
+        autoPtr<surfaceScalarField> remapMass_;
 
         //- Inlets (WP 3.7a, decision 0060): name, patch, speed into the
         //  domain over time [m/s], start and end time [s], closed-wall
@@ -584,6 +606,19 @@ public:
 
         //- Change the velocity damping (for example off once settled)
         void setDamping(const scalar alpha) { damping_ = alpha; }
+
+        //- Pore gas pressure on the material (WP F.3, decision 0128):
+        //  from now on sigma is the effective stress and each cell's
+        //  momentum also gets -sum(p_f S_f); the remap keeps its face
+        //  masses (remapMass)
+        void setPorePressure(const volScalarField& p);
+
+        //- Surface load on a traction patch at time t [Pa] (0 if none)
+        scalar loadPressure(const word& patch, const scalar t) const;
+
+        //- Mass carried across each face by the last remap [kg], out of
+        //  the owner; valid after setPorePressure()
+        const surfaceScalarField& remapMass() const { return *remapMass_; }
 
 
     // Immersed walls (WP 4.3a, decision 0047)
