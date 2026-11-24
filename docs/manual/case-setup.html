@@ -245,6 +245,16 @@ velocity, and not also listed in <code>walls</code>.</p>
 <code>speed</code> is an OpenFOAM <code>Function1</code>, so it can be a constant, a <code>table</code>, a <code>sine</code>, and so
 on. Needs <code>freeSurface yes</code>; the patch must be a plain patch, not also a wall or an outlet.</p>
 
+<h3 id="loads">Surface loads: <code>loads</code></h3>
+<pre><code>loads
+{
+    top { pressure 2000; startTime 0; }
+}</code></pre>
+<p>Puts a uniform normal pressure <code>pressure</code> (Pa, compression) on a traction patch from
+<code>startTime</code> (s, default 0) on; the patch moves with the material under it, as a free surface
+does. The patch must be a plain patch, not a wall, outlet or inlet, and without a fixed velocity.
+With pore gas the load acts on the effective stress where the gas is drained (version 2, decision 0128).</p>
+
 <h3 id="other-patches">Other boundaries</h3>
 <p>Patches not listed in <code>walls</code>, <code>outlets</code> or <code>inlets</code> behave according to their mesh type and
 the velocity boundary condition:</p>
@@ -259,6 +269,31 @@ the velocity boundary condition:</p>
 <tr><td>any other <code>patch</code></td><td>traction-free (an open boundary)</td></tr>
 </tbody>
 </table>
+
+<h2 id="gas">Pore gas (version 2): constant/gasProperties</h2>
+<p>Optional. Without this file, or with <code>model none</code>, nothing changes. With it the gas in the
+pores is solved each step (decisions 0125 to 0128):</p>
+<pre><code>model       poreGas;     // none | poreGas
+rhoP        2650;        // grain density, kg/m^3
+d           0.0001;      // grain diameter, m
+T           293.15;      // gas temperature, K (default)
+p0          101325;      // ambient pressure, Pa (default)
+drag        ergunWenYu;  // drag law (default; others come in WP F.7)
+coupled     yes;         // gas pressure acts on the solid (default); no: solid frozen for the gas
+
+// optional, all with defaults
+inflow      { bottom 0.05; }   // fixedGradient patches of 0/p blowing air in, m/s at p0
+nOuter      50;          // Newton iterations per step, at most
+nAnderson   5;           // Anderson acceleration depth (0 off)
+pTolerance  1e-9;        // Pa, converged when the error left is below this (default 1e-14 p0)
+laplacian   "Gauss linear corrected";
+solver      { solver PCG; preconditioner DIC; relTol 1e-3; }   // each Newton correction</code></pre>
+<p>The pressure field <code>0/p</code> is the gauge pressure (absolute minus <code>p0</code>):
+<code>fixedValue</code> patches hold a pressure, <code>zeroGradient</code> patches are sealed. With
+<code>coupled yes</code> the stress <code>sigma</code> is the effective stress and the gas pressure pushes on
+the material; the grains carry and squeeze the gas. Until the void is handled (WP F.4),
+<code>coupled yes</code> needs a solid without <code>freeSurface</code>. The solver writes <code>phiS</code>,
+<code>phiG</code>, <code>k</code>, <code>p</code> and <code>qGas</code>.</p>
 
 <h2 id="fields">Initial fields</h2>
 <p>celFoam reads these fields from the start time folder if they are there, and otherwise
