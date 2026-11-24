@@ -301,7 +301,8 @@ Gmsh or blockMesh, and user-provided meshes. Replaces S.5-S.7 above.
 
 Sia, 2026-11-24: version 2 couples a fluid (air) to the solver; Stage A then B,
 gas only, no temperature. Several drag laws for users; every test uses
-`ergunWenYu` (Sia, 2026-11-24). One thread and one PR per package; Sia gets a report after
+`ergunWenYu` (Sia, 2026-11-24). Fully parallel: every test from F.2 on also runs on 2 and
+4 processors against serial; F.9 adds a speed test. One thread and one PR per package; Sia gets a report after
 each. Briefs: `docs/wp/WP-F.x.md`. References: `docs/spec/gas-references.md`.
 
 | WP | Title | Done when | ETA |
@@ -315,4 +316,15 @@ each. Briefs: `docs/wp/WP-F.x.md`. References: `docs/spec/gas-references.md`.
 | F.6 | Gas momentum in the void | Channel flow against Poiseuille within 1 %; still air stays still to 1e-10 m/s; step set by the solid | 4 h |
 | F.7 | Gas through and around grains; more drag laws (`ergun`, `wenYu`, `diFelice`, `syamlalOBrien`, `beetstra`) | Each law matches its closed form to 1e-10; with `ergunWenYu`, U_mf against Wen-Yu within 10 % and settling against Richardson-Zaki within 10 %; Stage A within 1 % | 6 h |
 | F.8 | Collapse in gas (end of Stage B) | Fluidised dam break against Roche et al. (2010) within 20 % (fall-back Rondon et al. 2011); mesh shown to Sia first | 2 h + 2 h runs |
-| F.9 | Restart, MPI, tutorial, manual, v2.0.0 | Restart and 2/4 processors match serial to 1e-12 on F.5 and F.8; `tutorials/gasHopper`; manual chapter; release | 4 h |
+| F.9 | Restart, MPI, tutorial, manual, v2.0.0 | Restart and 2/4 processors match serial to 1e-12 on F.5 and F.8; scaling: gas costs at most 1.5x per step, 4 processors at least 2.5x serial; `tutorials/gasHopper`; manual chapter; release | 4 h |
+
+Validation pack (Sia, 2026-11-24: "Include all four in validation pack"). Each runs on 1,
+2 and 4 processors; results must match and run times are recorded. F.9 runs all four
+in one script and writes `docs/results/gas-validation.md`.
+
+| Pack test | What | Reference | Built in | Run time |
+| --- | --- | --- | --- | --- |
+| 1 | Packed-bed pressure drop: air blown up through a fixed sand column | Ergun equation | F.2 | seconds |
+| 2 | Onset of fluidisation: raise the airflow until the bed lifts | Minimum fluidisation velocity, Wen and Yu | F.7 | minutes |
+| 3 | Pore-pressure decay in a suddenly loaded fine-powder column | Exact diffusion (Terzaghi) solution | F.3 | minutes |
+| 4 | Fine-powder hopper discharge, gas on and off | Crewdson et al. (1977) | F.5 | hours (coarse mesh) |

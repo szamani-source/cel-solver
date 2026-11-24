@@ -19,9 +19,11 @@ Release version 2.0.0 with the gas model.
 
 ## Done when
 
-- `tests/test_gas_parallel.sh`: restart and 2/4 processors match serial to 1e-12 on the F.5 and F.8 cases; `tests/test_manual.sh` passes with the gas chapter.
+- `tests/test_gas_parallel.sh`: restart and 2/4 processors match serial to 1e-12 on the F.5 and F.8 cases; `tests/test_manual.sh` passes with the gas chapter. Speed (`tests/manual/test_gas_scaling.sh`, F.5 fine-powder hopper and the Couto hopper, 1/2/4/8 processors, 200 steps): gas on costs at most 1.5 times gas off per step, and 4 processors run at least 2.5 times faster than serial (v1 baseline: 2.6 at 620 cells per processor, decision in WP 6.3a).
 
 Tests use the `ergunWenYu` drag law (Sia, 2026-11-24).
+
+Validation pack: `tests/manual/test_gas_validation_pack.sh` runs the four pack tests (F.2, F.7, F.3, F.5) on 1, 2 and 4 processors, checks each against its reference and the processor counts against each other, and writes one table of results and run times to `docs/results/gas-validation.md`.
 
 ## Out of scope
 
