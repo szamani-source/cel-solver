@@ -14,7 +14,8 @@ Description
     bodies are coupled in WP 4.3b (see docs/work-packages.md). Version 2
     (decision 0125): with constant/gasProperties the pore gas (library
     celFluid, class poreGas) follows the solid; F.1 computes the gas
-    fractions and permeability after each remap.
+    fractions and permeability after each remap, F.2 solves the pore
+    pressure with the solid frozen (decision 0127).
 \*---------------------------------------------------------------------------*/
 
 #include "fvCFD.H"
@@ -197,6 +198,7 @@ int main(int argc, char *argv[])
         if (gas)
         {
             gas->correctFractions();    // WP F.1: phiS, phiG, k
+            gas->solve(dt);             // WP F.2: pore pressure, solid frozen
         }
 
         if (runTime.write())

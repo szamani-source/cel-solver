@@ -13,3 +13,4 @@ tutorials/**/processor*/
 __pycache__/
 tutorials/coutoHopper/run/
 tutorials/coutoHopper/mesh.png
+tests/validation/**/run/

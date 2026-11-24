@@ -14,5 +14,7 @@ Libraries are added here by later work packages, one folder per library:
 - `celCoupling/` (WP 4.2, then 4.3a, 4.3b): `bodyCells`, exact cells and faces covered by
   each rigid body (decision 0043); the cut-cell wall coupling comes in 4.3a (decision 0042).
 - `celFluid/` (WP F.1, then F.2 to F.9, version 2): gas in the pores and the void
-  (decisions 0125, 0126). `poreGas/` reads `constant/gasProperties` and writes the gas
-  fractions `phiS`, `phiG` and the permeability `k`; the pressure solve comes in F.2.
+  (decisions 0125, 0126, 0127). `poreGas/` reads `constant/gasProperties`, writes the gas
+  fractions `phiS`, `phiG`, the permeability `k`, and solves the pore pressure `p` (gauge)
+  and flux `qGas` each step (F.2); `gasDragModels/` holds the run-time selected drag laws
+  (`ergunWenYu`, the default; more in F.7).

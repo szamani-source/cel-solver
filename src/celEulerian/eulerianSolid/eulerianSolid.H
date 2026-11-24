@@ -644,6 +644,13 @@ public:
         //- Material volume of each cell: V times the open fraction
         tmp<scalarField> openVolume() const;
 
+        //- Open area fraction per face, or null without bodies (WP F.2:
+        //  the pore gas scales its face fluxes by it)
+        const surfaceScalarField* faceOpenPtr() const noexcept
+        {
+            return immersed_ ? faceOpen_.get() : nullptr;
+        }
+
         //- Wall face area vectors (into the body), wall cells only
         const vectorField& wallArea() const noexcept { return wallA_; }
 

@@ -1,7 +1,7 @@
 # WP F.2: Pore pressure in a rigid bed
 
-State: not started
-Branch: assigned by the thread
+State: done (PR, decision 0127)
+Branch: claude/project-thread-bc5lwa
 
 ## Goal
 
@@ -34,5 +34,14 @@ Validation pack (Sia, 2026-11-24): this package delivers pack test 1, packed-bed
 ## Log
 
 Newest first. Each entry: date, what was done, what was learned, exact next step.
+
+- 2026-11-24: done (decision 0127). `poreGas::solve(dt)` (gauge p, Newton + Anderson,
+  conservative finish), `gasDragModel` selector with `ergunWenYu`, inflow patches,
+  `tests/test_pore_pressure.sh` passes (Ergun 1e-6, Wen-Yu branch, erfc 0.07 %, sealed
+  non-orthogonal box mass to round-off, 2/4 processors 3e-11), validation pack test 1
+  `tests/validation/gas/ergunBed` (0.008 %, 1/2/4 processors). Cost 1.09x (quiet) to 3.6x
+  (sharp blob) of gas off. Learned: solve in gauge pressure; `fvMatrix::residual()` is
+  wrong across processor faces for this use; Picard alone is far too slow with Ergun
+  inertia. Next: F.3 (grain velocity, volume change, effective stress).
 
 - 2026-11-24: brief written in WP F.0. Next: start when the package before it has merged.
