@@ -315,7 +315,8 @@ each. Briefs: `docs/wp/WP-F.x.md`. References: `docs/spec/gas-references.md`.
 | F.5 | Air-impeded discharge (end of Stage A) | Coarse grains within 5 % of the dry rate; fine grains slow with the published trend within 20 %; checkpointed runs | 2 h + 3 h runs |
 | F.6 | Gas momentum in the void | Channel flow against Poiseuille within 1 %; still air stays still to 1e-10 m/s; step set by the solid | 4 h |
 | F.7 | Gas through and around grains; more drag laws (`ergun`, `wenYu`, `diFelice`, `syamlalOBrien`, `beetstra`) | Each law matches its closed form to 1e-10; with `ergunWenYu`, U_mf against Wen-Yu within 10 % and settling against Richardson-Zaki within 10 %; Stage A within 1 % | 6 h |
-| F.8 | Collapse in gas (end of Stage B) | Fluidised dam break against Roche et al. (2010) within 20 % (fall-back Rondon et al. 2011); mesh shown to Sia first | 2 h + 2 h runs |
+| F.8 | Collapse in gas (end of Stage B) | Fluidised dam break against Roche et al. (2008; cited as 2010 before F.8) within 20 % (fall-back Rondon et al. 2011); mesh shown to Sia first | 2 h + 2 h runs. 2026-11-24: case, test and `surfaceCarry` built, test fails (-66 % run-out, parallel parts), decision 0133; split: F.8b |
+| F.8b | Fluidised dam break to the paper (split from F.8, decision 0133) | F.8's done-when test passes: read Roche (2008) in full and set the case to it (floor, gas supply, run table); void flow and pore drag robust near a thin front (no p below -p0); 2/4 processors match serial from a zero-effective-stress start; 5 mm mesh | 4 h + 2 h runs |
 | F.9 | Restart, MPI, tutorial, manual, v2.0.0 | Restart and 2/4 processors match serial to 1e-12 on F.5 and F.8; scaling: gas costs at most 1.5x per step, 4 processors at least 2.5x serial; `tutorials/gasHopper`; manual chapter; release | 4 h |
 
 Validation pack (Sia, 2026-11-24: "Include all four in validation pack"). Each runs on 1,

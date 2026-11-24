@@ -279,6 +279,7 @@ drag    ergunWenYu;     // drag law</code></pre>
 <tr><td><code>T</code></td><td>293.15</td><td>Gas temperature, K (air is an ideal gas with Sutherland viscosity)</td></tr>
 <tr><td><code>p0</code></td><td>101325</td><td>Ambient pressure, Pa</td></tr>
 <tr><td><code>drag</code></td><td><code>ergunWenYu</code></td><td>Gas-grain drag law: Ergun below gas fraction 0.8, Wen and Yu above (Gidaspow). More laws will follow</td></tr>
+<tr><td><code>surfaceCarry</code></td><td><code>no</code></td><td>With a free surface: <code>yes</code> lets the moving surface carry gas to and from the void (the part of a cell the material leaves fills with gas from the void without a pressure drop through the grains); <code>no</code>: only grains crossing the surface displace gas. Used by the fluidised dam break (WP F.8, decision 0133)</td></tr>
 </tbody>
 </table>
 <p>celFoam writes three more fields: <code>phiS</code>, the solids volume fraction

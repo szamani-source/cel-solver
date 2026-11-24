@@ -324,6 +324,14 @@ class poreGas
             //  (K + e rhoG/dt); null when off
             autoPtr<gasDragModel> inertialDrag_;
 
+        // WP F.8: gas carried across the free surface (decision 0133)
+
+            //- The surface's own motion carries gas across faces between a
+            //  gas cell and a void cell (the vacated or newly filled part
+            //  of the cell exchanges gas with the void), as on every other
+            //  face; no: only grains crossing displace gas there (F.4)
+            Switch surfaceCarry_;
+
             //- Superficial flux relative to the grains through each face
             //  at the end of the last step, q.n [m/s], and 1 on the faces
             //  that were void flow faces then (their flux is absolute)

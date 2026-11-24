@@ -247,7 +247,8 @@ Foam::poreGas::poreGas(const eulerianSolid& solid, const IOobject& io)
     nCorr_(dict_.getOrDefault<label>("nCorr", 1)),
     divUg_(dict_.getOrDefault<string>("divUg", "Gauss upwind")),
     USolverDict_(),
-    poreInertia_(flow_ && dict_.getOrDefault<Switch>("poreInertia", true))
+    poreInertia_(flow_ && dict_.getOrDefault<Switch>("poreInertia", true)),
+    surfaceCarry_(dict_.getOrDefault<Switch>("surfaceCarry", false))
 {
     if (rhoP_ <= 0 || d_ <= 0 || T_ <= 0 || p0_ <= 0)
     {
@@ -364,6 +365,11 @@ Foam::poreGas::poreGas(const eulerianSolid& solid, const IOobject& io)
             << " void cells" << endl;
     }
     correctFacePressure();
+    if (freeSurface_ && surfaceCarry_)
+    {
+        Info<< "Pore gas (WP F.8): the moving surface carries gas to and "
+            << "from the void (surfaceCarry)" << endl;
+    }
 
     Info<< "Pore gas coupling (WP F.3): "
         << (coupled_ ? "two-way (effective stress, gas carried by the grains)"
@@ -811,8 +817,19 @@ void Foam::poreGas::solve(const scalar dt)
         // With gas flow in the void (WP F.6) the gas there moves by its
         // own velocity: on faces of void cells only the grains crossing
         // displace gas
+        // With surfaceCarry (WP F.8, decision 0133) the surface's own
+        // motion carries gas too: the part of a cell that the material
+        // leaves fills with gas from the void across the surface face, and
+        // material rising into a cell pushes the gas there into the void,
+        // without a pressure drop through the grains. Only faces between
+        // two void cells (gas flow there moves by its own velocity) keep
+        // the grains-only rule.
         auto surfaceFace = [&](const bool vA, const bool vB)
         {
+            if (surfaceCarry_)
+            {
+                return fs && flow_ && vA && vB;
+            }
             return fs && (flow_ ? (vA || vB) : vA != vB);
         };
         forAll(own, facei)
