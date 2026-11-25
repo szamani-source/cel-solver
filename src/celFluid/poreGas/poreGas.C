@@ -596,6 +596,61 @@ void Foam::poreGas::faceCoefficients
     const scalarField& vd = void_.primitiveField();
     const bool fs = freeSurface_;
 
+    // WP F.8i (decision 0133): with frictionOnly the gas drains over the
+    // flow depth. Along gravity each cell's pressure sits at the centroid of
+    // its material, taken as lying on the cell's lower face (alpha D/2 up),
+    // and the zero pressure on the material's surface (alpha D up), not on
+    // the cell's top face. So, as fractions of the centre distance |d| (D
+    // across a vertical face): a vertical face between a lower cell L and an
+    // upper cell U spans 1 - alpha_L/2 + alpha_U/2 (1 between full cells),
+    // and a gas cell C under a void cell drains over alpha_C/2 (not 1/2).
+    // Faces within 45 degrees of vertical only; bounded below by 0.1
+    const bool atSurface = fs && drainAtSurface() && mag(solid_.g()) > 0;
+    const vector gHat =
+        atSurface ? vector(solid_.g()/mag(solid_.g())) : vector::zero;
+    const scalarField& aF = solid_.alpha().primitiveField();
+    const vectorField& Cc = mesh.C().primitiveField();
+    // Centre distance vectors P to N of the internal faces
+    vectorField dCN(own.size(), Zero);
+    if (atSurface)
+    {
+        forAll(dCN, facei)
+        {
+            dCN[facei] = Cc[nei[facei]] - Cc[own[facei]];
+        }
+    }
+    auto clip01 = [](const scalar a) { return min(max(a, scalar(0)), scalar(1)); };
+    // Span of a gas face from P to N (d = C_N - C_P) over |d|
+    auto layerDist =
+        [&](const vector& d, const scalar aP, const scalar aN)
+    {
+        if (!atSurface)
+        {
+            return scalar(1);
+        }
+        const scalar c = (d & gHat)/max(mag(d), VSMALL);
+        if (c > 0.7)            // N below P
+        {
+            return max(1 - 0.5*clip01(aN) + 0.5*clip01(aP), 0.1);
+        }
+        if (c < -0.7)           // N above P
+        {
+            return max(1 - 0.5*clip01(aP) + 0.5*clip01(aN), 0.1);
+        }
+        return scalar(1);
+    };
+    // Factor on the gas cell's distance to a void face (d from the gas cell
+    // C towards the void cell): alpha_C when the void lies above
+    auto voidDist =
+        [&](const vector& d, const scalar aC)
+    {
+        if (atSurface && (d & gHat) < -0.7*mag(d))
+        {
+            return max(clip01(aC), 0.1);
+        }
+        return scalar(1);
+    };
+
     // Face gradient magnitude from the interpolated gradient g and the
     // normal derivative gn
     auto mag3 =
@@ -631,7 +686,9 @@ void Foam::poreGas::faceCoefficients
                 }
                 const bool ownGas = vd[P] < 0.5;
                 const label C = ownGas ? P : N;
-                const scalar fC = ownGas ? 1 - wf : wf;
+                const scalar fC =
+                    (ownGas ? 1 - wf : wf)
+                   *voidDist(ownGas ? dCN[facei] : -dCN[facei], aF[C]);
                 // The void side is at 0 without gas flow (F.4)
                 const scalar gn = (p[N] - p[P])*dc[facei]/max(fC, SMALL);
                 const vector gI = inertia ? gI_[facei] : Zero;
@@ -655,6 +712,12 @@ void Foam::poreGas::faceCoefficients
                 mag3(g, nf[facei], gn),
                 DS[facei], DT[facei]
             );
+            if (atSurface)
+            {
+                const scalar f = layerDist(dCN[facei], aF[P], aF[N]);
+                DS[facei] /= f;
+                DT[facei] /= f;
+            }
         }
     }
 
@@ -681,6 +744,19 @@ void Foam::poreGas::faceCoefficients
             (
                 fs ? void_.boundaryField()[patchi].patchNeighbourField()
                    : tmp<scalarField>::New(DS.size(), Zero)
+            );
+            const scalarField aN
+            (
+                atSurface
+              ? solid_.alpha().boundaryField()[patchi].patchNeighbourField()
+              : tmp<scalarField>::New(DS.size(), Zero)
+            );
+            // Centre to neighbour centre across the cut
+            const vectorField dB
+            (
+                atSurface
+              ? vectorField(mesh.boundary()[patchi].delta())
+              : vectorField(DS.size(), Zero)
             );
             const vectorField gIB
             (
@@ -709,7 +785,7 @@ void Foam::poreGas::faceCoefficients
                         // The gas side is across the cut: the neighbour
                         // processor's face takes its mobility; this side
                         // must give the same coefficient
-                        const scalar fC = wf[i];
+                        const scalar fC = wf[i]*voidDist(-dB[i], aN[i]);
                         const scalar gn = (pN[i] - p[P])*dcB[i]/max(fC, SMALL);
                         faceVoid
                         (
@@ -720,7 +796,7 @@ void Foam::poreGas::faceCoefficients
                     }
                     else
                     {
-                        const scalar fC = 1 - wf[i];
+                        const scalar fC = (1 - wf[i])*voidDist(dB[i], aF[P]);
                         const scalar gn = (pN[i] - p[P])*dcB[i]/max(fC, SMALL);
                         faceVoid
                         (
@@ -742,6 +818,12 @@ void Foam::poreGas::faceCoefficients
                     mag3(g, n[i], gn),
                     DS[i], DT[i]
                 );
+                if (atSurface)
+                {
+                    const scalar f = layerDist(dB[i], aF[P], aN[i]);
+                    DS[i] /= f;
+                    DT[i] /= f;
+                }
             }
         }
         else

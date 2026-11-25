@@ -487,6 +487,13 @@ public:
         //- WP F.8g: the pore pressure only lowers the friction
         bool frictionOnly() const noexcept { return frictionOnly_; }
 
+        //- WP F.8i: the zero pressure on the material's surface (route B
+        //  with frictionOnly and a free surface)
+        bool drainAtSurface() const noexcept
+        {
+            return frictionOnly_ && kappa_ > 0 && coupled_ && freeSurface_;
+        }
+
         //- Face pressures for the solid (WP F.4): linear between cells,
         //  the void pressure (0 gauge) on faces between material and void
         const surfaceScalarField& pFace() const noexcept { return pf_; }
