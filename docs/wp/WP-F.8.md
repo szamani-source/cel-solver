@@ -47,3 +47,4 @@ Newest first. Each entry: date, what was done, what was learned, exact next step
 
 - 2026-11-24: brief written in WP F.0. Next: start when the package before it has merged.
 - 2026-11-25: 5 mm refit kappa 0.22 (run /mnt/project-files/f8/run10_ratio5mm_k022): run-out 5.64 h0 (-2 %), stops 6.7, front 1.11 sqrt(g h0) (-21.5 %). Theory passes front, refit passes run-out; run-out mesh dependent.
+- 2026-11-25 (F.8i): zero pore pressure on the material's surface (tests/test_surface_drainage.sh, 1.1 %). Dam break theoretical kappa: 10 mm 5.17 h0, 5 mm to the channel end. Learned: the surface error was real (15-28 % slow drainage) but the mesh dependence comes from the partly supported frictional flow; fully supported fronts agree within 5 %. Next: dry 5 mm check.

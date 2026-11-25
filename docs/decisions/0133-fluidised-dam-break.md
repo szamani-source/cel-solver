@@ -290,6 +290,22 @@ with the cell (Gueugneau relaxes p/(rho g h) over the depth). Refit once on 5 mm
 kappa cannot pass both: theory passes the front, the refit passes the run-out. Since the fit
 also depends on the cell size, kappa is not yet set in the test; next step for Sia to choose.
 
+F.8i (Sia chose "drain over the flow depth"). Runs with almost no diffusion (kappa 1e-6)
+keep p/P = 1 on both meshes and their fronts agree within 5 % to 0.6 s, so the carrying is
+not mesh dependent; the drainage is. A still, fully supported layer with a half-filled top
+cell drained 15 % (5 mm) to 28 % (10 mm) too slowly: the zero pressure sat on the face above
+the top cell. Now, with frictionOnly, along gravity each cell's pressure sits at the centroid
+of its material (taken as lying on the cell's lower face) and the zero pressure on the
+material's surface; lateral faces are unchanged. `tests/test_surface_drainage.sh`: the
+bottom-cell pressure follows the series solution within 1.1 % of rho_b g h on 10 and 5 mm with
+the top cell 1/4, 1/2 and 3/4 full. Tried and rejected: counting cells under half full as void
+(p = 0) put full friction on thin surface cells, and the fully supported flow lagged the
+frictionless one by 22 % (now 8.3 %). Dam break, theoretical kappa: 10 mm run-out 5.17 h0
+(was 5.02), front 1.05; 5 mm 6.41 h0 at Roche's stop time (was 6.57), then to the channel end,
+front 1.18. So the surface location was a real error but not the cause of the mesh
+dependence; the remaining split is in the partly supported frictional flow (the fully
+supported fronts agree), i.e. the grain law itself. A dry 5 mm run checks this.
+
 ## Consequences
 
 - F.8 is not done. Its remaining work is split into F.8b (`docs/work-packages.md`):
