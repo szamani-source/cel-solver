@@ -1,6 +1,6 @@
 # WP F.5: Air-impeded discharge (end of Stage A)
 
-State: not started
+State: done (decision 0130)
 Branch: assigned by the thread
 
 ## Goal
@@ -35,5 +35,15 @@ Validation pack (Sia, 2026-11-24): this package delivers pack test 4, fine-powde
 ## Log
 
 Newest first. Each entry: date, what was done, what was learned, exact next step.
+
+- 2026-11-24: done (decision 0130). Crewdson (1977) and Muite (2004) could not be
+  read online; checked against Crewdson's model as quoted in an open thesis and the
+  abstracts of Hsiau et al. (2010) and Muite et al. Plane-flow hopper, 60 mm slot, 544
+  cells; gas on against off: 1 mm -2.2 %, 0.1 mm -64 %, 2/4 processors 4e-12; pack test
+  4 (fineHopper) fails on 4 processors in one surface cell (8e-10). Learned: (1) a 20 mm
+  slot with 2 mm cells discharges at 1/15 of Beverloo in v1 (gas or not), so use a wider
+  slot; (2) mu(I)'s d must be the case's d in the dry control too; (3) the T0 rules
+  part the solid between processor counts (4 % by 0.25 s), so parallel checks use plain
+  Mohr-Coulomb. Next: F.6; F.9 fixes the 4-processor surface cell and the cost.
 
 - 2026-11-24: brief written in WP F.0. Next: start when the package before it has merged.
