@@ -33,6 +33,8 @@ Tests use the `ergunWenYu` drag law (Sia, 2026-11-24).
 
 Newest first. Each entry: date, what was done, what was learned, exact next step.
 
+- 2026-11-25 (F.8g): diagnosed the slow front from the papers (our carried p acted as a force; the papers use it only to lower friction) and added gasProperties `frictionOnly`. 10 mm: run-out 5.67 h0 (-1 %), front 1.04 sqrt(g h0) (-26 %). Learned: the carried p must also follow the dynamic total pressure (the papers carry the ratio p/rho g h); 2 processors part at the MC apex as the dry frictionless case does. Next: 5 mm run, then carry the ratio.
+
 - 2026-11-25 (F.8f, step 1): added the Princeton packing-dependent pressure (`princetonFr`) as a limit on the effective mean stress, and `tests/test_packing_pressure.sh`. Dam break: dry 2.47 h0, compressible gas 3.50 h0 (-39 %), route B 4.47 h0. Learned: the base pore pressure now drops at release and recovers as in Breard; the flowing part still loses its pressure. Next: Breard's other settings (air through the reservoir, initial packing, wall friction) on the compressible model.
 
 - 2026-11-25 (F.8d, F.8e): dry column calibrated (mu(I) + flowImpedance + fullBlend, Gueugneau 24/19 deg): 2.375 h0, -9 % of Roche's pressure-balanced run. Added gasProperties `diffusivity` (route B: pore pressure carried by the grains and diffusing) and `tests/test_pore_diffusion.sh`. Dam break at kappa 0.015: run-out 4.45 h0 (-23 %), front -25 %; at the theoretical 0.11: 3.30 h0. Learned: the compressible gas's suction at release costs about 1.3 h0 of run-out; with route B we are close but not yet within 20 %. Next: 5 mm mesh, then F.8f.

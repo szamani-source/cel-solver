@@ -236,6 +236,31 @@ Roche's dry run-out (Breard's kinetic-theory solid dissipates differently), so t
 not taken over. Ratio fluidised/dry (Roche 1.8-2.2): compressible 1.42 (3.50/2.47), route B
 1.81 (4.47/2.47).
 
+## F.8g: route B as published (2026-11-25)
+
+Diagnosis (Sia: use the papers to find why we are slower): with friction removed, the dry
+column spreads at 1.43 sqrt(g h0), Roche's sqrt 2, so the numerics are not the limit. With
+route B and the pressure kept (kappa 1e-6) the column interior stayed still and only the cell
+at the free face was blown off (16 m/s): the carried p acted as a force, horizontally uniform
+inside, all of its jump on the edge cell (the 5 mm spray). Gueugneau (2017) and Aravena (2021)
+use the pore pressure only to lower the friction, tan phi = (1 - p/rho g h) tan delta.
+
+Sia chose to implement that. New gasProperties `frictionOnly` (with `diffusivity`): sigma
+stays the total stress, no gas force; each step lambda = min(p/P, 1) (P the total mean
+pressure at the step start); the constitutive update sees sigma + lambda P_trial I (P_trial
+the elastic trial pressure, so a supported cell keeps an elastic isotropic total stress) and
+the wall friction is scaled by 1 - lambda. The route B advection now mixes the incoming
+pressure by volume (bounded; the first runs diverged in fast thin flows); test_pore_diffusion
+still passes. The case starts with the total stress -rho_b g (H0 - y) I.
+
+Dam break 10 mm: fitted kappa 0.015 run-out 5.67 h0 (-1 %), front 1.04 sqrt(g h0) (-26 %;
+Aravena's model 1.0-1.15); theoretical 0.11: 3.88 h0, 0.71; pressure kept: 1.25 (frictionless
+1.43). `tests/manual/test_friction_only.sh` (coarse 20 mm): the supported flow is 25-29 %
+behind the frictionless one: the carried p does not follow the dynamic rise of the total
+pressure, so friction returns where P > p (the papers carry the ratio p/rho g h instead). 2
+processors part from round-off at the Mohr-Coulomb apex, as the dry frictionless case does
+(F.9).
+
 ## Consequences
 
 - F.8 is not done. Its remaining work is split into F.8b (`docs/work-packages.md`):

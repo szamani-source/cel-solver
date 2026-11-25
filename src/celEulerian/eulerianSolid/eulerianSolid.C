@@ -1315,6 +1315,19 @@ void Foam::eulerianSolid::setPorePressure(const volScalarField& p)
 }
 
 
+void Foam::eulerianSolid::setSupportPressure(const volScalarField& p)
+{
+    // the face masses of the remap as with a pore pressure, but no force
+    setPorePressure(p);
+    poreP_ = nullptr;
+    supportP_ = &p;
+    supportShift_.setSize(mesh_.nCells(), 0);
+    frictionScale_.setSize(mesh_.nCells(), 1);
+    Info<< "Pore pressure lowers the friction only (frictionOnly, "
+        << "WP F.8g): sigma is the total stress, no gas force" << nl;
+}
+
+
 void Foam::eulerianSolid::setPorePressure
 (
     const volScalarField& p,

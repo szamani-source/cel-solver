@@ -347,6 +347,11 @@ class poreGas
             //  does not act on it (no compression or suction)
             scalar kappa_;
 
+            //- gasProperties frictionOnly (WP F.8g, needs diffusivity):
+            //  the pore pressure only lowers the friction of the grains
+            //  (Gueugneau 2017, Aravena 2021) instead of acting as a force
+            Switch frictionOnly_;
+
             //- Superficial flux relative to the grains through each face
             //  at the end of the last step, q.n [m/s], and 1 on the faces
             //  that were void flow faces then (their flux is absolute)
@@ -474,6 +479,9 @@ public:
 
         //- Two-way coupled with the solid (WP F.3)
         bool coupled() const noexcept { return coupled_; }
+
+        //- WP F.8g: the pore pressure only lowers the friction
+        bool frictionOnly() const noexcept { return frictionOnly_; }
 
         //- Face pressures for the solid (WP F.4): linear between cells,
         //  the void pressure (0 gauge) on faces between material and void

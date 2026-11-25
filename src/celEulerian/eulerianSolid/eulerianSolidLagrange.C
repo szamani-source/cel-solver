@@ -1720,6 +1720,22 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
     const scalar G = material_->shearModulus();
     const scalar K = M - 4.0*G/3.0;
 
+    // WP F.8g (decision 0133): support by a pore pressure that only lowers
+    // the friction: s = min(p, P) on the total stress of the step start
+    if (supportP_)
+    {
+        const scalarField& ps = supportP_->primitiveField();
+        const symmTensorField& sg = sigma_.primitiveField();
+        forAll(ps, celli)
+        {
+            const scalar P = -tr(sg[celli])/3;
+            const scalar sh = (P > 0 ? min(max(ps[celli], scalar(0)), P) : 0);
+            supportShift_[celli] = sh;
+            frictionScale_[celli] =
+                P > 0 ? max(1 - sh/P, scalar(0)) : (ps[celli] > 0 ? 0 : 1);
+        }
+    }
+
     // Outlets open at the start of the first step at or after their
     // opening time (WP 3.3, decision 0033)
     {
@@ -2706,7 +2722,9 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
             {
                 wallFace
                 (
-                    n, vL, pso[i], zp[P], zs[P], wallFriction_[p.name()],
+                    n, vL, pso[i], zp[P], zs[P],
+                    wallFriction_[p.name()]
+                   *(supportP_ ? frictionScale_[P] : scalar(1)),
                     v, t,
                     fi && teta()[P] > 0
                   ? min(zs[P], teta()[P]*deltaCoeffs.boundaryField()[patchi][i])
@@ -3224,6 +3242,19 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
             hOld.epsPEq = epsPEq[celli];
             hOld.pc = pc_.valid() ? pc_()[celli] : 0;
 
+            // WP F.8g: the constitutive update sees sigma + s I with
+            // s = lambda P_trial (lambda = min(p/P, 1) of the step start,
+            // P_trial the elastic trial mean pressure), so a fully
+            // supported cell keeps an elastic, isotropic total stress
+            const scalar shift = supportP_
+              ? (1 - frictionScale_[celli])
+               *max(-tr(sigma[celli])/3 - K*tr(dEps), scalar(0))
+              : 0;
+            if (shift != 0)
+            {
+                sigma[celli] += shift*symmTensor::I;
+            }
+
             symmTensor sNew;
             if (fluidity_.valid())
             {
@@ -3320,7 +3351,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                 }
             }
 
-            sigma[celli] = sNew;
+            sigma[celli] = sNew - shift*symmTensor::I;
             symmTensor e(constitutiveModel::fromVoigt(hNew.epsP));
             e.xy() *= 0.5;
             e.yz() *= 0.5;

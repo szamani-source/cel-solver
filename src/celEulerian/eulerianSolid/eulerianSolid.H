@@ -338,6 +338,18 @@ class eulerianSolid
         //  the reaction of the pore gas inertia); null: none
         const volVectorField* gasForce_ = nullptr;
 
+        //- WP F.8g (decision 0133): pore pressure that only lowers the
+        //  friction (Gueugneau 2017, Aravena 2021). sigma stays the total
+        //  stress; each step the constitutive update and the wall friction
+        //  see sigma + s I, s = min(p, P) (P the total mean pressure), and
+        //  no gas force acts. Null: off
+        const volScalarField* supportP_ = nullptr;
+
+        //- s of each cell this step [Pa] and the wall friction factor
+        //  1 - s/P
+        scalarField supportShift_;
+        scalarField frictionScale_;
+
         //- Mass carried across each face by the last remap [kg], out of
         //  the owner (internal and coupled faces; WP F.3, for the gas
         //  carried with the grains). Only kept with gas.
@@ -652,6 +664,10 @@ public:
         //- An extra force of the gas on the grains of each cell [N],
         //  added with the pore pressure's (WP F.7)
         void setGasForce(const volVectorField& f) { gasForce_ = &f; }
+
+        //- Pore pressure that only lowers the friction (WP F.8g): sigma
+        //  stays total, no gas force; the remap keeps its face masses
+        void setSupportPressure(const volScalarField& p);
 
         //- Surface load on a traction patch at time t [Pa] (0 if none)
         scalar loadPressure(const word& patch, const scalar t) const;

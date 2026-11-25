@@ -28,6 +28,10 @@ model poreGas, diffusivity collapse_cases.KAPPA_FIT (fitted, as Aravena et
 al. 2021); A also reports a run with the theoretical k p0/(mu e). Route B
 carries pore pressure, not gas mass, so the gas mass checks apply only to the
 compressible route (KAPPA_FIT = 0: model gasFlow, surfaceCarry yes).
+Since F.8g route B uses frictionOnly (collapse_cases.FRICTION_ONLY): the
+pore pressure only lowers the friction, internal and floor, as Gueugneau
+et al. (2017) and Aravena et al. (2021); 10 mm: run-out 5.67 h0, front
+1.04 sqrt(g h0) (-26 %); theoretical kappa 3.88 h0.
 
     python3 collapse_checks.py WORKDIR [--only A,B,C,K]
 """

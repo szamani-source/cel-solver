@@ -250,7 +250,8 @@ Foam::poreGas::poreGas(const eulerianSolid& solid, const IOobject& io)
     poreInertia_(flow_ && dict_.getOrDefault<Switch>("poreInertia", true)),
     surfaceCarry_(dict_.getOrDefault<Switch>("surfaceCarry", false)),
     eMin_(dict_.getOrDefault<scalar>("eMin", 0.2)),
-    kappa_(dict_.getOrDefault<scalar>("diffusivity", 0))
+    kappa_(dict_.getOrDefault<scalar>("diffusivity", 0)),
+    frictionOnly_(dict_.getOrDefault<Switch>("frictionOnly", false))
 {
     if (rhoP_ <= 0 || d_ <= 0 || T_ <= 0 || p0_ <= 0)
     {
@@ -384,6 +385,12 @@ Foam::poreGas::poreGas(const eulerianSolid& solid, const IOobject& io)
             << "and diffused with diffusivity " << kappa_ << " m^2/s "
             << "(no compression or suction by the grains; gas mass is not "
             << "conserved)" << endl;
+    }
+    if (frictionOnly_ && !(kappa_ > 0 && coupled_))
+    {
+        FatalIOErrorInFunction(dict_)
+            << "frictionOnly needs diffusivity > 0 and coupled yes"
+            << exit(FatalIOError);
     }
     if (eMin_ != 0.2)
     {
@@ -855,6 +862,7 @@ void Foam::poreGas::solve(const scalar dt)
         {
             return alpha[c] > alphaMin ? rhoC[c]/alpha[c] : rhoP_;
         };
+        scalarField Fin(X.size(), Zero), FinP(X.size(), Zero);
         forAll(own, facei)
         {
             const scalar m = dm[facei];
@@ -865,7 +873,8 @@ void Foam::poreGas::solve(const scalar dt)
             const label d = m > 0 ? own[facei] : nei[facei];
             const label r = m > 0 ? nei[facei] : own[facei];
             const scalar F = mag(m)/bulk(d);
-            X[r] -= S[r]/max(alpha[r], alphaMin)*F*(pOld[d] - pOld[r]);
+            Fin[r] += F;
+            FinP[r] += F*pOld[d];
         }
         forAll(mesh.boundary(), patchi)
         {
@@ -896,8 +905,23 @@ void Foam::poreGas::solve(const scalar dt)
                     const label r = fc[i];
                     const scalar F =
                         -pdm[i]/(aN[i] > alphaMin ? rN[i]/aN[i] : rhoP_);
-                    X[r] -= S[r]/max(alpha[r], alphaMin)*F*(pN[i] - pOld[r]);
+                    Fin[r] += F;
+                    FinP[r] += F*pN[i];
                 }
+            }
+        }
+        // Convex mix of the cell's own pressure and the incoming ones by
+        // volume, so that the advected p stays bounded however much comes
+        // in (WP F.8g: fast flows into nearly empty cells)
+        const scalarField& Vc = mesh.V().field();
+        forAll(X, r)
+        {
+            if (Fin[r] > 0)
+            {
+                const scalar Vf = max(alpha[r], alphaMin)*Vc[r];
+                const scalar w = min(Fin[r]/Vf, scalar(1));
+                const scalar target = w*FinP[r]/Fin[r] + (1 - w)*pOld[r];
+                X[r] = -S[r]*Vc[r]*(target - pOld[r]);
             }
         }
     }

@@ -301,7 +301,11 @@ surfaceCarry no;        // free surface: yes lets the moving surface carry gas t
 eMin        0.2;        // smallest gas fraction of the filled part of a cell (remap overfill; decision 0133)
 diffusivity 0;          // poreGas only, m2/s: &gt; 0 replaces gas compressibility by a pore pressure that is
                         // carried with the grains and diffuses with this coefficient (Gueugneau 2017,
-                        // Aravena 2021); fitted, e.g. 0.015 for the Roche dam break (default 0 = off)</code></pre>
+                        // Aravena 2021); fitted, e.g. 0.015 for the Roche dam break (default 0 = off)
+frictionOnly no;        // with diffusivity: yes = the pore pressure only lowers the grains' friction
+                        // (internal and wall) as in Gueugneau 2017 and Aravena 2021: sigma stays the
+                        // total stress and the constitutive update sees sigma + min(p, P) I; no gas
+                        // force acts. Start sigma as the total stress (decision 0133, WP F.8g)</code></pre>
 <p>The gauge gas pressure is the field <code>0/p</code> (optional): <code>fixedValue</code> patches are open at that
 pressure, <code>zeroGradient</code> patches are sealed. Outlets must be <code>fixedValue</code>. With
 <code>model gasFlow</code> the field <code>0/Ug</code> (optional) is the gas velocity; without it walls are no-slip

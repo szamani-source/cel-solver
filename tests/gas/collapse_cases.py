@@ -97,6 +97,8 @@ ARAVENA_RUNOUT = 3.8                  # x/h0, a = 2, horizontal
 # (2017) and Aravena et al. (2021). KAPPA_FIT is fitted to Roche's run-out
 # (Aravena fit 0.015 m^2/s); kappa_theory() is k p0 / (mu e).
 KAPPA_FIT = 0.015
+# F.8g: route B as published, the pore pressure only lowers the friction
+FRICTION_ONLY = True
 # Expanded (fluidised) packing: soft until compacted (decision 0133): the
 # compaction cap (WP K.1, decision 0113) normally consolidated from 1 Pa, with
 # lambda* = 0.0044 so that loading to the column's base stress (about 3 kPa)
@@ -132,9 +134,17 @@ def describe():
             f"reservoir air {supply() * 1e3:.2f} mm/s")
 
 
-def make(path, *, gas=True, decomp=(1, 1, 1), end=T_END, extra_gas="", cap=True, kappa=KAPPA_FIT):
+def make(path, *, gas=True, decomp=(1, 1, 1), end=T_END, extra_gas="", cap=True, kappa=KAPPA_FIT,
+         friction_only=None):
     """kappa > 0: route B (model poreGas, diffusivity kappa); kappa = 0: the
-    compressible gas of F.8c (model gasFlow, surfaceCarry yes)."""
+    compressible gas of F.8c (model gasFlow, surfaceCarry yes).
+    friction_only (route B only, F.8g): the pore pressure only lowers the
+    friction (gasProperties frictionOnly); sigma starts as the total stress,
+    isotropic -rho_b g (H0 - y)."""
+    if friction_only is None:
+        friction_only = FRICTION_ONLY and kappa > 0
+    if friction_only:
+        extra_gas = "frictionOnly yes;\n" + extra_gas
     if os.path.isdir(path):
         shutil.rmtree(path)
     pc.make_case(path, size=(NX * CELL, NY * CELL), cells=(NX, NY), e=E0, d=D, end=end,
@@ -161,7 +171,10 @@ def make(path, *, gas=True, decomp=(1, 1, 1), end=T_END, extra_gas="", cap=True,
             rho.append(RHO_B if bed else 0.0)
             w = RHO_B * G_ACC * (H0 - y) if bed else 0.0
             ws = (1.0 - P_FRAC) * w if gas else w
-            sig.append((-k0 * ws, -ws))
+            if gas and friction_only:
+                sig.append((-w, -w))
+            else:
+                sig.append((-k0 * ws, -ws))
             p.append(P_FRAC * w if gas else 0.0)
     fl._write_fields(path, alpha, rho, sig, N)
     txt = open(f"{path}/0/p").read()
