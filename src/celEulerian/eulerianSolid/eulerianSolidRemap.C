@@ -55,6 +55,36 @@ namespace remapDetail
 // gradient): such faces do not constrain the limiter.
 static const scalar perpTol = 1e-10;
 
+// Keep the face masses of a remap (WP F.3, decision 0128): internal faces
+// and coupled patches, out of the owner / local cell
+static void keepRemapMass
+(
+    Foam::autoPtr<Foam::surfaceScalarField>& keep,
+    const Foam::scalarField& dmInt,
+    const Foam::List<Foam::scalarField>& dmPatch
+)
+{
+    using namespace Foam;
+    if (!keep)
+    {
+        return;
+    }
+    surfaceScalarField& m = keep.ref();
+    m.primitiveFieldRef() = dmInt;
+    forAll(m.boundaryField(), patchi)
+    {
+        scalarField& pm = m.boundaryFieldRef()[patchi];
+        if (m.boundaryField()[patchi].coupled() && dmPatch[patchi].size())
+        {
+            pm = dmPatch[patchi];
+        }
+        else
+        {
+            pm = 0;
+        }
+    }
+}
+
 // Relative size below which a face flux counts as round-off noise
 static const scalar fluxTol = 1e-10;
 
@@ -829,6 +859,8 @@ void Foam::eulerianSolid::remap(const scalar dt)
         dmPatch[patchi] = dt*phi.boundaryField()[patchi]*rhofPatch[patchi];
     }
 
+    keepRemapMass(remapMass_, dmInt, dmPatch);
+
     scalarField dmOut(mesh.nCells(), Zero);
     forAll(own, facei)
     {
@@ -1299,6 +1331,8 @@ void Foam::eulerianSolid::remapFreeSurface(const scalar dt)
             vOut[fc[i]] += sgn*v;
         }
     }
+
+    keepRemapMass(remapMass_, dmInt, dmPatch);
 
     // New mass and volume fraction; round-off dust (alpha < 1e-9 with
     // mass) gets its volume from its mass and no velocity or stress

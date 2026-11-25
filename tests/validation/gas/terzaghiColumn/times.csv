@@ -1,0 +1,4 @@
+nprocs,steps,wall_s,worst_U_error,vs_serial,mass_drift,solves_per_step,pass
+1,41741,20.939,6.625e-03,0.0e+00,1.3e-15,2.00,True
+2,41741,27.090,6.625e-03,1.2e-12,9.0e-16,2.04,True
+4,41741,34.040,6.625e-03,9.4e-13,5.4e-16,2.03,True

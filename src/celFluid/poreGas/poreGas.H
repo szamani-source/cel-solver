@@ -36,12 +36,29 @@ Description
     iterations on the correction: the residual of the mass balance with the
     flux law (secant mobility lambda) at the current p, the matrix with the
     tangent mobility d|q|/d|grad p| (rho_g lagged), Anderson-accelerated,
-    until the largest correction is below pTolerance. The step ends with
+    until the error left, the largest correction (or, once the corrections
+    shrink tenfold per iteration, the next one estimated from their ratio;
+    WP F.3), is below pTolerance. The first guess is p extrapolated from the
+    last two steps (WP F.3). The step ends with
     p = p_old - dt div(F)/S from the face fluxes F of that state, so the
     gas mass changes exactly by the boundary fluxes. Face coefficients: harmonic mean of the cell mobilities
     (0 if either side has none) times the linear face gas density, times the
     open face fraction with bodies. The equation is conservative: the gas
     mass changes only by the boundary fluxes (printed each step).
+
+    WP F.3 (decision 0128) couples the two both ways (coupled yes, the
+    default): sigma of eulerianSolid is the effective stress, and each
+    cell's momentum also gets -sum(p_f S_f) over its faces, so the total
+    stress sigma - p I balances the loads; the gas moves with the grains,
+
+        d(phi_g rho_g)/dt + div(phi_g rho_g u_s) + div(rho_g q) = 0,
+
+    discretised to match the solid's remap: the gas volume crossing a face
+    in a step is the Lagrangian volume dt phiL less the grain volume
+    dm/rhoP of the remap, at the donor's gas density of the start of the
+    step, and the change of phi_g in each cell comes from the solid's new
+    density. A compressed cell therefore squeezes its gas by exactly its
+    Lagrangian volume change (undrained limit p0 dV/(phi_g V)).
 
     Boundaries, from 0/p (optional; without it p = 0 and every patch is
     sealed): fixedValue = fixed pressure, zeroGradient = sealed, and
@@ -58,6 +75,9 @@ Description
         drag    ergunWenYu;     // run-time selected drag law (gasDragModel);
                                 // F.7 adds the others (decision 0125 item 7)
 
+        coupled yes;            // WP F.3: two-way with the grains
+                                // (no: F.2, the solid frozen for the gas)
+
         // WP F.2, all optional:
         inflow                  // fixedGradient patches of 0/p blowing gas
         {                       // in: superficial velocity [m/s] at p0, T
@@ -73,7 +93,7 @@ Description
             solver          PCG;
             preconditioner  DIC;
             tolerance       1e-30;
-            relTol          0.1;    // inexact Newton
+            relTol          1e-3;   // inexact Newton (F.2: 0.1)
             maxIter         1000;
         }
     \endverbatim
@@ -96,6 +116,7 @@ SourceFiles
 #include "surfaceFields.H"
 #include "HashTable.H"
 #include "gasDragModel.H"
+#include "Switch.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -164,6 +185,21 @@ class poreGas
             //- Gas mass that came in through the boundaries so far [kg]
             scalar netIn_;
 
+        // WP F.3: coupling with the grains (decision 0128)
+
+            //- Two-way coupling (default yes): the gas pressure acts on the
+            //  solid (sigma is the effective stress) and the grains carry
+            //  and squeeze the gas. no: the F.2 frozen-solid gas.
+            Switch coupled_;
+
+            //- Gas fraction at the last solve (before this step's remap)
+            scalarField phiG0_;
+
+            //- Pressure before the last step and that step's length, for
+            //  the first guess of the next solve (linear extrapolation)
+            scalarField pOldOld_;
+            scalar dtOld_;
+
 
 public:
 
@@ -224,6 +260,9 @@ public:
 
         //- Gas mass that came in through the boundaries so far [kg]
         scalar netIn() const noexcept { return netIn_; }
+
+        //- Two-way coupled with the solid (WP F.3)
+        bool coupled() const noexcept { return coupled_; }
 
 
     // Cycle

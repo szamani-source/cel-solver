@@ -26,7 +26,8 @@ Checks:
    tools/gas_reference.py permeability(d, e_m), e_m = 1 - rho/(alpha rhoP),
    to 1e-12; air density and viscosity printed by celFoam match the script.
 4. Gas off unchanged: rho, U, sigma, epsP, epsPEq, alpha of A, B and C are
-   identical byte for byte at every written time; A and B write no phiS,
+   identical byte for byte at every written time (C with coupled no: the
+   gas does not act on the solid, WP F.3); A and B write no phiS,
    phiG or k and A prints nothing about gas. (The full v1 suite in CI is the
    wider check that nothing else moved.)
 5. Parallel: D's reconstructed phiS, phiG and k match E to 1e-12.
@@ -170,6 +171,7 @@ d       {D!r};
 T       293.15;
 p0      101325;
 drag    ergunWenYu;
+coupled no;     // WP F.3: the fractions only, the solid as without gas
 """)
 
 

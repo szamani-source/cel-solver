@@ -70,6 +70,7 @@
 #include "PstreamBuffers.H"
 #include "calculatedFvPatchFields.H"
 #include "equilibriumJump.H"
+#include "surfaceInterpolate.H"
 
 #include "transform.H"
 
@@ -2478,6 +2479,19 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
         phiL_[facei] = vS[facei] & Sf[facei];
     }
 
+    // Surface loads at the start of the step (WP F.3, decision 0128)
+    scalarList qLoad(mesh.boundary().size(), Zero);
+    if (loadPressure_.size())
+    {
+        forAll(mesh.boundary(), patchi)
+        {
+            qLoad[patchi] = loadPressure
+            (
+                mesh.boundary()[patchi].name(), mesh.time().value() - dt
+            );
+        }
+    }
+
     forAll(mesh.boundary(), patchi)
     {
         const fvPatch& p = mesh.boundary()[patchi];
@@ -2705,6 +2719,14 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                 v = vtL - ttL/zs[P];
                 t = (tnL - zp[P]*vnL)*n;
             }
+            else if (qLoad[patchi] != 0)
+            {
+                // Surface load (WP F.3, decision 0128): normal traction
+                // -q n, the face moves as a free surface under it
+                const scalar q = qLoad[patchi];
+                v = (vnL - (tnL + q)/zp[P])*n + vtL - ttL/zs[P];
+                t = -q*n;
+            }
             else
             {
                 // Free surface: zero traction
@@ -2928,6 +2950,51 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
             }
         }
     }
+    // Pore gas (WP F.3, decision 0128): sigma is the effective stress; the
+    // gas pressure acts on each cell as -sum(p_f Sf) over its open faces
+    // (and its immersed wall face), so a uniform pressure exerts no force
+    // and the total stress sigma - p I is in equilibrium with the loads.
+    // In a partly filled cell it acts on the material part, alpha.
+    if (poreP_)
+    {
+        const surfaceScalarField pf(fvc::interpolate(*poreP_));
+        vectorField fGas(mesh.nCells(), Zero);
+        forAll(own, facei)
+        {
+            const vector f(pf[facei]*Sfo[facei]);
+            fGas[own[facei]] -= f;
+            fGas[nei[facei]] += f;
+        }
+        forAll(mesh.boundary(), patchi)
+        {
+            const labelUList& fc = mesh.boundary()[patchi].faceCells();
+            const vectorField& pS = Sfo.boundaryField()[patchi];
+            const scalarField& pp = pf.boundaryField()[patchi];
+            forAll(fc, i)
+            {
+                fGas[fc[i]] -= pp[i]*pS[i];
+            }
+        }
+        if (imm)
+        {
+            const scalarField& pc = poreP_->primitiveField();
+            forAll(wallA_, celli)
+            {
+                if (wallBody_[celli] >= 0)
+                {
+                    fGas[celli] -= pc[celli]*wallA_[celli];
+                }
+            }
+        }
+        forAll(fGas, celli)
+        {
+            if (m[celli] > 0)
+            {
+                force[celli] += (fs ? alpha_[celli] : 1)*fGas[celli];
+            }
+        }
+    }
+
     // Small cut cells: one cell with the cell they are mixed with for the
     // momentum and the strain (decision 0047); each keeps its own volume
     // change for its density
