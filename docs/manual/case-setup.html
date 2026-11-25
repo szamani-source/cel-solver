@@ -257,6 +257,7 @@ the velocity boundary condition:</p>
 <tr><td><code>symmetry</code>, <code>symmetryPlane</code></td><td>mirror plane: no normal velocity, no shear</td></tr>
 <tr><td><code>cyclic</code></td><td>periodic</td></tr>
 <tr><td><code>patch</code> with a <code>fixedValue</code> condition in <code>0/U</code></td><td>prescribed velocity</td></tr>
+<tr><td><code>patch</code> listed in materialProperties <code>loads { name { pressure P; } }</code></td><td>a surface pressure P (Pa) on the material there (WP F.3, decision 0128)</td></tr>
 <tr><td>any other <code>patch</code></td><td>traction-free (an open boundary)</td></tr>
 </tbody>
 </table>
@@ -280,6 +281,19 @@ drag    ergunWenYu;     // drag law</code></pre>
 <tr><td><code>T</code></td><td>293.15</td><td>Gas temperature, K (air is an ideal gas with Sutherland viscosity)</td></tr>
 <tr><td><code>p0</code></td><td>101325</td><td>Ambient pressure, Pa</td></tr>
 <tr><td><code>drag</code></td><td><code>ergunWenYu</code></td><td>Gas-grain drag law: Ergun below gas fraction 0.8, Wen and Yu above (Gidaspow). More laws will follow</td></tr>
+<tr><td><code>coupled</code></td><td><code>yes</code></td><td>The gas pressure acts on the grains (effective stress, WP F.3); <code>no</code>: the gas is solved but the solid does not feel it</td></tr>
+<tr><td><code>inflow</code></td><td>none</td><td>Sub-dictionary <code>{ patch U; }</code>: gas blown in through a patch at superficial velocity U (m/s at p0, a number or a Function1 of time). The patch must be <code>fixedGradient</code> in <code>0/p</code></td></tr>
+<tr><td><code>alphaVoid</code></td><td>1e-4</td><td>With a free surface: cells with less material than this are void (gas at its own pressure, or at p0 without <code>gasFlow</code>)</td></tr>
+<tr><td><code>pTolerance</code></td><td>1e-14 p0</td><td>Pressure change, Pa, at which the Newton solve of the gas pressure stops</td></tr>
+<tr><td><code>nOuter</code></td><td>50</td><td>Most Newton iterations of the gas pressure each step</td></tr>
+<tr><td><code>nAnderson</code></td><td>5</td><td>Depth of Anderson acceleration of the Newton iterations</td></tr>
+<tr><td><code>laplacian</code></td><td><code>Gauss linear corrected</code></td><td>Discretisation of the Darcy term</td></tr>
+<tr><td><code>solver</code></td><td>PCG, DIC</td><td>Sub-dictionary: linear solver controls for the pressure (OpenFOAM <code>fvSolution</code> syntax)</td></tr>
+<tr><td><code>nCorr</code></td><td>1</td><td><code>model gasFlow</code>: pressure corrections of the void gas each step (PISO)</td></tr>
+<tr><td><code>divUg</code></td><td><code>Gauss upwind</code></td><td><code>model gasFlow</code>: discretisation of gas momentum advection in the void</td></tr>
+<tr><td><code>USolver</code></td><td>PBiCGStab, DILU</td><td><code>model gasFlow</code>: sub-dictionary with the linear solver controls for the void gas velocity</td></tr>
+<tr><td><code>poreInertia</code></td><td><code>yes</code> with <code>gasFlow</code></td><td>Pore gas momentum (the drag law plus the inertia of the pore gas, WP F.7)</td></tr>
+<tr><td><code>inertiaForce</code></td><td><code>no</code></td><td>With <code>poreInertia</code>: the reaction of the pore gas inertia on the grains (off: it blew up a lifting bed, decision 0132)</td></tr>
 <tr><td><code>surfaceCarry</code></td><td><code>no</code></td><td>With a free surface: <code>yes</code> lets the moving surface carry gas to and from the void (the part of a cell the material leaves fills with gas from the void without a pressure drop through the grains); <code>no</code>: only grains crossing the surface displace gas. Used by the fluidised dam break (WP F.8, decision 0133)</td></tr>
 <tr><td><code>eMin</code></td><td><code>0.2</code></td><td>Smallest gas fraction of the filled part of a cell, used where the remap leaves more mass in a cell than its volume fraction holds (WP F.8b/F.8c, decision 0133).</td></tr>
 </tbody>
