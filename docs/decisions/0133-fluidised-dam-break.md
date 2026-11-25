@@ -1,6 +1,6 @@
 # 0133 Initially fluidised dam break; the surface carries gas (WP F.8)
 
-Date: 2026-11-24. Status: accepted; F.8 and F.8b not done (the case still misses the paper) (follows decisions 0125, 0129, 0131, 0132).
+Date: 2026-11-24. Status: accepted; F.8, F.8b and F.8c not done (the case still misses the paper; split F.8d-F.8f) (follows decisions 0125, 0129, 0131, 0132).
 
 ## Context
 
@@ -134,6 +134,46 @@ longer a jump. A restart from serial at 0.36 s stays within 1e-12 to 0.4 s.
 What is left: the run-out (the defluidised base's floor friction; the paper's floor and
 gas supply are unread), round-off growth over a long plastic flow against the 1e-10
 limit, and the cost (F.9). Next: F.8c (`docs/work-packages.md`).
+
+## F.8c (2026-11-25)
+
+1. **Paper read** (Sia downloaded it; copies of every paper below in /mnt/project-files/refs).
+   Roche et al. (2008): smooth Perspex apparatus, porous plate under the reservoir only ("no
+   air flux is provided in the channel"), channel 3 m x 10 cm, h0 10-40 cm, x0 10-20 cm, d50
+   75 um, rho_b 1450; Umf 7.5 mm/s (fully supported, not expanded), Umb 1.6-1.7 Umf
+   (expanded 2.5-4.5 %). Run-out 5.5-6 h0 at Umb, 4.5-5 at Umf, 1.8-2.2 times dry.
+2. **Case** set to it (`collapse_cases.py`): h0 0.4 m, x0 0.2 m (a = 2), 300 x 45 cells
+   (3 m channel), floor 15 deg (Aravena et al. 2021), full support at t = 0, air kept on
+   under the reservoir (patch floorRes, Darcy rate for full support).
+3. **Remap overfill** (crash at 0.26 s): the remap clips alpha at 1 but keeps the mass, so a
+   converging flow densified the packing with no stress (+17 % mean in F.8b, +20 % here, up to
+   rho/alpha 2500) and squeezed the gas until the solve diverged. New opt-in
+   materialProperties `overfillStress yes`: the overfill becomes an elastic volume strain
+   ln(alpha) (mean stress -K ln alpha). Density now holds (+0.4 %). Also gasProperties
+   `eMin` (the F.8b floor, default 0.2 unchanged). Neither changes v1 or earlier tests.
+4. **Result**: run-out 1.25 h0 (90 % support: 1.20), front 0.39 m/s; gas mass 1e-14; v1 dry
+   (plain MC) identical to main, 0.88 h0; 2 processors within 1e-10 to 0.06 s; 4 processors
+   stopped on the project file limit.
+5. **Diagnosis** (/mnt/project-files/f8/diag): support near the gate falls from 1 to 0 within
+   4 ms and rings between -0.7 and +0.9 of the weight (gas stiffness p0/e ~ 240 kPa: 1 %
+   dilation drops half the base weight); remap holes inside the bed (~0.8 % of its volume at
+   20 ms); probes with 100x stiffer gas and permeability / 9 were worse. The v1 dry collapse
+   itself is short: 0.85 h0 (MC 30 deg) against about 2.6 h0 in Roche's pressure-balanced
+   runs (1.05 m, Breard et al. 2019) and about 2 h0 in Aravena's dry simulation; with mu(I)
+   (tan 21, tan 33, I0 0.3) 1.2 h0, and with flowImpedance + fullBlend 3.5 h0.
+6. **Published models** of these experiments: Gueugneau et al. (2017, depth-averaged Coulomb,
+   advected basal pore pressure relaxing with a fitted D 0.004-0.02 m2/s, angles 24/19 deg),
+   Aravena et al. (2021, 2D incompressible mu(I), advected-diffused p_f with fitted kappa
+   0.015 against 0.13 theoretical, "reason unknown"), Breard, Dufek & Roche (2019, MFIX
+   two-fluid, compressible gas and real permeability, kinetic theory plus the Princeton
+   packing-dependent frictional pressure; delta 28, wall 12 deg, 5 mm, initial packing 0.58;
+   the same pressure drop at release, recovered by compaction). Chupin & Dubois (2023,
+   arXiv 2304.05083) is theory only.
+
+Sia chose (2026-11-25): calibrate the dry collapse first, then route B (pore pressure as an
+advected-diffused field with a fitted diffusivity, as Gueugneau and Aravena), then route A
+(packing-dependent friction for the compressible model, as Breard). Split: F.8d (dry), F.8e
+(B), F.8f (A).
 
 ## Consequences
 

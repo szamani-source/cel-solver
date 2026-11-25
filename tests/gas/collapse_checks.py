@@ -1,9 +1,10 @@
 """WP F.8 done-when: initially fluidised dam break against Roche et al.
 (2008) (cases in collapse_cases.py; decision 0133). Run by
 tests/manual/test_fluidised_collapse.sh, about 8 minutes on 4 cores.
-Result 2026-11-25 (decision 0133, F.8b): A fails (front -67 %, run-out
--62 %; gas mass 1e-14 passes), B passes, C fails (1e-10 to 0.36 / 0.46 s,
-1.6e-8 / 1.1e-8 at 1.3 s), K 2.3x.
+Result 2026-11-25 (decision 0133, F.8c, lab setup h0 0.4 m): A fails
+(front 0.39 m/s, -86 %; run-out 1.25 h0, -78 %; gas mass 1e-14 passes),
+B passes (dry 0.88 h0), C fails (2 processors 1e-10 to 0.06 s). Earlier
+(F.8b, 0.2 m column): front -67 %, run-out -62 %.
 
 A  serial gas run: front speed over Roche's constant-velocity phase within
    20 % of sqrt(2 g h0); run-out from the gate within 20 % of 5.75 h0;
@@ -21,7 +22,7 @@ C  2 and 4 processors (manual cuts: x = 0.1 m through the column, its free
 K  cost per step, gas on against gas off (report; F.9 target 1.5x).
 
 Every gas run: ergunWenYu, model gasFlow, surfaceCarry yes (decision 0133),
-the cap of collapse_cases.CAP.
+the cap of collapse_cases.CAP, overfillStress yes.
 
     python3 collapse_checks.py WORKDIR [--only A,B,C,K]
 """
