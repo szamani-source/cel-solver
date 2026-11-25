@@ -33,6 +33,8 @@ Tests use the `ergunWenYu` drag law (Sia, 2026-11-24).
 
 Newest first. Each entry: date, what was done, what was learned, exact next step.
 
+- 2026-11-25 (F.8b): papers still unreadable. Fixed the blow-ups (gas shut in nearly empty remapped cells: eMinPacked 0.2, face density floor) and two serial/parallel jumps (the cap's 'not set' p_c mixed by the remap: p_c = max(stored, old P, capP0)). Run-out 2.20 h0 (-62 %), front -67 %; parallel 1e-10 to 0.36-0.46 s, 1e-8 at the end; v1 dry check now plain MC (identical to main). Next F.8c: the paper's floor and gas supply; parallel round-off growth.
+
 - 2026-11-24: read the Roche (2008) abstract (full text refused by HAL, AGU, hal.science); case `tests/gas/collapse_cases.py`, mesh shown to Sia, `tests/manual/test_fluidised_collapse.sh` (checkpointed). Found and fixed (option `surfaceCarry`) the free surface sucking gas through the grains; expanded bed made soft with the cap. Result: run-out 1.95 h0 (-66 %), front -70 %: FAIL; dry identical to main, gas mass 1e-14; parallel parts within 0.002 s and blew up; cost 2.3x. Learned: the defluidised base's floor friction holds the flow (no floor friction: 7.0 h0); void flow near a thin front is not robust. Next (F.8b): full paper, then floor/gas supply, robust void flow and drag guard, parallel from an apex start, 5 mm mesh.
 
 - 2026-11-24: brief written in WP F.0. Next: start when the package before it has merged.

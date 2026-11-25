@@ -1,16 +1,18 @@
 """WP F.8 done-when: initially fluidised dam break against Roche et al.
 (2008) (cases in collapse_cases.py; decision 0133). Run by
 tests/manual/test_fluidised_collapse.sh, about 8 minutes on 4 cores.
-Result 2026-11-24 (decision 0133): A fails (front -70 %, run-out -66 %; gas
-mass 1e-14 passes), B passes, C fails (parts from round-off within 0.002 s;
-2 and 4 processors blew up at 0.33 s), K 2.3x.
+Result 2026-11-25 (decision 0133, F.8b): A fails (front -67 %, run-out
+-62 %; gas mass 1e-14 passes), B passes, C fails (1e-10 to 0.36 / 0.46 s,
+1.6e-8 / 1.1e-8 at 1.3 s), K 2.3x.
 
 A  serial gas run: front speed over Roche's constant-velocity phase within
    20 % of sqrt(2 g h0); run-out from the gate within 20 % of 5.75 h0;
    gas mass conserved to 1e-12 (gas mass less net inflow).
-B  dry collapse, gas off (no gasProperties): the front history and the final
-   column heights equal those of main before version 2 (v1.1.0, stored in
-   collapse_dry_reference.txt) to 1e-12.
+B  dry collapse, gas off (no gasProperties), plain Mohr-Coulomb (version 1's
+   collapse material, no cap): the front history and the final column heights
+   equal those of main before version 2 (v1.1.0, stored in
+   collapse_dry_reference.txt) to 1e-12. The dry run with the cap (as the gas
+   run) is reported (F.8b changed the cap's p_c rule, decision 0133).
 C  2 and 4 processors (manual cuts: x = 0.1 m through the column, its free
    surface and the void; 4: also y = 0.1 m through the bed) against serial:
    p, Ug and U within 1e-10 of their largest values at every write (pressure
@@ -96,12 +98,20 @@ def main(work, only):
     wd = f"{work}/dry"
     if not os.path.isdir(wd) or not os.path.exists(f"{wd}/log.wallTime"):
         cc.make(wd, gas=False)
+    wv1 = f"{work}/dryV1"
+    if "B" in only:
+        if not os.path.isdir(wv1) or not os.path.exists(f"{wv1}/log.wallTime"):
+            cc.make(wv1, gas=False, cap=False)
+        cc.run(wv1)
     secs["dry"] = cc.run(wd)
     nst["dry"] = cc.steps(wd)
     if "B" in only:
         print("\nB: dry collapse, gas off, against main before version 2")
-        hd = cc.history(wd)
-        hc, _ = cc.columns(wd, pc.times(wd)[-1])
+        hcap = cc.history(wd)
+        print(f"  dry with the cap (report): run-out {(hcap[-1, 1] - cc.X0) / cc.H0:.2f} h0, "
+              f"front speed {cc.front_speed(hcap):.3f} m/s")
+        hd = cc.history(wv1)
+        hc, _ = cc.columns(wv1, pc.times(wv1)[-1])
         ro = (hd[-1, 1] - cc.X0) / cc.H0
         if os.path.exists(REF):
             ref = np.loadtxt(REF)
@@ -144,6 +154,10 @@ def main(work, only):
                     first = (t, d)
                 worst = max(worst, d)
             drift = cc.gas_mass_drift(w)
+            last_ok = max([float(t) for t in pc.times(w1) if t in done and float(t) < float(first[0])]
+                          or [0.0]) if first else None
+            if first:
+                print(f"    within 1e-10 up to t = {last_ok} s ({last_ok / cc.T_SCALE:.1f} sqrt(h0/g))")
             report(f"{n} processors", worst <= 1e-10 and drift <= 1e-12,
                    f"p, Ug, U within {worst:.1e} of their largest"
                    + (f" (first above 1e-10 at t = {first[0]} s: {first[1]:.1e})" if first else "")

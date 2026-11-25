@@ -86,7 +86,7 @@ def describe():
             f"run-out {RUNOUT} h0 from the gate")
 
 
-def make(path, *, gas=True, decomp=(1, 1, 1), end=T_END, extra_gas=""):
+def make(path, *, gas=True, decomp=(1, 1, 1), end=T_END, extra_gas="", cap=True):
     if os.path.isdir(path):
         shutil.rmtree(path)
     pc.make_case(path, size=(NX * CELL, NY * CELL), cells=(NX, NY), e=E0, d=D, end=end,
@@ -94,7 +94,8 @@ def make(path, *, gas=True, decomp=(1, 1, 1), end=T_END, extra_gas=""):
                  decomp=decomp, E=E_MOD, coupled=True)
     g = f"{path}/constant/gasProperties"
     pc.write(g, open(g).read().replace(f"rhoP    {pc.RHOP!r};", f"rhoP    {RHOP!r};"))
-    fl._common(path, rho=RHO_B, E=E_MOD, extra_gas="surfaceCarry yes;\n" + extra_gas, material=MC,
+    fl._common(path, rho=RHO_B, E=E_MOD, extra_gas="surfaceCarry yes;\n" + extra_gas,
+               material=MC if cap else MC.split("capLambda")[0].rstrip("\n"),
                walls=f"    left {{ friction 0; }}\n    right {{ friction 0; }}\n"
                      f"    bottom {{ friction {PHI!r}; }}")
     k0 = 0.3 / 0.7

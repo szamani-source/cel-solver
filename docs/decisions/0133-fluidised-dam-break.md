@@ -1,6 +1,6 @@
 # 0133 Initially fluidised dam break; the surface carries gas (WP F.8)
 
-Date: 2026-11-24. Status: accepted, package not done (follows decisions 0125, 0129, 0131, 0132).
+Date: 2026-11-24. Status: accepted; F.8 and F.8b not done (the case still misses the paper) (follows decisions 0125, 0129, 0131, 0132).
 
 ## Context
 
@@ -83,6 +83,57 @@ Lessons:
   of a negative number: the gauge pressure fell below -p0 after a void gas speed of
   150 m/s). Void gas speeds of 7-25 m/s appear in every run of this case (also before
   this package's changes): the void flow next to a spraying front is not robust.
+
+## F.8b (2026-11-25)
+
+Sia asked (through the coordinator) to carry on at once: find the paper's floor and gas
+details, make the gas robust at the thin front, make 2/4 processors match.
+
+1. **Paper**: still only abstracts. Roche (2008) and every citing paper tried
+   (Montserrat et al. 2016 Granular Matter, Gueugneau et al. 2017 GRL and 2023 Bull.
+   Volcanol., Breard et al. 2019 JGR) refuse automated reading or are paywalled. From
+   their abstracts: 75 um beads; run-out x/x0 = alpha r^n, alpha growing with the degree of
+   fluidisation and with bed expansion (up to more than twice non-fluidised); Breard
+   et al. match the experiments with a frictional (Srivastava-Sundaresan) rheology. The
+   floor and the gas supply after release stay assumptions; nothing was tuned.
+2. **Crash fixed**: a nearly empty cell after the remap can hold more mass than its
+   alpha (rho/alpha > rho_p); its filled-part gas fraction went negative, its
+   permeability 0, the gas in it was shut in and its pressure diverged (to -p0, then the
+   drag's square root failed). The filled-part gas fraction is now at least
+   `eMinPacked` = 0.2, and the face gas densities in `faceCoefficients` use at least
+   1e-3 p0. No run blows up now (serial, 2 and 4 processors to 1.3 s).
+3. **Parallel fixed (the cap)**: serial and 2 processors parted by 1e-3 within 15 steps
+   with the cap and not without it (gas and plain Mohr-Coulomb agreed to 1e-13). The
+   cap's p_c of 0 means "not set"; the remap mixes it by mass (with a limiter) into
+   loaded cells, so a cell could get p_c of 2e-5 Pa in one run and 1 Pa in the other,
+   or 0 against 2765 Pa, and the next load then scaled its stress to almost nothing.
+   `Cap::apply` now starts from p_c = max(stored p_c, P of the old stress, capP0), which
+   is continuous in the stored value and, for a cell never loaded, the same as before.
+   `tests/test_cap.sh`, `test_cap_stl.sh`, `test_settle_column.sh` and
+   `test_constitutive_cpp.sh` still pass. It changes v1 results where the stress had got
+   outside a diluted cap: the dry dam break with the cap moves its front by one cell.
+   The v1 dry check therefore uses plain Mohr-Coulomb (version 1's collapse material).
+
+Results (`tests/manual/test_fluidised_collapse.sh`, 2026-11-25, results in
+/mnt/project-files/f8/run3, log test5.log):
+
+| Check | F.8 | F.8b | Limit |
+| --- | --- | --- | --- |
+| Front speed | 0.589 m/s (-70 %) | 0.664 m/s (-67 %) | 20 % FAIL |
+| Run-out | 1.95 h0 (-66 %) | 2.20 h0 (-62 %), stops at 7.8 sqrt(h0/g) | 20 % FAIL |
+| Gas mass | 1.2e-14 | 1.0e-14 | 1e-12 PASS |
+| v1 dry collapse against main | identical | identical (plain Mohr-Coulomb) | PASS |
+| 2 processors | 5e-2 at 0.02 s, crashed 0.33 s | within 1e-10 to 0.36 s, 1.6e-8 at 1.3 s | 1e-10 FAIL |
+| 4 processors | 5e-2 at 0.02 s, crashed 0.33 s | within 1e-10 to 0.46 s, 1.1e-8 at 1.3 s | 1e-10 FAIL |
+| Cost gas on / off | 2.3x | 2.33x | 1.5x (F.9) |
+
+The parallel difference now grows smoothly (1e-12 at 0.3 s, 1e-10 at 0.4-1 s, 1e-8 at
+1.3 s, largest in Ug and sigma): round-off amplified by a spreading plastic flow, no
+longer a jump. A restart from serial at 0.36 s stays within 1e-12 to 0.4 s.
+
+What is left: the run-out (the defluidised base's floor friction; the paper's floor and
+gas supply are unread), round-off growth over a long plastic flow against the 1e-10
+limit, and the cost (F.9). Next: F.8c (`docs/work-packages.md`).
 
 ## Consequences
 
