@@ -209,6 +209,27 @@ counted spray); 0.11: 1.18 m/s. Our flow is slower and lasts longer (stops at ab
 sqrt(h0/g) against 6.5). Run-out still depends on the mesh (4.45 to 5.12 h0). Plot
 /mnt/project-files/f8/diag/routeB_front.png. Next F.8f.
 
+## F.8f, first step (2026-11-25)
+
+New materialProperties `princetonFr` (with `princetonR`, `princetonS`, `princetonMin`,
+`princetonMax`, needs `rhoS`): the Princeton packing-dependent frictional pressure that
+Breard et al. (2019) use, Pc = Fr (es - esMin)^r / (esMax - es)^s, es = rho/(alpha rhoS). It is
+applied as a limit after the Lagrange step: an effective mean stress above Pc(es) is scaled
+towards the apex (the grains cannot carry it at this packing, so the cell compacts); below
+esMin the stress is zero. We did not take MFIX's form (Pc as the whole solid pressure, with
+the dilation factor N) because our grains already have an elastic-plastic stress; the limit
+keeps that and adds the packing dependence. Test `tests/test_packing_pressure.sh` (7 s): the
+bound holds, a column at 0.58 compacts to 0.597 (static need 0.593: the drop from a loose
+start overshoots), option off unchanged, 2 processors 1e-13.
+
+Dam break, 10 mm, F.8d grains with Breard's law (Fr 0.05, r 2, s 5, 0.49-0.64) instead of
+the cap: dry 2.47 h0 (Roche about 2.6); compressible gas (kappa 0) 3.50 h0, deposit front
+1.54 m/s (was 3.15 h0 with the cap, 2.57 without); route B (kappa 0.015) 4.47 h0, 1.70 m/s
+(4.45 without). The compressible run's base pore pressure under the reservoir falls from
+5.6 to 0.9 kPa within 0.02 s and recovers to 3-4.6 kPa by 0.06-0.16 s, the behaviour Breard
+reports (5.5 to 1 kPa, then about 4 kPa), but the pressure in the flowing part stays low
+(0.2-1.6 kPa). Gap to Roche still -39 % for the compressible model.
+
 ## Consequences
 
 - F.8 is not done. Its remaining work is split into F.8b (`docs/work-packages.md`):

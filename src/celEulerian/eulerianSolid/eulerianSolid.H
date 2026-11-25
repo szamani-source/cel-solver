@@ -263,6 +263,19 @@ class eulerianSolid
         //  stress -K ln(alpha)) instead of a stress-free densification
         Switch overfillStress_;
 
+        //- WP F.8f (decision 0133): packing-dependent frictional pressure
+        //  (Princeton / Srivastava-Sundaresan, as Breard et al. 2019).
+        //  materialProperties princetonFr > 0 turns it on: the effective
+        //  mean stress of a cell is at most
+        //      Pc = Fr (es - esMin)^r / (esMax - es)^s,  es = rho/(alpha rhoS)
+        //  (0 below esMin); a stress above it is scaled towards the apex
+        scalar princetonFr_;
+        scalar princetonR_;
+        scalar princetonS_;
+        scalar princetonMin_;
+        scalar princetonMax_;
+        scalar princetonRhoS_;
+
         //- A.4 (decision 0095): materialProperties voidPlasticFlow; in a
         //  partly filled cell the plastic normal strain the material takes
         //  on an axis (dilation, or extension of the deviatoric flow) goes

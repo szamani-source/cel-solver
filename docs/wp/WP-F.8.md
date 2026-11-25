@@ -33,6 +33,8 @@ Tests use the `ergunWenYu` drag law (Sia, 2026-11-24).
 
 Newest first. Each entry: date, what was done, what was learned, exact next step.
 
+- 2026-11-25 (F.8f, step 1): added the Princeton packing-dependent pressure (`princetonFr`) as a limit on the effective mean stress, and `tests/test_packing_pressure.sh`. Dam break: dry 2.47 h0, compressible gas 3.50 h0 (-39 %), route B 4.47 h0. Learned: the base pore pressure now drops at release and recovers as in Breard; the flowing part still loses its pressure. Next: Breard's other settings (air through the reservoir, initial packing, wall friction) on the compressible model.
+
 - 2026-11-25 (F.8d, F.8e): dry column calibrated (mu(I) + flowImpedance + fullBlend, Gueugneau 24/19 deg): 2.375 h0, -9 % of Roche's pressure-balanced run. Added gasProperties `diffusivity` (route B: pore pressure carried by the grains and diffusing) and `tests/test_pore_diffusion.sh`. Dam break at kappa 0.015: run-out 4.45 h0 (-23 %), front -25 %; at the theoretical 0.11: 3.30 h0. Learned: the compressible gas's suction at release costs about 1.3 h0 of run-out; with route B we are close but not yet within 20 %. Next: 5 mm mesh, then F.8f.
 
 - 2026-11-25 (F.8c): read Roche (2008) in full and the published models (Gueugneau 2017, Aravena 2021, Breard 2019; decision 0133). Case set to the lab (h0 0.4, a = 2, 15 deg floor, air on). `overfillStress` fixes the remap densification crash. Run-out 1.25 h0. Learned: the dry collapse is short too (0.85 against about 2.6 h0); our compressible gas loses support at release like Breard's, but our elastic-plastic grains then lock. Next: F.8d dry calibration, then F.8e (route B), F.8f (route A), Sia's order.

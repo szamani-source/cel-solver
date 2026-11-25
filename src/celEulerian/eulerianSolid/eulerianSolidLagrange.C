@@ -3355,6 +3355,30 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
 
         // 6. Lagrangian density
         rho[celli] = m[celli]/VL;
+
+        // WP F.8f (decision 0133): packing-dependent frictional pressure
+        // (Princeton, Breard et al. 2019): the effective mean stress is at
+        // most Pc(solid fraction of the filled part); above it the stress
+        // is scaled towards the apex (the grains cannot carry it at this
+        // packing and the cell compacts)
+        const scalar aP = freeSurface_ ? alphaL_[celli] : scalar(1);
+        if (princetonFr_ > 0 && aP > 0 && m[celli] > 0)
+        {
+            const scalar es = m[celli]/(VL*max(aP, SMALL)*princetonRhoS_);
+            scalar Pc = 0;
+            if (es > princetonMin_)
+            {
+                const scalar gap = max(princetonMax_ - es, 1e-6);
+                Pc = princetonFr_*Foam::pow(es - princetonMin_, princetonR_)
+                    /Foam::pow(gap, princetonS_);
+            }
+            symmTensor& s = sigma[celli];
+            const scalar P = -tr(s)/3;
+            if (P > Pc)
+            {
+                s *= (P > 0 ? Pc/P : 0);
+            }
+        }
     }
 
     rho_.correctBoundaryConditions();

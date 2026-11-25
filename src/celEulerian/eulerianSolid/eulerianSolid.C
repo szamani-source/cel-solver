@@ -482,6 +482,37 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
     {
         Info<< "Normal jump cap at Mohr-Coulomb yield (rule 12)" << nl;
     }
+    princetonFr_ = materialProperties_.getOrDefault<scalar>("princetonFr", 0);
+    princetonR_ = materialProperties_.getOrDefault<scalar>("princetonR", 2);
+    princetonS_ = materialProperties_.getOrDefault<scalar>("princetonS", 5);
+    princetonMin_ = materialProperties_.getOrDefault<scalar>("princetonMin", 0.49);
+    princetonMax_ = materialProperties_.getOrDefault<scalar>("princetonMax", 0.64);
+    princetonRhoS_ = 0;
+    if (princetonFr_ < 0)
+    {
+        FatalIOErrorInFunction(materialProperties_)
+            << "princetonFr must be positive (0 = off)" << exit(FatalIOError);
+    }
+    if (princetonFr_ > 0)
+    {
+        princetonRhoS_ = materialProperties_.get<scalar>("rhoS");
+        if
+        (
+            !(princetonMin_ >= 0 && princetonMax_ > princetonMin_
+           && princetonMax_ < 1 && princetonRhoS_ > 0 && princetonS_ >= 0
+           && princetonR_ >= 0)
+        )
+        {
+            FatalIOErrorInFunction(materialProperties_)
+                << "princeton: needs 0 <= princetonMin < princetonMax < 1, "
+                << "rhoS > 0, princetonR and princetonS >= 0"
+                << exit(FatalIOError);
+        }
+        Info<< "Packing-dependent pressure (Princeton): Fr " << princetonFr_
+            << " Pa, r " << princetonR_ << ", s " << princetonS_
+            << ", solid fraction " << princetonMin_ << " to "
+            << princetonMax_ << ", rhoS " << princetonRhoS_ << nl;
+    }
     if (overfillStress_)
     {
         Info<< "Overfilled cells take the excess as elastic volume strain "
