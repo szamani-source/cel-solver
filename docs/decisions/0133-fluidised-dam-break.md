@@ -175,6 +175,32 @@ advected-diffused field with a fitted diffusivity, as Gueugneau and Aravena), th
 (packing-dependent friction for the compressible model, as Breard). Split: F.8d (dry), F.8e
 (B), F.8f (A).
 
+## F.8d and F.8e (2026-11-25)
+
+**F.8d, dry calibration.** The dry a = 2 column (gas off, no cap) with Gueugneau's angles
+(phi 24 deg internal, floor 19 deg) and the mu(I) rule (mu2 tan 33, I0 0.3, d 75 um) plus
+`flowImpedance` and `fullBlend` reaches 2.375 h0 from the gate (front at
+1.15 m), -9 % of Roche's pressure-balanced 1.05 m (2.6 h0, Breard et al. 2019). Plain
+Mohr-Coulomb (24/19 or 28/12) stops at 0.9-1.1 h0: its elastic face impedance over-damps a
+fast collapse. `collapse_dry_reference.txt` was regenerated on main's binaries for this
+material, so check B still proves version 2 leaves the dry solver unchanged.
+
+**F.8e, route B.** New gasProperties `diffusivity` kappa (m2/s, default 0 = off, needs
+`model poreGas`). With kappa > 0 the storage term becomes alpha k/(mu kappa) (so the pressure
+diffuses at kappa, not at the rigid-bed k p0/(mu e)) and the squeezed-gas term is replaced by
+upwind advection of p with the material that crosses each face in the remap: pore pressure
+moves with the grains, with no compression or suction from the bulk volume change. This is
+Iverson & Denlinger (2001) as used by Gueugneau (2017) and Aravena (2021). Gas mass is then
+not conserved (pressure, not mass, is carried); the gas mass checks apply only to the
+compressible route (kappa = 0). Test `tests/test_pore_diffusion.sh`: a step at a face of a
+rigid bed matches erfc within 2 % at two kappa values, 2 and 4 processors within 1e-10.
+
+Dam break (10 mm, serial), fitted kappa 0.015 (Aravena's): run-out 4.45 h0 (-23 % of 5.75),
+front 2.09 m/s (-25 % of sqrt(2 g h0)), stops at 6.8 sqrt(h0/g) (Roche 6.5). With the
+theoretical kappa k p0/(mu e) = 0.11: 3.30 h0, 1.18 m/s. For comparison the compressible route
+with the same grains gives 3.15 h0 (with cap) and 2.57 h0 (without). Route B is the default
+gas route of `collapse_cases.py` (KAPPA_FIT); kappa = 0 still runs the compressible case.
+
 ## Consequences
 
 - F.8 is not done. Its remaining work is split into F.8b (`docs/work-packages.md`):

@@ -33,6 +33,8 @@ Tests use the `ergunWenYu` drag law (Sia, 2026-11-24).
 
 Newest first. Each entry: date, what was done, what was learned, exact next step.
 
+- 2026-11-25 (F.8d, F.8e): dry column calibrated (mu(I) + flowImpedance + fullBlend, Gueugneau 24/19 deg): 2.375 h0, -9 % of Roche's pressure-balanced run. Added gasProperties `diffusivity` (route B: pore pressure carried by the grains and diffusing) and `tests/test_pore_diffusion.sh`. Dam break at kappa 0.015: run-out 4.45 h0 (-23 %), front -25 %; at the theoretical 0.11: 3.30 h0. Learned: the compressible gas's suction at release costs about 1.3 h0 of run-out; with route B we are close but not yet within 20 %. Next: 5 mm mesh, then F.8f.
+
 - 2026-11-25 (F.8c): read Roche (2008) in full and the published models (Gueugneau 2017, Aravena 2021, Breard 2019; decision 0133). Case set to the lab (h0 0.4, a = 2, 15 deg floor, air on). `overfillStress` fixes the remap densification crash. Run-out 1.25 h0. Learned: the dry collapse is short too (0.85 against about 2.6 h0); our compressible gas loses support at release like Breard's, but our elastic-plastic grains then lock. Next: F.8d dry calibration, then F.8e (route B), F.8f (route A), Sia's order.
 
 - 2026-11-25 (F.8b): papers still unreadable. Fixed the blow-ups (gas shut in nearly empty remapped cells: eMinPacked 0.2, face density floor) and two serial/parallel jumps (the cap's 'not set' p_c mixed by the remap: p_c = max(stored, old P, capP0)). Run-out 2.20 h0 (-62 %), front -67 %; parallel 1e-10 to 0.36-0.46 s, 1e-8 at the end; v1 dry check now plain MC (identical to main). Next F.8c: the paper's floor and gas supply; parallel round-off growth.
