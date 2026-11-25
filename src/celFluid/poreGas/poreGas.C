@@ -442,7 +442,13 @@ void Foam::poreGas::correctFractions()
         }
         else
         {
-            eM_[celli] = 1 - rho[celli]/(alpha[celli]*rhoP_);
+            // WP F.8 (decision 0133): at least eMinPacked. The remap can
+            // leave a nearly empty cell with more mass than alpha holds
+            // (rho/alpha > rhoP); its gas fraction then went negative,
+            // its permeability 0, and the gas in it was shut in (the
+            // pressure diverged at a thin spreading front)
+            eM_[celli] =
+                max(1 - rho[celli]/(alpha[celli]*rhoP_), eMinPacked);
             k[celli] =
                 dragModel_->permeability(eM_[celli], d_, mu_, rhoG_);
         }
@@ -494,6 +500,9 @@ void Foam::poreGas::faceCoefficients
     const fvMesh& mesh = solid_.mesh();
     const volScalarField& p = *pPtr_;
     const scalar RT = Rair*T_;
+    // WP F.8 (decision 0133): the face gas density from at least 1e-3 p0,
+    // so a diverging iterate (gauge p below -p0) cannot make it negative
+    const scalar pFloor = 1e-3*p0_;
     const surfaceScalarField& w = mesh.weights();
     const surfaceVectorField nf(mesh.Sf()/mesh.magSf());
     const surfaceScalarField& dc = mesh.nonOrthDeltaCoeffs();
@@ -552,7 +561,7 @@ void Foam::poreGas::faceCoefficients
             dT = 0;
             return;
         }
-        const scalar rho = (flow_ ? p0_ + pV : p0_)/RT;
+        const scalar rho = max(flow_ ? p0_ + pV : p0_, pFloor)/RT;
         const gasDragModel& drag = *lawPtr;
         dS = rho*drag.mobility(eP, G, d_, mu_, rho)/fP;
         dT = rho*drag.tangentMobility(eP, G, d_, mu_, rho)/fP;
@@ -587,7 +596,7 @@ void Foam::poreGas::faceCoefficients
                     // momentum equation; none without (F.4)
                     DS[facei] =
                         flow_
-                      ? (p0_ + wf*p[P] + (1 - wf)*p[N])/RT
+                      ? max(p0_ + wf*p[P] + (1 - wf)*p[N], pFloor)/RT
                        *rAUfPtr_()[facei]
                       : 0;
                     DT[facei] = DS[facei];
@@ -615,7 +624,7 @@ void Foam::poreGas::faceCoefficients
             face
             (
                 eM[P], k[P], eM[N], k[N], wf,
-                (p0_ + wf*p[P] + (1 - wf)*p[N])/RT,
+                max(p0_ + wf*p[P] + (1 - wf)*p[N], pFloor)/RT,
                 mag3(g, nf[facei], gn),
                 DS[facei], DT[facei]
             );
@@ -661,7 +670,7 @@ void Foam::poreGas::faceCoefficients
                     {
                         DS[i] =
                             flow_
-                          ? (p0_ + wf[i]*p[P] + (1 - wf[i])*pN[i])/RT
+                          ? max(p0_ + wf[i]*p[P] + (1 - wf[i])*pN[i], pFloor)/RT
                            *rAUfPtr_().boundaryField()[patchi][i]
                           : 0;
                         DT[i] = DS[i];
@@ -702,7 +711,7 @@ void Foam::poreGas::faceCoefficients
                 face
                 (
                     eM[P], k[P], eN[i], kN[i], wf[i],
-                    (p0_ + wf[i]*p[P] + (1 - wf[i])*pN[i])/RT,
+                    max(p0_ + wf[i]*p[P] + (1 - wf[i])*pN[i], pFloor)/RT,
                     mag3(g, n[i], gn),
                     DS[i], DT[i]
                 );
@@ -736,7 +745,7 @@ void Foam::poreGas::faceCoefficients
                     // Gas flow in the void (WP F.6): rho_g 1/A
                     DS[i] =
                         (!shut && flow_)
-                      ? (p0_ + pB[i])/RT
+                      ? max(p0_ + pB[i], pFloor)/RT
                        *rAUfPtr_().boundaryField()[patchi][i]
                       : 0;
                     DT[i] = DS[i];
@@ -745,7 +754,7 @@ void Foam::poreGas::faceCoefficients
                 face
                 (
                     eM[P], k[P], eM[P], k[P], 1,
-                    (p0_ + pB[i])/RT,
+                    max(p0_ + pB[i], pFloor)/RT,
                     mag3(gradP[P] - gIB[i], n[i], gn[i] - (n[i] & gIB[i])),
                     DS[i], DT[i]
                 );

@@ -404,6 +404,9 @@ public:
     //- Cells with alpha below this are void (no permeability)
     static constexpr scalar alphaMin = 1e-6;
 
+    //- Smallest gas fraction of the filled part (WP F.8, decision 0133)
+    static constexpr scalar eMinPacked = 0.2;
+
     //- Ergun-Wen-Yu switch: Ergun below this gas fraction (Gidaspow)
     static constexpr scalar eSwitch = 0.8;
 
