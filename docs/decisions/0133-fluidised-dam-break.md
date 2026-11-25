@@ -281,7 +281,10 @@ within 5.6 % of the frictionless one (25-29 % behind before).
 Dam break 10 mm: theoretical kappa k p0/(mu e) = 0.11: run-out 5.02 h0 (-13 %), front 1.04
 sqrt(g h0) (-26 %), stops at 5.6 sqrt(h0/g) (Roche 6.5); fitted 0.015 now overshoots (channel
 end, front 1.26). So no fitted kappa is needed at 10 mm. 5 mm with the theoretical kappa:
-running.
+front 1.19 sqrt(g h0) (-16 %, inside 20 %), at Roche's stop time 6.57 h0 (+14 %), then on to the
+channel end (7.0 h0): run-out still depends on the mesh (10 mm 5.02 h0). Likely cause: the
+void at p = 0 one half cell above the flow surface, so the drainage path of a thin flow scales
+with the cell (Gueugneau relaxes p/(rho g h) over the depth). Refit on 5 mm (kappa 0.22) running.
 
 ## Consequences
 
