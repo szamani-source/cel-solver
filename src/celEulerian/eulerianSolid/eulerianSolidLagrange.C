@@ -1940,8 +1940,17 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
               : 1;
             if (w > 0)
             {
-                e[celli] =
-                    w*flowViscosity(sigma_[celli], flowLaw_, cCot, sm[celli]);
+                // WP F.8g: with frictionOnly the law sees the effective
+                // stress sigma + lambda P I
+                const symmTensor sEff
+                (
+                    supportP_
+                  ? sigma_[celli]
+                  + (1 - frictionScale_[celli])
+                   *max(-tr(sigma_[celli])/3, scalar(0))*symmTensor::I
+                  : sigma_[celli]
+                );
+                e[celli] = w*flowViscosity(sEff, flowLaw_, cCot, sm[celli]);
             }
         }
         // Nonlocal fluidity (WP N.2, decision 0111; C.3, decision 0112): a
@@ -2182,7 +2191,9 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                     {
                         wallFace
                         (
-                            pS[i]/pmS[i], pu[i], ps[i], zp[P], zs[P], mu, v, t,
+                            pS[i]/pmS[i], pu[i], ps[i], zp[P], zs[P],
+                            mu*(supportP_ ? frictionScale_[P] : scalar(1)),
+                            v, t,
                             fi && teta()[P] > 0
                           ? min
                             (

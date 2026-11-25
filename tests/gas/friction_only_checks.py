@@ -15,10 +15,9 @@ P  2 processors (cut at x = 0.1 m) against serial (report): a cohesionless
    the dry frictionless case parts the same way (known issue, decisions 0132,
    0133; F.9).
 
-Manual test (tests/manual/test_friction_only.sh, about 1 minute). Result
-2026-11-25: I FAILS, the supported flow is 25-29 % behind the frictionless
-one (the carried p does not follow the dynamic rise of the total pressure,
-so friction comes back where P > p); S passes.
+tests/test_friction_only.sh, about 1 minute. Result 2026-11-25 (F.8h: the
+support ratio carried; flow impedance and the wall predictor see the
+lowered friction): I within 5.6 % (before F.8h 25-29 % behind), S passes.
 
     python3 friction_only_checks.py WORKDIR
 """

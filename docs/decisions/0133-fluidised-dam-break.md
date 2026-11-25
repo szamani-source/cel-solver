@@ -266,6 +266,23 @@ time 6.5 sqrt(h0/g) the front is at 6.14 h0 (+7 %), but it keeps creeping and re
 channel end (7.0 h0) at 8.5. The fitted kappa depends on the mesh: the upwind advection of p
 adds numerical diffusion that halves with the cell size (10 mm 5.67 h0, 5 mm > 7 h0).
 
+## F.8h: support ratio carried (2026-11-25)
+
+Sia approved carrying the support ratio and a sharper scheme. With frictionOnly the grains
+now carry lambda = p/P (P the total mean pressure), as Gueugneau carries p/(rho g h): a cell
+keeps lambda when its load changes, and material crossing a face brings its lambda,
+reconstructed linearly to the face from the donor's gradient and bounded by the two cells'
+values (second order, no new extrema). p = lambda P then diffuses with kappa. Two places
+still used the full friction and are fixed: the mu(I) flow impedance (now on sigma +
+lambda P I) and the wall Riemann solution of the stress predictor (mu (1 - lambda)).
+`tests/test_friction_only.sh` (in the suite now): the fully supported coarse column moves
+within 5.6 % of the frictionless one (25-29 % behind before).
+
+Dam break 10 mm: theoretical kappa k p0/(mu e) = 0.11: run-out 5.02 h0 (-13 %), front 1.04
+sqrt(g h0) (-26 %), stops at 5.6 sqrt(h0/g) (Roche 6.5); fitted 0.015 now overshoots (channel
+end, front 1.26). So no fitted kappa is needed at 10 mm. 5 mm with the theoretical kappa:
+running.
+
 ## Consequences
 
 - F.8 is not done. Its remaining work is split into F.8b (`docs/work-packages.md`):

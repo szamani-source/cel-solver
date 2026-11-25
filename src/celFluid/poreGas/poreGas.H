@@ -352,6 +352,10 @@ class poreGas
             //  (Gueugneau 2017, Aravena 2021) instead of acting as a force
             Switch frictionOnly_;
 
+            //- WP F.8h: total mean pressure of each cell at the last solve
+            //  (frictionOnly carries the support ratio p/P); empty: not set
+            scalarField Pprev_;
+
             //- Superficial flux relative to the grains through each face
             //  at the end of the last step, q.n [m/s], and 1 on the faces
             //  that were void flow faces then (their flux is absolute)

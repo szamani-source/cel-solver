@@ -847,7 +847,138 @@ void Foam::poreGas::solve(const scalar dt)
     //   S Vo/dt (p - pOld) + X/dt + sum(Darcy flux out) = 0.
     scalarField X(p.size(), Zero);
     scalar carriedOut = 0;      // through non-coupled faces (WP F.4) [kg]
-    if (kappa_ > 0 && coupled_ && solid_.mesh().time().timeIndex() > 0)
+    // WP F.8h (decision 0133): with frictionOnly the grains carry the
+    // support ratio lambda = p/P (P the total mean pressure), as Gueugneau
+    // et al. (2017) carry p/(rho g h): a cell keeps its lambda when its
+    // load changes (p follows P), and material crossing a face brings its
+    // lambda, reconstructed to the face to second order and bounded by the
+    // two cells' values. The target p = lambda P then diffuses (kappa).
+    const bool carryRatio =
+        kappa_ > 0 && coupled_ && frictionOnly_ && fs;
+    scalarField Pnow;
+    if (carryRatio)
+    {
+        Pnow = max(-tr(solid_.sigma().primitiveField())/3, scalar(0));
+        if (Pprev_.size() != Pnow.size())
+        {
+            Pprev_ = Pnow;
+        }
+    }
+    if (carryRatio && solid_.mesh().time().timeIndex() > 0)
+    {
+        const labelUList& own = mesh.owner();
+        const labelUList& nei = mesh.neighbour();
+        const scalarField& dm = solid_.remapMass().primitiveField();
+        const scalarField& rhoC = solid_.rho().primitiveField();
+        const scalarField& alpha = solid_.alpha().primitiveField();
+        auto bulk = [&](const label c)
+        {
+            return alpha[c] > alphaMin ? rhoC[c]/alpha[c] : rhoP_;
+        };
+        volScalarField lam
+        (
+            IOobject
+            (
+                "supportRatio",
+                mesh.time().timeName(),
+                mesh,
+                IOobject::NO_READ,
+                IOobject::NO_WRITE,
+                IOobject::NO_REGISTER
+            ),
+            mesh,
+            dimensionedScalar(dimless, Zero),
+            fvPatchFieldBase::zeroGradientType()
+        );
+        scalarField& li = lam.primitiveFieldRef();
+        forAll(li, c)
+        {
+            li[c] =
+                Pprev_[c] > 0 ? min(max(pOld[c], scalar(0))/Pprev_[c], scalar(1))
+              : (pOld[c] > 0 ? 1 : 0);
+        }
+        lam.correctBoundaryConditions();
+        const volVectorField gLam(fvc::grad(lam));
+        const vectorField& gl = gLam.primitiveField();
+        const vectorField& C = mesh.C().primitiveField();
+        const vectorField& Cf = mesh.Cf().primitiveField();
+        // face value from the donor, second order, within the two cells
+        auto faceLam = [](scalar ld, scalar lr, const vector& g, const vector& d)
+        {
+            const scalar lf = ld + (g & d);
+            return min(max(lf, min(ld, lr)), max(ld, lr));
+        };
+        scalarField Fin(X.size(), Zero), FinL(X.size(), Zero);
+        forAll(own, facei)
+        {
+            const scalar m = dm[facei];
+            if (m == 0)
+            {
+                continue;
+            }
+            const label d = m > 0 ? own[facei] : nei[facei];
+            const label r = m > 0 ? nei[facei] : own[facei];
+            const scalar F = mag(m)/bulk(d);
+            Fin[r] += F;
+            FinL[r] += F*faceLam(li[d], li[r], gl[d], Cf[facei] - C[d]);
+        }
+        forAll(mesh.boundary(), patchi)
+        {
+            if (!mesh.boundary()[patchi].coupled())
+            {
+                continue;
+            }
+            const labelUList& fc = mesh.boundary()[patchi].faceCells();
+            const scalarField& pdm =
+                solid_.remapMass().boundaryField()[patchi];
+            const scalarField lN
+            (
+                lam.boundaryField()[patchi].patchNeighbourField()
+            );
+            const vectorField gN
+            (
+                gLam.boundaryField()[patchi].patchNeighbourField()
+            );
+            const vectorField CN
+            (
+                mesh.C().boundaryField()[patchi].patchNeighbourField()
+            );
+            const vectorField& Cfp = mesh.Cf().boundaryField()[patchi];
+            const scalarField rN
+            (
+                solid_.rho().boundaryField()[patchi].patchNeighbourField()
+            );
+            const scalarField aN
+            (
+                solid_.alpha().boundaryField()[patchi].patchNeighbourField()
+            );
+            forAll(fc, i)
+            {
+                if (pdm[i] < 0)
+                {
+                    const label r = fc[i];
+                    const scalar F =
+                        -pdm[i]/(aN[i] > alphaMin ? rN[i]/aN[i] : rhoP_);
+                    Fin[r] += F;
+                    FinL[r] += F*faceLam(lN[i], li[r], gN[i], Cfp[i] - CN[i]);
+                }
+            }
+        }
+        const scalarField& Vc = mesh.V().field();
+        forAll(X, r)
+        {
+            scalar l = li[r];
+            if (Fin[r] > 0)
+            {
+                const scalar Vf = max(alpha[r], alphaMin)*Vc[r];
+                const scalar w = min(Fin[r]/Vf, scalar(1));
+                l = w*FinL[r]/Fin[r] + (1 - w)*li[r];
+            }
+            const scalar target = (vd[r] > 0.5 ? 0 : l*Pnow[r]);
+            X[r] = -S[r]*Vc[r]*(target - pOld[r]);
+        }
+    }
+    else if (kappa_ > 0 && coupled_ && solid_.mesh().time().timeIndex() > 0)
     {
         // WP F.8e: the material crossing a face (its bulk volume, mass over
         // the donor's bulk density) brings the donor's pressure into the
@@ -1529,6 +1660,10 @@ void Foam::poreGas::solve(const scalar dt)
     if (fs)
     {
         netIn_ -= returnReduce(carriedOut, sumOp<scalar>());
+    }
+    if (carryRatio)
+    {
+        Pprev_ = Pnow;
     }
     correctFacePressure();
 
