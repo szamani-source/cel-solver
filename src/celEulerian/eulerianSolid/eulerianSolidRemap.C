@@ -1245,6 +1245,9 @@ void Foam::eulerianSolid::remapFreeSurface(const scalar dt)
 
     scalarField dmInt(own.size(), Zero);
     List<scalarField> dmPatch(bm.size());
+    // Mass out through non-coupled faces (outlets), kept for the pore gas
+    // only (WP F.4); dmPatch stays zero there for remapField
+    List<scalarField> dmLeave(bm.size());
     scalarField dmOut(nCells, Zero);
     scalarField vOut(nCells, Zero);
     forAll(own, facei)
@@ -1276,6 +1279,7 @@ void Foam::eulerianSolid::remapFreeSurface(const scalar dt)
         const scalarField& pmS = p.magSf();
         const scalarField pdc(p.deltaCoeffs());
         dmPatch[patchi].setSize(fc.size(), Zero);
+        dmLeave[patchi].setSize(fc.size(), Zero);
         const label ink = inletOfPatch_[patchi];
         forAll(fc, i)
         {
@@ -1326,6 +1330,7 @@ void Foam::eulerianSolid::remapFreeSurface(const scalar dt)
             {
                 // Leaves the domain (an open outlet, WP 3.3)
                 discharged_ += dm;
+                dmLeave[patchi][i] = dm;
             }
             dmOut[fc[i]] += sgn*dm;
             vOut[fc[i]] += sgn*v;
@@ -1333,6 +1338,19 @@ void Foam::eulerianSolid::remapFreeSurface(const scalar dt)
     }
 
     keepRemapMass(remapMass_, dmInt, dmPatch);
+    if (remapMass_)
+    {
+        // Pore gas (WP F.4): the mass through non-coupled faces too, out
+        // through outlets (dmLeave) and in through open inlets (dmPatch)
+        forAll(bm, patchi)
+        {
+            if (!bm[patchi].coupled())
+            {
+                remapMass_.ref().boundaryFieldRef()[patchi] =
+                    dmPatch[patchi] + dmLeave[patchi];
+            }
+        }
+    }
 
     // New mass and volume fraction; round-off dust (alpha < 1e-9 with
     // mass) gets its volume from its mass and no velocity or stress

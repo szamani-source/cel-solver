@@ -311,6 +311,10 @@ class eulerianSolid
         //  faces of each cell, so sigma - p I acts in total.
         const volScalarField* poreP_ = nullptr;
 
+        //- Its face values (WP F.4): the void pressure on faces between
+        //  material and void; null: linear interpolation of poreP_ (F.3)
+        const surfaceScalarField* porePf_ = nullptr;
+
         //- Mass carried across each face by the last remap [kg], out of
         //  the owner (internal and coupled faces; WP F.3, for the gas
         //  carried with the grains). Only kept with gas.
@@ -612,6 +616,15 @@ public:
         //  momentum also gets -sum(p_f S_f); the remap keeps its face
         //  masses (remapMass)
         void setPorePressure(const volScalarField& p);
+
+        //- ... with its face values set by the gas (WP F.4: the void
+        //  pressure on the free surface faces), used instead of the
+        //  linear interpolation of p
+        void setPorePressure
+        (
+            const volScalarField& p,
+            const surfaceScalarField& pf
+        );
 
         //- Surface load on a traction patch at time t [Pa] (0 if none)
         scalar loadPressure(const word& patch, const scalar t) const;

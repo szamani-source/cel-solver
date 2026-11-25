@@ -2957,7 +2957,14 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
     // In a partly filled cell it acts on the material part, alpha.
     if (poreP_)
     {
-        const surfaceScalarField pf(fvc::interpolate(*poreP_));
+        // Face values from the gas (WP F.4: the void pressure on faces
+        // between material and void), else linear (F.3)
+        tmp<surfaceScalarField> tpf
+        (
+            porePf_ ? tmp<surfaceScalarField>(*porePf_)
+                    : fvc::interpolate(*poreP_)
+        );
+        const surfaceScalarField& pf = tpf();
         vectorField fGas(mesh.nCells(), Zero);
         forAll(own, facei)
         {

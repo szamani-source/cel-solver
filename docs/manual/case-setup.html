@@ -271,7 +271,7 @@ the velocity boundary condition:</p>
 </table>
 
 <h2 id="gas">Gas in the pores (version 2, in progress): constant/gasProperties</h2>
-<p>Version 2 adds air in the pores of the granular material (decisions 0125 to 0128): the gas
+<p>Version 2 adds air in the pores of the granular material (decisions 0125 to 0129): the gas
 fractions, the pore pressure and, with <code>coupled yes</code>, its effect on the solid. Without this
 file, or with <code>model none</code>, celFoam runs exactly as version 1.</p>
 <pre><code>model   poreGas;        // none | poreGas
@@ -290,7 +290,8 @@ coupled yes;            // gas pressure acts on the solid</code></pre>
 <tr><td><code>T</code></td><td>293.15</td><td>Gas temperature, K (air is an ideal gas with Sutherland viscosity)</td></tr>
 <tr><td><code>p0</code></td><td>101325</td><td>Ambient pressure, Pa</td></tr>
 <tr><td><code>drag</code></td><td><code>ergunWenYu</code></td><td>Gas-grain drag law: Ergun below gas fraction 0.8, Wen and Yu above (Gidaspow). More laws will follow</td></tr>
-<tr><td><code>coupled</code></td><td><code>yes</code></td><td>Two-way coupling (WP F.3, decision 0128): <code>sigma</code> is the effective stress, the gas pressure pushes on the material and the grains carry and squeeze the gas. <code>no</code>: the gas sees a frozen solid and the solid is as without gas. Until WP F.4, <code>yes</code> needs a solid without <code>freeSurface</code></td></tr>
+<tr><td><code>coupled</code></td><td><code>yes</code></td><td>Two-way coupling (WP F.3, decision 0128): <code>sigma</code> is the effective stress, the gas pressure pushes on the material and the grains carry and squeeze the gas. <code>no</code>: the gas sees a frozen solid and the solid is as without gas.</td></tr>
+<tr><td><code>alphaVoid</code></td><td>1e-4</td><td>With <code>freeSurface yes</code> (WP F.4, decision 0129): cells with less material than this are void and hold <code>p0</code>; the gas vents through the free surface, walls carry no gas, and outlets must be <code>fixedValue</code> in <code>0/p</code> (without <code>0/p</code> they are <code>fixedValue 0</code>), sealed for the gas until they open</td></tr>
 <tr><td><code>inflow</code></td><td>none</td><td>Sub-dictionary <code>patch speed;</code>: air blown in through that patch at a superficial speed in m/s (at <code>p0</code>, <code>T</code>); the patch must be <code>fixedGradient</code> in <code>0/p</code></td></tr>
 <tr><td><code>nOuter</code></td><td>50</td><td>Most Newton iterations of the gas pressure per step</td></tr>
 <tr><td><code>nAnderson</code></td><td>5</td><td>Depth of the Anderson acceleration of those iterations (0 off)</td></tr>

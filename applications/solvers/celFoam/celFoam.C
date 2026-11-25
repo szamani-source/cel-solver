@@ -85,7 +85,16 @@ int main(int argc, char *argv[])
     {
         // WP F.3 (decision 0128): sigma is the effective stress and the gas
         // pressure acts on the material
-        solid.setPorePressure(gas->p());
+        // WP F.4 (decision 0129): with a free surface the solid sees the
+        // void pressure on the faces between material and void
+        if (solid.freeSurface())
+        {
+            solid.setPorePressure(gas->p(), gas->pFace());
+        }
+        else
+        {
+            solid.setPorePressure(gas->p());
+        }
     }
 
     // Reaction output: force of the material on each body, every step
