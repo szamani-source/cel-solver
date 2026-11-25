@@ -261,6 +261,11 @@ pressure, so friction returns where P > p (the papers carry the ratio p/rho g h 
 processors part from round-off at the Mohr-Coulomb apex, as the dry frictionless case does
 (F.9).
 
+5 mm (4 processors, kappa 0.015): front 1.18 sqrt(g h0) (-16 %, inside 20 %), at Roche's stop
+time 6.5 sqrt(h0/g) the front is at 6.14 h0 (+7 %), but it keeps creeping and reaches the
+channel end (7.0 h0) at 8.5. The fitted kappa depends on the mesh: the upwind advection of p
+adds numerical diffusion that halves with the cell size (10 mm 5.67 h0, 5 mm > 7 h0).
+
 ## Consequences
 
 - F.8 is not done. Its remaining work is split into F.8b (`docs/work-packages.md`):
