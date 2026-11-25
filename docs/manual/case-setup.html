@@ -279,11 +279,23 @@ drag    ergunWenYu;     // drag law</code></pre>
 <tr><td><code>T</code></td><td>293.15</td><td>Gas temperature, K (air is an ideal gas with Sutherland viscosity)</td></tr>
 <tr><td><code>p0</code></td><td>101325</td><td>Ambient pressure, Pa</td></tr>
 <tr><td><code>drag</code></td><td><code>ergunWenYu</code></td><td>Gas-grain drag law: Ergun below gas fraction 0.8, Wen and Yu above (Gidaspow). More laws will follow</td></tr>
+<tr><td><code>inflow</code></td><td>none</td><td>Sub-dictionary <code>patch speed;</code>: air blown in through that patch at a superficial speed in m/s (at <code>p0</code>, <code>T</code>); the patch must be <code>fixedGradient</code> in <code>0/p</code></td></tr>
+<tr><td><code>nOuter</code></td><td>50</td><td>Most Newton iterations of the gas pressure per step</td></tr>
+<tr><td><code>nAnderson</code></td><td>5</td><td>Depth of the Anderson acceleration of those iterations (0 off)</td></tr>
+<tr><td><code>pTolerance</code></td><td>1e-14 <code>p0</code></td><td>Converged when the largest pressure correction is below this, Pa</td></tr>
+<tr><td><code>laplacian</code></td><td><code>"Gauss linear corrected"</code></td><td>Discretisation of the gas flux (corrected for non-orthogonal cells)</td></tr>
+<tr><td><code>solver</code></td><td>PCG, DIC, <code>relTol 0.1</code></td><td>Sub-dictionary for the linear solver of each correction, as in <code>fvSolution</code></td></tr>
 </tbody>
 </table>
 <p>celFoam writes three more fields: <code>phiS</code>, the solids volume fraction
 \(\phi_s = \alpha\rho_m/\rho_p\) (cell density over grain density), <code>phiG</code> \(= 1 - \phi_s\), and
 <code>k</code>, the permeability of the filled part of each cell in m&sup2; (0 in empty cells).</p>
+<p>Gas pressure (WP F.2, decision 0127; the solid does not feel it yet): celFoam solves the pore
+pressure <code>p</code> each step and writes it with <code>qGas</code>, the gas flux through the grains
+in m/s. <code>p</code> is the gauge pressure (absolute minus <code>p0</code>). Its boundaries come from
+<code>0/p</code>: <code>fixedValue</code> holds a pressure, <code>zeroGradient</code> is sealed, and a
+<code>fixedGradient</code> patch named in <code>inflow</code> blows air in. Without <code>0/p</code>,
+<code>p</code> starts at 0 and every patch is sealed.</p>
 
 <h2 id="fields">Initial fields</h2>
 <p>celFoam reads these fields from the start time folder if they are there, and otherwise
@@ -430,7 +442,7 @@ yet.</p>
 <table>
 <thead><tr><th>Output</th><th>Where</th></tr></thead>
 <tbody>
-<tr><td>Fields <code>alpha</code>, <code>rho</code>, <code>U</code>, <code>sigma</code>, <code>epsP</code>, <code>epsPEq</code> (and <code>g</code>, <code>pc</code>, <code>alphaBody</code>, and <code>phiS</code>, <code>phiG</code>, <code>k</code> with gas, when used)</td><td>time folders</td></tr>
+<tr><td>Fields <code>alpha</code>, <code>rho</code>, <code>U</code>, <code>sigma</code>, <code>epsP</code>, <code>epsPEq</code> (and <code>g</code>, <code>pc</code>, <code>alphaBody</code>, and <code>phiS</code>, <code>phiG</code>, <code>k</code>, <code>p</code>, <code>qGas</code> with gas, when used)</td><td>time folders</td></tr>
 <tr><td>Total mass, momentum, discharged and fed mass</td><td><code>log.celFoam</code> at each write time</td></tr>
 <tr><td>Force of the material on each body, every step</td><td><code>postProcessing/bodyForces.dat</code></td></tr>
 <tr><td>Position and velocity of each body</td><td><code>postProcessing/rigidBodies/&lt;body&gt;.dat</code></td></tr>

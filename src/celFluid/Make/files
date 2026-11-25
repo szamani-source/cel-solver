@@ -1,3 +1,5 @@
+gasDragModels/gasDragModel/gasDragModel.C
+gasDragModels/ergunWenYu/ergunWenYu.C
 poreGas/poreGas.C
 
 LIB = $(FOAM_USER_LIBBIN)/libcelFluid
