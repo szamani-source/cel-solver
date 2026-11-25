@@ -257,6 +257,20 @@ def front(path, t, thresh=0.5):
     return (f.max() + 1) * CELL if f.size else 0.0
 
 
+def deposit_history(path):
+    """(t, front) at each write with the front at the end of the continuous
+    deposit from the gate (first column with less than half a cell of
+    material): grains sprayed ahead of the flow do not count (F.8e) [m]."""
+    rows = []
+    for t in pc.times(path):
+        hc, _ = columns(path, t)
+        k = int(round(X0 / CELL))
+        while k < NX and hc[k] >= 0.5 * CELL:
+            k += 1
+        rows.append((float(t), k * CELL))
+    return np.array(rows)
+
+
 def history(path, thresh=0.5):
     """Rows (t, front x) at every write, with t = 0."""
     rows = [(0.0, X0)]

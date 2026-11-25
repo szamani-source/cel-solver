@@ -6,7 +6,7 @@ Result 2026-11-25 (decision 0133, F.8c, lab setup h0 0.4 m): A fails
 B passes (dry 0.88 h0), C fails (2 processors 1e-10 to 0.06 s). Earlier
 (F.8b, 0.2 m column): front -67 %, run-out -62 %.
 
-A  serial gas run: front speed over Roche's constant-velocity phase within
+A  serial gas run (front = end of the continuous deposit): front speed over Roche's constant-velocity phase within
    20 % of sqrt(2 g h0); run-out from the gate within 20 % of 5.75 h0;
    gas mass conserved to 1e-12 (gas mass less net inflow).
 B  dry collapse, gas off (no gasProperties), the case's grains without the
@@ -88,6 +88,7 @@ def main(work, only):
     h = cc.history(w1)
 
     if "A" in only:
+        h = cc.deposit_history(w1)   # the front of the continuous deposit (F.8e)
         print("\nA: fluidised collapse against Roche et al. (2008)")
         u = cc.front_speed(h)
         ro = (h[-1, 1] - cc.X0) / cc.H0
@@ -109,7 +110,7 @@ def main(work, only):
             if not os.path.isdir(wt) or not os.path.exists(f"{wt}/log.wallTime"):
                 cc.make(wt, extra_gas=gas_extra, kappa=cc.kappa_theory())
             cc.run(wt)
-            ht = cc.history(wt)
+            ht = cc.deposit_history(wt)
             print(f"  with the theoretical kappa (report): run-out {(ht[-1, 1] - cc.X0) / cc.H0:.2f} h0, "
                   f"front speed {cc.front_speed(ht):.3f} m/s")
 

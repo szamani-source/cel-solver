@@ -201,6 +201,14 @@ theoretical kappa k p0/(mu e) = 0.11: 3.30 h0, 1.18 m/s. For comparison the comp
 with the same grains gives 3.15 h0 (with cap) and 2.57 h0 (without). Route B is the default
 gas route of `collapse_cases.py` (KAPPA_FIT); kappa = 0 still runs the compressible case.
 
+5 mm mesh (4 processors, kappa 0.015): run-out 5.12 h0 (-11 %, inside 20 %), but grains spray
+ahead of the flow and made the mass-threshold front jump, so check A now takes the front as
+the end of the continuous deposit (`deposit_history`). On that measure the front speed over
+Roche's phase is 1.69 m/s at 5 mm (-40 %) and 1.48 m/s at 10 mm (-47 %; the 2.09 above
+counted spray); 0.11: 1.18 m/s. Our flow is slower and lasts longer (stops at about 8
+sqrt(h0/g) against 6.5). Run-out still depends on the mesh (4.45 to 5.12 h0). Plot
+/mnt/project-files/f8/diag/routeB_front.png. Next F.8f.
+
 ## Consequences
 
 - F.8 is not done. Its remaining work is split into F.8b (`docs/work-packages.md`):
