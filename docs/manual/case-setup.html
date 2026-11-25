@@ -270,17 +270,18 @@ the velocity boundary condition:</p>
 
 <h2 id="gas">constant/gasProperties (version 2, in development)</h2>
 <p>Optional. Without this file, or with <code>model none</code>, the solver behaves as version 1. With it,
-air in the pores and the void is solved together with the grains (decisions 0125 to 0131). All
+air in the pores and the void is solved together with the grains (decisions 0125 to 0132). All
 tests use the <code>ergunWenYu</code> drag law.</p>
 <pre><code>model       poreGas;    // none | poreGas | gasFlow (gas velocity in the void, needs freeSurface)
 rhoP        2650;       // grain (particle) density, kg/m^3
 d           0.0001;     // grain diameter, m
 T           293.15;     // gas temperature, K (default)
 p0          101325;     // ambient pressure, Pa (default)
-drag        ergunWenYu; // drag law (default)
+drag        ergunWenYu; // ergunWenYu (default) | ergun | wenYu | diFelice | syamlalOBrien | beetstra
 coupled     yes;        // gas pressure acts on the grains, grains carry the gas (default)
 alphaVoid   1e-4;       // cells below this alpha are void for the gas (default)
-inflow      { bottom 0.05; }   // fixedGradient patches of 0/p blowing gas in, m/s at p0
+inflow      { bottom 0.05; }   // fixedGradient patches of 0/p blowing gas in, m/s at p0;
+                               // a Function1 of time, e.g. bottom table ((0 0) (0.3 0.05));
 nOuter      50;         // Newton iterations per step, at most (default)
 nAnderson   5;          // Anderson acceleration depth (default)
 pTolerance  1e-9;       // Pa, converged when the correction is below this (default 1e-14 p0)
@@ -288,7 +289,9 @@ laplacian   "Gauss linear corrected";
 solver      { solver PCG; preconditioner DIC; relTol 1e-3; }   // pressure corrections
 nCorr       1;          // gasFlow: pressure corrections per step (default)
 divUg       "Gauss upwind";   // gasFlow: convection of the gas velocity (default)
-USolver     { solver PBiCGStab; preconditioner DILU; relTol 1e-10; }   // gasFlow momentum</code></pre>
+USolver     { solver PBiCGStab; preconditioner DILU; relTol 1e-10; }   // gasFlow momentum
+poreInertia yes;        // gasFlow: gas momentum in the pores as well as the void (default)
+inertiaForce no;        // gasFlow: pore gas inertia's reaction on the grains (default off, decision 0132)</code></pre>
 <p>The gauge gas pressure is the field <code>0/p</code> (optional): <code>fixedValue</code> patches are open at that
 pressure, <code>zeroGradient</code> patches are sealed. Outlets must be <code>fixedValue</code>. With
 <code>model gasFlow</code> the field <code>0/Ug</code> (optional) is the gas velocity; without it walls are no-slip
