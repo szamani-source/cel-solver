@@ -293,6 +293,10 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
     (
         materialProperties_.getOrDefault<Switch>("fullBlend", false)
     ),
+    overfillStress_
+    (
+        materialProperties_.getOrDefault<Switch>("overfillStress", false)
+    ),
     voidPlasticFlow_
     (
         materialProperties_.getOrDefault<Switch>("voidPlasticFlow", false)
@@ -477,6 +481,11 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
     if (normalCap_)
     {
         Info<< "Normal jump cap at Mohr-Coulomb yield (rule 12)" << nl;
+    }
+    if (overfillStress_)
+    {
+        Info<< "Overfilled cells take the excess as elastic volume strain "
+            << "(overfillStress)" << nl;
     }
     if (fullBlend_)
     {

@@ -248,7 +248,8 @@ Foam::poreGas::poreGas(const eulerianSolid& solid, const IOobject& io)
     divUg_(dict_.getOrDefault<string>("divUg", "Gauss upwind")),
     USolverDict_(),
     poreInertia_(flow_ && dict_.getOrDefault<Switch>("poreInertia", true)),
-    surfaceCarry_(dict_.getOrDefault<Switch>("surfaceCarry", false))
+    surfaceCarry_(dict_.getOrDefault<Switch>("surfaceCarry", false)),
+    eMin_(dict_.getOrDefault<scalar>("eMin", 0.2))
 {
     if (rhoP_ <= 0 || d_ <= 0 || T_ <= 0 || p0_ <= 0)
     {
@@ -370,6 +371,11 @@ Foam::poreGas::poreGas(const eulerianSolid& solid, const IOobject& io)
         Info<< "Pore gas (WP F.8): the moving surface carries gas to and "
             << "from the void (surfaceCarry)" << endl;
     }
+    if (eMin_ != 0.2)
+    {
+        Info<< "Pore gas (WP F.8c): gas fraction of the filled part at "
+            << "least eMin = " << eMin_ << endl;
+    }
 
     Info<< "Pore gas coupling (WP F.3): "
         << (coupled_ ? "two-way (effective stress, gas carried by the grains)"
@@ -442,13 +448,13 @@ void Foam::poreGas::correctFractions()
         }
         else
         {
-            // WP F.8 (decision 0133): at least eMinPacked. The remap can
+            // WP F.8 (decision 0133): at least eMin (default 0.2). The remap can
             // leave a nearly empty cell with more mass than alpha holds
             // (rho/alpha > rhoP); its gas fraction then went negative,
             // its permeability 0, and the gas in it was shut in (the
             // pressure diverged at a thin spreading front)
             eM_[celli] =
-                max(1 - rho[celli]/(alpha[celli]*rhoP_), eMinPacked);
+                max(1 - rho[celli]/(alpha[celli]*rhoP_), eMin_);
             k[celli] =
                 dragModel_->permeability(eM_[celli], d_, mu_, rhoG_);
         }

@@ -3,29 +3,39 @@
 Shared by tests/gas/collapse_checks.py (done-when test,
 tests/manual/test_fluidised_collapse.sh).
 
-Reference: Roche, Montserrat, Nino and Tamburrino (2008), J. Geophys. Res.
+Targets: Roche, Montserrat, Nino and Tamburrino (2008), J. Geophys. Res.
 113, B12203, doi 10.1029/2008JB005664 (HAL hal-00381402; the F.0 table cites
-it as 2010). Only the abstract could be read (IRD record fdi:010046767; HAL,
-AGU and the other copies refused automated reading in F.8): glass beads 60 to
-90 micrometres, columns initially fluidised and expanded 2.5 to 4.5 %, height
+it as 2010). Only the abstract could be read: glass beads 60 to 90
+micrometres, columns initially fluidised and expanded 2.5 to 4.5 %, height
 over length 0.5 to 3; the front moves at a constant U = sqrt(2 g h0) from
 t/sqrt(h0/g) = 1.5 to about 4, the flow stops at about 6.5 with run-out
 x/h0 = 5.5 to 6. We read x as measured from the gate.
 
-Case (assumed where the abstract is silent, decision 0133): a column
-X0 = 0.2 m long and H0 = 0.2 m high (a = 1) against a smooth left wall, glass
-beads d 75 um, rho_p 2500, gas fraction E0 = 0.42 (a random loose packing
-0.40 expanded 3.5 %), plain Mohr-Coulomb (phi 30, c 0, psi 0, E 1 MPa) as in
-WP F.7 (the v1 T0 rules part serial from parallel, decision 0130), with a
-compaction cap for the expanded packing (CAP_LAMBDA below). Floor
-friction 30 deg, sealed floor (the reservoir's air supply is cut at release),
-open top. The column starts at rest, fully fluidised: zero effective stress
-and the pore pressure carrying the whole weight, p = rho_b g (H0 - y). The
-gate opens at once (no gate). 10 mm cells, CH = 25 rows, CL = 160 columns
-(1.6 m: room for 1.2 times the expected run-out). Every gas run uses
-ergunWenYu, model gasFlow and surfaceCarry yes (decision 0133).
+Setup (F.8c, decision 0133) from the open-access restatement of the same
+experiments, Aravena, Chupin, Dubois and Roche (2021), Bull. Volcanol. 83,
+doi 10.1007/s00445-021-01495-1: reservoir 0.2 m long, channel 3 m, smooth
+horizontal floor (their model: basal friction 15 deg), beads 75 um, rho_s
+2500, bulk density 1450 (gas fraction 0.42), the gate opens in under 0.1 s,
+the initial pore pressure 0.9 of the weight (measured, Montserrat et al.
+2012), and the air supply at the reservoir base kept on after release. Their
+model needs an effective diffusivity about 9 times below the theoretical one
+to reach the measured run-out; with the theoretical one (as here) it reaches
+less than 60 %. They report u_max/sqrt(g h0) 1.0 to 1.15 and a run-out of
+about 3.8 h0 for a = 2 on the horizontal (reported, not checked).
 
-Dry (gas off): same column, no gasProperties, geostatic K0 stress.
+Case: a column X0 = 0.2 m long and H0 = 0.4 m high (a = 2) against a smooth
+left wall, plain Mohr-Coulomb (phi 30, c 0, psi 0, E 1 MPa) with a compaction
+cap for the expanded packing (CAP_LAMBDA below), floor friction 15 deg, open
+top. The column starts at rest with p = 0.9 rho_b g (H0 - y) and the rest of
+the weight on the grains (sigma'_yy = -0.1 rho_b g (H0 - y), sigma'_xx = K0
+times that). The reservoir floor (x < X0, patch floorRes, made by topoSet and
+createPatch) blows air at the superficial velocity that carries 0.9 of the
+weight through the packing (Darcy, Q_SUPPLY); the channel floor is sealed.
+The gate opens at once (no gate). 10 mm cells, NY = 45 rows, NX = 300 columns
+(3 m, the channel). Every gas run uses ergunWenYu, model gasFlow and
+surfaceCarry yes (decision 0133).
+
+Dry (gas off): same column, no gasProperties, no floorRes, geostatic K0 stress.
 """
 
 import math
@@ -49,28 +59,33 @@ D = 7.5e-5
 RHOP = 2500.0
 E0 = 0.42
 RHO_B = (1.0 - E0) * RHOP
-X0, H0 = 0.2, 0.2
+X0, H0 = 0.2, 0.4
 CELL = 0.01
-NX, NY = 160, 25
+NX, NY = 300, 45
 N = NX * NY
 E_MOD = 1.0e6
 PHI = 30.0
+FLOOR = 15.0                          # basal friction, Aravena et al. (2021)
+P_FRAC = 1.0                          # initial pore pressure / weight (Roche 2008: fully supported)
 T_SCALE = math.sqrt(H0 / G_ACC)
 WRITE = 0.02
-T_END = WRITE * math.ceil(9.0 * T_SCALE / WRITE - 1e-9)   # 1.3 s; Roche: stops at 6.5
+T_END = WRITE * math.ceil(9.0 * T_SCALE / WRITE - 1e-9)   # 1.82 s; Roche: stops at 6.5
 MU = gr.air_viscosity(pc.T)
 RG = gr.air_density(pc.P0, pc.T)
 # Roche et al. (2008) abstract
 U_FRONT = math.sqrt(2.0 * G_ACC * H0)
 RUNOUT = 5.75                         # x/h0 5.5 to 6
 PHASE = (1.5, 4.0)                    # constant-velocity phase, t/sqrt(h0/g)
+# Aravena et al. (2021), reported only
+ARAVENA_U = (1.0, 1.15)               # u_max / sqrt(g h0)
+ARAVENA_RUNOUT = 3.8                  # x/h0, a = 2, horizontal
 # Expanded (fluidised) packing: soft until compacted (decision 0133): the
 # compaction cap (WP K.1, decision 0113) normally consolidated from 1 Pa, with
 # lambda* = 0.0044 so that loading to the column's base stress (about 3 kPa)
 # compacts it by the 3.5 % it was expanded (0.035 / ln 3000)
 CAP_LAMBDA, CAP_P0 = 0.0044, 1.0
 MC = (f"type mohrCoulomb;\nE {E_MOD!r};\nnu 0.3;\nphi {PHI!r};\nc 0;\npsi 0;\n"
-      f"capLambda {CAP_LAMBDA!r};\ncapP0 {CAP_P0!r};")
+      f"capLambda {CAP_LAMBDA!r};\ncapP0 {CAP_P0!r};\noverfillStress yes;")
 
 
 def diffusion_time():
@@ -79,11 +94,18 @@ def diffusion_time():
     return H0 * H0 / (k * pc.P0 / (MU * E0))
 
 
+def supply():
+    """Superficial air velocity at the reservoir floor that carries P_FRAC of
+    the weight through the packing (Darcy) [m/s]."""
+    return gr.permeability(D, E0) / MU * P_FRAC * RHO_B * G_ACC
+
+
 def describe():
     return (f"Dam break: column {X0} x {H0} m, {NX} x {NY} cells of {CELL * 1e3:g} mm; glass beads "
             f"d {D * 1e6:g} um, rho_p {RHOP:g}, e {E0}, rho_b {RHO_B:g} kg/m^3; H0^2/c "
             f"{diffusion_time():.3f} s; sqrt(h0/g) {T_SCALE:.4f} s; Roche: front {U_FRONT:.3f} m/s, "
-            f"run-out {RUNOUT} h0 from the gate")
+            f"run-out {RUNOUT} h0 from the gate; floor {FLOOR:g} deg, initial p {P_FRAC} of the weight, "
+            f"reservoir air {supply() * 1e3:.2f} mm/s")
 
 
 def make(path, *, gas=True, decomp=(1, 1, 1), end=T_END, extra_gas="", cap=True):
@@ -94,10 +116,12 @@ def make(path, *, gas=True, decomp=(1, 1, 1), end=T_END, extra_gas="", cap=True)
                  decomp=decomp, E=E_MOD, coupled=True)
     g = f"{path}/constant/gasProperties"
     pc.write(g, open(g).read().replace(f"rhoP    {pc.RHOP!r};", f"rhoP    {RHOP!r};"))
-    fl._common(path, rho=RHO_B, E=E_MOD, extra_gas="surfaceCarry yes;\n" + extra_gas,
+    inflow = f"inflow {{ floorRes {supply()!r}; }}\n" if gas else ""
+    fl._common(path, rho=RHO_B, E=E_MOD, extra_gas="surfaceCarry yes;\n" + inflow + extra_gas,
                material=MC if cap else MC.split("capLambda")[0].rstrip("\n"),
                walls=f"    left {{ friction 0; }}\n    right {{ friction 0; }}\n"
-                     f"    bottom {{ friction {PHI!r}; }}")
+                     f"    bottom {{ friction {FLOOR!r}; }}"
+                     + (f"\n    floorRes {{ friction {FLOOR!r}; }}" if gas else ""))
     k0 = 0.3 / 0.7
     alpha, rho, sig, p = [], [], [], []
     for j in range(NY):
@@ -107,14 +131,32 @@ def make(path, *, gas=True, decomp=(1, 1, 1), end=T_END, extra_gas="", cap=True)
             alpha.append(1.0 if bed else 0.0)
             rho.append(RHO_B if bed else 0.0)
             w = RHO_B * G_ACC * (H0 - y) if bed else 0.0
-            sig.append((0.0, 0.0) if gas else (-k0 * w, -w))
-            p.append(w if gas else 0.0)
+            ws = (1.0 - P_FRAC) * w if gas else w
+            sig.append((-k0 * ws, -ws))
+            p.append(P_FRAC * w if gas else 0.0)
     fl._write_fields(path, alpha, rho, sig, N)
     txt = open(f"{path}/0/p").read()
     lst = f"nonuniform List<scalar> {N}\n(\n" + "\n".join(repr(v) for v in p) + "\n)"
-    pc.write(f"{path}/0/p", txt.replace("internalField uniform 0;", f"internalField {lst};"))
+    txt = txt.replace("internalField uniform 0;", f"internalField {lst};")
     if not gas:
+        pc.write(f"{path}/0/p", txt)
         os.remove(g)
+        return
+    # the reservoir floor blows air (patch floorRes, made in run())
+    pc.write(f"{path}/0/p", txt.replace(
+        "    frontAndBack { type empty; }",
+        "    floorRes { type fixedGradient; gradient uniform 0; }\n    frontAndBack { type empty; }"))
+    pc.write(f"{path}/system/topoSetDict", pc.HEADER.format(cls="dictionary", obj="topoSetDict") + f"""
+actions
+(
+    {{ name floorRes; type faceSet; action new; source patchToFace; patch bottom; }}
+    {{ name floorRes; type faceSet; action subset; source boxToFace; box (-1 -1 -1) ({X0!r} 0.001 1); }}
+);
+""")
+    pc.write(f"{path}/system/createPatchDict", pc.HEADER.format(cls="dictionary", obj="createPatchDict") + """
+pointSync false;
+patches ( { name floorRes; patchInfo { type patch; } constructFrom set; set floorRes; } );
+""")
 
 
 def _latest(path):
@@ -142,6 +184,9 @@ def run(path, nProcs=1):
         return done
     if last is None:
         pc.sh(path, ["blockMesh"], "blockMesh")
+        if os.path.exists(f"{path}/system/createPatchDict"):
+            pc.sh(path, ["topoSet"], "topoSet")
+            pc.sh(path, ["createPatch", "-overwrite"], "createPatch")
         if nProcs > 1:
             pc.sh(path, ["decomposePar", "-force"], "decomposePar")
         log = "celFoam"

@@ -257,6 +257,12 @@ class eulerianSolid
         //  log(void): face states, stress predictor and flow viscosity
         Switch fullBlend_;
 
+        //- WP F.8c (decision 0133): materialProperties overfillStress yes.
+        //  A cell the remap overfills (alpha above 1 before the clip)
+        //  takes the excess as an elastic volume strain ln(alpha) (mean
+        //  stress -K ln(alpha)) instead of a stress-free densification
+        Switch overfillStress_;
+
         //- A.4 (decision 0095): materialProperties voidPlasticFlow; in a
         //  partly filled cell the plastic normal strain the material takes
         //  on an axis (dilation, or extension of the deviatoric flow) goes

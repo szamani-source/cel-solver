@@ -332,6 +332,10 @@ class poreGas
             //  face; no: only grains crossing displace gas there (F.4)
             Switch surfaceCarry_;
 
+            //- Smallest gas fraction of the filled part (WP F.8, F.8c,
+            //  decision 0133): keyword eMin, default 0.2
+            scalar eMin_;
+
             //- Superficial flux relative to the grains through each face
             //  at the end of the last step, q.n [m/s], and 1 on the faces
             //  that were void flow faces then (their flux is absolute)
@@ -404,8 +408,6 @@ public:
     //- Cells with alpha below this are void (no permeability)
     static constexpr scalar alphaMin = 1e-6;
 
-    //- Smallest gas fraction of the filled part (WP F.8, decision 0133)
-    static constexpr scalar eMinPacked = 0.2;
 
     //- Ergun-Wen-Yu switch: Ergun below this gas fraction (Gidaspow)
     static constexpr scalar eSwitch = 0.8;

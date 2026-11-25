@@ -179,6 +179,7 @@ elastic shear impedance, so the flow resistance no longer depends on \(E\). Need
 filled rules instead of switching. Removes speed spikes in partly filled cells; recommended for silo and
 hopper discharge and with <code>capLambda</code>.</td></tr>
 <tr><td><code>fullBlendVoid</code></td><td><code>(1e-4 1e-2)</code></td><td>Range of the void fraction over which <code>fullBlend</code> blends.</td></tr>
+<tr><td><code>overfillStress</code></td><td>no</td><td><code>yes</code>: a cell the remap overfills (more material volume than the cell) takes the excess as an elastic volume strain, so its stress pushes the excess back out. <code>no</code>: the excess mass stays in the cell with no stress, so the packing can densify in a long fast flow. Used by the fluidised dam break (WP F.8c, decision 0133).</td></tr>
 <tr><td><code>voidPlasticFlow</code></td><td>no</td><td>In a partly filled cell, plastic expansion of the material goes into the cell's void
 instead of compressing the material. Lets surface cells of a dilatant material dilate.</td></tr>
 <tr><td><code>restRelax</code></td><td>off</td><td>Sub-dictionary <code>{ time T; speed v; K0 k; }</code>: in full cells slower than
@@ -280,6 +281,7 @@ drag    ergunWenYu;     // drag law</code></pre>
 <tr><td><code>p0</code></td><td>101325</td><td>Ambient pressure, Pa</td></tr>
 <tr><td><code>drag</code></td><td><code>ergunWenYu</code></td><td>Gas-grain drag law: Ergun below gas fraction 0.8, Wen and Yu above (Gidaspow). More laws will follow</td></tr>
 <tr><td><code>surfaceCarry</code></td><td><code>no</code></td><td>With a free surface: <code>yes</code> lets the moving surface carry gas to and from the void (the part of a cell the material leaves fills with gas from the void without a pressure drop through the grains); <code>no</code>: only grains crossing the surface displace gas. Used by the fluidised dam break (WP F.8, decision 0133)</td></tr>
+<tr><td><code>eMin</code></td><td><code>0.2</code></td><td>Smallest gas fraction of the filled part of a cell, used where the remap leaves more mass in a cell than its volume fraction holds (WP F.8b/F.8c, decision 0133).</td></tr>
 </tbody>
 </table>
 <p>celFoam writes three more fields: <code>phiS</code>, the solids volume fraction
