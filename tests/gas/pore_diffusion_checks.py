@@ -8,7 +8,8 @@ diffusion acts. Every run uses the ergunWenYu drag law.
 D  Step at a face: column 0.5 m, 250 cells, d 75 um, gas fraction 0.42;
    the bottom face is raised to 0.001 p0 at t = 0, the top is sealed.
    With diffusivity kappa = 0.015 and 0.05 m^2/s the profiles at 0.25 and 0.5 s
-   match dp erfc(x/(2 sqrt(kappa t))) within 2 % of the step (the
+   match dp erfc(x/(2 sqrt(kappa t))), with images for the sealed top,
+   within 2 % of the step (the
    diffusivity is the given one, not the rigid-bed k p0/(mu e)).
 P  The kappa = 0.015 column on 2 and 4 processors (cuts through the front):
    p within 1e-10 of the step of serial at every write.
@@ -61,7 +62,11 @@ def main():
         worst, parts = 0.0, []
         for t in times:
             p = pc.field(f"{work}/D_{kap}_1", t, "p", n)
-            ref = dp * np.array([math.erfc(yy / (2 * math.sqrt(kap * float(t)))) for yy in y])
+            # erfc with images for the sealed top (no flux at y = L)
+            sc = 2 * math.sqrt(kap * float(t))
+            ref = dp * np.array([sum((-1) ** m * (math.erfc((2 * m * L + yy) / sc)
+                                                  + math.erfc((2 * (m + 1) * L - yy) / sc))
+                                     for m in range(6)) for yy in y])
             err = np.abs(p - ref).max() / dp
             worst = max(worst, err)
             parts.append(f"t {t} s {100 * err:.3f} %")
