@@ -74,6 +74,16 @@ Description
     fixedValue in 0/p (without 0/p they are fixedValue 0) and are sealed
     for the gas until they open.
 
+    WP F.6 (decision 0131): with model gasFlow the void cells carry a gas
+    velocity Ug and their own pressure (low Mach, implicit, the solid's
+    time step): momentum predictor, then nCorr pressure corrections that
+    are the same Newton solve with rho_f rAU_f on the faces between void
+    cells and the H/A mass flux (Rhie-Chow with ddtCorr) as a source. Faces
+    between bed and void keep the F.4 rule against the void cell's own
+    pressure; cells with grains hold the grain velocity plus q/phi_g. Open
+    patches (fixedValue p) are the atmosphere. Needs a freeSurface solid.
+    Implementation in poreGasFlow.C.
+
     Boundaries, from 0/p (optional; without it p = 0 and every patch is
     sealed): fixedValue = fixed pressure, zeroGradient = sealed, and
     fixedGradient patches listed in `inflow` get the gradient that blows
@@ -81,7 +91,8 @@ Description
 
     constant/gasProperties:
     \verbatim
-        model   poreGas;        // none | poreGas (none: as if absent)
+        model   poreGas;        // none | poreGas | gasFlow (WP F.6:
+                                // gas momentum in the void)
         rhoP    2650;           // grain (particle) density [kg/m^3]
         d       0.001;          // grain diameter [m]
         T       293.15;         // gas temperature [K], default 293.15
@@ -103,6 +114,17 @@ Description
         pTolerance      1e-9;   // [Pa] largest correction when converged
                                 // (default 1e-14 p0)
         laplacian       "Gauss linear corrected";
+
+        // WP F.6, model gasFlow only, all optional:
+        nCorr           1;      // pressure corrections per step (PISO)
+        divUg           "Gauss upwind";     // convection of Ug
+        USolver                 // linear solver of the gas momentum
+        {
+            solver          PBiCGStab;
+            preconditioner  DILU;
+            tolerance       1e-30;
+            relTol          1e-10;
+        }
         solver                  // linear solver for each correction
         {
             solver          PCG;
@@ -112,6 +134,9 @@ Description
             maxIter         1000;
         }
     \endverbatim
+
+    Field 0/Ug (gasFlow, optional): gas velocity; without it no slip on
+    walls, zeroGradient where p is fixedValue.
 
     Air: ideal gas R = 287.05 J/(kg K), Sutherland viscosity, as
     tools/gas_reference.py.
@@ -132,6 +157,7 @@ SourceFiles
 #include "HashTable.H"
 #include "gasDragModel.H"
 #include "Switch.H"
+#include "fvMatrices.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -235,6 +261,64 @@ class poreGas
             //- Gas mass the void (atmosphere) gave this run [kg]
             scalar voidIn_;
 
+        // WP F.6: gas momentum in the void (model gasFlow, decision 0131)
+
+            //- Gas flow in the void: void cells carry a gas velocity and
+            //  their own pressure instead of holding the void pressure
+            bool flow_;
+
+            //- Pressure corrections per step (PISO), at least 1
+            label nCorr_;
+
+            //- Convection scheme of the gas momentum
+            string divUg_;
+
+            //- Linear solver of the gas momentum
+            dictionary USolverDict_;
+
+            //- Gas velocity Ug [m/s]: solved in void cells; in the others
+            //  the grain velocity plus the pore flux over phi_g
+            autoPtr<volVectorField> UgPtr_;
+
+            //- Momentum matrix of this step and its 1/A, H/A
+            autoPtr<fvVectorMatrix> UEqnPtr_;
+            autoPtr<volScalarField> rAUPtr_;
+            autoPtr<volVectorField> HbyAPtr_;
+
+            //- 1/A at the faces [m^3 s/kg], and the gas mass flux of H/A
+            //  through faces of void cells [kg/s]
+            autoPtr<surfaceScalarField> rAUfPtr_;
+            autoPtr<surfaceScalarField> mHbyAPtr_;
+
+            //- Velocity and volume flux at the start of the step (ddtCorr)
+            autoPtr<volVectorField> Uold_;
+            autoPtr<surfaceScalarField> phiOld_;
+
+
+    // Private Member Functions (WP F.6, poreGasFlow.C)
+
+        //- Create Ug and the flow controls (constructor)
+        void initFlow();
+
+        //- 1 on the faces of the void flow (both sides void; open
+        //  boundary faces of void cells), else 0
+        tmp<surfaceScalarField> voidFaces() const;
+
+        //- Momentum matrix of the step (predictor solved), from the old
+        //  velocity, the last mass flux and the pressure p
+        void predictMomentum(const scalar dt, const scalarField& pOld);
+
+        //- rAU, H/A and its mass flux through faces of void cells
+        void flowFluxes();
+
+        //- Gradient of the face pressures pFace (the void cell's own
+        //  pressure on faces between bed and void), per cell
+        tmp<vectorField> flowGradP();
+
+        //- Void-cell velocities from H/A and the pressure gradient; the
+        //  others from the grains and the pore flux
+        void correctVelocity();
+
 
 public:
 
@@ -308,6 +392,12 @@ public:
 
         //- Gas mass the void (atmosphere) gave so far [kg] (part of netIn)
         scalar voidIn() const noexcept { return voidIn_; }
+
+        //- Gas flow in the void (WP F.6, model gasFlow)
+        bool flow() const noexcept { return flow_; }
+
+        //- Gas velocity (WP F.6; gasFlow only)
+        const volVectorField& Ug() const noexcept { return *UgPtr_; }
 
 
     // Cycle

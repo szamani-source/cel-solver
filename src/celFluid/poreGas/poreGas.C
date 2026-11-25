@@ -241,7 +241,11 @@ Foam::poreGas::poreGas(const eulerianSolid& solid, const IOobject& io)
         solid.mesh(),
         dimensionedScalar(dimPressure, Zero)
     ),
-    voidIn_(0)
+    voidIn_(0),
+    flow_(dict_.getOrDefault<word>("model", "poreGas") == "gasFlow"),
+    nCorr_(dict_.getOrDefault<label>("nCorr", 1)),
+    divUg_(dict_.getOrDefault<string>("divUg", "Gauss upwind")),
+    USolverDict_()
 {
     if (rhoP_ <= 0 || d_ <= 0 || T_ <= 0 || p0_ <= 0)
     {
@@ -335,7 +339,11 @@ Foam::poreGas::poreGas(const eulerianSolid& solid, const IOobject& io)
 
     correctFractions();
     phiG0_ = phiG_.primitiveField();
-    if (freeSurface_)
+    if (flow_)
+    {
+        initFlow();
+    }
+    if (freeSurface_ && !flow_)
     {
         // Void cells start at the void pressure
         scalarField& pc = pPtr_->primitiveFieldRef();
@@ -374,11 +382,11 @@ Foam::autoPtr<Foam::poreGas> Foam::poreGas::New(const eulerianSolid& solid)
         Info<< "Pore gas: model none (as without gasProperties)" << nl << endl;
         return nullptr;
     }
-    if (model != "poreGas")
+    if (model != "poreGas" && model != "gasFlow")
     {
         FatalErrorInFunction
             << "gasProperties model " << model
-            << " unknown; use none or poreGas" << exit(FatalError);
+            << " unknown; use none, poreGas or gasFlow" << exit(FatalError);
     }
     return autoPtr<poreGas>::New(solid, io);
 }
@@ -513,11 +521,13 @@ void Foam::poreGas::faceCoefficients
     // Face between a gas cell and a void cell (WP F.4): the gas cell's
     // mobility over the distance from its centre to the face, fP of the
     // centre distance (a pressure face at the void pressure, 0 gauge)
+    // With gas flow in the void (WP F.6) the void side is the void cell's
+    // pressure, and the gas density the face's (pV the void cell's p)
     auto faceVoid =
         [&]
         (
             const scalar eP, const scalar kP, const scalar fP,
-            const scalar G, scalar& dS, scalar& dT
+            const scalar G, scalar& dS, scalar& dT, const scalar pV = 0
         )
     {
         if (kP <= 0 || fP <= 0)
@@ -526,7 +536,7 @@ void Foam::poreGas::faceCoefficients
             dT = 0;
             return;
         }
-        const scalar rho = p0_/RT;
+        const scalar rho = (flow_ ? p0_ + pV : p0_)/RT;
         dS = rho*drag.mobility(eP, G, d_, mu_, rho)/fP;
         dT = rho*drag.tangentMobility(eP, G, d_, mu_, rho)/fP;
     };
@@ -552,20 +562,25 @@ void Foam::poreGas::faceCoefficients
             {
                 if (vd[P] > 0.5 && vd[N] > 0.5)
                 {
-                    // Gas flow inside the void is F.6
-                    DS[facei] = 0;
-                    DT[facei] = 0;
+                    // Gas flow inside the void (WP F.6): rho_g 1/A of the
+                    // momentum equation; none without (F.4)
+                    DS[facei] =
+                        flow_
+                      ? (p0_ + wf*p[P] + (1 - wf)*p[N])/RT
+                       *rAUfPtr_()[facei]
+                      : 0;
+                    DT[facei] = DS[facei];
                     continue;
                 }
                 const bool ownGas = vd[P] < 0.5;
                 const label C = ownGas ? P : N;
                 const scalar fC = ownGas ? 1 - wf : wf;
-                const scalar gn =
-                    (ownGas ? -p[P] : p[N])*dc[facei]/max(fC, SMALL);
+                // The void side is at 0 without gas flow (F.4)
+                const scalar gn = (p[N] - p[P])*dc[facei]/max(fC, SMALL);
                 faceVoid
                 (
                     eM[C], k[C], fC, mag3(gradP[C], nf[facei], gn),
-                    DS[facei], DT[facei]
+                    DS[facei], DT[facei], ownGas ? p[N] : p[P]
                 );
                 continue;
             }
@@ -611,8 +626,12 @@ void Foam::poreGas::faceCoefficients
                 {
                     if (vd[P] > 0.5 && vN[i] > 0.5)
                     {
-                        DS[i] = 0;
-                        DT[i] = 0;
+                        DS[i] =
+                            flow_
+                          ? (p0_ + wf[i]*p[P] + (1 - wf[i])*pN[i])/RT
+                           *rAUfPtr_().boundaryField()[patchi][i]
+                          : 0;
+                        DT[i] = DS[i];
                         continue;
                     }
                     if (vd[P] > 0.5)
@@ -621,21 +640,21 @@ void Foam::poreGas::faceCoefficients
                         // processor's face takes its mobility; this side
                         // must give the same coefficient
                         const scalar fC = wf[i];
-                        const scalar gn = pN[i]*dcB[i]/max(fC, SMALL);
+                        const scalar gn = (pN[i] - p[P])*dcB[i]/max(fC, SMALL);
                         faceVoid
                         (
                             eN[i], kN[i], fC, mag3(gN[i], n[i], gn),
-                            DS[i], DT[i]
+                            DS[i], DT[i], p[P]
                         );
                     }
                     else
                     {
                         const scalar fC = 1 - wf[i];
-                        const scalar gn = -p[P]*dcB[i]/max(fC, SMALL);
+                        const scalar gn = (pN[i] - p[P])*dcB[i]/max(fC, SMALL);
                         faceVoid
                         (
                             eM[P], k[P], fC, mag3(gradP[P], n[i], gn),
-                            DS[i], DT[i]
+                            DS[i], DT[i], pN[i]
                         );
                     }
                     continue;
@@ -663,8 +682,13 @@ void Foam::poreGas::faceCoefficients
                 const label P = fc[i];
                 if (shut || (fs && vd[P] > 0.5))
                 {
-                    DS[i] = 0;
-                    DT[i] = 0;
+                    // Gas flow in the void (WP F.6): rho_g 1/A
+                    DS[i] =
+                        (!shut && flow_)
+                      ? (p0_ + pB[i])/RT
+                       *rAUfPtr_().boundaryField()[patchi][i]
+                      : 0;
+                    DT[i] = DS[i];
                     continue;
                 }
                 face
@@ -711,6 +735,9 @@ void Foam::poreGas::solve(const scalar dt)
 
     const bool fs = freeSurface_;
     const scalarField& vd = void_.primitiveField();
+    // Void cells held at the void pressure (WP F.4); with gas flow in the
+    // void (WP F.6) they solve for their own
+    const bool fixVoid = fs && !flow_;
 
     // Gas carried and squeezed by the grains (WP F.3, decision 0128): per
     // cell the gas mass X [kg] that the solid's step would add to the gas
@@ -736,9 +763,12 @@ void Foam::poreGas::solve(const scalar dt)
         // the void: the surface moving does not squeeze the gas, only the
         // grains crossing it displace their volume of gas (out of the void
         // when they leave the cell, into it when they come in)
+        // With gas flow in the void (WP F.6) the gas there moves by its
+        // own velocity: on faces of void cells only the grains crossing
+        // displace gas
         auto surfaceFace = [&](const bool vA, const bool vB)
         {
-            return fs && vA != vB;
+            return fs && (flow_ ? (vA || vB) : vA != vB);
         };
         forAll(own, facei)
         {
@@ -788,7 +818,10 @@ void Foam::poreGas::solve(const scalar dt)
                 const scalarField& pB = p.boundaryField()[patchi];
                 forAll(fc, i)
                 {
-                    const scalar G = dt*pPhi[i] - pdm[i]/rhoP_;
+                    const scalar G =
+                        (flow_ && vd[fc[i]] > 0.5)
+                      ? -pdm[i]/rhoP_
+                      : dt*pPhi[i] - pdm[i]/rhoP_;
                     if (G == 0)
                     {
                         continue;
@@ -834,7 +867,7 @@ void Foam::poreGas::solve(const scalar dt)
     // become void gives its gas to the atmosphere (counted below). After
     // the carried gas, which takes the old pressure on both sides of every
     // face (processor faces too)
-    if (fs)
+    if (fixVoid)
     {
         scalarField& pc = p.primitiveFieldRef();
         forAll(pc, celli)
@@ -853,7 +886,7 @@ void Foam::poreGas::solve(const scalar dt)
     if (dtOld_ > 0 && pOldOld_.size() == pOld.size())
     {
         p.primitiveFieldRef() += (pOld - pOldOld_)*(dt/dtOld_);
-        if (fs)
+        if (fixVoid)
         {
             scalarField& pc = p.primitiveFieldRef();
             forAll(pc, celli)
@@ -901,12 +934,32 @@ void Foam::poreGas::solve(const scalar dt)
     label outer = 0;
     scalar change = GREAT, prevChange = GREAT, errorEst = GREAT;
     label nNewton = 0;
+    label nInner = 0;
+    label nOuterAll = 0;
+
+    // Gas flow in the void (WP F.6): momentum predictor, then nCorr
+    // pressure solves (PISO), each with H/A of the latest velocity
+    if (flow_)
+    {
+        predictMomentum(dt, pOld);
+    }
+    const label nCorr = flow_ ? max(nCorr_, label(1)) : 1;
+
+    for (label corr = 0; corr < nCorr; ++corr)
+    {
+    if (flow_)
+    {
+        flowFluxes();
+    }
+    outer = 0;
+    change = GREAT;
+    prevChange = GREAT;
+    errorEst = GREAT;
 
     // Anderson history
     DynamicList<scalarField> dF, dG;
     scalarField fPrev, gPrev;
     bool lastNewton = false;
-    label nInner = 0;
     scalarField delta(p.size(), Zero);
 
     for (outer = 0; outer < nOuter_; ++outer)
@@ -945,6 +998,13 @@ void Foam::poreGas::solve(const scalar dt)
           - tLap.ref().fvmLaplacian(DfS, p)
         );
         eqnS.source() += SdtV.field()*mesh.V().field()*pOld - X/dt;
+        if (flow_)
+        {
+            // Gas carried by H/A through faces of void cells (WP F.6)
+            eqnS.source() -=
+                fvc::surfaceIntegrate(mHbyAPtr_())().primitiveField()
+               *mesh.V().field();
+        }
 
         if (outer > 0 && errorEst <= pTol_)
         {
@@ -986,7 +1046,7 @@ void Foam::poreGas::solve(const scalar dt)
                 0
             );
         }
-        if (fs)
+        if (fixVoid)
         {
             // Void cells are fixed (WP F.4)
             forAll(r, celli)
@@ -1013,7 +1073,7 @@ void Foam::poreGas::solve(const scalar dt)
             fvm::Sp(SdtV, p)
           - tLap.ref().fvmLaplacian(newton ? DfT : DfS, p)
         );
-        if (fs)
+        if (fixVoid)
         {
             // Void cells are fixed (WP F.4): no coupling to them, so their
             // correction is zero and a gas cell beside one sees it as a
@@ -1202,6 +1262,18 @@ void Foam::poreGas::solve(const scalar dt)
         );
         massFlux_ = eqnS.flux();
     }
+    nOuterAll += outer;
+
+    if (flow_)
+    {
+        // Total gas mass flux: the pressure part and H/A (WP F.6)
+        massFlux_ += mHbyAPtr_();
+        if (corr < nCorr - 1)
+        {
+            correctVelocity();
+        }
+    }
+    }   // pressure corrections (WP F.6)
 
     // Conservative finish: the new pressure from the old one and the face
     // fluxes of the converged state, so the gas mass changes by exactly
@@ -1216,7 +1288,7 @@ void Foam::poreGas::solve(const scalar dt)
         scalar fromVoid = 0;
         forAll(pc, celli)
         {
-            if (fs && vd[celli] > 0.5)
+            if (fixVoid && vd[celli] > 0.5)
             {
                 // Void at the void pressure (WP F.4): the atmosphere gives
                 // what its balance lacks
@@ -1232,7 +1304,7 @@ void Foam::poreGas::solve(const scalar dt)
               - (netOut[celli] + X[celli]/(dt*mesh.V()[celli]))/SdtV[celli];
         }
         p.correctBoundaryConditions();
-        if (fs)
+        if (fixVoid)
         {
             fromVoid = returnReduce(fromVoid, sumOp<scalar>());
             voidIn_ += fromVoid;
@@ -1267,14 +1339,32 @@ void Foam::poreGas::solve(const scalar dt)
         qGas_ = fvc::reconstruct(volFlux);
         qGas_.correctBoundaryConditions();
     }
+    if (flow_)
+    {
+        correctVelocity();
+    }
 
     const label oldPrecision = Info().precision(16);
-    if (fs)
+    if (fixVoid)
     {
         Info<< "Pore gas void: " << gSum(vd) << " cells, from the void "
             << voidIn_ << " kg" << nl;
     }
-    Info<< "Pore gas: " << outer << " solves (" << nNewton << " Newton, "
+    if (flow_)
+    {
+        const volVectorField& Ug = *UgPtr_;
+        scalar uMax = 0;
+        forAll(vd, celli)
+        {
+            if (vd[celli] > 0.5)
+            {
+                uMax = max(uMax, mag(Ug[celli]));
+            }
+        }
+        Info<< "Gas flow: " << nCorr << " corrections, largest |Ug| in the "
+            << "void " << returnReduce(uMax, maxOp<scalar>()) << " m/s" << nl;
+    }
+    Info<< "Pore gas: " << (flow_ ? nOuterAll : outer) << " solves (" << nNewton << " Newton, "
         << nInner << " iterations), change " << change
         << " Pa, mass " << gasMass() << " kg, net in " << netIn_ << " kg"
         << nl;
@@ -1303,11 +1393,17 @@ void Foam::poreGas::correctFacePressure()
     const labelUList& nei = mesh.neighbour();
     const scalarField& vd = void_.primitiveField();
     scalarField& pfi = pf_.primitiveFieldRef();
+    const scalarField& pc = pPtr_->primitiveField();
     forAll(pfi, facei)
     {
-        if (vd[own[facei]] > 0.5 || vd[nei[facei]] > 0.5)
+        const bool vO = vd[own[facei]] > 0.5, vN = vd[nei[facei]] > 0.5;
+        if (vO || vN)
         {
-            pfi[facei] = 0;
+            // With gas flow (WP F.6) the void cell's pressure
+            pfi[facei] =
+                !flow_ ? 0
+              : (vO && vN) ? pfi[facei]
+              : vO ? pc[own[facei]] : pc[nei[facei]];
         }
     }
     forAll(mesh.boundary(), patchi)
@@ -1320,11 +1416,19 @@ void Foam::poreGas::correctFacePressure()
             (
                 void_.boundaryField()[patchi].patchNeighbourField()
             );
+            const scalarField pN
+            (
+                pPtr_->boundaryField()[patchi].patchNeighbourField()
+            );
             forAll(fc, i)
             {
-                if (vd[fc[i]] > 0.5 || vN[i] > 0.5)
+                const bool vO = vd[fc[i]] > 0.5, vB = vN[i] > 0.5;
+                if (vO || vB)
                 {
-                    pp[i] = 0;
+                    pp[i] =
+                        !flow_ ? 0
+                      : (vO && vB) ? pp[i]
+                      : vO ? pc[fc[i]] : pN[i];
                 }
             }
         }

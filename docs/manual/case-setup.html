@@ -274,7 +274,7 @@ the velocity boundary condition:</p>
 <p>Version 2 adds air in the pores of the granular material (decisions 0125 to 0129): the gas
 fractions, the pore pressure and, with <code>coupled yes</code>, its effect on the solid. Without this
 file, or with <code>model none</code>, celFoam runs exactly as version 1.</p>
-<pre><code>model   poreGas;        // none | poreGas
+<pre><code>model   poreGas;        // none | poreGas | gasFlow
 rhoP    2650;           // density of the grains, kg/m^3
 d       0.001;          // grain diameter, m
 T       293.15;         // gas temperature, K
@@ -284,7 +284,7 @@ coupled yes;            // gas pressure acts on the solid</code></pre>
 <table>
 <thead><tr><th>Keyword</th><th>Default</th><th>Meaning</th></tr></thead>
 <tbody>
-<tr><td><code>model</code></td><td><code>poreGas</code></td><td><code>none</code> switches the gas off</td></tr>
+<tr><td><code>model</code></td><td><code>poreGas</code></td><td><code>none</code> switches the gas off; <code>gasFlow</code> (WP F.6, decision 0131, needs <code>freeSurface yes</code>) also gives the gas in the void its own velocity <code>Ug</code> and pressure, solved implicitly at the solid's time step, with open (<code>fixedValue</code>) patches of <code>0/p</code> as the atmosphere</td></tr>
 <tr><td><code>rhoP</code></td><td>required</td><td>Density of the grains (particles), kg/m&sup3;</td></tr>
 <tr><td><code>d</code></td><td>required</td><td>Grain diameter, m</td></tr>
 <tr><td><code>T</code></td><td>293.15</td><td>Gas temperature, K (air is an ideal gas with Sutherland viscosity)</td></tr>
@@ -298,6 +298,9 @@ coupled yes;            // gas pressure acts on the solid</code></pre>
 <tr><td><code>pTolerance</code></td><td>1e-14 <code>p0</code></td><td>Converged when the error left (the last correction, or the next one estimated from the last two) is below this, Pa</td></tr>
 <tr><td><code>laplacian</code></td><td><code>"Gauss linear corrected"</code></td><td>Discretisation of the gas flux (corrected for non-orthogonal cells)</td></tr>
 <tr><td><code>solver</code></td><td>PCG, DIC, <code>relTol 1e-3</code></td><td>Sub-dictionary for the linear solver of each correction, as in <code>fvSolution</code></td></tr>
+<tr><td><code>nCorr</code></td><td>1</td><td><code>gasFlow</code>: pressure corrections per step (PISO)</td></tr>
+<tr><td><code>divUg</code></td><td><code>"Gauss upwind"</code></td><td><code>gasFlow</code>: convection scheme of the gas velocity</td></tr>
+<tr><td><code>USolver</code></td><td>PBiCGStab, DILU, <code>relTol 1e-10</code></td><td><code>gasFlow</code>: sub-dictionary for the linear solver of the gas momentum</td></tr>
 </tbody>
 </table>
 <p>celFoam writes three more fields: <code>phiS</code>, the solids volume fraction
@@ -309,6 +312,9 @@ in m/s. <code>p</code> is the gauge pressure (absolute minus <code>p0</code>). I
 <code>0/p</code>: <code>fixedValue</code> holds a pressure, <code>zeroGradient</code> is sealed, and a
 <code>fixedGradient</code> patch named in <code>inflow</code> blows air in. Without <code>0/p</code>,
 <code>p</code> starts at 0 and every patch is sealed.</p>
+<p>Gas velocity (WP F.6, <code>model gasFlow</code>): <code>0/Ug</code> is optional; without it walls are no-slip
+and open patches zeroGradient. celFoam writes <code>Ug</code>; inside the material the gas follows the
+pore-pressure law.</p>
 
 <h2 id="fields">Initial fields</h2>
 <p>celFoam reads these fields from the start time folder if they are there, and otherwise
