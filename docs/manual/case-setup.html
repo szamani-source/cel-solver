@@ -295,7 +295,10 @@ poreInertia yes;        // gasFlow: gas momentum in the pores as well as the voi
 inertiaForce no;        // gasFlow: pore gas inertia's reaction on the grains (default off, decision 0132)
 surfaceCarry no;        // free surface: yes lets the moving surface carry gas to and from the void
                         // (the vacated part of a cell fills from the void, not through the grains; decision 0133)
-eMin        0.2;        // smallest gas fraction of the filled part of a cell (remap overfill; decision 0133)</code></pre>
+eMin        0.2;        // smallest gas fraction of the filled part of a cell (remap overfill; decision 0133)
+diffusivity 0;          // poreGas only, m2/s: &gt; 0 replaces gas compressibility by a pore pressure that is
+                        // carried with the grains and diffuses with this coefficient (Gueugneau 2017,
+                        // Aravena 2021); fitted, e.g. 0.015 for the Roche dam break (default 0 = off)</code></pre>
 <p>The gauge gas pressure is the field <code>0/p</code> (optional): <code>fixedValue</code> patches are open at that
 pressure, <code>zeroGradient</code> patches are sealed. Outlets must be <code>fixedValue</code>. With
 <code>model gasFlow</code> the field <code>0/Ug</code> (optional) is the gas velocity; without it walls are no-slip

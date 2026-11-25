@@ -24,16 +24,19 @@ less than 60 %. They report u_max/sqrt(g h0) 1.0 to 1.15 and a run-out of
 about 3.8 h0 for a = 2 on the horizontal (reported, not checked).
 
 Case: a column X0 = 0.2 m long and H0 = 0.4 m high (a = 2) against a smooth
-left wall, plain Mohr-Coulomb (phi 30, c 0, psi 0, E 1 MPa) with a compaction
-cap for the expanded packing (CAP_LAMBDA below), floor friction 15 deg, open
+left wall, Mohr-Coulomb with mu(I) (phi 24, mu2 tan 33, I0 0.3, c 0, psi 0, E 1 MPa;
+flowImpedance, fullBlend; F.8d) with a compaction cap for the expanded
+packing (CAP_LAMBDA below) and overfillStress, floor friction 19 deg, open
 top. The column starts at rest with p = 0.9 rho_b g (H0 - y) and the rest of
 the weight on the grains (sigma'_yy = -0.1 rho_b g (H0 - y), sigma'_xx = K0
 times that). The reservoir floor (x < X0, patch floorRes, made by topoSet and
 createPatch) blows air at the superficial velocity that carries 0.9 of the
 weight through the packing (Darcy, Q_SUPPLY); the channel floor is sealed.
 The gate opens at once (no gate). 10 mm cells, NY = 45 rows, NX = 300 columns
-(3 m, the channel). Every gas run uses ergunWenYu, model gasFlow and
-surfaceCarry yes (decision 0133).
+(3 m, the channel). Every gas run uses ergunWenYu. Route B (default, F.8e):
+model poreGas with the pore pressure carried by the grains and diffusing at
+KAPPA_FIT; kappa = 0 gives the compressible gas of F.8c (model gasFlow,
+surfaceCarry yes; decision 0133).
 
 Dry (gas off): same column, no gasProperties, no floorRes, geostatic K0 stress.
 """
@@ -64,8 +67,18 @@ CELL = 0.01
 NX, NY = 300, 45
 N = NX * NY
 E_MOD = 1.0e6
-PHI = 30.0
-FLOOR = 15.0                          # basal friction, Aravena et al. (2021)
+# Grains (F.8d, decision 0133): mu(I) of glass beads with the static angle
+# measured by Gueugneau et al. (2017) (24 deg, slope of a pile at rest),
+# mu2 tan 33 deg and I0 0.3 (Jop et al. 2006 as quoted by Chupin and Dubois
+# 2023), floor 19 deg (Gueugneau: beads glued on a plate sliding on the
+# channel base). With flowImpedance and fullBlend the dry column runs out
+# 2.35 h0 against Roche's pressure-balanced 1.05 m (2.6 h0, Breard et al.
+# 2019); plain Mohr-Coulomb with these angles stops at 0.9 h0
+PHI = 24.0
+MU2 = math.tan(math.radians(33.0))
+I0 = 0.3
+FLOOR = 19.0
+DRY_RUNOUT = 1.05 / 0.4                  # x/h0, pressure-balanced (Breard et al. 2019)
 P_FRAC = 1.0                          # initial pore pressure / weight (Roche 2008: fully supported)
 T_SCALE = math.sqrt(H0 / G_ACC)
 WRITE = 0.02
@@ -79,12 +92,18 @@ PHASE = (1.5, 4.0)                    # constant-velocity phase, t/sqrt(h0/g)
 # Aravena et al. (2021), reported only
 ARAVENA_U = (1.0, 1.15)               # u_max / sqrt(g h0)
 ARAVENA_RUNOUT = 3.8                  # x/h0, a = 2, horizontal
+# Route B (F.8e, decision 0133): pore pressure carried with the grains and
+# diffusing (gasProperties diffusivity, model poreGas), as Gueugneau et al.
+# (2017) and Aravena et al. (2021). KAPPA_FIT is fitted to Roche's run-out
+# (Aravena fit 0.015 m^2/s); kappa_theory() is k p0 / (mu e).
+KAPPA_FIT = 0.015
 # Expanded (fluidised) packing: soft until compacted (decision 0133): the
 # compaction cap (WP K.1, decision 0113) normally consolidated from 1 Pa, with
 # lambda* = 0.0044 so that loading to the column's base stress (about 3 kPa)
 # compacts it by the 3.5 % it was expanded (0.035 / ln 3000)
 CAP_LAMBDA, CAP_P0 = 0.0044, 1.0
 MC = (f"type mohrCoulomb;\nE {E_MOD!r};\nnu 0.3;\nphi {PHI!r};\nc 0;\npsi 0;\n"
+      f"mu2 {MU2!r};\nI0 {I0!r};\nd {D!r};\nrhoS {RHOP!r};\nflowImpedance yes;\nfullBlend yes;\n"
       f"capLambda {CAP_LAMBDA!r};\ncapP0 {CAP_P0!r};\noverfillStress yes;")
 
 
@@ -92,6 +111,11 @@ def diffusion_time():
     """H0^2/c with the rigid-bed diffusivity c = k p0/(mu e) [s]."""
     k = gr.permeability(D, E0)
     return H0 * H0 / (k * pc.P0 / (MU * E0))
+
+
+def kappa_theory():
+    """Pore pressure diffusivity of the rigid packing, k p0 / (mu e) [m^2/s]."""
+    return gr.permeability(D, E0) * pc.P0 / (MU * E0)
 
 
 def supply():
@@ -108,7 +132,9 @@ def describe():
             f"reservoir air {supply() * 1e3:.2f} mm/s")
 
 
-def make(path, *, gas=True, decomp=(1, 1, 1), end=T_END, extra_gas="", cap=True):
+def make(path, *, gas=True, decomp=(1, 1, 1), end=T_END, extra_gas="", cap=True, kappa=KAPPA_FIT):
+    """kappa > 0: route B (model poreGas, diffusivity kappa); kappa = 0: the
+    compressible gas of F.8c (model gasFlow, surfaceCarry yes)."""
     if os.path.isdir(path):
         shutil.rmtree(path)
     pc.make_case(path, size=(NX * CELL, NY * CELL), cells=(NX, NY), e=E0, d=D, end=end,
@@ -117,11 +143,14 @@ def make(path, *, gas=True, decomp=(1, 1, 1), end=T_END, extra_gas="", cap=True)
     g = f"{path}/constant/gasProperties"
     pc.write(g, open(g).read().replace(f"rhoP    {pc.RHOP!r};", f"rhoP    {RHOP!r};"))
     inflow = f"inflow {{ floorRes {supply()!r}; }}\n" if gas else ""
-    fl._common(path, rho=RHO_B, E=E_MOD, extra_gas="surfaceCarry yes;\n" + inflow + extra_gas,
+    route = f"diffusivity {kappa!r};\n" if kappa > 0 else "surfaceCarry yes;\n"
+    fl._common(path, rho=RHO_B, E=E_MOD, extra_gas=route + inflow + extra_gas,
                material=MC if cap else MC.split("capLambda")[0].rstrip("\n"),
                walls=f"    left {{ friction 0; }}\n    right {{ friction 0; }}\n"
                      f"    bottom {{ friction {FLOOR!r}; }}"
                      + (f"\n    floorRes {{ friction {FLOOR!r}; }}" if gas else ""))
+    if gas and kappa > 0:
+        pc.write(g, open(g).read().replace("model   gasFlow;", "model   poreGas;"))
     k0 = 0.3 / 0.7
     alpha, rho, sig, p = [], [], [], []
     for j in range(NY):

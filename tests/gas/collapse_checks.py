@@ -9,10 +9,12 @@ B passes (dry 0.88 h0), C fails (2 processors 1e-10 to 0.06 s). Earlier
 A  serial gas run: front speed over Roche's constant-velocity phase within
    20 % of sqrt(2 g h0); run-out from the gate within 20 % of 5.75 h0;
    gas mass conserved to 1e-12 (gas mass less net inflow).
-B  dry collapse, gas off (no gasProperties), plain Mohr-Coulomb (version 1's
-   collapse material, no cap): the front history and the final column heights
-   equal those of main before version 2 (v1.1.0, stored in
-   collapse_dry_reference.txt) to 1e-12. The dry run with the cap (as the gas
+B  dry collapse, gas off (no gasProperties), the case's grains without the
+   cap and overfillStress (version 1 options only): run-out from the gate
+   within 20 % of Roche's pressure-balanced 1.05 m (2.6 h0, Breard et al.
+   2019; F.8d); the front history and the final column heights equal those of
+   main before version 2 (v1.1.0, stored in collapse_dry_reference.txt) to
+   1e-12. The dry run with the cap (as the gas
    run) is reported (F.8b changed the cap's p_c rule, decision 0133).
 C  2 and 4 processors (manual cuts: x = 0.1 m through the column, its free
    surface and the void; 4: also y = 0.1 m through the bed) against serial:
@@ -21,8 +23,11 @@ C  2 and 4 processors (manual cuts: x = 0.1 m through the column, its free
    The first write where they part is reported.
 K  cost per step, gas on against gas off (report; F.9 target 1.5x).
 
-Every gas run: ergunWenYu, model gasFlow, surfaceCarry yes (decision 0133),
-the cap of collapse_cases.CAP, overfillStress yes.
+Every gas run: ergunWenYu, the cap, overfillStress yes and route B (F.8e):
+model poreGas, diffusivity collapse_cases.KAPPA_FIT (fitted, as Aravena et
+al. 2021); A also reports a run with the theoretical k p0/(mu e). Route B
+carries pore pressure, not gas mass, so the gas mass checks apply only to the
+compressible route (KAPPA_FIT = 0: model gasFlow, surfaceCarry yes).
 
     python3 collapse_checks.py WORKDIR [--only A,B,C,K]
 """
@@ -94,7 +99,19 @@ def main(work, only):
         report("run-out", abs(ro / cc.RUNOUT - 1) <= 0.2,
                f"{ro:.2f} h0 from the gate against 5.5 to 6 ({100 * (ro / cc.RUNOUT - 1):+.1f} % of 5.75); "
                f"stops at {cc.stop_time(h) / cc.T_SCALE:.1f} sqrt(h0/g) (Roche 6.5)")
-        report("gas mass", drift <= 1e-12, f"{drift:.1e} of the gas mass")
+        if cc.KAPPA_FIT == 0:
+            report("gas mass", drift <= 1e-12, f"{drift:.1e} of the gas mass")
+        else:
+            # route B carries pressure, not gas mass: report the theoretical kappa
+            print(f"  pore pressure diffusivity fitted {cc.KAPPA_FIT:g} m^2/s against k p0/(mu e) = "
+                  f"{cc.kappa_theory():.3f} (Aravena et al. 2021: 0.015 against 0.13)")
+            wt = f"{work}/gasTheory"
+            if not os.path.isdir(wt) or not os.path.exists(f"{wt}/log.wallTime"):
+                cc.make(wt, extra_gas=gas_extra, kappa=cc.kappa_theory())
+            cc.run(wt)
+            ht = cc.history(wt)
+            print(f"  with the theoretical kappa (report): run-out {(ht[-1, 1] - cc.X0) / cc.H0:.2f} h0, "
+                  f"front speed {cc.front_speed(ht):.3f} m/s")
 
     wd = f"{work}/dry"
     if not os.path.isdir(wd) or not os.path.exists(f"{wd}/log.wallTime"):
@@ -114,6 +131,8 @@ def main(work, only):
         hd = cc.history(wv1)
         hc, _ = cc.columns(wv1, pc.times(wv1)[-1])
         ro = (hd[-1, 1] - cc.X0) / cc.H0
+        report("dry run-out", abs(ro / cc.DRY_RUNOUT - 1) <= 0.2,
+               f"{ro:.2f} h0 against {cc.DRY_RUNOUT:.2f} ({100 * (ro / cc.DRY_RUNOUT - 1):+.1f} %)")
         if os.path.exists(REF):
             ref = np.loadtxt(REF)
             nh = len(hd)
@@ -150,7 +169,7 @@ def main(work, only):
                 worst = float("inf")
             for t in [t for t in pc.times(w1) if t in done]:
                 d = max(gf.rel(gf.vfield(w1, t, f, cc.N), gf.vfield(w, t, f, cc.N))
-                        for f in ("p", "Ug", "U"))
+                        for f in (("p", "U") if cc.KAPPA_FIT > 0 else ("p", "Ug", "U")))
                 if d > 1e-10 and first is None:
                     first = (t, d)
                 worst = max(worst, d)
@@ -159,6 +178,8 @@ def main(work, only):
                           or [0.0]) if first else None
             if first:
                 print(f"    within 1e-10 up to t = {last_ok} s ({last_ok / cc.T_SCALE:.1f} sqrt(h0/g))")
+            if cc.KAPPA_FIT > 0:
+                drift = 0.0     # route B: pressure, not gas mass, is carried
             report(f"{n} processors", worst <= 1e-10 and drift <= 1e-12,
                    f"p, Ug, U within {worst:.1e} of their largest"
                    + (f" (first above 1e-10 at t = {first[0]} s: {first[1]:.1e})" if first else "")

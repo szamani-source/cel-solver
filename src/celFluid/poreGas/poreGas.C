@@ -249,7 +249,8 @@ Foam::poreGas::poreGas(const eulerianSolid& solid, const IOobject& io)
     USolverDict_(),
     poreInertia_(flow_ && dict_.getOrDefault<Switch>("poreInertia", true)),
     surfaceCarry_(dict_.getOrDefault<Switch>("surfaceCarry", false)),
-    eMin_(dict_.getOrDefault<scalar>("eMin", 0.2))
+    eMin_(dict_.getOrDefault<scalar>("eMin", 0.2)),
+    kappa_(dict_.getOrDefault<scalar>("diffusivity", 0))
 {
     if (rhoP_ <= 0 || d_ <= 0 || T_ <= 0 || p0_ <= 0)
     {
@@ -370,6 +371,19 @@ Foam::poreGas::poreGas(const eulerianSolid& solid, const IOobject& io)
     {
         Info<< "Pore gas (WP F.8): the moving surface carries gas to and "
             << "from the void (surfaceCarry)" << endl;
+    }
+    if (kappa_ < 0 || (kappa_ > 0 && flow_))
+    {
+        FatalIOErrorInFunction(dict_)
+            << "diffusivity must be positive and needs model poreGas"
+            << exit(FatalIOError);
+    }
+    if (kappa_ > 0)
+    {
+        Info<< "Pore gas (WP F.8e): pore pressure advected with the grains "
+            << "and diffused with diffusivity " << kappa_ << " m^2/s "
+            << "(no compression or suction by the grains; gas mass is not "
+            << "conserved)" << endl;
     }
     if (eMin_ != 0.2)
     {
@@ -790,6 +804,17 @@ void Foam::poreGas::solve(const scalar dt)
     // gas (inside a body) get 1/RT so the matrix stays regular; they have
     // no mobility, so their p never changes and they hold no mass.
     scalarField S(open*phiG/RT);
+    if (kappa_ > 0)
+    {
+        // WP F.8e: storage that gives the Darcy term the diffusivity kappa
+        // in the filled part of each cell
+        const scalarField& alpha = solid_.alpha().primitiveField();
+        const scalarField& kc = k_.primitiveField();
+        forAll(S, celli)
+        {
+            S[celli] = open[celli]*alpha[celli]*rhoG_*kc[celli]/(mu_*kappa_);
+        }
+    }
     forAll(S, celli)
     {
         if (S[celli] <= 0)
@@ -815,7 +840,68 @@ void Foam::poreGas::solve(const scalar dt)
     //   S Vo/dt (p - pOld) + X/dt + sum(Darcy flux out) = 0.
     scalarField X(p.size(), Zero);
     scalar carriedOut = 0;      // through non-coupled faces (WP F.4) [kg]
-    if (coupled_ && solid_.mesh().time().timeIndex() > 0)
+    if (kappa_ > 0 && coupled_ && solid_.mesh().time().timeIndex() > 0)
+    {
+        // WP F.8e: the material crossing a face (its bulk volume, mass over
+        // the donor's bulk density) brings the donor's pressure into the
+        // receiving cell; the cell it leaves keeps its own (upwind
+        // advection, non-conservative as dp/dt + u.grad p)
+        const labelUList& own = mesh.owner();
+        const labelUList& nei = mesh.neighbour();
+        const scalarField& dm = solid_.remapMass().primitiveField();
+        const scalarField& rhoC = solid_.rho().primitiveField();
+        const scalarField& alpha = solid_.alpha().primitiveField();
+        auto bulk = [&](const label c)
+        {
+            return alpha[c] > alphaMin ? rhoC[c]/alpha[c] : rhoP_;
+        };
+        forAll(own, facei)
+        {
+            const scalar m = dm[facei];
+            if (m == 0)
+            {
+                continue;
+            }
+            const label d = m > 0 ? own[facei] : nei[facei];
+            const label r = m > 0 ? nei[facei] : own[facei];
+            const scalar F = mag(m)/bulk(d);
+            X[r] -= S[r]/max(alpha[r], alphaMin)*F*(pOld[d] - pOld[r]);
+        }
+        forAll(mesh.boundary(), patchi)
+        {
+            if (!mesh.boundary()[patchi].coupled())
+            {
+                continue;
+            }
+            const labelUList& fc = mesh.boundary()[patchi].faceCells();
+            const scalarField& pdm =
+                solid_.remapMass().boundaryField()[patchi];
+            const scalarField pN
+            (
+                p.boundaryField()[patchi].patchNeighbourField()
+            );
+            const scalarField rN
+            (
+                solid_.rho().boundaryField()[patchi].patchNeighbourField()
+            );
+            const scalarField aN
+            (
+                solid_.alpha().boundaryField()[patchi].patchNeighbourField()
+            );
+            forAll(fc, i)
+            {
+                // Material coming in from the neighbour processor
+                if (pdm[i] < 0)
+                {
+                    const label r = fc[i];
+                    const scalar F =
+                        -pdm[i]/(aN[i] > alphaMin ? rN[i]/aN[i] : rhoP_);
+                    X[r] -= S[r]/max(alpha[r], alphaMin)*F*(pN[i] - pOld[r]);
+                }
+            }
+        }
+    }
+    else if (coupled_ && solid_.mesh().time().timeIndex() > 0)
     {
         const scalarField Vo(open*mesh.V().field());
         const labelUList& own = mesh.owner();

@@ -336,6 +336,17 @@ class poreGas
             //  decision 0133): keyword eMin, default 0.2
             scalar eMin_;
 
+        // WP F.8e: pore pressure as an advected-diffused field (decision
+        // 0133, route B; Iverson & Denlinger 2001, Gueugneau et al. 2017,
+        // Aravena et al. 2021)
+
+            //- gasProperties diffusivity [m^2/s]; 0 (default): off. When
+            //  set, the pore pressure moves with the grains and diffuses
+            //  with this diffusivity: the storage is rho_g0 k/(mu kappa)
+            //  per unit of filled volume, and the grains' volume change
+            //  does not act on it (no compression or suction)
+            scalar kappa_;
+
             //- Superficial flux relative to the grains through each face
             //  at the end of the last step, q.n [m/s], and 1 on the faces
             //  that were void flow faces then (their flux is absolute)
