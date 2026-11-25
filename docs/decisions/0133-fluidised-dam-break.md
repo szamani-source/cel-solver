@@ -284,7 +284,11 @@ end, front 1.26). So no fitted kappa is needed at 10 mm. 5 mm with the theoretic
 front 1.19 sqrt(g h0) (-16 %, inside 20 %), at Roche's stop time 6.57 h0 (+14 %), then on to the
 channel end (7.0 h0): run-out still depends on the mesh (10 mm 5.02 h0). Likely cause: the
 void at p = 0 one half cell above the flow surface, so the drainage path of a thin flow scales
-with the cell (Gueugneau relaxes p/(rho g h) over the depth). Refit on 5 mm (kappa 0.22) running.
+with the cell (Gueugneau relaxes p/(rho g h) over the depth). Refit once on 5 mm, kappa 0.22
+(twice the theory): run-out 5.64 h0 (-2 % of 5.75, inside 5.5 to 6), stops at 6.7 sqrt(h0/g)
+(Roche 6.5), front 1.11 sqrt(g h0) (-21.5 % of sqrt(2 g h0), just outside 20 %). So on 5 mm one
+kappa cannot pass both: theory passes the front, the refit passes the run-out. Since the fit
+also depends on the cell size, kappa is not yet set in the test; next step for Sia to choose.
 
 ## Consequences
 
