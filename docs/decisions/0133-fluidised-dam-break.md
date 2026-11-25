@@ -230,6 +230,12 @@ the cap: dry 2.47 h0 (Roche about 2.6); compressible gas (kappa 0) 3.50 h0, depo
 reports (5.5 to 1 kPa, then about 4 kPa), but the pressure in the flowing part stays low
 (0.2-1.6 kPa). Gap to Roche still -39 % for the compressible model.
 
+Breard's own angles (28 deg internal, 12 deg floor) with our grains: dry 5.77 h0 (Roche about
+2.6), compressible gas 7.00 h0. Our mu(I) + flowImpedance grains need the 19 deg floor to give
+Roche's dry run-out (Breard's kinetic-theory solid dissipates differently), so the angles are
+not taken over. Ratio fluidised/dry (Roche 1.8-2.2): compressible 1.42 (3.50/2.47), route B
+1.81 (4.47/2.47).
+
 ## Consequences
 
 - F.8 is not done. Its remaining work is split into F.8b (`docs/work-packages.md`):
