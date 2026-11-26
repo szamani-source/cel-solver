@@ -1,0 +1,10 @@
+EXE_INC = \
+    -I$(LIB_SRC)/finiteVolume/lnInclude \
+    -I../../../src/celConstitutive/lnInclude \
+    -I../../../src/celEulerian/lnInclude \
+    -I../../../src/celFluid/lnInclude
+
+EXE_LIBS = \
+    -lfiniteVolume \
+    -L$(FOAM_USER_LIBBIN) \
+    -lcelFluid

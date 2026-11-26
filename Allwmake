@@ -9,3 +9,4 @@ wmake libso src/celCoupling
 wmake libso src/celFluid
 wmake applications/solvers/celFoam
 wmake applications/utilities/celBodyCells
+wmake applications/utilities/celDragTable

@@ -71,6 +71,26 @@ public:
             const scalar rhoG
         ) const;
 
+        //- Ergun branch: K = K0 + K1 u (WP F.7)
+        virtual bool affine
+        (
+            const scalar e,
+            const scalar d,
+            const scalar mu,
+            const scalar rhoG,
+            scalar& K0,
+            scalar& K1
+        ) const
+        {
+            if (!(e < eSwitch))
+            {
+                return false;
+            }
+            K0 = 150*(1 - e)*(1 - e)*mu/(e*d*d);
+            K1 = 1.75*(1 - e)*rhoG/d;
+            return true;
+        }
+
         //- Exact on the Ergun branch (K linear in u), the default above
         virtual scalar dKdu
         (

@@ -120,6 +120,28 @@ void Foam::poreGas::initFlow()
         massFlux_ = voidFaces()*rhof*(linearInterpolate(*UgPtr_) & mesh.Sf());
     }
 
+    if (poreInertia_ && dict_.getOrDefault<Switch>("inertiaForce", false))
+    {
+        gasForce_.reset
+        (
+            new volVectorField
+            (
+                IOobject
+                (
+                    "gasInertiaForce",
+                    mesh.time().timeName(),
+                    mesh,
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE
+                ),
+                mesh,
+                dimensionedVector(dimForce, Zero)
+            )
+        );
+        Info<< "Gas momentum in the pores (WP F.7): inertia of the pore gas,"
+            << " implicit drag " << drag_ << nl;
+    }
+
     Info<< "Gas flow in the void (WP F.6): " << nCorr_
         << " pressure corrections per step, convection " << divUg_
         << ", Ug " << (io.readOpt() == IOobject::MUST_READ ? "read" : "0")
@@ -395,6 +417,243 @@ void Foam::poreGas::correctVelocity()
         }
     }
     U.correctBoundaryConditions();
+}
+
+
+// * * * * * * * * * * * WP F.7: gas momentum in the pores * * * * * * * * * //
+
+void Foam::poreGas::startInertia(const scalar dt)
+{
+    if (!poreInertia_)
+    {
+        return;
+    }
+    const fvMesh& mesh = solid_.mesh();
+    const scalar RT = Rair*T_;
+    const volScalarField& p = *pPtr_;
+
+    inertialDrag_.reset(new inertialGasDrag(*dragModel_, dt));
+
+    const tmp<surfaceScalarField> tVoidNow(voidFaces());
+    if (!qnOld_)
+    {
+        // First step (or a restart, F.9): the pore gas starts at rest
+        // relative to the grains
+        qnOld_.reset
+        (
+            new surfaceScalarField
+            (
+                IOobject("gasQnOld", mesh.time().timeName(), mesh),
+                mesh,
+                dimensionedScalar(dimVelocity, Zero)
+            )
+        );
+        voidFaceOld_.reset(new surfaceScalarField("gasVoidFaceOld", tVoidNow()));
+    }
+
+    // Gas fraction at the faces: the mean of the two sides, the gas side's
+    // where one side is void
+    const scalarField& vd = void_.primitiveField();
+    const scalarField& eM = eM_.primitiveField();
+    surfaceScalarField ef(linearInterpolate(eM_));
+    {
+        const labelUList& own = mesh.owner();
+        const labelUList& nei = mesh.neighbour();
+        scalarField& efi = ef.primitiveFieldRef();
+        forAll(efi, facei)
+        {
+            const label P = own[facei], N = nei[facei];
+            efi[facei] =
+                vd[P] > 0.5 ? eM[N]
+              : vd[N] > 0.5 ? eM[P]
+              : 0.5*(eM[P] + eM[N]);
+        }
+        forAll(mesh.boundary(), patchi)
+        {
+            const labelUList& fc = mesh.boundary()[patchi].faceCells();
+            scalarField& eb = ef.boundaryFieldRef()[patchi];
+            if (mesh.boundary()[patchi].coupled())
+            {
+                const scalarField eN
+                (
+                    eM_.boundaryField()[patchi].patchNeighbourField()
+                );
+                const scalarField vN
+                (
+                    void_.boundaryField()[patchi].patchNeighbourField()
+                );
+                forAll(fc, i)
+                {
+                    eb[i] =
+                        vd[fc[i]] > 0.5 ? eN[i]
+                      : vN[i] > 0.5 ? eM[fc[i]]
+                      : 0.5*(eM[fc[i]] + eN[i]);
+                }
+            }
+            else
+            {
+                forAll(fc, i)
+                {
+                    eb[i] = eM[fc[i]];
+                }
+            }
+        }
+    }
+
+    // Old relative face flux: as stored, or, on a face that was in the
+    // void flow (absolute gas velocity), e (u_g - u_s).n
+    surfaceScalarField qn(qnOld_());
+    {
+        const surfaceScalarField usn
+        (
+            linearInterpolate(solid_.U()) & mesh.Sf()/mesh.magSf()
+        );
+        qn = qn
+          + voidFaceOld_()*(1 - tVoidNow())
+           *(ef*(qnOld_() - usn) - qnOld_());
+    }
+
+    const surfaceScalarField rhof
+    (
+        (linearInterpolate(p) + dimensionedScalar(dimPressure, p0_))
+       /dimensionedScalar(dimPressure/dimDensity, RT)
+    );
+    const surfaceVectorField nf(mesh.Sf()/mesh.magSf());
+    const dimensionedScalar dtD(dimTime, dt);
+    const dimensionedScalar eMin(dimless, 1e-12);
+    const surfaceScalarField h(rhof/(max(ef, eMin)*dtD));
+
+    // Faces with the inertia: between gas cells or a gas and a void cell,
+    // and fixed-pressure boundaries of gas cells (not inside the void
+    // flow, not on inflow patches or walls)
+    surfaceScalarField on(1 - tVoidNow());
+    forAll(on.boundaryField(), patchi)
+    {
+        if
+        (
+            !mesh.boundary()[patchi].coupled()
+         && !p.boundaryField()[patchi].fixesValue()
+        )
+        {
+            on.boundaryFieldRef()[patchi] = 0;
+        }
+    }
+
+    {
+        const surfaceVectorField qv(linearInterpolate(qGas_));
+        gInertia_.reset
+        (
+            new surfaceVectorField
+            (
+                "gasInertiaG",
+                on*h*(qv + nf*(qn - (nf & qv)))
+            )
+        );
+    }
+
+    // On a face between a gas and a void cell the face coefficient is the
+    // gas side's over its distance to the face, fC of the centre distance
+    // (WP F.4): the old flux's part takes fC back out
+    {
+        const surfaceScalarField& w = mesh.weights();
+        const labelUList& own = mesh.owner();
+        const labelUList& nei = mesh.neighbour();
+        scalarField& oi = on.primitiveFieldRef();
+        forAll(oi, facei)
+        {
+            const bool vP = vd[own[facei]] > 0.5, vN = vd[nei[facei]] > 0.5;
+            if (vP != vN)
+            {
+                oi[facei] *= vP ? w[facei] : 1 - w[facei];
+            }
+        }
+        forAll(mesh.boundary(), patchi)
+        {
+            if (!mesh.boundary()[patchi].coupled())
+            {
+                continue;
+            }
+            const labelUList& fc = mesh.boundary()[patchi].faceCells();
+            const scalarField vN
+            (
+                void_.boundaryField()[patchi].patchNeighbourField()
+            );
+            const scalarField& wb = w.boundaryField()[patchi];
+            scalarField& ob = on.boundaryFieldRef()[patchi];
+            forAll(fc, i)
+            {
+                const bool vP = vd[fc[i]] > 0.5, vB = vN[i] > 0.5;
+                if (vP != vB)
+                {
+                    ob[i] *= vP ? wb[i] : 1 - wb[i];
+                }
+            }
+        }
+    }
+    sInertia_.reset(new surfaceScalarField("gasInertiaS", on*h*qn*mesh.magSf()));
+    mInertia_.reset
+    (
+        new surfaceScalarField
+        (
+            IOobject("gasInertiaFlux", mesh.time().timeName(), mesh),
+            mesh,
+            dimensionedScalar(dimMass/dimTime, Zero)
+        )
+    );
+    qCellOld_ = qGas_.primitiveField();
+    voidOld_ = void_.primitiveField();
+}
+
+
+void Foam::poreGas::inertiaFlux(const surfaceScalarField& DfS)
+{
+    if (!poreInertia_)
+    {
+        return;
+    }
+    mInertia_() = DfS*sInertia_();
+}
+
+
+void Foam::poreGas::endInertia(const scalar dt)
+{
+    if (!poreInertia_)
+    {
+        return;
+    }
+    const fvMesh& mesh = solid_.mesh();
+    const scalar RT = Rair*T_;
+    const volScalarField& p = *pPtr_;
+    const surfaceScalarField rhof
+    (
+        (linearInterpolate(p) + dimensionedScalar(dimPressure, p0_))
+       /dimensionedScalar(dimPressure/dimDensity, RT)
+    );
+    qnOld_() = massFlux_/(rhof*mesh.magSf());
+    voidFaceOld_() = voidFaces();
+
+    // Reaction on the grains: -V open (rho_g/dt) (q - q_o) in cells that
+    // hold grains now and did at the start of the step
+    const tmp<scalarField> tOpen(solid_.cellOpen());
+    const scalarField& open = tOpen();
+    const scalarField& vd = void_.primitiveField();
+    const scalarField& pc = p.primitiveField();
+    if (!gasForce_)
+    {
+        return;
+    }
+    vectorField& f = gasForce_->primitiveFieldRef();
+    forAll(f, celli)
+    {
+        if (vd[celli] > 0.5 || voidOld_[celli] > 0.5)
+        {
+            f[celli] = Zero;
+            continue;
+        }
+        f[celli] =
+          - mesh.V()[celli]*open[celli]*(p0_ + pc[celli])/(RT*dt)
+           *(qGas_[celli] - qCellOld_[celli]);
+    }
 }
 
 

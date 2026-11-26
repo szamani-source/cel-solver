@@ -114,8 +114,93 @@ def drag_ergun_wen_yu(e, u, d, mu, rho_g):
     """Gidaspow momentum exchange coefficient K [kg/(m^3 s)], u = slip speed."""
     if e < 0.8:
         return 150.0 * (1 - e) ** 2 * mu / (e * d * d) + 1.75 * (1 - e) * rho_g * u / d
-    re = max(e * rho_g * u * d / mu, 1e-300)
-    return 0.75 * cd_schiller_naumann(re) * e * (1 - e) * rho_g * u / d * e ** -2.65
+    # Wen-Yu branch in its Cd Re form (finite Stokes limit at u = 0; WP F.7)
+    return drag_wen_yu(e, u, d, mu, rho_g)
+
+
+def drag_ergun(e, u, d, mu, rho_g):
+    """Ergun at every gas fraction (WP F.7, user option)."""
+    return 150.0 * (1 - e) ** 2 * mu / (e * d * d) + 1.75 * (1 - e) * rho_g * u / d
+
+
+def drag_wen_yu(e, u, d, mu, rho_g):
+    """Wen and Yu at every gas fraction, Cd Re form (finite at u = 0)."""
+    re = e * rho_g * u * d / mu
+    cdre = 24.0 * (1.0 + 0.15 * re ** 0.687) if re < 1000.0 else 0.44 * re
+    return 0.75 * cdre * mu * (1 - e) / (d * d) * e ** -2.65
+
+
+def drag_di_felice(e, u, d, mu, rho_g):
+    """Di Felice (1994): one sphere (Dallavalle Cd) at the superficial slip
+    times e^-beta; K = 0.75 Cd Re mu (1-e)/d^2 e^(1-beta), Re = e rho u d/mu."""
+    re = e * rho_g * u * d / mu
+    s = 0.63 * math.sqrt(re) + 4.8
+    beta = di_felice_beta(re) if re > 0 else 3.7
+    return 0.75 * s * s * mu * (1 - e) / (d * d) * e ** (1.0 - beta)
+
+
+def drag_syamlal_obrien(e, u, d, mu, rho_g):
+    """Syamlal and O'Brien (MFiX theory guide, 1993), Re = rho u d/mu."""
+    re = rho_g * u * d / mu
+    a = e ** 4.14
+    b = 0.8 * e ** 1.28 if e <= 0.85 else e ** 2.65
+    vr = 0.5 * (a - 0.06 * re + math.sqrt((0.06 * re) ** 2 + 0.12 * re * (2 * b - a) + a * a))
+    s = 0.63 * math.sqrt(re) + 4.8 * math.sqrt(vr)
+    return 0.75 * e * (1 - e) * mu / (vr * vr * d * d) * s * s
+
+
+def drag_beetstra(e, u, d, mu, rho_g):
+    """Beetstra, van der Hoef and Kuipers (2007); K = 18 mu e (1-e) F/d^2,
+    Re = e rho u d/mu."""
+    phi = 1.0 - e
+    re = e * rho_g * u * d / mu
+    f = 10.0 * phi / e ** 2 + e ** 2 * (1.0 + 1.5 * math.sqrt(phi))
+    if re > 0:
+        f += (0.413 * re / (24.0 * e ** 2) * (1.0 / e + 3.0 * e * phi + 8.4 * re ** -0.343)
+              / (1.0 + 10.0 ** (3.0 * phi) * re ** (-0.5 * (1.0 + 4.0 * phi))))
+    return 18.0 * mu * e * phi * f / (d * d)
+
+
+def drag_law(name):
+    """The K(e, u, d, mu, rho_g) of a gasDragModel by its celFoam name."""
+    return {"ergunWenYu": drag_ergun_wen_yu, "ergun": drag_ergun, "wenYu": drag_wen_yu,
+            "diFelice": drag_di_felice, "syamlalOBrien": drag_syamlal_obrien,
+            "beetstra": drag_beetstra}[name]
+
+
+def model_slip(e, grad, d, mu, rho_g, law=None):
+    """Slip u at which K(e, u) u / e = grad (bisection), the Darcy-Ergun flux
+    law of celFoam's pore gas: superficial flux q = e u."""
+    law = law or drag_ergun_wen_yu
+    lo, hi = 0.0, 1e-9
+    while law(e, hi, d, mu, rho_g) * hi / e < grad:
+        hi *= 2.0
+    for _ in range(200):
+        mid = 0.5 * (lo + hi)
+        if law(e, mid, d, mu, rho_g) * mid / e > grad:
+            hi = mid
+        else:
+            lo = mid
+    return 0.5 * (lo + hi)
+
+
+def model_umf(d, rho_p, rho_g, mu, e_mf, law=None):
+    """Superficial velocity at which the drag law's pressure gradient equals
+    the bed weight (1 - e) rho_p g (gas weight left out, as in celFoam)."""
+    return e_mf * model_slip(e_mf, (1.0 - e_mf) * rho_p * G, d, mu, rho_g, law)
+
+
+def model_settling(d, rho_p, rho_g, mu, e, law=None):
+    """Speed of a uniform suspension settling with no net volume flux, as
+    celFoam's mixture model: pressure gradient = (1 - e) rho_p g, gas through
+    the grains at q = e u_slip = settling speed."""
+    return e * model_slip(e, (1.0 - e) * rho_p * G, d, mu, rho_g, law)
+
+
+def richardson_zaki(d, rho_p, rho_g, mu, e):
+    """Hindered settling U_t e^n, U_t Dallavalle, n from Rowe (1987)."""
+    ut = terminal_velocity(d, rho_p, rho_g, mu)
+    return ut * e ** rz_exponent(rho_g * ut * d / mu)
 
 
 def cd_dallavalle(re):

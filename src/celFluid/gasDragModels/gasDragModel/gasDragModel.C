@@ -10,6 +10,7 @@
 namespace Foam
 {
     defineTypeNameAndDebug(gasDragModel, 0);
+    defineTypeNameAndDebug(inertialGasDrag, 0);
     defineRunTimeSelectionTable(gasDragModel, dictionary);
 }
 
@@ -75,12 +76,21 @@ Foam::scalar Foam::gasDragModel::slip
     }
 
     // f(u) = K(e, u) u / e - G grows with u; f(0) = -G < 0 and, since
-    // K(e, u) >= K(e, 0), f(uD) >= 0 at the Darcy speed uD
+    // for most laws K(e, u) >= K(e, 0), so f(uD) >= 0 at the Darcy speed uD
     auto f = [&](const scalar u) { return K(e, u, d, mu, rhoG)*u/e - G; };
 
     scalar a = 0, fa = -G;
     scalar b = G*e/K(e, 0, d, mu, rhoG), fb = f(b);
-    if (fb <= 0)
+    // A law whose K falls with the slip (syamlalOBrien, WP F.7) can leave
+    // the root above the Darcy speed: widen the bracket
+    for (int it = 0; fb < 0 && it < 200; ++it)
+    {
+        a = b;
+        fa = fb;
+        b *= 2;
+        fb = f(b);
+    }
+    if (fb == 0)
     {
         return b;
     }

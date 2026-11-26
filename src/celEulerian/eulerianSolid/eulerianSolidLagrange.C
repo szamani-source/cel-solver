@@ -2993,6 +2993,11 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                 }
             }
         }
+        if (gasForce_)
+        {
+            // Reaction of the pore gas inertia (WP F.7)
+            fGas += gasForce_->primitiveField();
+        }
         forAll(fGas, celli)
         {
             if (m[celli] > 0)
