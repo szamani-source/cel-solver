@@ -250,6 +250,17 @@ class eulerianSolid
         //  between two flowing cells and uses phi_m elsewhere
         Switch flowImpedance_;
 
+        //- WP F.8j (decision 0134): materialProperties yieldShearJump no
+        //  (Mohr-Coulomb or Drucker-Prager; default yes). At a face beside a
+        //  yielding cell (stress within 3 % in sin(phi) of the static
+        //  Mohr-Coulomb surface, partly filled cells too) the yielding side
+        //  adds no elastic shear jump (zs) to the face traction: only its
+        //  mu(I) viscosity with flowImpedance, else none. Elastic cells keep
+        //  zs. The Riemann solver's shear damping, about rho c_s D, set the
+        //  run-out of the dry dam break (it fell with E and grew 35-50 %
+        //  from 10 to 5 mm cells)
+        Switch yieldShearJump_;
+
         //- WP 3.6h (decision 0049): materialProperties fullBlend yes (with
         //  freeSurface). Instead of the nearly-full snap (decisions 0044,
         //  0045), cells with void between 1e-4 and 1e-2 blend the full and

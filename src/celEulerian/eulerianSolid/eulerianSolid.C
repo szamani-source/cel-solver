@@ -289,6 +289,10 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
     (
         materialProperties_.getOrDefault<Switch>("flowImpedance", false)
     ),
+    yieldShearJump_
+    (
+        materialProperties_.getOrDefault<Switch>("yieldShearJump", true)
+    ),
     fullBlend_
     (
         materialProperties_.getOrDefault<Switch>("fullBlend", false)
@@ -564,6 +568,26 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
         }
         Info<< "Flow impedance (WP 3.6c): mu(I) tangent viscosity at faces "
             << "between flowing cells, plastic Hancock predictor" << nl;
+    }
+    if (!yieldShearJump_)
+    {
+        const dictionary& d = materialProperties_;
+        const word type(d.get<word>("type"));
+        if (type != "mohrCoulomb" && type != "druckerPrager")
+        {
+            FatalIOErrorInFunction(d)
+                << "yieldShearJump no needs type mohrCoulomb or druckerPrager"
+                << exit(FatalIOError);
+        }
+        if (capSinPhi_ == 0)
+        {
+            capSinPhi_ = Foam::sin(degToRad(d.get<scalar>("phi")));
+            capCCos_ =
+                d.getOrDefault<scalar>("c", 0)
+               *Foam::cos(degToRad(d.get<scalar>("phi")));
+        }
+        Info<< "No elastic shear jump beside yielding cells "
+            << "(yieldShearJump no, WP F.8j)" << nl;
     }
     if (spreadLayers_)
     {

@@ -2018,6 +2018,62 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
         teta.ref().correctBoundaryConditions();
         tsinMob.ref().correctBoundaryConditions();
     }
+
+    // WP F.8j (decision 0134): yielding cells (1) with yieldShearJump no:
+    // stress within flowBand (in sin phi) of the static Mohr-Coulomb surface,
+    // partly filled cells too; with neighbour values on coupled patches
+    tmp<volScalarField> tyield;
+    const bool noYieldJump = !yieldShearJump_ && solveMomentum_;
+    if (noYieldJump)
+    {
+        tyield = workField<scalar>(mesh, "yielding", dimless);
+        scalarField& y = tyield.ref().primitiveFieldRef();
+        const scalar cCot = capSinPhi_ > 0 ? capCCos_/capSinPhi_ : 0;
+        forAll(y, celli)
+        {
+            y[celli] = 0;
+            if (fs && alpha_[celli] <= alphaEmpty)
+            {
+                continue;
+            }
+            const symmTensor sEff
+            (
+                supportP_
+              ? sref[celli]
+              + (1 - frictionScale_[celli])
+               *max(-tr(sref[celli])/3, scalar(0))*symmTensor::I
+              : sref[celli]
+            );
+            const vector ev(principal(sEff));
+            const scalar s1 = cmptMax(ev);
+            const scalar s3 = cmptMin(ev);
+            const scalar pm = cCot - 0.5*(s1 + s3);
+            if (pm <= 0 || 0.5*(s1 - s3) >= capSinPhi_*(1 - flowBand)*pm)
+            {
+                y[celli] = 1;
+            }
+        }
+        tyield.ref().correctBoundaryConditions();
+    }
+    // Shear jump coefficient of a face with a yielding side: the yielding
+    // side gives min(zs, 2 eta/delta) with a mu(I) viscosity, else 0; the
+    // other side zs; in series. -1 (elastic jump) when neither side yields
+    auto yieldJump =
+        [&]
+        (
+            const scalar zsL, const bool yL, const scalar etaL,
+            const scalar zsR, const bool yR, const scalar etaR,
+            const scalar delta
+        )
+    {
+        if (!yL && !yR)
+        {
+            return scalar(-1);
+        }
+        const scalar kL = yL ? (etaL > 0 ? min(zsL, 2*etaL/delta) : 0) : zsL;
+        const scalar kR = yR ? (etaR > 0 ? min(zsR, 2*etaR/delta) : 0) : zsR;
+        return (kL > 0 && kR > 0) ? kL*kR/(kL + kR) : scalar(0);
+    };
     const surfaceScalarField& deltaCoeffs = mesh.deltaCoeffs();
     const volScalarField* smoothPtr = fs ? &tsmooth() : nullptr;
     const volScalarField* eFacPtr = fs ? &teFac() : nullptr;
@@ -2291,7 +2347,11 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
             }
             const symmTensor D(symm(gradU[celli])/VoP[celli]);
             symmTensor Dd(dev(D));
-            if (fi && teta()[celli] > 0)
+            if
+            (
+                (fi && teta()[celli] > 0)
+             || (noYieldJump && tyield()[celli] > 0.5)    // WP F.8j
+            )
             {
                 // Flowing cell: no elastic stress rate along the plastic
                 // flow direction m = (e1 e1 - e3 e3)/sqrt(2) while loading
@@ -2449,6 +2509,17 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                 if (eN > 0) capSin = max(capSin, tsinMob()[N]);
             }
         }
+        if (noYieldJump)
+        {
+            const bool yP = tyield()[P] > 0.5, yN = tyield()[N] > 0.5;
+            kj = yieldJump
+            (
+                zs[P], yP, fi ? teta()[P] : 0,
+                zs[N], yN, fi ? teta()[N] : 0,
+                1/deltaCoeffs[facei]
+            );
+            bothFlow = bothFlow || (yP && yN);
+        }
         if (fs)
         {
             const scalar aP = alpha_[P], aN = alpha_[N];
@@ -2558,11 +2629,15 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
             {
                 srn = sref.boundaryField()[patchi].patchNeighbourField();
             }
-            scalarField etan, smn;
+            scalarField etan, smn, yn;
             if (fi)
             {
                 etan = teta().boundaryField()[patchi].patchNeighbourField();
                 smn = tsinMob().boundaryField()[patchi].patchNeighbourField();
+            }
+            if (noYieldJump)
+            {
+                yn = tyield().boundaryField()[patchi].patchNeighbourField();
             }
             forAll(fc, i)
             {
@@ -2586,6 +2661,17 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                         if (eP > 0) capSin = max(capSin, tsinMob()[fc[i]]);
                         if (eN > 0) capSin = max(capSin, smn[i]);
                     }
+                }
+                if (noYieldJump)
+                {
+                    const bool yP = tyield()[fc[i]] > 0.5, yN = yn[i] > 0.5;
+                    kj = yieldJump
+                    (
+                        zs[fc[i]], yP, fi ? teta()[fc[i]] : 0,
+                        zsn[i], yN, fi ? etan[i] : 0,
+                        1/deltaCoeffs.boundaryField()[patchi][i]
+                    );
+                    bothFlow = bothFlow || (yP && yN);
                 }
                 if (fs)
                 {
