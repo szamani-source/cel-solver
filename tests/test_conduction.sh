@@ -1,5 +1,5 @@
 #!/bin/bash
-# WP T.1: conduction in the grains of a fixed bed (decision 0135).
+# WP T.1: conduction in the grains of a fixed bed (decision 0136).
 # tests/thermal/conduction_checks.py: erfc and constant-flux faces against
 # tools/thermal_reference.py (1 %), a linear temperature steady on cells leaning
 # 27 deg (1e-10), energy conserved to 1e-12 with adiabatic walls, 2 and 4

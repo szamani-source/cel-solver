@@ -1,4 +1,4 @@
-"""WP T.2 done-when: temperature moves with the material (decision 0135).
+"""WP T.2 done-when: temperature moves with the material (decision 0136).
 
 Cases (celFoam, freeSurface yes, thermalProperties model equilibrium):
 A  Translating block. A 1D channel 2 m long, 200 cells of 10 mm, no gravity,

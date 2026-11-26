@@ -4,7 +4,7 @@ Sources opened 2026-11-26 unless marked "not read". Values in the generated bloc
 from `tools/thermal_reference.py`; `tests/test_thermal_reference.sh` checks that this
 page matches the script and that every closed form passes its check against an
 independent finite-difference solution or a published tabulated value. Plan:
-decision 0135.
+decision 0136.
 
 ## Equations
 

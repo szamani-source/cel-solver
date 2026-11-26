@@ -1,4 +1,4 @@
-"""WP T.6 done-when: a moving bed past heated walls (decision 0135).
+"""WP T.6 done-when: a moving bed past heated walls (decision 0136).
 
 The case of Adapa et al. (2024, arXiv 2403.19892): ceramic particles (CARBO
 HSP 40/70, d 404 microns) flow in plug flow down a 5 mm gap between plates

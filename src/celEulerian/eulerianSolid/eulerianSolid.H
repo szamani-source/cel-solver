@@ -653,7 +653,7 @@ public:
         void storeRemapMass();
 
         //- Carry a mass-weighted scalar per cell through every remap
-        //  (WP T.2, decision 0135): m q is conserved, emptied cells get 0,
+        //  (WP T.2, decision 0136): m q is conserved, emptied cells get 0,
         //  open inlets bring the field's patch value; limiter as in
         //  remapLimiters (MC, superbee, ...)
         void addPassenger(volScalarField& f, const word& limiter);

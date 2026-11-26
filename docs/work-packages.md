@@ -317,6 +317,7 @@ each. Briefs: `docs/wp/WP-F.x.md`. References: `docs/spec/gas-references.md`.
 | F.7 | Gas through and around grains; more drag laws (`ergun`, `wenYu`, `diFelice`, `syamlalOBrien`, `beetstra`) | Each law matches its closed form to 1e-10; with `ergunWenYu`, U_mf against Wen-Yu within 10 % and settling against Richardson-Zaki within 10 %; Stage A within 1 % | 6 h |
 | F.8 | Collapse in gas (end of Stage B) | Fluidised dam break against Roche et al. (2010) within 20 % (fall-back Rondon et al. 2011); mesh shown to Sia first | 2 h + 2 h runs |
 | F.9a | Parallel runs with gas: why they part from serial (Sia, 2026-11-26; split from F.9) | Processor-boundary values of every gas and solid field consistent to 1e-12 (`parallelCheck`); serial and parallel before lift within 1e-10 (p); the parting after lift explained; `tests/test_gas_parallel.sh`; decision 0134 | 3 h |
+| F.9b | Range of validity of the gas coupling (Sia, 2026-11-26) | Lift check warns on the onset bed within 0.9-1.1 U_mf and not on the fine hopper; range table in the manual; `tests/test_gas_validity.sh`; decision 0135 | 2 h |
 | F.9 | Restart, MPI, tutorial, manual, v2.0.0 | Restart and 2/4 processors match serial to 1e-12 on F.5 and F.8; scaling: gas costs at most 1.5x per step, 4 processors at least 2.5x serial; `tutorials/gasHopper`; manual chapter; release | 4 h |
 
 Validation pack (Sia, 2026-11-24: "Include all four in validation pack"). Each runs on 1,
@@ -330,7 +331,7 @@ in one script and writes `docs/results/gas-validation.md`.
 | 3 | Pore-pressure decay in a suddenly loaded fine-powder column | Exact diffusion (Terzaghi) solution | F.3 | minutes |
 | 4 | Fine-powder hopper discharge, gas on and off | Crewdson et al. (1977) | F.5 | hours (coarse mesh) |
 
-## Temperature (T series, decision 0135)
+## Temperature (T series, decision 0136)
 
 Sia, 2026-11-26: temperature before the manual rebuild and the version 2 release; plan
 approved ("Go: T.0 to T.8 as planned"). Every test from T.1 on also runs on 2 and 4
@@ -339,7 +340,7 @@ processors against serial (1e-10). Brief: `docs/wp/WP-T.md`. References:
 
 | WP | Title | Done when | ETA |
 | --- | --- | --- | --- |
-| T.0 | References, decision, `tools/thermal_reference.py` | `tests/test_thermal_reference.sh` passes; decision 0135 | 2 h |
+| T.0 | References, decision, `tools/thermal_reference.py` | `tests/test_thermal_reference.sh` passes; decision 0136 | 2 h |
 | T.1 | Grain conduction in a fixed bed: `celThermal`, field T, fixed, adiabatic and flux walls | Suddenly heated face against erfc within 1 %; linear steady profile on a 27 deg non-orthogonal mesh to 1e-10; energy to 1e-12 with adiabatic walls; `model none` bit for bit; 2/4 processors 1e-10 | 3 h |
 | T.2 | Temperature moves with the material: remap, free surface, outlet, inlet | Translating hot block keeps its energy to 1e-12, edges 2 cells or fewer; discharge energy balance (inside + out = start) 1e-12; uniform tank stays uniform exactly | 3 h |
 | T.2b | Temperature with immersed STL walls and bodies (split from T.2) | The small-cell mixing and covered-cell fill carry T; energy to 1e-12 in an STL hopper with an outlet | 2 h |

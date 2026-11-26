@@ -1,5 +1,5 @@
 /*---------------------------------------------------------------------------*\
-    Temperature in the granular material (WP T.1, decision 0135).
+    Temperature in the granular material (WP T.1, decision 0136).
     See heatTransfer.H.
 \*---------------------------------------------------------------------------*/
 

@@ -1,5 +1,5 @@
 #!/bin/bash
-# WP T.2: temperature moves with the material (decision 0135).
+# WP T.2: temperature moves with the material (decision 0136).
 # tests/thermal/carried_checks.py: a hot-cold block carried 50 cells through
 # void (energy 1e-12, front sharp and in place), a box fed through an inlet and
 # emptied through an outlet (energy balance 1e-12, fed material at the inlet

@@ -1,4 +1,4 @@
-"""Plots for the hotSiloDischarge tutorial (WP T.8, decision 0135).
+"""Plots for the hotSiloDischarge tutorial (WP T.8, decision 0136).
 
 Run after ./Allrun (needs numpy and matplotlib; OpenFOAM sourced for the
 cell centres):

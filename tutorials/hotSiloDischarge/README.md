@@ -1,7 +1,7 @@
 # hotSiloDischarge: hot sand under cold sand, discharging
 
 Sia's target tank (T0, as `siloDischarge`) with **temperature** (version 2, WP T.8,
-decision 0135). The lower half of the fill is hot sand at 150 C, the upper half cold
+decision 0136). The lower half of the fill is hot sand at 150 C, the upper half cold
 sand at 20 C. The material settles for 0.3 s with the outlet closed, then the outlet
 opens. The temperature moves with the sand, so it shows which material leaves first:
 in this flat-bottomed tank the flow is a funnel above the outlet, which draws the cold
@@ -73,4 +73,4 @@ side walls lose little in 2 s (conduction moves heat less than 1 mm in that time
 heat left in the tank falls only because hot sand leaves.
 
 Temperature does not act back on the flow (no thermal stress, no temperature-dependent
-friction; decision 0135). The gas properties stay at the case temperature until WP T.7.
+friction; decision 0136). The gas properties stay at the case temperature until WP T.7.

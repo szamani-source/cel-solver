@@ -8,7 +8,7 @@ FoamFile
     class       dictionary;
     object      thermalProperties;
 }
-// Temperature of the grains (decision 0135). Dry quartz sand: specific heat
+// Temperature of the grains (decision 0136). Dry quartz sand: specific heat
 // 800 J/(kg K) (Incropera et al., Fundamentals of Heat and Mass Transfer,
 // Table A.3, sand); quartz grains 3 W/(m K) in air, so the bed conducts
 // about 0.25 W/(m K) (Zehner-Schluender, tools/thermal_reference.py).

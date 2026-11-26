@@ -1,4 +1,4 @@
-"""WP T.5 done-when: gas heat in the void (decision 0135).
+"""WP T.5 done-when: gas heat in the void (decision 0136).
 
 A plane channel of void (gasProperties model gasFlow, no material), height
 H 2 mm, length 60 mm, 200 x 16 cells, air at a mean speed of 0.53 m/s

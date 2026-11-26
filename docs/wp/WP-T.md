@@ -7,11 +7,11 @@ Branch: `claude/project-thread-8aqh4z` (thread "Add temperature to the solver")
 
 An energy equation for the grains and the gas: conduction, heat carried by the
 moving solid and the gas, grain-gas exchange (Gunn), wall heating and cooling,
-restart and MPI. Plan approved by Sia 2026-11-26 (decision 0135).
+restart and MPI. Plan approved by Sia 2026-11-26 (decision 0136).
 
 ## Read first
 
-- `docs/decisions/0135-temperature-plan.md`, `docs/spec/thermal-references.md`
+- `docs/decisions/0136-temperature-plan.md`, `docs/spec/thermal-references.md`
 - Gas side: decisions 0126 (fractions), 0127 (pore pressure), 0129 (void, outlets),
   0131 (void gas flow); `src/celFluid/poreGas/poreGas.H`
 - Remap of a mass-weighted history field: the cap's p_c (decision 0113) in
@@ -30,7 +30,7 @@ restart and MPI. Plan approved by Sia 2026-11-26 (decision 0135).
 ## Out of scope
 
 - Thermal stress, temperature-dependent friction, radiation beyond Zehner-Schluender,
-  drying and phase change, reactions (decision 0135).
+  drying and phase change, reactions (decision 0136).
 
 ## Log
 
@@ -87,7 +87,7 @@ restart and MPI. Plan approved by Sia 2026-11-26 (decision 0135).
   `tests/test_conduction.sh` (about 15 s): erfc 0.012 % (limit 1 %), heat in -0.024 %,
   constant flux 0.006 %, linear temperature on 27 deg cells exactly steady, energy
   7e-15 adiabatic and 3e-15 with a heated face, 2/4 processors 6e-15, off = byte for
-  byte. Lessons in decision 0135 (processor patch values, patch delta). Manual: new
+  byte. Lessons in decision 0136 (processor patch values, patch delta). Manual: new
   thermalProperties section in case-setup.html. Next: T.2 (temperature carried by
   the remap).
 - 2026-11-26: T.0 done. `tools/thermal_reference.py` (pure Python) and

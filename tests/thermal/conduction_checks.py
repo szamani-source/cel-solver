@@ -1,4 +1,4 @@
-"""WP T.1 done-when: conduction in the grains of a fixed bed (decision 0135).
+"""WP T.1 done-when: conduction in the grains of a fixed bed (decision 0136).
 
 The solid is an elastic bed at rest (no gravity, E 0.1 MPa so the solid step is
 long), rho 1500 kg/m^3, with thermalProperties model equilibrium, c 1000

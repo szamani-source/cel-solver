@@ -4,7 +4,7 @@ Class
 
 Description
     Temperature in the granular material (version 2 temperature work, T
-    series, decision 0135). Library celThermal, called by the celFoam
+    series, decision 0136). Library celThermal, called by the celFoam
     driver after the gas solve.
 
     WP T.1: conduction in the grains of a bed that may move but is not yet

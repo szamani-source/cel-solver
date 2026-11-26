@@ -1,4 +1,4 @@
-"""WP T.2b done-when: temperature with immersed STL walls (decision 0135).
+"""WP T.2b done-when: temperature with immersed STL walls (decision 0136).
 
 tutorials/stlHopper (the T0 tank with two STL hopper walls at 60 deg down to
 the 0.06 m outlet; E 0.1 MPa) with thermalProperties model equilibrium,

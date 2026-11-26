@@ -1,6 +1,6 @@
 # Thermal validation pack
 
-Written by `thermal_pack.py` (decision 0135).
+Written by `thermal_pack.py` (decision 0136).
 
 | case | processors | wall [s] | result | error | limit | vs serial |
 | --- | --- | --- | --- | --- | --- | --- |

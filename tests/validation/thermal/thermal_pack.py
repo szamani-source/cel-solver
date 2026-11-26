@@ -1,4 +1,4 @@
-"""Thermal validation pack (WP T.8, decision 0135).
+"""Thermal validation pack (WP T.8, decision 0136).
 
 Three cases from the done-when tests, each run on 1, 2 and 4 processors:
 
@@ -88,7 +88,7 @@ def main():
         for r in rows:
             f.write(f"{r[0]},{r[1]},{r[2]:.1f},{r[3]:.4e},{r[4]:g},{r[5]:.1e},{r[7]}\n")
     with open(os.path.join(HERE, "results.md"), "w") as f:
-        f.write("# Thermal validation pack\n\nWritten by `thermal_pack.py` (decision 0135).\n\n"
+        f.write("# Thermal validation pack\n\nWritten by `thermal_pack.py` (decision 0136).\n\n"
                 "| case | processors | wall [s] | result | error | limit | vs serial |\n"
                 "| --- | --- | --- | --- | --- | --- | --- |\n")
         for r in rows:

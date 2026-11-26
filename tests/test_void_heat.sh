@@ -1,5 +1,5 @@
 #!/bin/bash
-# WP T.5: gas heat in the void (decision 0135). tests/thermal/void_heat_checks.py:
+# WP T.5: gas heat in the void (decision 0136). tests/thermal/void_heat_checks.py:
 # laminar air between plates at a fixed wall temperature (model gasFlow,
 # twoTemperature) against the developed Nu 7.5407 (3 %), steady profile,
 # energy balance 1e-10. About 2 minutes.

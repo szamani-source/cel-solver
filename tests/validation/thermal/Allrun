@@ -1,5 +1,5 @@
 #!/bin/bash
-# Thermal validation pack (WP T.8, decision 0135): Schumann column (T.4),
+# Thermal validation pack (WP T.8, decision 0136): Schumann column (T.4),
 # laminar air between hot plates (T.5), moving bed past a heated wall
 # (Adapa et al. 2024, T.6), each on 1, 2 and 4 processors. Writes
 # results.md and times.csv. About 8 minutes.

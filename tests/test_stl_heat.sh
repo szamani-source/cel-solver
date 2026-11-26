@@ -1,5 +1,5 @@
 #!/bin/bash
-# WP T.2b: temperature with immersed STL walls (decision 0135).
+# WP T.2b: temperature with immersed STL walls (decision 0136).
 # tests/thermal/stl_heat_checks.py: tutorials/stlHopper with a hot lower
 # layer: energy balance 1e-12 with STL walls and an outlet, material within
 # the start's range, uniform temperature kept to 1e-12, heat carried out

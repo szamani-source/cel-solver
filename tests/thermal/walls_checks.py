@@ -1,5 +1,5 @@
 """WP T.3 done-when: convective and heat-flux walls, Zehner-Schluender bed
-conductivity (decision 0135).
+conductivity (decision 0136).
 
 Cases (celFoam, an elastic bed at rest without gravity, rho 1500, c 1000):
 A  Slab 2L = 0.1 m (50 cells of 2 mm), k 1500 W/(m K) (a = 1e-3 m^2/s),

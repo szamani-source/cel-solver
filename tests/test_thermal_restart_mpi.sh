@@ -1,5 +1,5 @@
 #!/bin/bash
-# WP T.8: temperature restarts and runs in parallel (decision 0135).
+# WP T.8: temperature restarts and runs in parallel (decision 0136).
 # tests/thermal/thermal_restart_mpi_checks.py: the T.4 Schumann column and
 # the T.6 moving bed restarted and on 2 and 4 processors match serial to
 # 1e-10; temperature costs at most 1.2 times a gas-on step. About 3 minutes.

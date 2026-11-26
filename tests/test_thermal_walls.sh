@@ -1,6 +1,6 @@
 #!/bin/bash
 # WP T.3: convective and heat-flux walls, Zehner-Schluender bed conductivity
-# (decision 0135). tests/thermal/walls_checks.py: slab cooled at Bi 1 and 10
+# (decision 0136). tests/thermal/walls_checks.py: slab cooled at Bi 1 and 10
 # against the Carslaw-Jaeger series (1 %), energy balance 1e-12, 2 processors
 # 1e-10, heat flux q A t exact, kBed against tools/thermal_reference.py 1e-12.
 # About 1 minute.

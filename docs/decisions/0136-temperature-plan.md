@@ -1,4 +1,4 @@
-# 0135 Temperature: an energy equation for grains and gas (plan, T series)
+# 0136 Temperature: an energy equation for grains and gas (plan, T series)
 
 Date: 2026-11-26. Status: accepted (Sia chose "Go: T.0 to T.8 as planned",
 2026-11-26 20:31 UTC). Plan doc: https://claude.ai/artifact/4BPFHQjq6ijFqRRpQ4sfj7.

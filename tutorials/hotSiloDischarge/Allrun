@@ -1,5 +1,5 @@
 #!/bin/sh
-# Hot sand discharging from Sia's T0 tank (WP T.8, decision 0135): a 150 C
+# Hot sand discharging from Sia's T0 tank (WP T.8, decision 0136): a 150 C
 # layer under a 20 C layer, cooled side walls, then the outlet opens.
 #   ./Allrun            # E = 10 MPa (T0), 10 mm cells, about 10 minutes
 #   ./Allrun 0.1        # E in MPa (0.1 runs in about a minute)
