@@ -175,6 +175,7 @@ along the surface. Needs <code>freeSurface yes</code>.</td></tr>
 <tr><td><code>flowImpedance</code></td><td>no</td><td>Between flowing cells the face uses the viscosity of the \(\mu(I)\) law instead of the
 elastic shear impedance, so the flow resistance no longer depends on \(E\). Needs <code>mohrCoulomb</code> or
 <code>druckerPrager</code> with <code>mu2</code>.</td></tr>
+<tr><td><code>yieldShearJump</code></td><td>yes</td><td>Mohr-Coulomb or Drucker-Prager (WP F.8j, decision 0134, under test): <code>no</code> drops the elastic shear damping of the face solver beside yielding cells (only the mu(I) viscosity remains with <code>flowImpedance</code>) and the elastic stress predictor along the plastic flow direction in yielding cells</td></tr>
 <tr><td><code>fullBlend</code></td><td>no</td><td>Cells that are nearly full blend smoothly between the full-cell and the partly
 filled rules instead of switching. Removes speed spikes in partly filled cells; recommended for silo and
 hopper discharge and with <code>capLambda</code>.</td></tr>
@@ -252,10 +253,12 @@ on. Needs <code>freeSurface yes</code>; the patch must be a plain patch, not als
 <h3 id="loads">Surface loads: <code>loads</code></h3>
 <pre><code>loads
 {
-    top { pressure 2000; startTime 0; }   // Pa on the patch from startTime (s, default 0)
+    top { pressure 2000; startTime 0; }
 }</code></pre>
-<p>A uniform pressure on a plain patch from <code>startTime</code> on (version 2, decision 0128), for
-example the load of a consolidation test.</p>
+<p>Puts a uniform normal pressure <code>pressure</code> (Pa, compression) on a traction patch from
+<code>startTime</code> (s, default 0) on; the patch moves with the material under it, as a free surface
+does. The patch must be a plain patch, not a wall, outlet or inlet, and without a fixed velocity.
+With pore gas the load acts on the effective stress where the gas is drained (version 2, decision 0128).</p>
 
 <h3 id="other-patches">Other boundaries</h3>
 <p>Patches not listed in <code>walls</code>, <code>outlets</code> or <code>inlets</code> behave according to their mesh type and
@@ -272,45 +275,57 @@ the velocity boundary condition:</p>
 </tbody>
 </table>
 
-<h2 id="gas">constant/gasProperties (version 2, in development)</h2>
-<p>Optional. Without this file, or with <code>model none</code>, the solver behaves as version 1. With it,
-air in the pores and the void is solved together with the grains (decisions 0125 to 0132). All
-tests use the <code>ergunWenYu</code> drag law.</p>
-<pre><code>model       poreGas;    // none | poreGas | gasFlow (gas velocity in the void, needs freeSurface)
-rhoP        2650;       // grain (particle) density, kg/m^3
-d           0.0001;     // grain diameter, m
-T           293.15;     // gas temperature, K (default)
-p0          101325;     // ambient pressure, Pa (default)
-drag        ergunWenYu; // ergunWenYu (default) | ergun | wenYu | diFelice | syamlalOBrien | beetstra
-coupled     yes;        // gas pressure acts on the grains, grains carry the gas (default)
-alphaVoid   1e-4;       // cells below this alpha are void for the gas (default)
-inflow      { bottom 0.05; }   // fixedGradient patches of 0/p blowing gas in, m/s at p0;
-                               // a Function1 of time, e.g. bottom table ((0 0) (0.3 0.05));
-nOuter      50;         // Newton iterations per step, at most (default)
-nAnderson   5;          // Anderson acceleration depth (default)
-pTolerance  1e-9;       // Pa, converged when the correction is below this (default 1e-14 p0)
-laplacian   "Gauss linear corrected";
-solver      { solver PCG; preconditioner DIC; relTol 1e-3; }   // pressure corrections
-nCorr       1;          // gasFlow: pressure corrections per step (default)
-divUg       "Gauss upwind";   // gasFlow: convection of the gas velocity (default)
-USolver     { solver PBiCGStab; preconditioner DILU; relTol 1e-10; }   // gasFlow momentum
-poreInertia yes;        // gasFlow: gas momentum in the pores as well as the void (default)
-inertiaForce no;        // gasFlow: pore gas inertia's reaction on the grains (default off, decision 0132)
-surfaceCarry no;        // free surface: yes lets the moving surface carry gas to and from the void
-                        // (the vacated part of a cell fills from the void, not through the grains; decision 0133)
-eMin        0.2;        // smallest gas fraction of the filled part of a cell (remap overfill; decision 0133)
-diffusivity 0;          // poreGas only, m2/s: &gt; 0 replaces gas compressibility by a pore pressure that is
-                        // carried with the grains and diffuses with this coefficient (Gueugneau 2017,
-                        // Aravena 2021); fitted, e.g. 0.015 for the Roche dam break (default 0 = off)
-frictionOnly no;        // with diffusivity: yes = the pore pressure only lowers the grains' friction
-                        // (internal and wall) as in Gueugneau 2017 and Aravena 2021: sigma stays the
-                        // total stress and the constitutive update sees sigma + min(p, P) I; no gas
-                        // force acts. Start sigma as the total stress (decision 0133, WP F.8g)</code></pre>
-<p>The gauge gas pressure is the field <code>0/p</code> (optional): <code>fixedValue</code> patches are open at that
-pressure, <code>zeroGradient</code> patches are sealed. Outlets must be <code>fixedValue</code>. With
-<code>model gasFlow</code> the field <code>0/Ug</code> (optional) is the gas velocity; without it walls are no-slip
-and open patches zeroGradient. Written: <code>p</code>, <code>phiS</code>, <code>phiG</code>, <code>k</code>, <code>qGas</code> and, with gasFlow,
-<code>Ug</code>.</p>
+<h2 id="gas">Gas in the pores (version 2, in progress): constant/gasProperties</h2>
+<p>Version 2 adds air in the pores of the granular material (decisions 0125 to 0132): the gas
+fractions, the pore pressure and, with <code>coupled yes</code>, its effect on the solid. Without this
+file, or with <code>model none</code>, celFoam runs exactly as version 1.</p>
+<pre><code>model   poreGas;        // none | poreGas | gasFlow
+rhoP    2650;           // density of the grains, kg/m^3
+d       0.001;          // grain diameter, m
+T       293.15;         // gas temperature, K
+p0      101325;         // ambient pressure, Pa
+drag    ergunWenYu;     // drag law
+coupled yes;            // gas pressure acts on the solid</code></pre>
+<table>
+<thead><tr><th>Keyword</th><th>Default</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>model</code></td><td><code>poreGas</code></td><td><code>none</code> switches the gas off; <code>gasFlow</code> (WP F.6, decision 0131, needs <code>freeSurface yes</code>) also gives the gas in the void its own velocity <code>Ug</code> and pressure, solved implicitly at the solid's time step, with open (<code>fixedValue</code>) patches of <code>0/p</code> as the atmosphere</td></tr>
+<tr><td><code>rhoP</code></td><td>required</td><td>Density of the grains (particles), kg/m&sup3;</td></tr>
+<tr><td><code>d</code></td><td>required</td><td>Grain diameter, m</td></tr>
+<tr><td><code>T</code></td><td>293.15</td><td>Gas temperature, K (air is an ideal gas with Sutherland viscosity)</td></tr>
+<tr><td><code>p0</code></td><td>101325</td><td>Ambient pressure, Pa</td></tr>
+<tr><td><code>drag</code></td><td><code>ergunWenYu</code></td><td>Gas-grain drag law (decision 0132): <code>ergunWenYu</code> is Ergun below gas fraction 0.8, Wen and Yu above (Gidaspow), and all tests use it; also <code>ergun</code>, <code>wenYu</code>, <code>diFelice</code>, <code>syamlalOBrien</code> and <code>beetstra</code></td></tr>
+<tr><td><code>coupled</code></td><td><code>yes</code></td><td>Two-way coupling (WP F.3, decision 0128): <code>sigma</code> is the effective stress, the gas pressure pushes on the material and the grains carry and squeeze the gas. <code>no</code>: the gas sees a frozen solid and the solid is as without gas.</td></tr>
+<tr><td><code>alphaVoid</code></td><td>1e-4</td><td>With <code>freeSurface yes</code> (WP F.4, decision 0129): cells with less material than this are void and hold <code>p0</code>; the gas vents through the free surface, walls carry no gas, and outlets must be <code>fixedValue</code> in <code>0/p</code> (without <code>0/p</code> they are <code>fixedValue 0</code>), sealed for the gas until they open</td></tr>
+<tr><td><code>inflow</code></td><td>none</td><td>Sub-dictionary <code>patch speed;</code>: air blown in through that patch at a superficial speed in m/s (at <code>p0</code>, <code>T</code>); the patch must be <code>fixedGradient</code> in <code>0/p</code>. The speed is a Function1 of time, so it can ramp: <code>bottom table ((0 0) (0.3 0.05));</code></td></tr>
+<tr><td><code>nOuter</code></td><td>50</td><td>Most Newton iterations of the gas pressure per step</td></tr>
+<tr><td><code>nAnderson</code></td><td>5</td><td>Depth of the Anderson acceleration of those iterations (0 off)</td></tr>
+<tr><td><code>pTolerance</code></td><td>1e-14 <code>p0</code></td><td>Converged when the error left (the last correction, or the next one estimated from the last two) is below this, Pa</td></tr>
+<tr><td><code>laplacian</code></td><td><code>"Gauss linear corrected"</code></td><td>Discretisation of the gas flux (corrected for non-orthogonal cells)</td></tr>
+<tr><td><code>solver</code></td><td>PCG, DIC, <code>relTol 1e-3</code></td><td>Sub-dictionary for the linear solver of each correction, as in <code>fvSolution</code></td></tr>
+<tr><td><code>nCorr</code></td><td>1</td><td><code>gasFlow</code>: pressure corrections per step (PISO)</td></tr>
+<tr><td><code>divUg</code></td><td><code>"Gauss upwind"</code></td><td><code>gasFlow</code>: convection scheme of the gas velocity</td></tr>
+<tr><td><code>USolver</code></td><td>PBiCGStab, DILU, <code>relTol 1e-10</code></td><td><code>gasFlow</code>: sub-dictionary for the linear solver of the gas momentum</td></tr>
+<tr><td><code>poreInertia</code></td><td><code>yes</code></td><td><code>gasFlow</code> (WP F.7, decision 0132): the gas in the pores has momentum too, e&rho;<sub>g</sub> Dw/Dt = &minus;e&nabla;p &minus; K w with the drag implicit; <code>no</code> keeps the pore-pressure law inside the material</td></tr>
+<tr><td><code>inertiaForce</code></td><td><code>no</code></td><td><code>gasFlow</code>: apply the reaction of the pore gas inertia to the grains (about 0.1 % of the force; explicit, it destabilised a lifting bed, so it is off)</td></tr>
+<tr><td><code>surfaceCarry</code></td><td><code>no</code></td><td>Free surface (WP F.8, decision 0133): <code>yes</code> lets the moving surface carry gas to and from the void (the vacated part of a cell fills from the void, not through the grains)</td></tr>
+<tr><td><code>eMin</code></td><td>0.2</td><td>Smallest gas fraction of the filled part of a cell (remap overfill; decision 0133)</td></tr>
+<tr><td><code>diffusivity</code></td><td>0</td><td><code>poreGas</code> only, m&sup2;/s (WP F.8e, decision 0133): &gt; 0 replaces gas compressibility by a pore pressure that is carried with the grains and diffuses with this coefficient (Gueugneau 2017, Aravena 2021)</td></tr>
+<tr><td><code>frictionOnly</code></td><td><code>no</code></td><td>With <code>diffusivity</code> (WP F.8g-F.8i, decision 0133): <code>yes</code> = the pore pressure only lowers the grains' friction (internal and wall); <code>sigma</code> stays the total stress, the grains carry the support ratio p/P, and the gas drains at the material's own surface. Start <code>sigma</code> as the total stress</td></tr>
+</tbody>
+</table>
+<p>celFoam writes three more fields: <code>phiS</code>, the solids volume fraction
+\(\phi_s = \alpha\rho_m/\rho_p\) (cell density over grain density), <code>phiG</code> \(= 1 - \phi_s\), and
+<code>k</code>, the permeability of the filled part of each cell in m&sup2; (0 in empty cells).</p>
+<p>Gas pressure (WP F.2, decision 0127): celFoam solves the pore
+pressure <code>p</code> each step and writes it with <code>qGas</code>, the gas flux through the grains
+in m/s. <code>p</code> is the gauge pressure (absolute minus <code>p0</code>). Its boundaries come from
+<code>0/p</code>: <code>fixedValue</code> holds a pressure, <code>zeroGradient</code> is sealed, and a
+<code>fixedGradient</code> patch named in <code>inflow</code> blows air in. Without <code>0/p</code>,
+<code>p</code> starts at 0 and every patch is sealed.</p>
+<p>Gas velocity (WP F.6, <code>model gasFlow</code>): <code>0/Ug</code> is optional; without it walls are no-slip
+and open patches zeroGradient. celFoam writes <code>Ug</code>; inside the material the gas follows the
+pore-pressure law, with its momentum when <code>poreInertia yes</code> (WP F.7).</p>
 
 <h2 id="fields">Initial fields</h2>
 <p>celFoam reads these fields from the start time folder if they are there, and otherwise
@@ -457,7 +472,7 @@ yet.</p>
 <table>
 <thead><tr><th>Output</th><th>Where</th></tr></thead>
 <tbody>
-<tr><td>Fields <code>alpha</code>, <code>rho</code>, <code>U</code>, <code>sigma</code>, <code>epsP</code>, <code>epsPEq</code> (and <code>g</code>, <code>pc</code>, <code>alphaBody</code>, and <code>phiS</code>, <code>phiG</code>, <code>k</code> with gas, when used)</td><td>time folders</td></tr>
+<tr><td>Fields <code>alpha</code>, <code>rho</code>, <code>U</code>, <code>sigma</code>, <code>epsP</code>, <code>epsPEq</code> (and <code>g</code>, <code>pc</code>, <code>alphaBody</code>, and <code>phiS</code>, <code>phiG</code>, <code>k</code>, <code>p</code>, <code>qGas</code> with gas, when used)</td><td>time folders</td></tr>
 <tr><td>Total mass, momentum, discharged and fed mass</td><td><code>log.celFoam</code> at each write time</td></tr>
 <tr><td>Force of the material on each body, every step</td><td><code>postProcessing/bodyForces.dat</code></td></tr>
 <tr><td>Position and velocity of each body</td><td><code>postProcessing/rigidBodies/&lt;body&gt;.dat</code></td></tr>
