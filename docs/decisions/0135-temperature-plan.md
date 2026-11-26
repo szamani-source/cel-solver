@@ -105,3 +105,10 @@ fluxes; the gas is isothermal at the case temperature.
   practice). Gas conduction uses the gas part of Zehner-Schluender,
   (1 - sqrt(phi_s)) kGas. The Schumann test was planned at 3 % but 20 % in h moves
   theta by only 3 %, so the test asks 1 % (got 0.38 %).
+- T.5 (2026-11-26): no new code. In the void of a `gasFlow` case the gas cells
+  have no grains (C_s 0, no exchange), the gas conducts with kGas and is carried
+  by the gas solve's mass flux; walls hold Tg through `0/Tg` (fixedValue). Laminar
+  air between plates at a fixed wall temperature gives the developed Nu 7.457
+  against 7.5407 (-1.1 %, from the upwind transport on 0.3 mm cells and the
+  axial conduction at Peclet 50). gasFlow is not stable at a 2e-4 s step on
+  these cells (the solid sets the step, decision 0131); the test uses 4e-5 s.

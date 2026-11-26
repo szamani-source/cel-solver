@@ -34,6 +34,10 @@ restart and MPI. Plan approved by Sia 2026-11-26 (decision 0135).
 
 ## Log
 
+- 2026-11-26: T.5 done, no solver change (the T.4 gas transport covers the void).
+  `tests/test_void_heat.sh` (about 100 s): plates at a fixed wall temperature,
+  Nu 7.457 against 7.5407 (-1.11 %, limit 3 %), steady to 1.6e-6, energy 3e-15.
+  Next: T.6 (show Sia the mesh first).
 - 2026-11-26: T.4 done. `model twoTemperature` (field `Tg`, Gunn exchange) and
   `equilibrium` with the gas; keywords `cGas`, `TgVoid`; poreGas accessors
   `massFlux()`, `qGas()`; celThermal links celFluid. `tests/test_gas_heat.sh`
