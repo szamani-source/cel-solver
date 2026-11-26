@@ -304,7 +304,10 @@ frictionless one by 22 % (now 8.3 %). Dam break, theoretical kappa: 10 mm run-ou
 (was 5.02), front 1.05; 5 mm 6.41 h0 at Roche's stop time (was 6.57), then to the channel end,
 front 1.18. So the surface location was a real error but not the cause of the mesh
 dependence; the remaining split is in the partly supported frictional flow (the fully
-supported fronts agree), i.e. the grain law itself. A dry 5 mm run checks this.
+supported fronts agree), i.e. the grain law itself. Dry check: the calibrated dry column (F.8d, 2.375 h0 on 10 mm)
+runs out 3.625 h0 on 5 mm (+53 %). So the v1 grain law (mu(I) + flowImpedance + fullBlend)
+is itself mesh dependent in this collapse, and every calibration made on one mesh moves on
+another. F.8 cannot pass on more than one mesh until that is addressed; for Sia to decide.
 
 ## Consequences
 
