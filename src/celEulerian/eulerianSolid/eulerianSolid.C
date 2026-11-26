@@ -1252,6 +1252,23 @@ Foam::scalar Foam::eulerianSolid::stableDeltaT() const
 void Foam::eulerianSolid::setPorePressure(const volScalarField& p)
 {
     poreP_ = &p;
+    storeRemapMass();
+}
+
+
+void Foam::eulerianSolid::addPassenger
+(
+    volScalarField& f,
+    const word& limiter
+)
+{
+    passengers_.push_back(&f);
+    passengerLimiters_.push_back(limiter);
+}
+
+
+void Foam::eulerianSolid::storeRemapMass()
+{
     if (!remapMass_)
     {
         remapMass_.reset

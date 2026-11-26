@@ -32,7 +32,7 @@ Foam::IOobject thermalPropertiesIO(const Foam::fvMesh& mesh)
 
 Foam::heatTransfer::heatTransfer
 (
-    const eulerianSolid& solid,
+    eulerianSolid& solid,
     const IOobject& io
 )
 :
@@ -57,8 +57,21 @@ Foam::heatTransfer::heatTransfer
     ),
     heatIn_(0),
     energy0_(0),
+    carriedIn_(0),
+    TOld_(),
+    limiter_(dict_.getOrDefault<word>("limiter", "superbee")),
+    voidT_(dict_.getOrDefault<scalar>("voidT", 293.15)),
     nSub_(1)
 {
+    if (solid_.immersed())
+    {
+        FatalIOErrorInFunction(dict_)
+            << "temperature with immersed (STL) walls or bodies is not yet "
+            << "supported (WP T.2b)" << exit(FatalIOError);
+    }
+    solid_.addPassenger(T_, limiter_);
+    solid_.storeRemapMass();
+
     if (model_ != "equilibrium")
     {
         FatalIOErrorInFunction(dict_)
@@ -92,7 +105,7 @@ Foam::heatTransfer::heatTransfer
 
 Foam::autoPtr<Foam::heatTransfer> Foam::heatTransfer::New
 (
-    const eulerianSolid& solid
+    eulerianSolid& solid
 )
 {
     IOobject io(thermalPropertiesIO(solid.mesh()));
@@ -259,10 +272,14 @@ void Foam::heatTransfer::conduct(const scalar dt)
     vectorField& g = gradT.primitiveFieldRef();
     forAll(nei, facei)
     {
-        const scalar Tf =
-            w[facei]*T[own[facei]] + (1 - w[facei])*T[nei[facei]];
-        g[own[facei]] += Sf[facei]*Tf;
-        g[nei[facei]] -= Sf[facei]*Tf;
+        // a face to an empty cell takes the material side's value
+        const label P = own[facei];
+        const label N = nei[facei];
+        const scalar wf =
+            a[P] > 0 && a[N] > 0 ? w[facei] : (a[P] > 0 ? 1 : 0);
+        const scalar Tf = wf*T[P] + (1 - wf)*T[N];
+        g[P] += Sf[facei]*Tf;
+        g[N] -= Sf[facei]*Tf;
     }
     forAll(mesh_.boundary(), patchi)
     {
@@ -274,10 +291,17 @@ void Foam::heatTransfer::conduct(const scalar dt)
         {
             // a processor patch holds the neighbour cell values
             const scalarField TN(pT.patchNeighbourField());
+            const scalarField aN
+            (
+                aVol.boundaryField()[patchi].patchNeighbourField()
+            );
             const scalarField& pw = p.weights();
             forAll(fc, i)
             {
-                g[fc[i]] += pSf[i]*(pw[i]*T[fc[i]] + (1 - pw[i])*TN[i]);
+                const label P = fc[i];
+                const scalar wf =
+                    a[P] > 0 && aN[i] > 0 ? pw[i] : (a[P] > 0 ? 1 : 0);
+                g[P] += pSf[i]*(wf*T[P] + (1 - wf)*TN[i]);
             }
         }
         else
@@ -397,6 +421,57 @@ void Foam::heatTransfer::conduct(const scalar dt)
 }
 
 
+void Foam::heatTransfer::beforeRemap()
+{
+    TOld_ = T_.primitiveField();
+}
+
+
+void Foam::heatTransfer::afterRemap()
+{
+    const surfaceScalarField& dm = solid_.remapMass();
+    scalar in = 0;
+    forAll(mesh_.boundary(), patchi)
+    {
+        const fvPatch& p = mesh_.boundary()[patchi];
+        if (p.coupled() || isA<emptyFvPatch>(p))
+        {
+            continue;
+        }
+        const labelUList& fc = p.faceCells();
+        const scalarField& pdm = dm.boundaryField()[patchi];
+        const fvPatchScalarField& pT = T_.boundaryField()[patchi];
+        forAll(fc, i)
+        {
+            if (pdm[i] > 0)
+            {
+                in -= c_*pdm[i]*TOld_[fc[i]];       // out with the cell's T
+            }
+            else if (pdm[i] < 0)
+            {
+                in -= c_*pdm[i]*pT[i];              // in at the inlet's T
+            }
+        }
+    }
+    carriedIn_ += returnReduce(in, sumOp<scalar>());
+
+    // Empty cells hold no heat; write voidT there
+    if (solid_.freeSurface())
+    {
+        const scalarField& rho = solid_.rho().primitiveField();
+        scalarField& T = T_.primitiveFieldRef();
+        forAll(T, celli)
+        {
+            if (rho[celli] <= 0)
+            {
+                T[celli] = voidT_;
+            }
+        }
+    }
+    T_.correctBoundaryConditions();
+}
+
+
 void Foam::heatTransfer::solve(const scalar dt)
 {
     const scalar dtc = stableDeltaT();
@@ -419,8 +494,9 @@ void Foam::heatTransfer::report() const
     const label oldPrecision = Info().precision(16);
     Info<< "Thermal energy  = " << E << nl
         << "Heat in         = " << heatIn_ << nl
-        << "Energy balance  = " << E - energy0_ - heatIn_
-        << " (energy - start - heat in)" << endl;
+        << "Heat carried in = " << carriedIn_ << nl
+        << "Energy balance  = " << E - energy0_ - heatIn_ - carriedIn_
+        << " (energy - start - heat in - carried in)" << endl;
     Info().precision(oldPrecision);
 }
 

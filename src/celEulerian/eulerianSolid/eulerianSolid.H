@@ -135,6 +135,12 @@ class eulerianSolid
         //  in the remap; only with capLambda
         autoPtr<volScalarField> pc_;
 
+        //- Mass-weighted scalars carried by the remap for other libraries
+        //  (WP T.2: temperature) and their remap limiters; open inlets
+        //  bring each field's patch value
+        UPtrList<volScalarField> passengers_;
+        wordList passengerLimiters_;
+
         //- Fraction of the CFL limit used for the time step
         scalar maxCo_;
 
@@ -638,8 +644,19 @@ public:
         scalar loadPressure(const word& patch, const scalar t) const;
 
         //- Mass carried across each face by the last remap [kg], out of
-        //  the owner; valid after setPorePressure()
+        //  the owner; valid after setPorePressure() or storeRemapMass().
+        //  On non-coupled patches: mass out through open outlets
+        //  (positive) and in through open inlets (negative)
         const surfaceScalarField& remapMass() const { return *remapMass_; }
+
+        //- Keep the face masses of every remap from now on (remapMass)
+        void storeRemapMass();
+
+        //- Carry a mass-weighted scalar per cell through every remap
+        //  (WP T.2, decision 0135): m q is conserved, emptied cells get 0,
+        //  open inlets bring the field's patch value; limiter as in
+        //  remapLimiters (MC, superbee, ...)
+        void addPassenger(volScalarField& f, const word& limiter);
 
 
     // Immersed walls (WP 4.3a, decision 0047)

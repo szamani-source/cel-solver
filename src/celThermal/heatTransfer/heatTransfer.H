@@ -47,6 +47,16 @@ Description
         conductivity constant;      // bed conductivity model (T.3 adds
                                     // zehnerSchlunder)
         k            0.25;          // bed conductivity [W/(m K)]
+        limiter      superbee;      // remap limiter of T (T.2), as the
+                                    // history fields (decision 0017)
+        voidT        293.15;        // written in empty cells [K] (T.2)
+
+    WP T.2: T moves with the material. The solid's remap carries it mass
+    weighted (eulerianSolid::addPassenger), so sum m c T is conserved; an
+    emptied cell holds no heat (voidT is only what is written there); open
+    outlets carry out m c T of the cell, open inlets bring material at the
+    inlet patch value of 0/T. Immersed STL walls are not yet supported (WP
+    T.2b): the remap's small-cell mixing does not carry T.
 
     With no file, or model none, nothing is created and every v1 and v2
     result is unchanged bit for bit.
@@ -78,7 +88,7 @@ class heatTransfer
 {
     // Private Data
 
-        const eulerianSolid& solid_;
+        eulerianSolid& solid_;
 
         const fvMesh& mesh_;
 
@@ -102,6 +112,17 @@ class heatTransfer
         //- Thermal energy at the start of this run [J]
         scalar energy0_;
 
+        //- Heat carried in by material through inlets less that carried
+        //  out through outlets, since the start [J] (WP T.2)
+        scalar carriedIn_;
+
+        //- Temperature before the remap (outlet faces carry it out)
+        scalarField TOld_;
+
+        //- Remap limiter of T and the value written in empty cells
+        word limiter_;
+        scalar voidT_;
+
         //- Sub-cycles used in the last step
         label nSub_;
 
@@ -122,10 +143,10 @@ public:
 
     // Constructors
 
-        heatTransfer(const eulerianSolid& solid, const IOobject& io);
+        heatTransfer(eulerianSolid& solid, const IOobject& io);
 
         //- Null without constant/thermalProperties or with model none
-        static autoPtr<heatTransfer> New(const eulerianSolid& solid);
+        static autoPtr<heatTransfer> New(eulerianSolid& solid);
 
         heatTransfer(const heatTransfer&) = delete;
         void operator=(const heatTransfer&) = delete;
@@ -148,6 +169,17 @@ public:
 
         //- Explicit conduction limit [s] (all processors)
         scalar stableDeltaT() const;
+
+        //- Call before the solid's remap: keeps T for the outlet faces
+        void beforeRemap();
+
+        //- Call after the solid's remap (which carries T, mass weighted):
+        //  counts the heat carried through outlets and inlets and sets
+        //  empty cells to voidT
+        void afterRemap();
+
+        //- Heat carried in through inlets less out through outlets [J]
+        scalar carriedIn() const noexcept { return carriedIn_; }
 
         //- Advance the temperature over dt
         void solve(const scalar dt);

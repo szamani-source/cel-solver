@@ -71,3 +71,16 @@ fluxes; the gas is isothermal at the case temperature.
   exactly steady and 2/4 processors match serial to 6e-15. k_f = k min(a_P, a_N)
   (a = material fraction), so void neither stores nor conducts heat; how
   temperature crosses the free surface with the material is T.2.
+- T.2 (2026-11-26): the solid's remap carries T as a "passenger"
+  (`eulerianSolid::addPassenger`, the same mass-weighted path as the cap's p_c), so
+  sum m c T is conserved to round-off; outlets carry out m c T of the cell, open
+  inlets bring the inlet patch value of `0/T`; heatTransfer counts both from
+  `remapMass()` and prints them, so the balance is an independent check of the
+  remap. Default limiter `superbee` (as the history fields, decision 0017): with
+  `MC` a front carried 50 cells at the small material Courant number of the solid
+  step spreads over 5 cells, with superbee 2. Faces between material and void take
+  the material side's T in the gradient. Immersed STL walls and bodies are not yet
+  supported: the small-cell mixing (decision 0047) would need T too; split as T.2b.
+  A plain Mohr-Coulomb stream landing in a box parts serial and parallel runs of the
+  solid itself after about 0.2 s (amplified round-off, decision 0134); T matches to
+  2e-15 until then and to 2e-14 across processor cuts in a carried block.

@@ -196,7 +196,17 @@ int main(int argc, char *argv[])
 
         moveBodies(solid, bodies);  // WP 4.1, 4.3d: bodies to t
 
+        if (thermal)
+        {
+            thermal->beforeRemap();     // WP T.2: T before the remap
+        }
+
         solid.remap(dt);            // WP 2.4
+
+        if (thermal)
+        {
+            thermal->afterRemap();      // WP T.2: heat through outlets, inlets
+        }
 
         if (cut)
         {

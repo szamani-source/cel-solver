@@ -342,6 +342,7 @@ processors against serial (1e-10). Brief: `docs/wp/WP-T.md`. References:
 | T.0 | References, decision, `tools/thermal_reference.py` | `tests/test_thermal_reference.sh` passes; decision 0135 | 2 h |
 | T.1 | Grain conduction in a fixed bed: `celThermal`, field T, fixed, adiabatic and flux walls | Suddenly heated face against erfc within 1 %; linear steady profile on a 27 deg non-orthogonal mesh to 1e-10; energy to 1e-12 with adiabatic walls; `model none` bit for bit; 2/4 processors 1e-10 | 3 h |
 | T.2 | Temperature moves with the material: remap, free surface, outlet, inlet | Translating hot block keeps its energy to 1e-12, edges 2 cells or fewer; discharge energy balance (inside + out = start) 1e-12; uniform tank stays uniform exactly | 3 h |
+| T.2b | Temperature with immersed STL walls and bodies (split from T.2) | The small-cell mixing and covered-cell fill carry T; energy to 1e-12 in an STL hopper with an outlet | 2 h |
 | T.3 | Convective and heat-flux walls; Zehner-Schluender bed conductivity | Cooling slab at Bi 1 and 10 against the Carslaw-Jaeger series within 1 %; k_eff equals the closed form to 1e-12 | 2 h |
 | T.4 | Gas temperature and grain-gas exchange (Gunn); `equilibrium` option | Hot gas through a cold packed bed against Schumann within 3 %; equilibrium front speed within 1 %; uniform temperature under flow to 1e-12 | 5 h |
 | T.5 | Gas heat transport in the void | Flow between heated plates, Nu_Dh against 7.541 within 3 % | 3 h |

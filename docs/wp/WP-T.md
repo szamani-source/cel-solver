@@ -34,6 +34,14 @@ restart and MPI. Plan approved by Sia 2026-11-26 (decision 0135).
 
 ## Log
 
+- 2026-11-26: T.2 done. `eulerianSolid::addPassenger` and `storeRemapMass`;
+  heatTransfer `beforeRemap`/`afterRemap`, `limiter` (default superbee), `voidT`;
+  celFoam prints "Heat carried in". `tests/test_carried_temperature.sh` (about 30 s):
+  block carried 50 cells, energy 2e-14, front in place (1.1011 against 1.1 m) and
+  2 cells wide, 4 processors 2e-14; box with inlet (353 K) and outlet, balance
+  8e-15, fed material at the inlet temperature exactly; one temperature exact;
+  carried heat = c T (fed - out) to 1e-13; 2 processors 2e-15 until the solid parts
+  (decision 0134). Split: T.2b immersed STL walls with temperature. Next: T.3.
 - 2026-11-26: T.1 done. `src/celThermal` (`heatTransfer`), `constant/thermalProperties`
   (`model equilibrium`, `c`, `conductivity constant`, `k`), field `T`, celFoam calls it
   after the gas and prints thermal energy, heat in and their balance at each write.
