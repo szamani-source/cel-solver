@@ -273,6 +273,25 @@ def slug_plates_nu_local(gz, rnw_keff_over_4b=0.0, terms=2000):
     return 1.0 / (1.0 / 12.0 - 0.5 * s + rnw_keff_over_4b)
 
 
+def slug_plates_nu_mean(dh_over_l, pe, rnw_keff_over_4b=0.0, terms=2000):
+    """Mean Nu_Dh over a heated length L (Adapa et al. 2024, eq. 9): the wall
+    minus mean temperature difference averaged over L, h = q / mean(dT)."""
+    s = sum(dh_over_l * pe / (32.0 * (n * math.pi) ** 4)
+            * (math.exp(-16.0 * (n * math.pi) ** 2 / (dh_over_l * pe)) - 1.0)
+            for n in range(1, terms + 1))
+    return 1.0 / (1.0 / 12.0 + s + rnw_keff_over_4b)
+
+
+def slug_plates_h_mean(k_eff, d_air, k_air, rho_bulk, cp, u, b, length, terms=2000):
+    """Mean wall heat transfer coefficient [W/(m^2 K)] of a moving bed between
+    plates 2b apart, heated over length with a uniform flux (Adapa et al. 2024,
+    eqs. 9-10): D_h = 4 b, Pe = U D_h rho c/k_eff, R_nw = d_air/k_air."""
+    dh = 4.0 * b
+    pe = u * dh * rho_bulk * cp / k_eff
+    nu = slug_plates_nu_mean(dh / length, pe, d_air / k_air * k_eff / (4.0 * b), terms)
+    return nu * k_eff / dh
+
+
 def slug_plates_fd(zeta, n=200):
     """Independent check of the gap-free local Nu: plug flow between plates of half gap
     b = 1, theta_zeta = theta_yy (zeta = a z/(U b^2)), q = 1 into the bed at y = 1,
@@ -505,6 +524,17 @@ def check():
     nu0 = slug_plates_nu_local(1e-9)
     nug = slug_plates_nu_local(1e-9, 0.1)
     report("slug flow with gap: 1/Nu adds the gap term", abs(1 / nug - 1 / nu0 - 0.1), 1e-12)
+
+    # mean Nu (eq. 9) is the length average of 1/Nu_local (eq. 4), with the gap
+    for pe, g in ((800.0, 0.0), (300.0, 0.15)):
+        dh_l = 0.02
+        m = 4000
+        inv = 0.0
+        for i in range(m):
+            z_over_dh = (i + 0.5) / m / dh_l
+            inv += 1.0 / slug_plates_nu_local(pe / z_over_dh, g)
+        report("slug flow mean Nu (Pe %g, gap %g) is the mean of 1/Nu_local" % (pe, g),
+               abs(slug_plates_nu_mean(dh_l, pe, g) * inv / m - 1), 1e-4)
 
     print("thermal_reference --check: %s" % ("PASS" if ok else "FAIL"))
     return ok

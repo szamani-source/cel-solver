@@ -60,8 +60,9 @@ Description
     by Kuipers et al. 1992; docs/spec/thermal-references.md); faces use the
     harmonic mean of the two cells. Convective walls put the film 1/h and
     the half cell 1/(k delta) in series (no non-orthogonal correction).
-        limiter      superbee;      // remap limiter of T (T.2), as the
-                                    // history fields (decision 0017)
+        limiter      MC;            // remap limiter of T (T.2, T.6), as rho,
+                                    // U and sigma; superbee keeps fronts
+                                    // sharper but steps smooth profiles
         voidT        293.15;        // written in empty cells [K] (T.2)
 
     WP T.4: with the pore gas, equilibrium adds the gas heat capacity and

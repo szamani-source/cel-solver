@@ -7,7 +7,7 @@ A  Translating block. A 1D channel 2 m long, 200 cells of 10 mm, no gravity,
    is only carried. The left half of the block is 30 K hotter.
    - energy constant to 1e-12;
    - the hot-cold front moved 0.5 m (within one cell) and is at most 2
-     cells wide between 10 % and 90 % (default limiter superbee, as the
+     cells wide between 10 % and 90 % (limiter superbee, as the
      history fields);
    - on 4 processors (the block crosses two cuts) T matches serial to 1e-10;
    - a second run with a uniform block keeps T uniform to 1e-12.
@@ -83,7 +83,8 @@ snGradSchemes { default corrected; }
              + f"numberOfSubdomains {n};\nmethod simple;\ncoeffs {{ n ({decomp[0]} {decomp[1]} {decomp[2]}); }}\n")
 
 
-def thermal(path, k):
+def thermal(path, k, limiter=None):
+    lim = f"limiter      {limiter};\n" if limiter else ""
     cc.write(f"{path}/constant/thermalProperties",
              HEADER.format(cls="dictionary", obj="thermalProperties") + f"""
 model        equilibrium;
@@ -91,7 +92,7 @@ c            {C_HEAT!r};
 conductivity constant;
 k            {k!r};
 voidT        {T0!r};
-""")
+{lim}""")
 
 
 def scalar_file(path, name, dim, values, patches):
@@ -175,7 +176,7 @@ E 1e6;
 nu 0.3;
 walls { left { friction 0; } right { friction 0; } bottom { friction 0; } top { friction 0; } }
 """)
-    thermal(path, 0.0)
+    thermal(path, 0.0, "superbee")
     cc.run(path, decomp[0] * decomp[1] * decomp[2])
     return x
 

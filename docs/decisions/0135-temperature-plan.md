@@ -112,3 +112,20 @@ fluxes; the gas is isothermal at the case temperature.
   against 7.5407 (-1.1 %, from the upwind transport on 0.3 mm cells and the
   axial conduction at Peclet 50). gasFlow is not stable at a 2e-4 s step on
   these cells (the solid sets the step, decision 0131); the test uses 4e-5 s.
+- T.6 (2026-11-26): the Adapa et al. (2024) case, HSP 40/70 at 480 C and 10 mm/s
+  (their Table 5: k_eff 0.28 W/(m K), D_air 35 microns; bulk 2090 kg/m^3), half the
+  5 mm gap, 500 mm heated by a uniform flux, the bed fed through an inlet in plug
+  flow. The near-wall gap is their series resistance R_nw = D_air/k_air (eq. 2),
+  added to the wall temperature: a flux wall does not need it in the solve. The bed
+  moves at 1 m/s with c scaled by 0.01 (same Peclet number 821, so the same
+  dimensionless answer) to keep the run at 0.7 s. The specific heat is not in the
+  paper (cited from Siegel et al. 2015, not reachable here); 1100 J/(kg K) is used,
+  and 900 or 1300 move h by 1 %. Result: local Nu within 0.45 % of eq. 4, mean h
+  291.3 against 292.8 W/(m^2 K) of eq. 9, inside their 225-350 range. The 225-350
+  is their model's range for such a heat exchanger (fitted to their measurements),
+  not a direct measurement.
+- Limiter default changed to MC (T.6): with superbee (the T.2 default) the smooth
+  temperature rise along the moving bed turned into steps over 200 cells of travel
+  and the local Nu was off by up to 20 % (the mean h by only 0.7 %). MC, the remap
+  default of rho, U and sigma, gets 0.45 %. superbee stays available for sharp
+  fronts (2 cells against 5); the T.2 front test now names it.

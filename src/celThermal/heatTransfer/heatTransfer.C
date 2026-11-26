@@ -123,7 +123,7 @@ Foam::heatTransfer::heatTransfer
     energy0_(0),
     carriedIn_(0),
     TOld_(),
-    limiter_(dict_.getOrDefault<word>("limiter", "superbee")),
+    limiter_(dict_.getOrDefault<word>("limiter", "MC")),
     voidT_(dict_.getOrDefault<scalar>("voidT", 293.15)),
     kCell_
     (

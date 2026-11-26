@@ -46,6 +46,13 @@ in Armstrong et al. 2010, Table 1, and Mahmood et al., eqs. 7-8).
 | T.6 | Ceramic particles flowing at 5-15 mm/s down a 5 mm gap between heated plates (300 x 30 x 5 mm), 300-650 C | Measured bed k_eff and near-wall gap D_air for three particle sizes (275, 404, 956 microns, Tables 1-6), average wall heat transfer coefficients 225-350 W/(m^2 K) (figures only), and the slug-flow model above fitted to them | [Adapa et al. (2024), arXiv 2403.19892](https://arxiv.org/pdf/2403.19892) |
 | T.6 | Glass beads and sands flowing past a heated surface | Semi-empirical correlation with the 0.085 d gap; thesis is a scan without text | Sullivan and Sabersky (1975) (not read) |
 
+Values used in T.6 (Adapa et al. 2024, read 2026-11-26): HSP 40/70 (d 404 microns),
+flowing at 10 mm/s and 480 C: k_eff 0.28 W/(m K), D_air 35 microns (Table 5); flowing
+(frozen/tapped) bulk density 2090 kg/m^3; gap 5 mm, heated length 500 mm (their
+225-350 W/(m^2 K) statement). Grain density 3480 kg/m^3 (Chung et al. 2021, arXiv
+2105.02366, Table 1). Specific heat: not given (both papers cite Siegel et al. 2015,
+not read); 1100 J/(kg K) assumed, h changes 1 % between 900 and 1300.
+
 The Adapa et al. (2024) case is the T.6 validation: their measured k_eff and D_air are
 inputs, their slug-flow formula is the analytical check, and their 225-350 W/(m^2 K)
 range is the experimental check. It replaces the plan's Sullivan and Sabersky (1975)

@@ -34,6 +34,14 @@ restart and MPI. Plan approved by Sia 2026-11-26 (decision 0135).
 
 ## Log
 
+- 2026-11-26: T.6 done. Adapa et al. (2024) moving bed between plates:
+  `tests/test_moving_bed_heat.sh` (about 50 s): local Nu within 0.45 % of the
+  slug-flow solution with the gap, mean h 291.3 against 292.8 W/(m^2 K) (-0.52 %),
+  inside their 225-350, energy 1e-14. `tools/thermal_reference.py` gains
+  `slug_plates_nu_mean` and `slug_plates_h_mean` (eq. 9, checked against the length
+  average of eq. 4 to 1e-6). The T limiter default is now MC (superbee steps smooth
+  profiles: local Nu off by 20 %). Specific heat 1100 J/(kg K) assumed (not in the
+  paper; h moves 1 % for 900-1300). Next: T.8 (T.7 waits for the dam-break thread).
 - 2026-11-26: T.5 done, no solver change (the T.4 gas transport covers the void).
   `tests/test_void_heat.sh` (about 100 s): plates at a fixed wall temperature,
   Nu 7.457 against 7.5407 (-1.11 %, limit 3 %), steady to 1.6e-6, energy 3e-15.
