@@ -127,6 +127,11 @@ Description
         pTolerance      1e-9;   // [Pa] largest correction when converged
                                 // (default 1e-14 p0)
         laplacian       "Gauss linear corrected";
+        parallelCheck   no;     // WP F.9a (decision 0134), debug: compare
+                                // every gas and solid field across each
+                                // processor cut (stale halos, one-sided
+                                // face values); prints "Parallel check"
+        parallelCheckEvery 1;   // ... every this many steps
 
         // WP F.6, model gasFlow only, all optional:
         nCorr           1;      // pressure corrections per step (PISO)
@@ -351,6 +356,20 @@ class poreGas
             //  part -phi_g grad p less this (decision 0132)
             autoPtr<volVectorField> gasForce_;
 
+        // WP F.9: parallel consistency check (debug)
+
+            //- gasProperties parallelCheck (default no): after each solve,
+            //  compare every field's processor-boundary values with its
+            //  neighbour's (stale halo values, one-sided face values)
+            Switch parallelCheck_;
+
+            //- Every this many steps (gasProperties parallelCheckEvery,
+            //  default 1)
+            label parallelCheckEvery_;
+
+            //- Largest mismatch seen so far, and where
+            scalar parallelWorst_;
+
 
     // Private Member Functions (WP F.6, poreGasFlow.C)
 
@@ -501,6 +520,13 @@ public:
 
         //- Face pressures pFace() from p (WP F.4)
         void correctFacePressure();
+
+        //- Parallel consistency check (WP F.9, poreGasParallelCheck.C):
+        //  the largest mismatch of the processor-boundary values of the
+        //  gas and solid fields against their neighbours', relative to
+        //  each field's largest value; printed, and kept in
+        //  parallelWorst_
+        void checkParallel(const word& where);
 };
 
 

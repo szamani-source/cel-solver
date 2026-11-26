@@ -247,7 +247,13 @@ Foam::poreGas::poreGas(const eulerianSolid& solid, const IOobject& io)
     nCorr_(dict_.getOrDefault<label>("nCorr", 1)),
     divUg_(dict_.getOrDefault<string>("divUg", "Gauss upwind")),
     USolverDict_(),
-    poreInertia_(flow_ && dict_.getOrDefault<Switch>("poreInertia", true))
+    poreInertia_(flow_ && dict_.getOrDefault<Switch>("poreInertia", true)),
+    parallelCheck_(dict_.getOrDefault<Switch>("parallelCheck", false)),
+    parallelCheckEvery_
+    (
+        max(dict_.getOrDefault<label>("parallelCheckEvery", 1), label(1))
+    ),
+    parallelWorst_(0)
 {
     if (rhoP_ <= 0 || d_ <= 0 || T_ <= 0 || p0_ <= 0)
     {
@@ -757,6 +763,8 @@ void Foam::poreGas::faceCoefficients
 
 void Foam::poreGas::solve(const scalar dt)
 {
+    checkParallel("before the gas solve");     // WP F.9 (debug)
+
     const fvMesh& mesh = solid_.mesh();
     volScalarField& p = *pPtr_;
     const scalar RT = Rair*T_;
@@ -1406,6 +1414,7 @@ void Foam::poreGas::solve(const scalar dt)
     {
         correctVelocity();
     }
+    checkParallel("after the gas solve");      // WP F.9 (debug)
 
     const label oldPrecision = Info().precision(16);
     if (fixVoid)

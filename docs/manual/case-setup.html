@@ -303,6 +303,8 @@ coupled yes;            // gas pressure acts on the solid</code></pre>
 <tr><td><code>USolver</code></td><td>PBiCGStab, DILU, <code>relTol 1e-10</code></td><td><code>gasFlow</code>: sub-dictionary for the linear solver of the gas momentum</td></tr>
 <tr><td><code>poreInertia</code></td><td><code>yes</code></td><td><code>gasFlow</code> (WP F.7, decision 0132): the gas in the pores has momentum too, e&rho;<sub>g</sub> Dw/Dt = &minus;e&nabla;p &minus; K w with the drag implicit; <code>no</code> keeps the pore-pressure law inside the material</td></tr>
 <tr><td><code>inertiaForce</code></td><td><code>no</code></td><td><code>gasFlow</code>: apply the reaction of the pore gas inertia to the grains (about 0.1 % of the force; explicit, it destabilised a lifting bed, so it is off)</td></tr>
+<tr><td><code>parallelCheck</code></td><td><code>no</code></td><td>Debug (WP F.9a, decision 0134): on every processor cut, compare each gas and solid field with the neighbour processor&rsquo;s values (stale halos, one-sided face values) and print the largest mismatch as &ldquo;Parallel check&rdquo;; round-off (below 1e-12) means the boundaries are right</td></tr>
+<tr><td><code>parallelCheckEvery</code></td><td>1</td><td>With <code>parallelCheck yes</code>: check every this many steps</td></tr>
 </tbody>
 </table>
 <p>celFoam writes three more fields: <code>phiS</code>, the solids volume fraction
