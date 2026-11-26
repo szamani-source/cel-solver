@@ -49,3 +49,17 @@ Newest first. Each entry: date, what was done, what was learned, exact next step
 - 2026-11-25: 5 mm refit kappa 0.22 (run /mnt/project-files/f8/run10_ratio5mm_k022): run-out 5.64 h0 (-2 %), stops 6.7, front 1.11 sqrt(g h0) (-21.5 %). Theory passes front, refit passes run-out; run-out mesh dependent.
 - 2026-11-25 (F.8i): zero pore pressure on the material's surface (tests/test_surface_drainage.sh, 1.1 %). Dam break theoretical kappa: 10 mm 5.17 h0, 5 mm to the channel end. Learned: the surface error was real (15-28 % slow drainage) but the mesh dependence comes from the partly supported frictional flow; fully supported fronts agree within 5 %. Next: dry 5 mm check.
 - 2026-11-26 (F.8i): dry check: dry run-out 3.625 h0 on 5 mm against 2.375 h0 on 10 mm (+53 %): the grain law is mesh dependent here.
+- 2026-11-26 (F.8j, Sia: fix the grain law's mesh dependence first): dry dam break to 1.4 s, run-out from the gate (h0):
+
+  | Variant | 10 mm | 5 mm |
+  | --- | --- | --- |
+  | As calibrated (mu(I), flowImpedance, fullBlend) | 2.47 | 3.61 |
+  | No flowImpedance | 1.08 | 1.59 |
+  | No fullBlend | 1.38 | 1.88 |
+  | Plain Mohr-Coulomb 24 deg | 1.08 | 1.56 |
+  | Plain MC, E 0.25 / 1 / 4 MPa (10 mm) | 1.40 / 1.08 / 0.93 | |
+  | Calibrated, E 0.25 / 1 / 4 MPa (10 mm) | 2.90 / 2.47 / 2.20 | |
+
+  Every variant runs 35-50 % further on 5 mm, plain MC too, and the run-out falls with stiffness: it follows rho c_s D,
+  the damping of the face Riemann solver (shear jump term), not the grain law. A rate-independent collapse should not
+  depend on E or D. Proposal to Sia pending.
