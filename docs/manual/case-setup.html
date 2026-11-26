@@ -328,7 +328,8 @@ conditions: <code>fixedValue</code> holds a wall temperature, <code>zeroGradient
 adiabatic wall, and <code>fixedGradient</code> with <code>gradient</code> = q/k heats the material
 with a flux q in W/m&sup2; (gradient along the outward normal). celFoam prints the thermal energy,
 the heat that has entered through the boundaries and their balance at each write.
-Immersed STL walls and bodies do not yet work with temperature (WP T.2b). The tutorial
+With immersed STL walls and bodies the heat is stored in the open part of each cut cell
+and the STL walls are adiabatic (WP T.2b). The tutorial
 <code>hotSiloDischarge</code> uses this file; <code>tests/validation/thermal</code> checks it against
 Schumann (1929), the laminar Nusselt number between plates and Adapa et al. (2024).</p>
 <pre><code>model        equilibrium;   // none | equilibrium | twoTemperature

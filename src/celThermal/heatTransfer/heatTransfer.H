@@ -76,8 +76,12 @@ Description
     weighted (eulerianSolid::addPassenger), so sum m c T is conserved; an
     emptied cell holds no heat (voidT is only what is written there); open
     outlets carry out m c T of the cell, open inlets bring material at the
-    inlet patch value of 0/T. Immersed STL walls are not yet supported (WP
-    T.2b): the remap's small-cell mixing does not carry T.
+    inlet patch value of 0/T.
+
+    WP T.2b: immersed STL walls and bodies: heat is stored in the open
+    volume and conducted through the open face area (covered cells hold
+    none); the solid mixes T by mass with its small cut cells and gives
+    covered cells ghost values. STL walls are adiabatic.
 
     With no file, or model none, nothing is created and every v1 and v2
     result is unchanged bit for bit.
@@ -183,6 +187,9 @@ class heatTransfer
 
         //- Material fraction per cell (alpha, or 1 without a free surface)
         tmp<scalarField> fill() const;
+
+        //- Face area open to the material (immersed walls cut it)
+        tmp<surfaceScalarField> openArea() const;
 
         //- The same as a field with processor halos (all: 1 everywhere,
         //  for the gas, which fills the cell)

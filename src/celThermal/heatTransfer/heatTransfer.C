@@ -194,12 +194,9 @@ Foam::heatTransfer::heatTransfer
         );
     }
 
-    if (solid_.immersed())
-    {
-        FatalIOErrorInFunction(dict_)
-            << "temperature with immersed (STL) walls or bodies is not yet "
-            << "supported (WP T.2b)" << exit(FatalIOError);
-    }
+    // Immersed (STL) walls and bodies (WP T.2b): heat is stored in the open
+    // volume, conducted through the open face area, and mixed by mass with
+    // the solid's small cut cells; the STL walls are adiabatic
     solid_.addPassenger(T_, limiter_);
     solid_.storeRemapMass();
 
@@ -327,14 +324,42 @@ Foam::autoPtr<Foam::heatTransfer> Foam::heatTransfer::New
 
 Foam::tmp<Foam::scalarField> Foam::heatTransfer::fill() const
 {
-    if (solid_.freeSurface())
-    {
-        return tmp<scalarField>::New
+    tmp<scalarField> tf
+    (
+        solid_.freeSurface()
+      ? tmp<scalarField>::New
         (
             max(min(solid_.alpha().primitiveField(), scalar(1)), scalar(0))
-        );
+        )
+      : tmp<scalarField>::New(mesh_.nCells(), scalar(1))
+    );
+    if (solid_.immersed())
+    {
+        // Covered cells (inside a body) hold no material (WP T.2b)
+        const tmp<scalarField> tOpen(solid_.cellOpen());
+        scalarField& f = tf.ref();
+        forAll(f, celli)
+        {
+            if (tOpen()[celli] <= 0)
+            {
+                f[celli] = 0;
+            }
+        }
     }
-    return tmp<scalarField>::New(mesh_.nCells(), scalar(1));
+    return tf;
+}
+
+
+Foam::tmp<Foam::surfaceScalarField> Foam::heatTransfer::openArea() const
+{
+    // Face area open to the material: |S_f| times the open fraction with
+    // immersed walls (0 where either side is covered), else |S_f| (WP T.2b)
+    tmp<surfaceScalarField> tA(new surfaceScalarField("openArea", mesh_.magSf()));
+    if (const surfaceScalarField* fo = solid_.faceOpenPtr())
+    {
+        tA.ref() *= *fo;
+    }
+    return tA;
 }
 
 
@@ -430,7 +455,7 @@ Foam::tmp<Foam::scalarField> Foam::heatTransfer::capacity() const
 {
     return tmp<scalarField>::New
     (
-        solid_.rho().primitiveField()*c_*mesh_.V().field()
+        solid_.rho().primitiveField()*c_*solid_.openVolume()
     );
 }
 
@@ -446,7 +471,7 @@ Foam::tmp<Foam::scalarField> Foam::heatTransfer::gasCapacity() const
     (
         gas_->phiG().primitiveField()
        *(gas_->p0() + gas_->p().primitiveField())/RT
-       *cg_*mesh_.V().field()
+       *cg_*solid_.openVolume()
     );
 }
 
@@ -473,7 +498,8 @@ Foam::scalar Foam::heatTransfer::stableDeltaT
     // Explicit limit per cell: C_P / sum_f k_f |S_f| delta_f
     const labelUList& own = mesh_.owner();
     const labelUList& nei = mesh_.neighbour();
-    const surfaceScalarField& magSf = mesh_.magSf();
+    const tmp<surfaceScalarField> tOpenArea(openArea());
+    const surfaceScalarField& magSf = tOpenArea();
     const surfaceScalarField& ndc = mesh_.nonOrthDeltaCoeffs();
     const scalarField& a = aVol.primitiveField();
     const scalarField& kc = kF.primitiveField();
@@ -543,7 +569,8 @@ Foam::scalar Foam::heatTransfer::conduct
     const labelUList& own = mesh_.owner();
     const labelUList& nei = mesh_.neighbour();
     const surfaceVectorField& Sf = mesh_.Sf();
-    const surfaceScalarField& magSf = mesh_.magSf();
+    const tmp<surfaceScalarField> tOpenArea(openArea());
+    const surfaceScalarField& magSf = tOpenArea();
     const scalarField& w = mesh_.weights();
     const surfaceScalarField& ndc = mesh_.nonOrthDeltaCoeffs();
     const surfaceVectorField& corr = mesh_.nonOrthCorrectionVectors();
@@ -1019,7 +1046,8 @@ void Foam::heatTransfer::exchange
     const tmp<scalarField> tA(fill());
     const scalarField& a = tA();
     const vectorField& q = gas_->qGas().primitiveField();
-    const scalarField& V = mesh_.V();
+    const tmp<scalarField> tV(solid_.openVolume());
+    const scalarField& V = tV();
     const scalar d = gas_->d();
     const scalar mu = gas_->mu();
     const scalar RT = poreGas::Rair*gas_->T();

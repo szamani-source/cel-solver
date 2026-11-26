@@ -140,3 +140,11 @@ fluxes; the gas is isothermal at the case temperature.
   (conduction moves heat about 1 mm), while carrying heat with the flow shows the
   funnel flow. Validation pack `tests/validation/thermal`: T.4, T.5 and T.6 on 1, 2
   and 4 processors.
+- T.2b (2026-11-26): with immersed STL walls and bodies the heat capacity is rho c
+  times the open volume and conduction uses the open face area (0 where either side is
+  covered), so covered cells neither store nor conduct heat and the STL walls are
+  adiabatic (a heated or cooled STL wall would need its own wall face term: not
+  planned). The solid's small-cell mixing mixes T by mass (as epsP) and covered cells
+  take the mean of their open neighbours as a ghost for the remap's reconstruction.
+  `tutorials/stlHopper` with a hot layer: energy 1.8e-14, T within the start's range,
+  uniform T kept to 2e-13.

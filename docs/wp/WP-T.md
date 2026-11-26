@@ -34,6 +34,11 @@ restart and MPI. Plan approved by Sia 2026-11-26 (decision 0135).
 
 ## Log
 
+- 2026-11-26: T.2b done. Temperature with immersed STL walls: capacity on the open
+  volume, conduction on the open face area (STL walls adiabatic), T in the solid's
+  small-cell mixing (by mass) and covered-cell ghosts. `tests/test_stl_heat.sh`
+  (about 80 s, tutorials/stlHopper with a hot layer): energy 1.8e-14, T within
+  20-150 C, uniform T 2e-13, heat out c T times discharged mass 4e-15. Left: T.7.
 - 2026-11-26: T.8 done. `tests/test_thermal_restart_mpi.sh` (about 2.5 min): T.4
   column and T.6 bed restarted and on 2/4 processors within 3e-13; temperature
   1.0-1.1x a gas-on step (capacities and limits now computed once per step).
