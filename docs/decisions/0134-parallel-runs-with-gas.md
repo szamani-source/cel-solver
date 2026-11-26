@@ -94,3 +94,29 @@ release).
   rechecked here. Running it with `parallelCheck yes` will tell.
 - Still in F.9: restart of the gas state, cost per step (1.9-3.8x against the 1.5x
   target), tutorial, manual, release.
+
+## Follow-up: are parallel results valid? (Sia, 2026-11-26)
+
+- **Fluidisation onset (validated metric U_mf):** valid. 1, 2 and 4 processors agree to
+  1e-11 up to the onset and give the same U_mf (-3.05 % of Wen-Yu, pack test 2).
+- **Fluidised bed after lift (0.3 to 0.6 s, inflow 1.4 U_mf, not a validated metric):**
+  time averages, serial / serial with pTolerance 1e-13 / 2 x 1 / 1 x 4: pressure drop
+  over the bed weight 2.73 / 2.64 / 2.76 / 2.70 (standard deviation 8 to 10 W), centre
+  of mass 60 / 61 / 53 / 56 mm, gas mass 3e-15 to 7e-15. The processor counts fall in
+  the same scatter as the serial pair, but the state itself is not physical in any
+  run: the pressure drop swings by many times the weight (it should sit near 1 W), the
+  pressure iteration hits nOuter in 360 to 2,300 steps and the void gas reaches 60 m/s
+  against an inflow of 0.05 m/s. The 2 x 2 run stopped at 0.447 s with a floating-point
+  exception in `inertialGasDrag::slip` (as F.8 saw, decision 0133); the other runs got
+  through by chance. Post-lift fluidised beds need model work (particle pressure or
+  viscosity for a dilute bed, a guard in the slip root) before any count is trusted:
+  a modelling gap, not a parallel one.
+- **Dam break (F.8 branch at 914f3ff, local copy with `parallelCheck`, not pushed),
+  serial against 2 x 2 to 1.82 s:** processor boundaries 5e-16 throughout; centre of
+  mass of the flow within 3 mm (0.2 %) at every write; the front within one cell to
+  0.6 s. After that a thin tongue ahead of the flow crosses the half-cell threshold at
+  different times (serial jumps to the channel end at 0.8 s, 2 x 2 at 1.3 s), so the
+  front speed fit over 0.3-0.8 s reads 3.92 against 4.27 m/s. Both reach the channel
+  end (this branch's current settings), so their run-out is the same. The bulk flow
+  is valid in parallel; a front picked by a thin-layer threshold is not robust in
+  serial or parallel, and F.8 should measure the front on the continuous deposit.
