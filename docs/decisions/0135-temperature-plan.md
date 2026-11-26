@@ -92,3 +92,16 @@ fluxes; the gas is isothermal at the case temperature.
   a contact resistance (the moving-bed air gap of T.6) is the same with h = 1/R.
   `zehnerSchlunder` takes the packing of the filled part per cell and faces use
   the harmonic mean (series conduction); `constant` keeps k exactly.
+- T.4 (2026-11-26): with the pore gas, `equilibrium` adds the gas heat capacity
+  phi_g rho_g c_g V to the grains' and carries T with the gas; `twoTemperature`
+  reads `0/Tg`. The gas mass flux carried is the gas solve's (relative to the
+  grains) plus the gas the grains carry, (dt phiL - dm/rhoP) at the donor density,
+  with the same face rules as the gas solve (decisions 0128, 0129). Transport is
+  upwind in advective form, C_P dT_P = dt c_g sum_in |F| (T_up - T_P), so a
+  uniform temperature stays uniform under any flow (1e-14), sub-cycled to Courant
+  0.5. The exchange is Gunn's h on a_s = 6 phi_s/d, applied exactly per cell
+  (the difference decays as exp(-H (1/Cs + 1/Cg) dt), Cs Ts + Cg Tg kept), after
+  the transport (first-order splitting; dt is far below the exchange time in
+  practice). Gas conduction uses the gas part of Zehner-Schluender,
+  (1 - sqrt(phi_s)) kGas. The Schumann test was planned at 3 % but 20 % in h moves
+  theta by only 3 %, so the test asks 1 % (got 0.38 %).

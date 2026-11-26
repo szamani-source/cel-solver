@@ -41,8 +41,8 @@ Description
 
     constant/thermalProperties:
 
-        model        equilibrium;   // none | equilibrium (T.1);
-                                    // twoTemperature from T.4
+        model        equilibrium;   // none | equilibrium (T.1) |
+                                    // twoTemperature (T.4, field Tg)
         c            830;           // specific heat of the grains [J/(kg K)]
         conductivity constant;      // constant | zehnerSchlunder (T.3)
         k            0.25;          // bed conductivity [W/(m K)] (constant)
@@ -63,6 +63,13 @@ Description
         limiter      superbee;      // remap limiter of T (T.2), as the
                                     // history fields (decision 0017)
         voidT        293.15;        // written in empty cells [K] (T.2)
+
+    WP T.4: with the pore gas, equilibrium adds the gas heat capacity and
+    carries T with the gas flow; twoTemperature gives the gas its own Tg
+    (conducted with (1 - sqrt(phi_s)) kGas, carried upwind with the total
+    gas mass flux, exchanging heat with the grains by Gunn (1978), exact per
+    cell). Keywords cGas (1006 J/(kg K)) and TgVoid (voidT): the gas
+    temperature held in the void of a poreGas case.
 
     WP T.2: T moves with the material. The solid's remap carries it mass
     weighted (eulerianSolid::addPassenger), so sum m c T is conserved; an
@@ -88,6 +95,8 @@ SourceFiles
 #include "surfaceFields.H"
 #include "autoPtr.H"
 
+namespace Foam { class poreGas; }
+
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
@@ -102,6 +111,9 @@ class heatTransfer
     // Private Data
 
         eulerianSolid& solid_;
+
+        //- The pore gas, or null (WP T.4)
+        const poreGas* gas_;
 
         const fvMesh& mesh_;
 
@@ -153,8 +165,17 @@ class heatTransfer
         scalarList wallTinf_;
         scalarList wallQ_;
 
-        //- Sub-cycles used in the last step
+        //- Gas (WP T.4): specific heat [J/(kg K)], the atmosphere's
+        //  temperature in void cells (poreGas), gas temperature (model
+        //  twoTemperature) and the gas part of the bed conductivity
+        scalar cg_;
+        scalar TgVoid_;
+        autoPtr<volScalarField> Tg_;
+        volScalarField kGasCell_;
+
+        //- Sub-cycles used in the last step (conduction, gas advection)
         label nSub_;
+        label nSubAdv_;
 
 
     // Private Member Functions
@@ -162,24 +183,70 @@ class heatTransfer
         //- Material fraction per cell (alpha, or 1 without a free surface)
         tmp<scalarField> fill() const;
 
-        //- The same as a field with processor halos
-        tmp<volScalarField> fillField() const;
+        //- The same as a field with processor halos (all: 1 everywhere,
+        //  for the gas, which fills the cell)
+        tmp<volScalarField> fillField(const bool all = false) const;
+
+        //- Twice the explicit limit of one conduction problem
+        scalar stableDeltaT
+        (
+            const volScalarField& kF,
+            const volScalarField& aVol,
+            const scalarField& C
+        ) const;
+
+        //- Explicit conduction step of one field; returns the heat in
+        //  through non-coupled boundaries [J] (walls: thermalProperties
+        //  walls apply)
+        scalar conduct
+        (
+            volScalarField& Tfield,
+            const volScalarField& kF,
+            const volScalarField& aVol,
+            const scalarField& C,
+            const bool walls,
+            const scalar dt
+        );
+
+        //- Total gas mass flux out of the owner [kg/s] (WP T.4)
+        void totalGasFlux(surfaceScalarField& F, const scalar dt) const;
+
+        //- Heat carried by the gas, upwind; returns heat in [J]
+        scalar advect
+        (
+            volScalarField& Tfield,
+            const surfaceScalarField& F,
+            const scalarField& C,
+            const scalar dt
+        );
+
+        //- Grain-gas exchange (Gunn), implicit (WP T.4)
+        void exchange(const scalar dt);
+
+        bool twoT() const noexcept { return model_ == "twoTemperature"; }
 
         //- Bed conductivity per cell from the current packing
         void correctK();
 
-        //- One explicit conduction step of length dt
-        void conduct(const scalar dt);
 
 
 public:
 
     // Constructors
 
-        heatTransfer(eulerianSolid& solid, const IOobject& io);
+        heatTransfer
+        (
+            eulerianSolid& solid,
+            const IOobject& io,
+            const poreGas* gas = nullptr
+        );
 
         //- Null without constant/thermalProperties or with model none
-        static autoPtr<heatTransfer> New(eulerianSolid& solid);
+        static autoPtr<heatTransfer> New
+        (
+            eulerianSolid& solid,
+            const poreGas* gas = nullptr
+        );
 
         heatTransfer(const heatTransfer&) = delete;
         void operator=(const heatTransfer&) = delete;
@@ -191,8 +258,11 @@ public:
 
         scalar c() const noexcept { return c_; }
 
-        //- Heat capacity per cell, rho c V [J/K]
+        //- Heat capacity of the grains per cell, rho c V [J/K]
         tmp<scalarField> capacity() const;
+
+        //- Heat capacity of the gas per cell, phi_g rho_g c_g V [J/K]
+        tmp<scalarField> gasCapacity() const;
 
         //- Total thermal energy sum C T [J] (all processors)
         scalar energy() const;

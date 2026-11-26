@@ -459,6 +459,17 @@ public:
         const volScalarField& phiG() const noexcept { return phiG_; }
         const volScalarField& k() const noexcept { return k_; }
         const volScalarField& p() const noexcept { return *pPtr_; }
+
+        //- Gas mass flux through the faces of the last solve, relative to
+        //  the grains (Darcy-Ergun, and in the void Ug) [kg/s], out of the
+        //  owner (WP T.4: the gas temperature is carried by it)
+        const surfaceScalarField& massFlux() const noexcept
+        {
+            return massFlux_;
+        }
+
+        //- Superficial gas flux relative to the grains per cell [m/s]
+        const volVectorField& qGas() const noexcept { return qGas_; }
         const gasDragModel& dragModel() const noexcept { return *dragModel_; }
 
         //- Gas mass in the domain, all processors [kg]

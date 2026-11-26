@@ -329,7 +329,7 @@ adiabatic wall, and <code>fixedGradient</code> with <code>gradient</code> = q/k 
 with a flux q in W/m&sup2; (gradient along the outward normal). celFoam prints the thermal energy,
 the heat that has entered through the boundaries and their balance at each write.
 Immersed STL walls and bodies do not yet work with temperature (WP T.2b).</p>
-<pre><code>model        equilibrium;   // none | equilibrium
+<pre><code>model        equilibrium;   // none | equilibrium | twoTemperature
 c            830;           // specific heat of the grains, J/(kg K)
 conductivity constant;      // constant | zehnerSchlunder
 k            0.25;          // bed conductivity, W/(m K)
@@ -341,7 +341,7 @@ walls
 <table>
 <thead><tr><th>Keyword</th><th>Default</th><th>Meaning</th></tr></thead>
 <tbody>
-<tr><td><code>model</code></td><td><code>none</code></td><td><code>none</code> switches temperature off; <code>equilibrium</code> (WP T.1) carries one temperature per cell, conducted through the bed (explicit finite volume with the non-orthogonal correction, exact for a linear temperature on leaning cells)</td></tr>
+<tr><td><code>model</code></td><td><code>none</code></td><td><code>none</code> switches temperature off; <code>equilibrium</code> (WP T.1) carries one temperature per cell, conducted through the bed (explicit finite volume with the non-orthogonal correction, exact for a linear temperature on leaning cells); with the pore gas (<code>constant/gasProperties</code>, WP T.4) the gas shares that temperature, adds its heat capacity and carries heat with its flow. <code>twoTemperature</code> (WP T.4, needs the pore gas) gives the gas its own temperature <code>0/Tg</code> (its inlet patches set the temperature of the air blown in), conducted with (1 &minus; &radic;phi<sub>s</sub>) <code>kGas</code>, carried with the gas flow (upwind) and exchanging heat with the grains by Gunn's (1978) correlation, h = Nu kGas/d on the grain surface 6 phi<sub>s</sub>/d per volume; checked against Schumann (1929) within 0.4 %</td></tr>
 <tr><td><code>c</code></td><td>required</td><td>Specific heat of the grains, J/(kg K); a cell stores rho c V T with rho the bulk density</td></tr>
 <tr><td><code>conductivity</code></td><td><code>constant</code></td><td>Bed conductivity model: <code>constant</code> uses <code>k</code>; <code>zehnerSchlunder</code> (WP T.3) computes it per cell from the packing of the filled part, rho/(alpha rhoP), with Zehner and Schl&uuml;nder (1970) as split by Kuipers et al. (1992), and writes it as the field <code>kBed</code></td></tr>
 <tr><td><code>kParticle</code></td><td>required for <code>zehnerSchlunder</code></td><td>Conductivity of the grain material, W/(m K)</td></tr>
@@ -350,6 +350,8 @@ walls
 <tr><td><code>walls</code></td><td>none</td><td>Sub-dictionary per patch, overriding its <code>0/T</code> type (WP T.3): <code>{ h 50; Tinf 350; }</code> is a convective wall (heat transfer coefficient h in W/(m&sup2; K) to a surrounding temperature Tinf, in series with the half cell); <code>{ q 1000; }</code> a heat flux into the material in W/m&sup2;. A fixed wall temperature with a contact resistance R is <code>h</code> = 1/R</td></tr>
 <tr><td><code>k</code></td><td>required</td><td>Bed (effective) conductivity, W/(m K); empty cells do not conduct and a partly filled face conducts with the smaller fill fraction</td></tr>
 <tr><td><code>limiter</code></td><td><code>superbee</code></td><td>Remap limiter of T (WP T.2): the temperature moves with the material, mass weighted, so its heat is conserved exactly; <code>superbee</code> keeps fronts within 2 cells, as the history fields; <code>MC</code> and the others of <code>remapLimiters</code> also work</td></tr>
+<tr><td><code>cGas</code></td><td>1006</td><td>Specific heat of the gas at constant pressure, J/(kg K) (WP T.4; air)</td></tr>
+<tr><td><code>TgVoid</code></td><td><code>voidT</code></td><td>Gas temperature held in empty cells of a <code>poreGas</code> case (the surrounding atmosphere), K (WP T.4)</td></tr>
 <tr><td><code>voidT</code></td><td>293.15</td><td>Temperature written in empty cells, K (they hold no heat). Open outlets carry the heat of the material out; an open inlet brings material at the value of its patch in <code>0/T</code> (make it <code>fixedValue</code>); celFoam prints the net heat carried in</td></tr>
 </tbody>
 </table>

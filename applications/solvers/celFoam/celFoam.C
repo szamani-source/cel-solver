@@ -105,7 +105,7 @@ int main(int argc, char *argv[])
 
     // Temperature (WP T.1, decision 0135): null without
     // constant/thermalProperties or with model none (nothing changes)
-    autoPtr<heatTransfer> thermal(heatTransfer::New(solid));
+    autoPtr<heatTransfer> thermal(heatTransfer::New(solid, gas.get()));
 
     // Reaction output: force of the material on each body, every step
     autoPtr<OFstream> forceFile;

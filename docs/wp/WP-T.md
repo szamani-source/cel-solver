@@ -34,6 +34,12 @@ restart and MPI. Plan approved by Sia 2026-11-26 (decision 0135).
 
 ## Log
 
+- 2026-11-26: T.4 done. `model twoTemperature` (field `Tg`, Gunn exchange) and
+  `equilibrium` with the gas; keywords `cGas`, `TgVoid`; poreGas accessors
+  `massFlux()`, `qGas()`; celThermal links celFluid. `tests/test_gas_heat.sh`
+  (about 30 s): Schumann gas 0.38 % and grains 0.26 % (limit 1 %), equilibrium
+  front speed -0.02 %, uniform T under flow 1e-14, energy balance drift 2e-15,
+  2 processors 2e-13. Next: T.5.
 - 2026-11-26: T.3 done. thermalProperties `walls` (convective h, Tinf; heat flux q),
   `conductivity zehnerSchlunder` (`kParticle`, `kGas`, `rhoP`; field `kBed`).
   `tests/test_thermal_walls.sh` (about 25 s): slab against Carslaw-Jaeger 0.006 %

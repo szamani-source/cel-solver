@@ -344,7 +344,7 @@ processors against serial (1e-10). Brief: `docs/wp/WP-T.md`. References:
 | T.2 | Temperature moves with the material: remap, free surface, outlet, inlet | Translating hot block keeps its energy to 1e-12, edges 2 cells or fewer; discharge energy balance (inside + out = start) 1e-12; uniform tank stays uniform exactly | 3 h |
 | T.2b | Temperature with immersed STL walls and bodies (split from T.2) | The small-cell mixing and covered-cell fill carry T; energy to 1e-12 in an STL hopper with an outlet | 2 h |
 | T.3 | Convective and heat-flux walls; Zehner-Schluender bed conductivity | Cooling slab at Bi 1 and 10 against the Carslaw-Jaeger series within 1 %; k_eff equals the closed form to 1e-12 | 2 h |
-| T.4 | Gas temperature and grain-gas exchange (Gunn); `equilibrium` option | Hot gas through a cold packed bed against Schumann within 3 %; equilibrium front speed within 1 %; uniform temperature under flow to 1e-12 | 5 h |
+| T.4 | Gas temperature and grain-gas exchange (Gunn); `equilibrium` option | Hot gas through a cold packed bed against Schumann within 1 % (planned 3 %, tightened: 20 % in h moves theta 3 %); equilibrium front speed within 1 %; uniform temperature under flow to 1e-12 | 5 h |
 | T.5 | Gas heat transport in the void | Flow between heated plates, Nu_Dh against 7.541 within 3 % | 3 h |
 | T.6 | Moving bed past a heated wall (validation) | Plug flow between heated plates against the slug-flow solution with the wall gap within 5 %; against Adapa et al. (2024) measured h within 20 %; mesh shown to Sia first | 2 h + 2 h runs |
 | T.7 | Gas density and viscosity with temperature; plastic heating (after the F.8 thread ends) | Sealed heated box keeps p/T to 1e-10; adiabatic shear rise beta W/(rho c) to 1e-10; T.4 and T.5 within 1 % | 4 h |
