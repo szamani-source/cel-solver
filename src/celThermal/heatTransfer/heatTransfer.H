@@ -44,9 +44,22 @@ Description
         model        equilibrium;   // none | equilibrium (T.1);
                                     // twoTemperature from T.4
         c            830;           // specific heat of the grains [J/(kg K)]
-        conductivity constant;      // bed conductivity model (T.3 adds
-                                    // zehnerSchlunder)
-        k            0.25;          // bed conductivity [W/(m K)]
+        conductivity constant;      // constant | zehnerSchlunder (T.3)
+        k            0.25;          // bed conductivity [W/(m K)] (constant)
+        kParticle    3;             // zehnerSchlunder: grain material [W/(m K)]
+        kGas         0.02569;       // zehnerSchlunder: gas [W/(m K)], air 20 C
+        rhoP         2650;          // zehnerSchlunder: grain density [kg/m^3]
+        walls                       // optional, overrides the 0/T patch type
+        {
+            hot  { h 50; Tinf 350; }   // convective (film + half cell)
+            side { q 1000; }           // heat flux into the material [W/m^2]
+        }
+
+    WP T.3: zehnerSchlunder takes the packing of the filled part,
+    phi_s = rho/(alpha rhoP), per cell (Zehner and Schluender 1970 as split
+    by Kuipers et al. 1992; docs/spec/thermal-references.md); faces use the
+    harmonic mean of the two cells. Convective walls put the film 1/h and
+    the half cell 1/(k delta) in series (no non-orthogonal correction).
         limiter      superbee;      // remap limiter of T (T.2), as the
                                     // history fields (decision 0017)
         voidT        293.15;        // written in empty cells [K] (T.2)
@@ -103,6 +116,12 @@ class heatTransfer
         word conductivity_;
         scalar k_;
 
+        //- Zehner-Schluender inputs (WP T.3): gas and particle
+        //  conductivity [W/(m K)], particle density [kg/m^3]
+        scalar kGas_;
+        scalar kParticle_;
+        scalar rhoP_;
+
         //- Temperature of the grains [K]
         volScalarField T_;
 
@@ -123,6 +142,17 @@ class heatTransfer
         word limiter_;
         scalar voidT_;
 
+        //- Bed conductivity per cell [W/(m K)] (written as kBed with
+        //  zehnerSchlunder)
+        volScalarField kCell_;
+
+        //- Wall heat transfer per patch (WP T.3)
+        enum wallKind { NONE, CONVECTIVE, FLUX };
+        List<wallKind> wallType_;
+        scalarList wallH_;
+        scalarList wallTinf_;
+        scalarList wallQ_;
+
         //- Sub-cycles used in the last step
         label nSub_;
 
@@ -134,6 +164,9 @@ class heatTransfer
 
         //- The same as a field with processor halos
         tmp<volScalarField> fillField() const;
+
+        //- Bed conductivity per cell from the current packing
+        void correctK();
 
         //- One explicit conduction step of length dt
         void conduct(const scalar dt);

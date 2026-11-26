@@ -84,3 +84,11 @@ fluxes; the gas is isothermal at the case temperature.
   A plain Mohr-Coulomb stream landing in a box parts serial and parallel runs of the
   solid itself after about 0.2 s (amplified round-off, decision 0134); T matches to
   2e-15 until then and to 2e-14 across processor cuts in a carried block.
+- T.3 (2026-11-26): walls in `thermalProperties` (`walls { patch { h; Tinf; } }` or
+  `{ q; }`), as the solid's `walls` live in materialProperties, rather than new
+  `0/T` patch types: no new boundary-condition classes to register, and the film
+  1/h is put in series with the half cell 1/(k delta) so the slab matches the
+  Carslaw-Jaeger series within 0.02 % at Bi 10. A wall at a fixed temperature with
+  a contact resistance (the moving-bed air gap of T.6) is the same with h = 1/R.
+  `zehnerSchlunder` takes the packing of the filled part per cell and faces use
+  the harmonic mean (series conduction); `constant` keeps k exactly.

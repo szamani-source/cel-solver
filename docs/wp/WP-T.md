@@ -34,6 +34,12 @@ restart and MPI. Plan approved by Sia 2026-11-26 (decision 0135).
 
 ## Log
 
+- 2026-11-26: T.3 done. thermalProperties `walls` (convective h, Tinf; heat flux q),
+  `conductivity zehnerSchlunder` (`kParticle`, `kGas`, `rhoP`; field `kBed`).
+  `tests/test_thermal_walls.sh` (about 25 s): slab against Carslaw-Jaeger 0.006 %
+  (Bi 1) and 0.021 % (Bi 10), energy 2e-15, 2 processors identical, q A t to 6e-14,
+  kBed against the reference tool 2e-16. Lesson: after changing a celThermal header
+  rebuild celFoam too (Allwmake), or it crashes at exit. Next: T.4.
 - 2026-11-26: T.2 done. `eulerianSolid::addPassenger` and `storeRemapMass`;
   heatTransfer `beforeRemap`/`afterRemap`, `limiter` (default superbee), `voidT`;
   celFoam prints "Heat carried in". `tests/test_carried_temperature.sh` (about 30 s):
