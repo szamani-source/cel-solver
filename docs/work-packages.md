@@ -317,6 +317,7 @@ each. Briefs: `docs/wp/WP-F.x.md`. References: `docs/spec/gas-references.md`.
 | F.7 | Gas through and around grains; more drag laws (`ergun`, `wenYu`, `diFelice`, `syamlalOBrien`, `beetstra`) | Each law matches its closed form to 1e-10; with `ergunWenYu`, U_mf against Wen-Yu within 10 % and settling against Richardson-Zaki within 10 %; Stage A within 1 % | 6 h |
 | F.8 | Collapse in gas (end of Stage B) | Fluidised dam break against Roche et al. (2010) within 20 % (fall-back Rondon et al. 2011); mesh shown to Sia first | 2 h + 2 h runs |
 | F.9a | Parallel runs with gas: why they part from serial (Sia, 2026-11-26; split from F.9) | Processor-boundary values of every gas and solid field consistent to 1e-12 (`parallelCheck`); serial and parallel before lift within 1e-10 (p); the parting after lift explained; `tests/test_gas_parallel.sh`; decision 0134 | 3 h |
+| F.9b | Range of validity of the gas coupling (Sia, 2026-11-26) | Lift check warns on the onset bed within 0.9-1.1 U_mf and not on the fine hopper; range table in the manual; `tests/test_gas_validity.sh`; decision 0135 | 2 h |
 | F.9 | Restart, MPI, tutorial, manual, v2.0.0 | Restart and 2/4 processors match serial to 1e-12 on F.5 and F.8; scaling: gas costs at most 1.5x per step, 4 processors at least 2.5x serial; `tutorials/gasHopper`; manual chapter; release | 4 h |
 
 Validation pack (Sia, 2026-11-24: "Include all four in validation pack"). Each runs on 1,

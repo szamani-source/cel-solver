@@ -305,6 +305,10 @@ coupled yes;            // gas pressure acts on the solid</code></pre>
 <tr><td><code>inertiaForce</code></td><td><code>no</code></td><td><code>gasFlow</code>: apply the reaction of the pore gas inertia to the grains (about 0.1 % of the force; explicit, it destabilised a lifting bed, so it is off)</td></tr>
 <tr><td><code>parallelCheck</code></td><td><code>no</code></td><td>Debug (WP F.9a, decision 0134): on every processor cut, compare each gas and solid field with the neighbour processor&rsquo;s values (stale halos, one-sided face values) and print the largest mismatch as &ldquo;Parallel check&rdquo;; round-off (below 1e-12) means the boundaries are right</td></tr>
 <tr><td><code>parallelCheckEvery</code></td><td>1</td><td>With <code>parallelCheck yes</code>: check every this many steps</td></tr>
+<tr><td><code>liftCheck</code></td><td><code>yes</code></td><td>Range of validity (decision 0135): each step, the share of the grain mass whose weight the gas carries (upward gas force on a cell at least <code>liftRatio</code> times its weight); printed at write times as &ldquo;Gas lift&rdquo;, with a warning once it stays above <code>liftWarn</code> for <code>liftTime</code>. A lifting or expanding bed is outside the range of the gas coupling (see below)</td></tr>
+<tr><td><code>liftRatio</code></td><td>1</td><td>With <code>liftCheck yes</code>: a cell counts as carried at this ratio of upward gas force to weight</td></tr>
+<tr><td><code>liftWarn</code></td><td>0.01</td><td>With <code>liftCheck yes</code>: warn when this share of the grain mass is carried &hellip;</td></tr>
+<tr><td><code>liftTime</code></td><td>0.01</td><td>&hellip; for this long, in s (short spikes when an outlet opens are not a lift)</td></tr>
 </tbody>
 </table>
 <p>celFoam writes three more fields: <code>phiS</code>, the solids volume fraction
@@ -319,6 +323,25 @@ in m/s. <code>p</code> is the gauge pressure (absolute minus <code>p0</code>). I
 <p>Gas velocity (WP F.6, <code>model gasFlow</code>): <code>0/Ug</code> is optional; without it walls are no-slip
 and open patches zeroGradient. celFoam writes <code>Ug</code>; inside the material the gas follows the
 pore-pressure law, with its momentum when <code>poreInertia yes</code> (WP F.7).</p>
+<h3 id="gas-validity">Where the gas coupling is valid</h3>
+<p>The grains stay at their packed density: a bed that stretches opens void inside its cells
+instead of loosening, and the gas sees the permeability of the packed part (decision 0135). The
+coupling is therefore valid while the grains&rsquo; own stress carries their weight, less the gas&rsquo;s
+share, and not once the gas carries all of it.</p>
+<table>
+<thead><tr><th>Situation</th><th>Valid?</th><th>Checked by</th></tr></thead>
+<tbody>
+<tr><td>Pore pressure in a packed or consolidating bed (drainage, venting, compaction)</td><td>Yes</td><td>Terzaghi column, Ergun bed (pack tests 1, 3)</td></tr>
+<tr><td>Gas through a packed bed up to the onset of fluidisation (U_mf)</td><td>Yes</td><td>U_mf within 3 % of Wen and Yu (pack test 2)</td></tr>
+<tr><td>Air-impeded discharge of fine powder from a hopper or silo</td><td>Yes</td><td>gas on against off, Crewdson trend (pack test 4)</td></tr>
+<tr><td>Gas flow in the void around the material (free surface, outlets)</td><td>Yes</td><td>Poiseuille, venting column (decision 0131)</td></tr>
+<tr><td>Flows where the gas carries part of the weight, the grains still in contact</td><td>Yes, while <code>liftCheck</code> stays quiet</td><td>the share printed as &ldquo;Gas lift&rdquo;</td></tr>
+<tr><td>Uniform settling of a dilute slab as one block</td><td>Approximately (+7.6 % of Richardson and Zaki)</td><td>settling test (decision 0132)</td></tr>
+<tr><td>Fluidised flows of powder (gas-supported dam break)</td><td>Not validated: run-out 60 % short of Roche (2008)</td><td>decision 0133, work in progress</td></tr>
+<tr><td>A bed above U_mf: lifted, expanded, bubbling or slugging; dilute suspensions; pneumatic conveying</td><td>No: use a two-fluid model (OpenFOAM&rsquo;s twoPhaseEulerFoam or multiphaseEulerFoam)</td><td><code>liftCheck</code> warns</td></tr>
+</tbody>
+</table>
+
 
 <h2 id="fields">Initial fields</h2>
 <p>celFoam reads these fields from the start time folder if they are there, and otherwise
