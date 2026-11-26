@@ -320,6 +320,28 @@ in m/s. <code>p</code> is the gauge pressure (absolute minus <code>p0</code>). I
 and open patches zeroGradient. celFoam writes <code>Ug</code>; inside the material the gas follows the
 pore-pressure law, with its momentum when <code>poreInertia yes</code> (WP F.7).</p>
 
+<h2 id="thermal">Temperature (version 2, in progress): constant/thermalProperties</h2>
+<p>Temperature in the granular material (decision 0135, packages T.1 to T.8). Without this file,
+or with <code>model none</code>, celFoam runs exactly as without temperature. With it the start
+time must hold the field <code>0/T</code> (kelvin); its patch types are the thermal boundary
+conditions: <code>fixedValue</code> holds a wall temperature, <code>zeroGradient</code> is an
+adiabatic wall, and <code>fixedGradient</code> with <code>gradient</code> = q/k heats the material
+with a flux q in W/m&sup2; (gradient along the outward normal). celFoam prints the thermal energy,
+the heat that has entered through the boundaries and their balance at each write.</p>
+<pre><code>model        equilibrium;   // none | equilibrium
+c            830;           // specific heat of the grains, J/(kg K)
+conductivity constant;      // bed conductivity model
+k            0.25;          // bed conductivity, W/(m K)</code></pre>
+<table>
+<thead><tr><th>Keyword</th><th>Default</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>model</code></td><td><code>none</code></td><td><code>none</code> switches temperature off; <code>equilibrium</code> (WP T.1) carries one temperature per cell, conducted through the bed (explicit finite volume with the non-orthogonal correction, exact for a linear temperature on leaning cells)</td></tr>
+<tr><td><code>c</code></td><td>required</td><td>Specific heat of the grains, J/(kg K); a cell stores rho c V T with rho the bulk density</td></tr>
+<tr><td><code>conductivity</code></td><td><code>constant</code></td><td>Bed conductivity model: <code>constant</code> uses <code>k</code></td></tr>
+<tr><td><code>k</code></td><td>required</td><td>Bed (effective) conductivity, W/(m K); empty cells do not conduct and a partly filled face conducts with the smaller fill fraction</td></tr>
+</tbody>
+</table>
+
 <h2 id="fields">Initial fields</h2>
 <p>celFoam reads these fields from the start time folder if they are there, and otherwise
 creates them with the default:</p>

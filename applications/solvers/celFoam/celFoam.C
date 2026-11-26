@@ -25,6 +25,7 @@ Description
 #include "bodyCells.H"
 #include "immersedWalls.H"
 #include "poreGas.H"
+#include "heatTransfer.H"
 #include <cmath>
 
 // Print total mass and momentum with enough digits to compare runs
@@ -101,6 +102,10 @@ int main(int argc, char *argv[])
             solid.setGasForce(*gas->gasForcePtr());
         }
     }
+
+    // Temperature (WP T.1, decision 0135): null without
+    // constant/thermalProperties or with model none (nothing changes)
+    autoPtr<heatTransfer> thermal(heatTransfer::New(solid));
 
     // Reaction output: force of the material on each body, every step
     autoPtr<OFstream> forceFile;
@@ -222,9 +227,18 @@ int main(int argc, char *argv[])
             gas->solve(dt);             // WP F.2, F.3: pore pressure
         }
 
+        if (thermal)
+        {
+            thermal->solve(dt);         // WP T.1: conduction
+        }
+
         if (runTime.write())
         {
             printDiagnostics(solid);
+            if (thermal)
+            {
+                thermal->report();
+            }
             solid.writeState();     // WP 6.2: restart state (decision 0081)
             bodies.write();
             forAll(solid.bodyNames(), b)

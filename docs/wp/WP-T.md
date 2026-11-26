@@ -34,6 +34,15 @@ restart and MPI. Plan approved by Sia 2026-11-26 (decision 0135).
 
 ## Log
 
+- 2026-11-26: T.1 done. `src/celThermal` (`heatTransfer`), `constant/thermalProperties`
+  (`model equilibrium`, `c`, `conductivity constant`, `k`), field `T`, celFoam calls it
+  after the gas and prints thermal energy, heat in and their balance at each write.
+  `tests/test_conduction.sh` (about 15 s): erfc 0.012 % (limit 1 %), heat in -0.024 %,
+  constant flux 0.006 %, linear temperature on 27 deg cells exactly steady, energy
+  7e-15 adiabatic and 3e-15 with a heated face, 2/4 processors 6e-15, off = byte for
+  byte. Lessons in decision 0135 (processor patch values, patch delta). Manual: new
+  thermalProperties section in case-setup.html. Next: T.2 (temperature carried by
+  the remap).
 - 2026-11-26: T.0 done. `tools/thermal_reference.py` (pure Python) and
   `tests/test_thermal_reference.sh` (about 20 s): erfc and the cooled slab against
   finite differences and Incropera Table 5.1, Zehner-Schluender limits and bounds, Gunn

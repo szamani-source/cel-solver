@@ -15,6 +15,8 @@ Formulas (sources in docs/spec/thermal-references.md):
                           conductivity k = k0 (T/T0)^1.5 (T0 + S)/(T + S),
                           k0 = 0.0241 W/(m K), T0 = 273.15 K, S = 194 K
     Step at a face (T.1): T - T0 = dT erfc(x / (2 sqrt(a t))),  a = k/(rho c)
+    Flux q into a face (T.1): T - T0 = 2 q/k sqrt(a t/pi) exp(-x^2/(4 a t))
+                                       - q x/k erfc(x / (2 sqrt(a t)))
     Slab cooled by convection on both faces (T.3), half thickness L, Bi = h L/k:
                           theta = sum C_n exp(-z_n^2 Fo) cos(z_n x/L),  Fo = a t/L^2
                           z_n tan z_n = Bi,  C_n = 4 sin z_n / (2 z_n + sin 2 z_n)
@@ -87,6 +89,13 @@ def air_prandtl(T=T_REF):
 
 def erfc_step(x, t, a, T0=0.0, dT=1.0):
     return T0 + dT * math.erfc(x / (2.0 * math.sqrt(a * t)))
+
+
+def flux_step(x, t, a, k, q, T0=0.0):
+    """Half-space heated by a constant flux q at x = 0 (Carslaw and Jaeger 2.9)."""
+    r = math.sqrt(a * t)
+    return T0 + 2.0 * q / k * r / math.sqrt(math.pi) * math.exp(-x * x / (4.0 * r * r)) \
+        - q * x / k * math.erfc(x / (2.0 * r))
 
 
 def slab_roots(Bi, n=60):
@@ -400,6 +409,21 @@ def check():
         T, t = new, t + step
     err = max(abs(T[i] - erfc_step((i + 0.5) * h, 1.0, a)) for i in range(n))
     report("erfc step vs finite differences", err, 2e-3)
+
+    # constant flux q = 1 (k = 1) into the half-space against finite differences
+    T = [0.0] * n
+    t = 0.0
+    while t < 1.0 - 1e-12:
+        step = min(dt, 1.0 - t)
+        new = T[:]
+        for i in range(n):
+            left = T[0] + h * 1.0 if i == 0 else T[i - 1]   # -dT/dx = q/k at x = 0
+            right = T[i] if i == n - 1 else T[i + 1]
+            new[i] = T[i] + a * step / (h * h) * (left - 2 * T[i] + right)
+        T, t = new, t + step
+    err = max(abs(T[i] - flux_step((i + 0.5) * h, 1.0, a, 1.0, 1.0)) for i in range(n))
+    report("constant-flux face vs finite differences", err / flux_step(0, 1.0, a, 1.0, 1.0),
+           2e-3)
 
     # slab: roots against Incropera Table 5.1 and series against finite differences
     for Bi, z1, C1 in ((1.0, 0.8603, 1.1191), (10.0, 1.4289, 1.2620)):

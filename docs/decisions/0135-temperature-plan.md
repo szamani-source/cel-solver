@@ -57,3 +57,17 @@ fluxes; the gas is isothermal at the case temperature.
 - Out of scope: thermal expansion and stress, temperature-dependent friction or
   cohesion, radiation beyond the Zehner-Schluender form, moisture and drying, phase
   change, reactions.
+
+## Implementation notes
+
+- T.1 (2026-11-26): class `heatTransfer` in `src/celThermal`. Face flux
+  k_f |S| [(T_N - T_P) delta + c . grad T] with OpenFOAM's over-relaxed
+  `nonOrthDeltaCoeffs` and `nonOrthCorrectionVectors` and a Gauss gradient with
+  linear face values, written out by hand (no `fvSchemes` entries needed). Two
+  OpenFOAM details matter: a processor patch field holds the neighbour cell values,
+  not face values, so the gradient interpolates them; and `fvPatch::delta()` is only
+  the normal part on non-coupled patches, so Dirichlet faces use Cf - C for the
+  non-orthogonal correction. With these a linear temperature on 27 deg cells is
+  exactly steady and 2/4 processors match serial to 6e-15. k_f = k min(a_P, a_N)
+  (a = material fraction), so void neither stores nor conducts heat; how
+  temperature crosses the free surface with the material is T.2.
