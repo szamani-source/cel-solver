@@ -7,5 +7,6 @@ gasDragModels/syamlalOBrien/syamlalOBrien.C
 gasDragModels/beetstra/beetstra.C
 poreGas/poreGas.C
 poreGas/poreGasFlow.C
+poreGas/poreGasParallelCheck.C
 
 LIB = $(FOAM_USER_LIBBIN)/libcelFluid
