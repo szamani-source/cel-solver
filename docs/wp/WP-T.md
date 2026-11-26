@@ -34,6 +34,16 @@ restart and MPI. Plan approved by Sia 2026-11-26 (decision 0135).
 
 ## Log
 
+- 2026-11-26: T.8 done. `tests/test_thermal_restart_mpi.sh` (about 2.5 min): T.4
+  column and T.6 bed restarted and on 2/4 processors within 3e-13; temperature
+  1.0-1.1x a gas-on step (capacities and limits now computed once per step).
+  Tutorial `tutorials/hotSiloDischarge` (T0 tank, 150 C layer under 20 C, cooled
+  walls, Zehner-Schluender; README, plot.py; `tests/test_hot_silo_tutorial.sh`,
+  22 s). Validation pack `tests/validation/thermal` (Allrun, about 5 min): T.4,
+  T.5, T.6 on 1/2/4 processors. Manual: case setup, quick start, Validation
+  (Temperature table), References. Lesson: oversubscribed MPI next to another
+  run can take 40x longer (602 s against 14 s); time packs on a quiet machine.
+  Left: T.7 (after the dam-break thread), T.2b (STL walls).
 - 2026-11-26: T.6 done. Adapa et al. (2024) moving bed between plates:
   `tests/test_moving_bed_heat.sh` (about 50 s): local Nu within 0.45 % of the
   slug-flow solution with the gap, mean h 291.3 against 292.8 W/(m^2 K) (-0.52 %),

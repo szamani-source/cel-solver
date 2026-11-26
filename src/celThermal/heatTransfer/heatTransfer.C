@@ -803,6 +803,17 @@ void Foam::heatTransfer::afterRemap()
 }
 
 
+Foam::label Foam::heatTransfer::nSubCycles
+(
+    const scalar dt,
+    const scalar dtc
+)
+{
+    // Sub-cycle when the step exceeds half the explicit limit
+    return dt > 0.5*dtc ? label(std::ceil(dt/(0.5*dtc))) : label(1);
+}
+
+
 Foam::scalar Foam::heatTransfer::stableDeltaT() const
 {
     const tmp<volScalarField> tAVol(fillField());
@@ -995,14 +1006,15 @@ Foam::scalar Foam::heatTransfer::advect
 }
 
 
-void Foam::heatTransfer::exchange(const scalar dt)
+void Foam::heatTransfer::exchange
+(
+    const scalar dt,
+    const scalarField& Cs,
+    const scalarField& Cg
+)
 {
     // Grain-gas heat transfer, Gunn (1978), implicit and exact per cell:
     // the difference decays as exp(-H (1/Cs + 1/Cg) dt), Cs Ts + Cg Tg kept
-    const tmp<scalarField> tCs(capacity());
-    const tmp<scalarField> tCg(gasCapacity());
-    const scalarField& Cs = tCs();
-    const scalarField& Cg = tCg();
     const scalarField& rho = solid_.rho().primitiveField();
     const tmp<scalarField> tA(fill());
     const scalarField& a = tA();
@@ -1046,19 +1058,14 @@ void Foam::heatTransfer::exchange(const scalar dt)
 
 void Foam::heatTransfer::solve(const scalar dt)
 {
+    // Capacities, fill fractions and the limit are computed once per step
     correctK();
-    const scalar dtc = stableDeltaT();
-    nSub_ = 1;
-    if (dt > 0.5*dtc)
-    {
-        nSub_ = label(std::ceil(dt/(0.5*dtc)));
-    }
-    const scalar h = dt/nSub_;
-
     const tmp<volScalarField> tAVol(fillField());
-    tmp<scalarField> tCs(capacity());
+    const tmp<scalarField> tCs(capacity());
     if (!gas_)
     {
+        nSub_ = nSubCycles(dt, stableDeltaT(kCell_, tAVol(), tCs()));
+        const scalar h = dt/nSub_;
         for (label n = 0; n < nSub_; ++n)
         {
             heatIn_ += conduct(T_, kCell_, tAVol(), tCs(), true, h);
@@ -1087,6 +1094,8 @@ void Foam::heatTransfer::solve(const scalar dt)
     if (!twoT())
     {
         const scalarField C(tCs() + tCg());
+        nSub_ = nSubCycles(dt, stableDeltaT(kCell_, tAVol(), C));
+        const scalar h = dt/nSub_;
         for (label n = 0; n < nSub_; ++n)
         {
             heatIn_ += conduct(T_, kCell_, tAVol(), C, true, h);
@@ -1096,13 +1105,23 @@ void Foam::heatTransfer::solve(const scalar dt)
     }
 
     const tmp<volScalarField> tOne(fillField(true));
+    nSub_ = nSubCycles
+    (
+        dt,
+        min
+        (
+            stableDeltaT(kCell_, tAVol(), tCs()),
+            stableDeltaT(kGasCell_, tOne(), tCg())
+        )
+    );
+    const scalar h = dt/nSub_;
     for (label n = 0; n < nSub_; ++n)
     {
         heatIn_ += conduct(T_, kCell_, tAVol(), tCs(), true, h);
         heatIn_ += conduct(Tg_(), kGasCell_, tOne(), tCg(), false, h);
     }
     carriedIn_ += advect(Tg_(), F, tCg(), dt);
-    exchange(dt);
+    exchange(dt, tCs(), tCg());
 
     // Void cells of a poreGas (not gasFlow) case are the atmosphere
     if (solid_.freeSurface() && !gas_->flow())

@@ -221,8 +221,17 @@ class heatTransfer
             const scalar dt
         );
 
-        //- Grain-gas exchange (Gunn), implicit (WP T.4)
-        void exchange(const scalar dt);
+        //- Grain-gas exchange (Gunn), implicit (WP T.4), with the grain
+        //  and gas heat capacities per cell
+        void exchange
+        (
+            const scalar dt,
+            const scalarField& Cs,
+            const scalarField& Cg
+        );
+
+        //- Sub-cycles for a step dt against the explicit limit dtc
+        static label nSubCycles(const scalar dt, const scalar dtc);
 
         bool twoT() const noexcept { return model_ == "twoTemperature"; }
 

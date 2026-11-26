@@ -328,7 +328,9 @@ conditions: <code>fixedValue</code> holds a wall temperature, <code>zeroGradient
 adiabatic wall, and <code>fixedGradient</code> with <code>gradient</code> = q/k heats the material
 with a flux q in W/m&sup2; (gradient along the outward normal). celFoam prints the thermal energy,
 the heat that has entered through the boundaries and their balance at each write.
-Immersed STL walls and bodies do not yet work with temperature (WP T.2b).</p>
+Immersed STL walls and bodies do not yet work with temperature (WP T.2b). The tutorial
+<code>hotSiloDischarge</code> uses this file; <code>tests/validation/thermal</code> checks it against
+Schumann (1929), the laminar Nusselt number between plates and Adapa et al. (2024).</p>
 <pre><code>model        equilibrium;   // none | equilibrium | twoTemperature
 c            830;           // specific heat of the grains, J/(kg K)
 conductivity constant;      // constant | zehnerSchlunder
@@ -343,7 +345,7 @@ walls
 <tbody>
 <tr><td><code>model</code></td><td><code>none</code></td><td><code>none</code> switches temperature off; <code>equilibrium</code> (WP T.1) carries one temperature per cell, conducted through the bed (explicit finite volume with the non-orthogonal correction, exact for a linear temperature on leaning cells); with the pore gas (<code>constant/gasProperties</code>, WP T.4) the gas shares that temperature, adds its heat capacity and carries heat with its flow. <code>twoTemperature</code> (WP T.4, needs the pore gas) gives the gas its own temperature <code>0/Tg</code> (its inlet patches set the temperature of the air blown in), conducted with (1 &minus; &radic;phi<sub>s</sub>) <code>kGas</code>, carried with the gas flow (upwind) and exchanging heat with the grains by Gunn's (1978) correlation, h = Nu kGas/d on the grain surface 6 phi<sub>s</sub>/d per volume; checked against Schumann (1929) within 0.4 %</td></tr>
 <tr><td><code>c</code></td><td>required</td><td>Specific heat of the grains, J/(kg K); a cell stores rho c V T with rho the bulk density</td></tr>
-<tr><td><code>conductivity</code></td><td><code>constant</code></td><td>Bed conductivity model: <code>constant</code> uses <code>k</code>; <code>zehnerSchlunder</code> (WP T.3) computes it per cell from the packing of the filled part, rho/(alpha rhoP), with Zehner and Schl&uuml;nder (1970) as split by Kuipers et al. (1992), and writes it as the field <code>kBed</code></td></tr>
+<tr><td><code>conductivity</code></td><td><code>constant</code></td><td>Bed conductivity model: <code>constant</code> uses <code>k</code>; <code>zehnerSchlunder</code> (WP T.3) computes it per cell from the packing of the filled part, rho/(alpha rhoP), with Zehner and Schl&uuml;nder <a class="cite" href="references.html#ref-zehner1970">1970</a> as split by Kuipers et al. <a class="cite" href="references.html#ref-kuipers1992">1992</a>, and writes it as the field <code>kBed</code></td></tr>
 <tr><td><code>kParticle</code></td><td>required for <code>zehnerSchlunder</code></td><td>Conductivity of the grain material, W/(m K)</td></tr>
 <tr><td><code>kGas</code></td><td>0.02569</td><td>Conductivity of the gas in the pores, W/(m K) (air at 20 &deg;C)</td></tr>
 <tr><td><code>rhoP</code></td><td>required for <code>zehnerSchlunder</code></td><td>Density of the grains, kg/m&sup3;</td></tr>

@@ -129,3 +129,14 @@ fluxes; the gas is isothermal at the case temperature.
   and the local Nu was off by up to 20 % (the mean h by only 0.7 %). MC, the remap
   default of rho, U and sigma, gets 0.45 %. superbee stays available for sharp
   fronts (2 cells against 5); the T.2 front test now names it.
+- T.8 (2026-11-26): restart needs nothing new (T and Tg are written fields; the
+  heat counters restart from zero and the balance from the restarted energy):
+  the Schumann column and the moving bed restart and run on 2 and 4 processors
+  within 3e-13. The step computes the heat capacities, fill fractions and limit
+  once (they were recomputed up to four times), so temperature costs 1.0 to 1.1
+  times a gas-on step on the Schumann column (limit 1.2). The tutorial is
+  `hotSiloDischarge` (Sia's T0 tank with a hot lower layer and cooled walls) rather
+  than the planned `hotBedCooling`: in seconds of simulated time a bed barely cools
+  (conduction moves heat about 1 mm), while carrying heat with the flow shows the
+  funnel flow. Validation pack `tests/validation/thermal`: T.4, T.5 and T.6 on 1, 2
+  and 4 processors.

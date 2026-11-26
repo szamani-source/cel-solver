@@ -53,8 +53,8 @@ T0, DT0 = pc.T, 10.0
 END = 0.3
 
 
-def make(path):
-    pc.make_case(path, size=(LC, H), cells=(NX, NY), e=0.4, d=1e-3, end=END,
+def make(path, decomp=(1, 1, 1)):
+    pc.make_case(path, size=(LC, H), cells=(NX, NY), e=0.4, d=1e-3, end=END, decomp=decomp,
                  write_interval=0.1,
                  p_patches={"left": f"type fixedValue; value uniform {DP!r};",
                             "right": "type fixedValue; value uniform 0;"},
@@ -111,6 +111,19 @@ def bulk(path, t):
     return ((Tg - T0) * U).sum(axis=0) / U.sum(axis=0) / DT0, U
 
 
+def nusselt(p):
+    """Developed Nu_Dh from the decay of the bulk temperature at END, the
+    bulk profile and the mean speed."""
+    th, U = bulk(p, END)
+    x = (np.arange(NX) + 0.5) * LC / NX
+    sel = (x > 0.020) & (x < 0.055)
+    lam = -np.polyfit(x[sel], np.log(th[sel]), 1)[0]
+    rho = (pc.P0 + 0.5 * DP) / (287.05 * pc.T)
+    G = rho * U.mean(axis=0)[sel].mean()
+    h = lam * G * C_G * H / 2
+    return h * 2 * H / K_G, th, U
+
+
 def check(work):
     print("[A] Developed laminar heat transfer between plates (Graetz)", flush=True)
     p = os.path.join(work, "graetz")
@@ -118,15 +131,8 @@ def check(work):
     t0 = time.perf_counter()
     pc.run(p)
     secs = time.perf_counter() - t0
-    th, U = bulk(p, END)
+    nu, th, U = nusselt(p)
     th4, _ = bulk(p, END - 0.1)
-    x = (np.arange(NX) + 0.5) * LC / NX
-    sel = (x > 0.020) & (x < 0.055)
-    lam = -np.polyfit(x[sel], np.log(th[sel]), 1)[0]
-    rho = (pc.P0 + 0.5 * DP) / (287.05 * pc.T)
-    G = rho * U.mean(axis=0)[sel].mean()
-    h = lam * G * C_G * H / 2
-    nu = h * 2 * H / K_G
     want = tr.graetz_plates_nu()
     report("Nu against 7.5407", abs(nu / want - 1) < 0.03,
            f"Nu {nu:.4f} ({(nu / want - 1) * 100:+.2f} %, limit 3 %), mean speed "

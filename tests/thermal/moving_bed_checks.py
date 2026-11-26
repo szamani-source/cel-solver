@@ -66,8 +66,8 @@ PE = U_REAL * DH * RHO * CP / K_EFF
 GAP = R_NW * K_EFF / (4 * B)
 
 
-def make(path):
-    ca.controls(path, END, 0.1)
+def make(path, decomp=(1, 1, 1)):
+    ca.controls(path, END, 0.1, decomp)
     dz = DY
     cc.write(f"{path}/system/blockMeshDict", cc.HEADER.format(cls="dictionary", obj="blockMeshDict") + f"""
 scale 1;
@@ -116,18 +116,10 @@ walls {{ wall {{ q {Q!r}; }} }}
 """)
 
 
-def check(work):
-    print("[A] Moving bed past a heated wall against the slug-flow solution", flush=True)
-    print(f"    Pe {PE:.1f}, k_air {K_AIR:.4f} W/(m K), R_nw k/(4b) {GAP:.4f}, "
-          f"c scaled to {C_SIM:g} J/(kg K)", flush=True)
-    p = os.path.join(work, "bed")
-    make(p)
-    t0 = time.perf_counter()
-    cc.run(p)
-    secs = time.perf_counter() - t0
+def metrics(p, verbose=False):
+    """Largest local Nu error at x = 0.1, 0.25, 0.45 m, the mean h and the
+    mean h of eq. 9."""
     T = cc.read_internal(f"{p}/{END:g}/T").reshape(NY, NX)
-    rho = cc.read_internal(f"{p}/{END:g}/rho")
-    rho = np.full(NX * NY, RHO) if rho is None else rho
     x = (np.arange(NX) + 0.5) * LEN / NX
     Tm = T.mean(axis=0)
     Tw = T[0] + Q * (DY / 2) / K_EFF + Q * R_NW
@@ -138,9 +130,25 @@ def check(work):
         nu = Q / dT[i] * DH / K_EFF
         want = tr.slug_plates_nu_local(DH / x[i] * PE, GAP)
         worst = max(worst, abs(nu / want - 1))
-        print(f"    x {x[i]:.4f} m: Nu {nu:.3f} against {want:.3f}", flush=True)
+        if verbose:
+            print(f"    x {x[i]:.4f} m: Nu {nu:.3f} against {want:.3f}", flush=True)
     h = Q / dT.mean()
     hw = tr.slug_plates_h_mean(K_EFF, D_AIR, K_AIR, RHO, CP, U_REAL, B, LEN)
+    return worst, h, hw
+
+
+def check(work):
+    print("[A] Moving bed past a heated wall against the slug-flow solution", flush=True)
+    print(f"    Pe {PE:.1f}, k_air {K_AIR:.4f} W/(m K), R_nw k/(4b) {GAP:.4f}, "
+          f"c scaled to {C_SIM:g} J/(kg K)", flush=True)
+    p = os.path.join(work, "bed")
+    make(p)
+    t0 = time.perf_counter()
+    cc.run(p)
+    secs = time.perf_counter() - t0
+    worst, h, hw = metrics(p, verbose=True)
+    rho = cc.read_internal(f"{p}/{END:g}/rho")
+    rho = np.full(NX * NY, RHO) if rho is None else rho
     report("local Nu against the slug-flow solution", worst < 0.05,
            f"largest difference {worst * 100:.2f} % (limit 5 %), {secs:.0f} s")
     report("mean h against eq. 9", abs(h / hw - 1) < 0.05,

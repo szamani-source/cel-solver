@@ -109,14 +109,8 @@ def balance_drift(path):
     return max(abs(b - bal[0]) for b in bal) / log["E"][0], log
 
 
-def check_schumann(work):
-    print("[A] Hot air into a cold bed against Schumann", flush=True)
-    print(f"    Re {RE:.1f}, Pr {PR:.4f}, Gunn h {H:.2f} W/(m^2 K), h a_s {HA:.1f} W/(m^3 K), "
-          f"xi per cell {HA * DX / (G * C_G):.4f}", flush=True)
-    p = os.path.join(work, "schumann")
-    t0 = time.perf_counter()
-    column(p, "twoTemperature", T0 + DT0)
-    secs = time.perf_counter() - t0
+def schumann_errors(p, verbose=False):
+    """Largest errors of theta_g and theta_s against Schumann at 1 and 2 s."""
     x = (np.arange(N) + 0.5) * DX
     sample = np.arange(4, N, 10)
     worst_g = worst_s = 0.0
@@ -133,7 +127,20 @@ def check_schumann(work):
                 es = tr.schumann_solid(xi, tau, 1000)
             worst_g = max(worst_g, abs((Tg[i] - T0) / DT0 - eg))
             worst_s = max(worst_s, abs((Ts[i] - T0) / DT0 - es))
-        print(f"    t {t:g} s: tau at the inlet {HA * t / CS:.2f}", flush=True)
+        if verbose:
+            print(f"    t {t:g} s: tau at the inlet {HA * t / CS:.2f}", flush=True)
+    return worst_g, worst_s
+
+
+def check_schumann(work):
+    print("[A] Hot air into a cold bed against Schumann", flush=True)
+    print(f"    Re {RE:.1f}, Pr {PR:.4f}, Gunn h {H:.2f} W/(m^2 K), h a_s {HA:.1f} W/(m^3 K), "
+          f"xi per cell {HA * DX / (G * C_G):.4f}", flush=True)
+    p = os.path.join(work, "schumann")
+    t0 = time.perf_counter()
+    column(p, "twoTemperature", T0 + DT0)
+    secs = time.perf_counter() - t0
+    worst_g, worst_s = schumann_errors(p, verbose=True)
     report("gas temperature against Schumann", worst_g < 0.01,
            f"largest error {worst_g * 100:.2f} % of the step (limit 1 %), {secs:.0f} s")
     report("grain temperature against Schumann", worst_s < 0.01,
