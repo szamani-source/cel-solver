@@ -1,0 +1,16 @@
+#!/bin/sh
+# Rigid strip footing pushed into undrained clay (Prandtl, Nc = 2 + pi): the
+# footing is a moving STL body, the clay the Eulerian material (WP 4.4,
+# decisions 0053, 0055). The case is written by tests/footing/footing_checks.py
+# and run with celVoidCheck (the driver that also writes the footing force).
+#   ./Allrun          # 10 mm cells, about 1 minute
+#   ./Allrun --fine   # 5 mm cells, about 9 minutes
+# Writes run/footing.out (q/cu against Prandtl), then plot.py makes
+# q-s.png and snapshot.png (needs numpy and matplotlib).
+cd "${0%/*}" || exit 1
+root="${CELFOAM_DIR:-$(cd ../../.. && pwd)}"
+[ -f "$root/tests/footing/footing_checks.py" ] || { echo "cannot find $root/tests/footing; load the celFoam environment" >&2; exit 1; }
+command -v celVoidCheck > /dev/null || { echo "celVoidCheck not found; load the celFoam environment (celfoam)" >&2; exit 1; }
+mkdir -p run
+CEL_ROOT="$root" python3 run_footing.py run "$@" 2>&1 | tee run/footing.out
+python3 plot.py
