@@ -1,0 +1,11 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      setFieldsDict;
+}
+
+defaultFieldValues ();
+regions ( boxToCell { box (-1 -1 -1) (1 0.2712435565298214 1);
+    fieldValues (volScalarFieldValue alpha 1 volScalarFieldValue rho 1590.0); } );

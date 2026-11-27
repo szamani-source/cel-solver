@@ -1,0 +1,23 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      controlDict;
+}
+application     celFoam;
+startFrom       startTime;
+startTime       0;
+stopAt          endTime;
+endTime         0.5;
+deltaT          1e-5;
+writeControl    adjustableRunTime;
+writeInterval   0.025;
+purgeWrite      0;
+writeFormat     ascii;
+writePrecision  17;     // 17 digits: a restart matches the continuous run
+timeFormat      general;
+timePrecision   8;
+runTimeModifiable false;
+maxCo           0.4;
+damping         50.0;   // velocity damping [1/s] while the outlet is closed

@@ -1,0 +1,23 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      controlDict;
+}
+application     celFoam;
+startFrom       startTime;
+startTime       0;
+stopAt          endTime;
+endTime         1.82;       // 9 sqrt(h0/g)
+deltaT          1e-5;
+writeControl    adjustableRunTime;
+writeInterval   0.02;
+purgeWrite      0;
+writeFormat     ascii;
+writePrecision  17;
+timeFormat      general;
+timePrecision   8;
+runTimeModifiable false;
+maxCo           0.4;
+damping         0;

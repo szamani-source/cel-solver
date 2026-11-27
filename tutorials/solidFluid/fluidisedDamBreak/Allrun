@@ -1,0 +1,58 @@
+#!/bin/sh
+# Fluidised dam break of fine glass beads against Roche et al. (2008)
+# (WP F.8, decision 0133; tutorial WP F.9). Runs the fluidised column, then
+# the same column dry (no gas) in dry/ for comparison.
+#   ./Allrun            # 10 mm cells, about 10 minutes per run on one core
+#   ./Allrun 5          # cell size in mm; 5 mm is the validated mesh (WP F.8k),
+#                       # about 80 minutes per run on one core
+#   ./Allrun 5 4        # on 4 processors
+#   ./Allrun 10 1 gas   # only the fluidised run
+# Then: python3 plot.py   (needs numpy and matplotlib)
+cd "${0%/*}" || exit
+. ${WM_PROJECT_DIR:?}/bin/tools/RunFunctions
+
+cell_mm="${1:-10}"
+nProcs="${2:-1}"
+only="${3:-}"
+nx=$(awk "BEGIN { printf \"%d\", 3000/$cell_mm + 0.5 }")
+ny=$(awk "BEGIN { printf \"%d\", 450/$cell_mm + 0.5 }")
+sed -i "s/([0-9]* [0-9]* 1) simpleGrading/($nx $ny 1) simpleGrading/" \
+    system/blockMeshDict
+echo "$cell_mm" > cellSize
+
+# dry/: the same column without gas (no constant/gasProperties, no 0/p)
+rm -rf dry
+if [ "$only" != "gas" ]
+then
+    mkdir dry
+    cp -r constant system makeColumn.py dry/
+    rm dry/constant/gasProperties
+fi
+
+for case in . dry
+do
+    [ -d "$case" ] || continue
+    (
+        cd "$case" || exit
+        rm -rf 0
+        runApplication blockMesh
+        runApplication topoSet
+        runApplication createPatch -overwrite
+        if [ "$case" = dry ]
+        then
+            python3 makeColumn.py "$cell_mm" dry
+        else
+            python3 makeColumn.py "$cell_mm"
+        fi
+        if [ "$nProcs" -gt 1 ]
+        then
+            foamDictionary -entry numberOfSubdomains -set "$nProcs" system/decomposeParDict > /dev/null
+            foamDictionary -entry coeffs.n -set "($nProcs 1 1)" system/decomposeParDict > /dev/null
+            runApplication decomposePar
+            runParallel celFoam
+            runApplication reconstructPar
+        else
+            runApplication celFoam
+        fi
+    )
+done

@@ -13,6 +13,8 @@
 #include "IStringStream.H"
 #include "scalarMatrices.H"
 #include "DynamicList.H"
+#include "IFstream.H"
+#include "OFstream.H"
 
 // * * * * * * * * * * * * * * * * Local helpers * * * * * * * * * * * * * * //
 
@@ -381,6 +383,7 @@ Foam::poreGas::poreGas(const eulerianSolid& solid, const IOobject& io)
             << " void cells" << endl;
     }
     correctFacePressure();
+    readState();        // WP F.9: restart
     if (freeSurface_ && surfaceCarry_)
     {
         Info<< "Pore gas (WP F.8): the moving surface carries gas to and "
@@ -1872,6 +1875,48 @@ void Foam::poreGas::correctFacePressure()
             }
         }
     }
+}
+
+
+void Foam::poreGas::writeState() const
+{
+    // WP F.9 (decision 0141): what a restart needs beyond the written fields
+    dictionary state;
+    state.set("netIn", netIn_);
+    state.set("voidIn", voidIn_);
+    state.set("dtOld", dtOld_);
+    state.set("pOldOld", pOldOld_);
+    state.set("Pprev", Pprev_);
+    state.set("liftSince", liftSince_);
+    state.set("liftWarned", liftWarned_);
+
+    const fileName dir(solid_.mesh().time().timePath()/"uniform");
+    mkDir(dir);
+    OFstream os(dir/"poreGas");
+    os.precision(17);
+    state.write(os, false);
+}
+
+
+void Foam::poreGas::readState()
+{
+    const Time& runTime = solid_.mesh().time();
+    const fileName f(runTime.timePath()/"uniform"/"poreGas");
+    if (!isFile(f))
+    {
+        return;
+    }
+    IFstream is(f);
+    const dictionary state(is);
+    netIn_ = state.get<scalar>("netIn");
+    voidIn_ = state.get<scalar>("voidIn");
+    dtOld_ = state.get<scalar>("dtOld");
+    pOldOld_ = state.get<scalarField>("pOldOld");
+    Pprev_ = state.get<scalarField>("Pprev");
+    liftSince_ = state.get<scalar>("liftSince");
+    liftWarned_ = state.get<bool>("liftWarned");
+    Info<< "Pore gas: restart state read from " << runTime.timeName()
+        << "/uniform/poreGas" << nl;
 }
 
 

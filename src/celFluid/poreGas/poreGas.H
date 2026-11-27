@@ -613,6 +613,15 @@ public:
         //- Face pressures pFace() from p (WP F.4)
         void correctFacePressure();
 
+        //- Restart state (WP F.9, decision 0141) to <time>/uniform/poreGas
+        //  (each processor): the gas totals, the last step's length and
+        //  pressure (first guess), the support pressures of frictionOnly
+        //  and the lift check's clock; call at write times
+        void writeState() const;
+
+        //- Read it back from the start time if present (constructor)
+        void readState();
+
         //- Parallel consistency check (WP F.9, poreGasParallelCheck.C):
         //  the largest mismatch of the processor-boundary values of the
         //  gas and solid fields against their neighbours', relative to
