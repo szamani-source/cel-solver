@@ -261,6 +261,16 @@ class eulerianSolid
         //  from 10 to 5 mm cells)
         Switch yieldShearJump_;
 
+        //- WP F.8k (decision 0135): materialProperties slowFlowJump yes
+        //  (needs yieldShearJump no; default no). At a face between two
+        //  yielding cells the normal jump coefficient zpL zpR/(zpL + zpR) of
+        //  the Riemann solver is scaled by the Mach number max |v|/c_p of the
+        //  faster side, kept between slowFlowMin (default 0.01) and 1: the
+        //  low-Mach correction of Godunov schemes. Waves in elastic material
+        //  and impacts (Mach near 1) keep the full jump
+        Switch slowFlowJump_;
+        scalar slowFlowMin_;
+
         //- WP 3.6h (decision 0049): materialProperties fullBlend yes (with
         //  freeSurface). Instead of the nearly-full snap (decisions 0044,
         //  0045), cells with void between 1e-4 and 1e-2 blend the full and

@@ -293,6 +293,14 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
     (
         materialProperties_.getOrDefault<Switch>("yieldShearJump", true)
     ),
+    slowFlowJump_
+    (
+        materialProperties_.getOrDefault<Switch>("slowFlowJump", false)
+    ),
+    slowFlowMin_
+    (
+        materialProperties_.getOrDefault<scalar>("slowFlowMin", 0.01)
+    ),
     fullBlend_
     (
         materialProperties_.getOrDefault<Switch>("fullBlend", false)
@@ -588,6 +596,23 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
         }
         Info<< "No elastic shear jump beside yielding cells "
             << "(yieldShearJump no, WP F.8j)" << nl;
+    }
+    if (slowFlowJump_)
+    {
+        if (yieldShearJump_)
+        {
+            FatalIOErrorInFunction(materialProperties_)
+                << "slowFlowJump yes needs yieldShearJump no"
+                << exit(FatalIOError);
+        }
+        if (slowFlowMin_ <= 0 || slowFlowMin_ > 1)
+        {
+            FatalIOErrorInFunction(materialProperties_)
+                << "slowFlowMin must lie in (0, 1], not " << slowFlowMin_
+                << exit(FatalIOError);
+        }
+        Info<< "Normal jump between yielding cells scaled by the Mach number, "
+            << "at least " << slowFlowMin_ << " (slowFlowJump, WP F.8k)" << nl;
     }
     if (spreadLayers_)
     {

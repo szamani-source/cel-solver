@@ -176,6 +176,8 @@ along the surface. Needs <code>freeSurface yes</code>.</td></tr>
 elastic shear impedance, so the flow resistance no longer depends on \(E\). Needs <code>mohrCoulomb</code> or
 <code>druckerPrager</code> with <code>mu2</code>.</td></tr>
 <tr><td><code>yieldShearJump</code></td><td>yes</td><td>Mohr-Coulomb or Drucker-Prager (WP F.8j, decision 0134, under test): <code>no</code> drops the elastic shear damping of the face solver beside yielding cells (only the mu(I) viscosity remains with <code>flowImpedance</code>) and the elastic stress predictor along the plastic flow direction in yielding cells</td></tr>
+<tr><td><code>slowFlowJump</code></td><td>no</td><td>Needs <code>yieldShearJump no</code> (WP F.8k, decision 0135, under test): <code>yes</code> scales the normal damping of the face solver between two yielding cells by the flow's Mach number max |v|/c<sub>p</sub> (at least <code>slowFlowMin</code>), so slow granular flow is not damped at the elastic wave speed. Elastic material and impacts keep the full damping</td></tr>
+<tr><td><code>slowFlowMin</code></td><td>0.01</td><td>Smallest scale factor of <code>slowFlowJump</code>, in (0, 1]</td></tr>
 <tr><td><code>fullBlend</code></td><td>no</td><td>Cells that are nearly full blend smoothly between the full-cell and the partly
 filled rules instead of switching. Removes speed spikes in partly filled cells; recommended for silo and
 hopper discharge and with <code>capLambda</code>.</td></tr>

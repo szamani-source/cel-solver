@@ -676,7 +676,9 @@ void faceStates
 //- Acoustic Riemann solution at a face with unit normal n (from L to R):
 //  face velocity vS and traction tS = sigma* & n. kj >= 0 replaces the
 //  shear jump coefficient zsL zsR/(zsL + zsR) of the traction (flow
-//  impedance, WP 3.6c); the velocity keeps the elastic impedances.
+//  impedance, WP 3.6c); the velocity keeps the elastic impedances. kn >= 0
+//  likewise replaces the normal jump coefficient zpL zpR/(zpL + zpR)
+//  (slowFlowJump, WP F.8k).
 inline void riemann
 (
     const vector& n,
@@ -684,7 +686,8 @@ inline void riemann
     const vector& vR, const symmTensor& sR, const scalar zpR, const scalar zsR,
     vector& vS,
     vector& tS,
-    const scalar kj = -1
+    const scalar kj = -1,
+    const scalar kn = -1
 )
 {
     const vector tL(sL & n);
@@ -703,7 +706,10 @@ inline void riemann
     const scalar zs = zsL + zsR;
 
     const scalar vn = (zpL*vnL + zpR*vnR + (tnR - tnL))/zp;
-    const scalar tn = (zpR*tnL + zpL*tnR + zpL*zpR*(vnR - vnL))/zp;
+    const scalar tn =
+        kn < 0
+      ? (zpR*tnL + zpL*tnR + zpL*zpR*(vnR - vnL))/zp
+      : (zpR*tnL + zpL*tnR)/zp + kn*(vnR - vnL);
     const vector vt((zsL*vtL + zsR*vtR + (ttR - ttL))/zs);
     const vector tt
     (
@@ -1367,12 +1373,13 @@ inline bool voidFace
     const scalar sT,
     vector& vS,
     vector& tS,
-    const scalar kj = -1
+    const scalar kj = -1,
+    const scalar kn = -1
 )
 {
     if (touchL && touchR)
     {
-        riemann(n, vL, sL, zpL, zsL, vR, sR, zpR, zsR, vS, tS, kj);
+        riemann(n, vL, sL, zpL, zsL, vR, sR, zpR, zsR, vS, tS, kj, kn);
         if ((tS & n) <= sT)
         {
             return true;
@@ -2074,6 +2081,25 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
         const scalar kR = yR ? (etaR > 0 ? min(zsR, 2*etaR/delta) : 0) : zsR;
         return (kL > 0 && kR > 0) ? kL*kR/(kL + kR) : scalar(0);
     };
+    // Normal jump coefficient of a face between two yielding cells
+    // (slowFlowJump, WP F.8k): the elastic zpL zpR/(zpL + zpR) times the
+    // Mach number of the faster side, max |v|/c_p, between slowFlowMin and
+    // 1 (low-Mach scaling of the jump, as for Godunov schemes in slow flow)
+    const scalar cP = sqrt(M/rho0_);
+    auto slowJump =
+        [&]
+        (
+            const scalar zpL, const scalar zpR, const vector& vL, const vector& vR
+        )
+    {
+        if (zpL <= 0 || zpR <= 0)
+        {
+            return scalar(-1);
+        }
+        const scalar mach =
+            min(max(max(mag(vL), mag(vR))/cP, slowFlowMin_), scalar(1));
+        return mach*zpL*zpR/(zpL + zpR);
+    };
     const surfaceScalarField& deltaCoeffs = mesh.deltaCoeffs();
     const volScalarField* smoothPtr = fs ? &tsmooth() : nullptr;
     const volScalarField* eFacPtr = fs ? &teFac() : nullptr;
@@ -2496,6 +2522,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
         vector t;
         bool contact = true;
         scalar kj = -1;
+        scalar kn = -1;
         bool bothFlow = false;
         scalar capSin = capSinPhi_;
         if (fi)
@@ -2519,6 +2546,10 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                 1/deltaCoeffs[facei]
             );
             bothFlow = bothFlow || (yP && yN);
+            if (slowFlowJump_ && yP && yN)
+            {
+                kn = slowJump(zp[P], zp[N], UO()[facei], UN()[facei]);
+            }
         }
         if (fs)
         {
@@ -2530,7 +2561,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                 touches(aP, lean_[P], inLines(P, Sf[facei])),
                 UN()[facei], sN()[facei], zp[N], zs[N], aN > alphaEmpty,
                 touches(aN, lean_[N], inLines(N, -Sf[facei])),
-                tensileStrength_, vS[facei], t, kj
+                tensileStrength_, vS[facei], t, kj, kn
             );
         }
         else
@@ -2540,7 +2571,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                 n,
                 UO()[facei], sO()[facei], zp[P], zs[P],
                 UN()[facei], sN()[facei], zp[N], zs[N],
-                vS[facei], t, kj
+                vS[facei], t, kj, kn
             );
         }
         if (shearCap_ && contact && solveMomentum_ && !bothFlow)
@@ -2645,6 +2676,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                 vector t;
                 bool contact = true;
                 scalar kj = -1;
+                scalar kn = -1;
                 bool bothFlow = false;
                 scalar capSin = capSinPhi_;
                 if (fi)
@@ -2672,6 +2704,10 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                         1/deltaCoeffs.boundaryField()[patchi][i]
                     );
                     bothFlow = bothFlow || (yP && yN);
+                    if (slowFlowJump_ && yP && yN)
+                    {
+                        kn = slowJump(zp[fc[i]], zpn[i], puo[i], pun[i]);
+                    }
                 }
                 if (fs)
                 {
@@ -2684,7 +2720,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                         touches(aP, lean_[fc[i]], inLines(fc[i], pS[i])),
                         pun[i], psn[i], zpn[i], zsn[i], aN > alphaEmpty,
                         touches(aN, leanNbr[patchi][i], inLinesNbr(patchi, i, -pS[i])),
-                        tensileStrength_, pvS[i], t, kj
+                        tensileStrength_, pvS[i], t, kj, kn
                     );
                 }
                 else
@@ -2694,7 +2730,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                         n,
                         puo[i], pso[i], zp[fc[i]], zs[fc[i]],
                         pun[i], psn[i], zpn[i], zsn[i],
-                        pvS[i], t, kj
+                        pvS[i], t, kj, kn
                     );
                 }
                 if (shearCap_ && contact && solveMomentum_ && !bothFlow)
