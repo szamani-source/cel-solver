@@ -104,7 +104,10 @@ ARAVENA_RUNOUT = 3.8                  # x/h0, a = 2, horizontal
 # diffusing (gasProperties diffusivity, model poreGas), as Gueugneau et al.
 # (2017) and Aravena et al. (2021). KAPPA_FIT is fitted to Roche's run-out
 # (Aravena fit 0.015 m^2/s); kappa_theory() is k p0 / (mu e).
-KAPPA_FIT = 0.22                      # F.8h refit on 5 mm cells (theory k p0/(mu e) 0.11)
+# WP F.8k: with slowFlowJump and the 22 deg floor the theoretical value
+# passes on 5 mm cells (run-out +8.5 %, front -19.5 %); 0.15 / 0.22 gave
+# 5.60 / 4.77 h0 with the front -24 / -28 %
+KAPPA_FIT = 0.11
 # F.8g: route B as published, the pore pressure only lowers the friction
 FRICTION_ONLY = True
 # Expanded (fluidised) packing: soft until compacted (decision 0133): the

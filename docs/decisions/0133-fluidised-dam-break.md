@@ -318,3 +318,13 @@ another. F.8 cannot pass on more than one mesh until that is addressed; for Sia 
   0132 issue, now the main blocker); then the 5 mm mesh.
 - `surfaceCarry` and the soft-bed cap stay case options until F.8b shows they are right
   against the paper.
+
+## F.8k (2026-11-27): recalibration with slowFlowJump (decision 0135)
+
+Sia chose a 22 deg floor (dry 5 mm: 3.27 h0 with Gueugneau's 19 deg, 2.73 with 22) and
+5 mm cells with the front at 5 mm deposit thickness. With the face damping of slow flow
+gone, the fully supported flow (kappa 1e-6) moves at Fr 1.54 like the frictionless
+column (1.55); the slow front came from drainage. On 5 mm: kappa 0.22 / 0.15 / 0.11
+gives run-out 4.77 / 5.60 / 6.24 h0 and front -28 / -24 / -19.5 %. The theoretical
+k p0/(mu e) = 0.11 passes both (no fitted parameter), in line with Gueugneau's fitted
+D growing with column height (0.004 and 0.02 m^2/s for 0.1 and 0.2 m).

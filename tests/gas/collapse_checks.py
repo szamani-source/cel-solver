@@ -33,7 +33,13 @@ pore pressure only lowers the friction, internal and floor, as Gueugneau
 et al. (2017) and Aravena et al. (2021); 10 mm: run-out 5.67 h0, front
 1.04 sqrt(g h0) (-26 %); theoretical kappa 3.88 h0.
 
-    python3 collapse_checks.py WORKDIR [--only A,B,C,K]
+WP F.8k (decisions 0134, 0135; Sia 2026-11-27): the grains run with
+yieldShearJump no and slowFlowJump yes, floor 22 deg, kappa the theoretical
+k p0/(mu e) = 0.11 m^2/s (no fitted parameter), measured on 5 mm cells with
+the front at 5 mm deposit thickness: run-out 6.24 h0 (+8.5 %), front
+2.26 m/s (-19.5 %); dry (with the cap) 2.73 h0 (+5 %).
+
+    python3 collapse_checks.py WORKDIR [--only A,B,C,K] [--cell 5]
 """
 
 import os
@@ -138,7 +144,9 @@ def main(work, only):
         ro = (hd[-1, 1] - cc.X0) / cc.H0
         report("dry run-out", abs(ro / cc.DRY_RUNOUT - 1) <= 0.2,
                f"{ro:.2f} h0 against {cc.DRY_RUNOUT:.2f} ({100 * (ro / cc.DRY_RUNOUT - 1):+.1f} %)")
-        if os.path.exists(REF):
+        if abs(cc.CELL - 0.01) > 1e-12:
+            print("  (the v1 reference is on 10 mm cells: not compared)")
+        elif os.path.exists(REF):
             ref = np.loadtxt(REF)
             nh = len(hd)
             dfront = float(np.abs(ref[:nh, 1] - hd[:, 1]).max()) if len(ref) >= nh + cc.NX else 1.0
@@ -206,4 +214,9 @@ if __name__ == "__main__":
     only = "ABCK"
     if "--only" in sys.argv:
         only = sys.argv[sys.argv.index("--only") + 1].replace(",", "")
+    if "--cell" in sys.argv:
+        # WP F.8k (Sia): the done-when is measured on 5 mm cells (--cell 5)
+        cc.CELL = float(sys.argv[sys.argv.index("--cell") + 1]) / 1000
+        cc.NX, cc.NY = int(round(3 / cc.CELL)), int(round(0.45 / cc.CELL))
+        cc.N = cc.NX * cc.NY
     sys.exit(main(sys.argv[1], only))
