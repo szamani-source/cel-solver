@@ -251,7 +251,20 @@ Foam::poreGas::poreGas(const eulerianSolid& solid, const IOobject& io)
     surfaceCarry_(dict_.getOrDefault<Switch>("surfaceCarry", false)),
     eMin_(dict_.getOrDefault<scalar>("eMin", 0.2)),
     kappa_(dict_.getOrDefault<scalar>("diffusivity", 0)),
-    frictionOnly_(dict_.getOrDefault<Switch>("frictionOnly", false))
+    frictionOnly_(dict_.getOrDefault<Switch>("frictionOnly", false)),
+    parallelCheck_(dict_.getOrDefault<Switch>("parallelCheck", false)),
+    parallelCheckEvery_
+    (
+        max(dict_.getOrDefault<label>("parallelCheckEvery", 1), label(1))
+    ),
+    parallelWorst_(0),
+    liftCheck_(dict_.getOrDefault<Switch>("liftCheck", true)),
+    liftRatio_(dict_.getOrDefault<scalar>("liftRatio", 1)),
+    liftWarn_(dict_.getOrDefault<scalar>("liftWarn", 0.01)),
+    liftTime_(dict_.getOrDefault<scalar>("liftTime", 0.01)),
+    liftSince_(-1),
+    liftWarned_(false),
+    liftShare_(0)
 {
     if (rhoP_ <= 0 || d_ <= 0 || T_ <= 0 || p0_ <= 0)
     {
@@ -881,6 +894,8 @@ void Foam::poreGas::faceCoefficients
 
 void Foam::poreGas::solve(const scalar dt)
 {
+    checkParallel("before the gas solve");     // WP F.9 (debug)
+
     const fvMesh& mesh = solid_.mesh();
     volScalarField& p = *pPtr_;
     const scalar RT = Rair*T_;
@@ -1765,6 +1780,8 @@ void Foam::poreGas::solve(const scalar dt)
     {
         correctVelocity();
     }
+    checkParallel("after the gas solve");      // WP F.9 (debug)
+    checkLift();                                // decision 0135
 
     const label oldPrecision = Info().precision(16);
     if (fixVoid)

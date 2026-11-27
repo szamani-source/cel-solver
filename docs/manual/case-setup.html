@@ -314,6 +314,12 @@ coupled yes;            // gas pressure acts on the solid</code></pre>
 <tr><td><code>eMin</code></td><td>0.2</td><td>Smallest gas fraction of the filled part of a cell (remap overfill; decision 0133)</td></tr>
 <tr><td><code>diffusivity</code></td><td>0</td><td><code>poreGas</code> only, m&sup2;/s (WP F.8e, decision 0133): &gt; 0 replaces gas compressibility by a pore pressure that is carried with the grains and diffuses with this coefficient (Gueugneau 2017, Aravena 2021)</td></tr>
 <tr><td><code>frictionOnly</code></td><td><code>no</code></td><td>With <code>diffusivity</code> (WP F.8g-F.8i, decision 0133): <code>yes</code> = the pore pressure only lowers the grains' friction (internal and wall); <code>sigma</code> stays the total stress, the grains carry the support ratio p/P, and the gas drains at the material's own surface. Start <code>sigma</code> as the total stress</td></tr>
+<tr><td><code>parallelCheck</code></td><td><code>no</code></td><td>Debug (WP F.9a, decision 0134): on every processor cut, compare each gas and solid field with the neighbour processor&rsquo;s values (stale halos, one-sided face values) and print the largest mismatch as &ldquo;Parallel check&rdquo;; round-off (below 1e-12) means the boundaries are right</td></tr>
+<tr><td><code>parallelCheckEvery</code></td><td>1</td><td>With <code>parallelCheck yes</code>: check every this many steps</td></tr>
+<tr><td><code>liftCheck</code></td><td><code>yes</code></td><td>Range of validity (decision 0135): each step, the share of the grain mass whose weight the gas carries (upward gas force on a cell at least <code>liftRatio</code> times its weight); printed at write times as &ldquo;Gas lift&rdquo;, with a warning once it stays above <code>liftWarn</code> for <code>liftTime</code>. A lifting or expanding bed is outside the range of the gas coupling (see below)</td></tr>
+<tr><td><code>liftRatio</code></td><td>1</td><td>With <code>liftCheck yes</code>: a cell counts as carried at this ratio of upward gas force to weight</td></tr>
+<tr><td><code>liftWarn</code></td><td>0.01</td><td>With <code>liftCheck yes</code>: warn when this share of the grain mass is carried &hellip;</td></tr>
+<tr><td><code>liftTime</code></td><td>0.01</td><td>&hellip; for this long, in s (short spikes when an outlet opens are not a lift)</td></tr>
 </tbody>
 </table>
 <p>celFoam writes three more fields: <code>phiS</code>, the solids volume fraction
@@ -328,6 +334,64 @@ in m/s. <code>p</code> is the gauge pressure (absolute minus <code>p0</code>). I
 <p>Gas velocity (WP F.6, <code>model gasFlow</code>): <code>0/Ug</code> is optional; without it walls are no-slip
 and open patches zeroGradient. celFoam writes <code>Ug</code>; inside the material the gas follows the
 pore-pressure law, with its momentum when <code>poreInertia yes</code> (WP F.7).</p>
+<h3 id="gas-validity">Where the gas coupling is valid</h3>
+<p>The grains stay at their packed density: a bed that stretches opens void inside its cells
+instead of loosening, and the gas sees the permeability of the packed part (decision 0135). The
+coupling is therefore valid while the grains&rsquo; own stress carries their weight, less the gas&rsquo;s
+share, and not once the gas carries all of it.</p>
+<table>
+<thead><tr><th>Situation</th><th>Valid?</th><th>Checked by</th></tr></thead>
+<tbody>
+<tr><td>Pore pressure in a packed or consolidating bed (drainage, venting, compaction)</td><td>Yes</td><td>Terzaghi column, Ergun bed (pack tests 1, 3)</td></tr>
+<tr><td>Gas through a packed bed up to the onset of fluidisation (U_mf)</td><td>Yes</td><td>U_mf within 3 % of Wen and Yu (pack test 2)</td></tr>
+<tr><td>Air-impeded discharge of fine powder from a hopper or silo</td><td>Yes</td><td>gas on against off, Crewdson trend (pack test 4)</td></tr>
+<tr><td>Gas flow in the void around the material (free surface, outlets)</td><td>Yes</td><td>Poiseuille, venting column (decision 0131)</td></tr>
+<tr><td>Flows where the gas carries part of the weight, the grains still in contact</td><td>Yes, while <code>liftCheck</code> stays quiet</td><td>the share printed as &ldquo;Gas lift&rdquo;</td></tr>
+<tr><td>Uniform settling of a dilute slab as one block</td><td>Approximately (+7.6 % of Richardson and Zaki)</td><td>settling test (decision 0132)</td></tr>
+<tr><td>Fluidised flows of powder (gas-supported dam break)</td><td>Not validated: run-out 60 % short of Roche (2008)</td><td>decision 0133, work in progress</td></tr>
+<tr><td>A bed above U_mf: lifted, expanded, bubbling or slugging; dilute suspensions; pneumatic conveying</td><td>No: use a two-fluid model (OpenFOAM&rsquo;s twoPhaseEulerFoam or multiphaseEulerFoam)</td><td><code>liftCheck</code> warns</td></tr>
+</tbody>
+</table>
+
+
+<h2 id="thermal">Temperature (version 2, in progress): constant/thermalProperties</h2>
+<p>Temperature in the granular material (decision 0136, packages T.1 to T.8). Without this file,
+or with <code>model none</code>, celFoam runs exactly as without temperature. With it the start
+time must hold the field <code>0/T</code> (kelvin); its patch types are the thermal boundary
+conditions: <code>fixedValue</code> holds a wall temperature, <code>zeroGradient</code> is an
+adiabatic wall, and <code>fixedGradient</code> with <code>gradient</code> = q/k heats the material
+with a flux q in W/m&sup2; (gradient along the outward normal). celFoam prints the thermal energy,
+the heat that has entered through the boundaries and their balance at each write.
+With immersed STL walls and bodies the heat is stored in the open part of each cut cell
+and the STL walls are adiabatic (WP T.2b). The tutorial
+<code>hotSiloDischarge</code> uses this file; <code>tests/validation/thermal</code> checks it against
+Schumann (1929), the laminar Nusselt number between plates and Adapa et al. (2024).</p>
+<pre><code>model        equilibrium;   // none | equilibrium | twoTemperature
+c            830;           // specific heat of the grains, J/(kg K)
+conductivity constant;      // constant | zehnerSchlunder
+k            0.25;          // bed conductivity, W/(m K)
+walls
+{
+    hotWall  { h 50; Tinf 350; }    // convective
+    heater   { q 1000; }            // heat flux, W/m^2
+}</code></pre>
+<table>
+<thead><tr><th>Keyword</th><th>Default</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>model</code></td><td><code>none</code></td><td><code>none</code> switches temperature off; <code>equilibrium</code> (WP T.1) carries one temperature per cell, conducted through the bed (explicit finite volume with the non-orthogonal correction, exact for a linear temperature on leaning cells); with the pore gas (<code>constant/gasProperties</code>, WP T.4) the gas shares that temperature, adds its heat capacity and carries heat with its flow. <code>twoTemperature</code> (WP T.4, needs the pore gas) gives the gas its own temperature <code>0/Tg</code> (its inlet patches set the temperature of the air blown in), conducted with (1 &minus; &radic;phi<sub>s</sub>) <code>kGas</code>, carried with the gas flow (upwind) and exchanging heat with the grains by Gunn's (1978) correlation, h = Nu kGas/d on the grain surface 6 phi<sub>s</sub>/d per volume; checked against Schumann (1929) within 0.4 %</td></tr>
+<tr><td><code>c</code></td><td>required</td><td>Specific heat of the grains, J/(kg K); a cell stores rho c V T with rho the bulk density</td></tr>
+<tr><td><code>conductivity</code></td><td><code>constant</code></td><td>Bed conductivity model: <code>constant</code> uses <code>k</code>; <code>zehnerSchlunder</code> (WP T.3) computes it per cell from the packing of the filled part, rho/(alpha rhoP), with Zehner and Schl&uuml;nder <a class="cite" href="references.html#ref-zehner1970">1970</a> as split by Kuipers et al. <a class="cite" href="references.html#ref-kuipers1992">1992</a>, and writes it as the field <code>kBed</code></td></tr>
+<tr><td><code>kParticle</code></td><td>required for <code>zehnerSchlunder</code></td><td>Conductivity of the grain material, W/(m K)</td></tr>
+<tr><td><code>kGas</code></td><td>0.02569</td><td>Conductivity of the gas in the pores, W/(m K) (air at 20 &deg;C)</td></tr>
+<tr><td><code>rhoP</code></td><td>required for <code>zehnerSchlunder</code></td><td>Density of the grains, kg/m&sup3;</td></tr>
+<tr><td><code>walls</code></td><td>none</td><td>Sub-dictionary per patch, overriding its <code>0/T</code> type (WP T.3): <code>{ h 50; Tinf 350; }</code> is a convective wall (heat transfer coefficient h in W/(m&sup2; K) to a surrounding temperature Tinf, in series with the half cell); <code>{ q 1000; }</code> a heat flux into the material in W/m&sup2;. A fixed wall temperature with a contact resistance R is <code>h</code> = 1/R</td></tr>
+<tr><td><code>k</code></td><td>required</td><td>Bed (effective) conductivity, W/(m K); empty cells do not conduct and a partly filled face conducts with the smaller fill fraction</td></tr>
+<tr><td><code>limiter</code></td><td><code>MC</code></td><td>Remap limiter of T (WP T.2, T.6): the temperature moves with the material, mass weighted, so its heat is conserved exactly. <code>MC</code> (as rho, U and sigma) keeps smooth temperature profiles smooth; <code>superbee</code> keeps a sharp hot-cold front within 2 cells (MC: 5) but turns a smooth slope into steps over a long run (a heated bed moving 200 cells: local Nu off by 20 %); <code>upwind</code> and <code>minmod</code> also work</td></tr>
+<tr><td><code>cGas</code></td><td>1006</td><td>Specific heat of the gas at constant pressure, J/(kg K) (WP T.4; air)</td></tr>
+<tr><td><code>TgVoid</code></td><td><code>voidT</code></td><td>Gas temperature held in empty cells of a <code>poreGas</code> case (the surrounding atmosphere), K (WP T.4)</td></tr>
+<tr><td><code>voidT</code></td><td>293.15</td><td>Temperature written in empty cells, K (they hold no heat). Open outlets carry the heat of the material out; an open inlet brings material at the value of its patch in <code>0/T</code> (make it <code>fixedValue</code>); celFoam prints the net heat carried in</td></tr>
+</tbody>
+</table>
 
 <h2 id="fields">Initial fields</h2>
 <p>celFoam reads these fields from the start time folder if they are there, and otherwise

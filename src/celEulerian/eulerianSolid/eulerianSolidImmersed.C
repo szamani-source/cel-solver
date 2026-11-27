@@ -597,6 +597,51 @@ void Foam::eulerianSolid::fillCovered()
     {
         alpha_.correctBoundaryConditions();
     }
+
+    // Passengers (temperature, WP T.2b): the mean of the open neighbours,
+    // so the remap's reconstruction next to a wall sees a mirror-like
+    // value; covered cells hold no mass, so nothing is created
+    forAll(passengers_, k)
+    {
+        volScalarField& f = passengers_[k];
+        f.correctBoundaryConditions();
+        scalarField& fi = f.primitiveFieldRef();
+        scalarField sum(nCells, Zero), cnt(nCells, Zero);
+        forAll(own, facei)
+        {
+            const label P = own[facei];
+            const label N = nei[facei];
+            const bool oP = cellOpen_[P] > 0, oN = cellOpen_[N] > 0;
+            if (oP == oN) continue;
+            if (oP) { sum[N] += fi[P]; cnt[N] += 1; }
+            else { sum[P] += fi[N]; cnt[P] += 1; }
+        }
+        tmp<volScalarField> to(work<scalar>(mesh, "o", cellOpen_));
+        forAll(mesh.boundary(), patchi)
+        {
+            const fvPatch& p = mesh.boundary()[patchi];
+            if (!p.coupled()) continue;
+            const labelUList& fc = p.faceCells();
+            const scalarField on(to().boundaryField()[patchi].patchNeighbourField());
+            const scalarField fn(f.boundaryField()[patchi].patchNeighbourField());
+            forAll(fc, i)
+            {
+                if (cellOpen_[fc[i]] <= 0 && on[i] > 0)
+                {
+                    sum[fc[i]] += fn[i];
+                    cnt[fc[i]] += 1;
+                }
+            }
+        }
+        forAll(fi, celli)
+        {
+            if (cellOpen_[celli] <= 0 && cnt[celli] > 0)
+            {
+                fi[celli] = sum[celli]/cnt[celli];
+            }
+        }
+        f.correctBoundaryConditions();
+    }
 }
 
 
@@ -632,10 +677,20 @@ void Foam::eulerianSolid::mixSmallCells()
     vectorField gp(nCells, Zero);
     symmTensorField gs(nCells, Zero), ge(nCells, Zero);
     boolList isTarget(nCells, false);
+    // passengers (temperature, WP T.2b): mass-weighted sums per group
+    PtrList<scalarField> gf(passengers_.size());
+    forAll(passengers_, j)
+    {
+        gf.set(j, new scalarField(nCells, Zero));
+    }
 
     auto add = [&](const label k, const label t)
     {
         const scalar mk = rho[k]*V[k]*cellOpen_[k];
+        forAll(passengers_, j)
+        {
+            gf[j][t] += mk*passengers_[j].primitiveField()[k];
+        }
         gm[t] += mk;
         gV[t] += V[k]*cellOpen_[k];
         if (fs)
@@ -716,6 +771,10 @@ void Foam::eulerianSolid::mixSmallCells()
         }
         rho[k] = r;
         U[k] = gp[t]/gm[t];
+        forAll(passengers_, j)
+        {
+            passengers_[j].primitiveFieldRef()[k] = gf[j][t]/gm[t];
+        }
         sigma[k] =
             gs[t]/gm[t] + equilibriumJump<symmTensor>(r, C[k] - C[t], g);
         epsP[k] = ge[t]/gm[t];
@@ -756,6 +815,10 @@ void Foam::eulerianSolid::mixSmallCells()
     if (fs)
     {
         alpha_.correctBoundaryConditions();
+    }
+    forAll(passengers_, j)
+    {
+        passengers_[j].correctBoundaryConditions();
     }
 }
 

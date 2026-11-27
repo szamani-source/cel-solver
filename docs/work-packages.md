@@ -326,6 +326,8 @@ each. Briefs: `docs/wp/WP-F.x.md`. References: `docs/spec/gas-references.md`.
 | F.8i | Drain over the flow depth (decision 0133) | frictionOnly: zero pressure on the material's surface; `tests/test_surface_drainage.sh` | 2026-11-25: drainage test 1.1 %; dam break 10 mm 5.17 h0, 5 mm to the channel end: mesh dependence remains (grain law) |
 | F.8j | Grain-law mesh dependence (decision 0137) | Dry dam break run-out within 10 % on 10/5/2.5 mm | 2026-11-26: shear damping in yielding cells removed (`yieldShearJump`); not enough; research found the slow-flow normal damping. Split: F.8k |
 | F.8k | Slow-flow face damping (decision 0138) | Plain MC dry collapse run-out on 10/5/2.5 mm within 5 % (front at 20 mm thickness, Sia) | Done 2026-11-27: 3.8 %; dam break recalibrated on 5 mm (floor 22 deg, theoretical kappa): run-out +8.5 %, front -19.5 % |
+| F.9a | Parallel runs with gas: why they part from serial (Sia, 2026-11-26; split from F.9) | Processor-boundary values of every gas and solid field consistent to 1e-12 (`parallelCheck`); serial and parallel before lift within 1e-10 (p); the parting after lift explained; `tests/test_gas_parallel.sh`; decision 0134 | 3 h |
+| F.9b | Range of validity of the gas coupling (Sia, 2026-11-26) | Lift check warns on the onset bed within 0.9-1.1 U_mf and not on the fine hopper; range table in the manual; `tests/test_gas_validity.sh`; decision 0135 | 2 h |
 | F.9 | Restart, MPI, tutorial, manual, v2.0.0 | Restart and 2/4 processors match serial to 1e-12 on F.5 and F.8; scaling: gas costs at most 1.5x per step, 4 processors at least 2.5x serial; `tutorials/gasHopper`; manual chapter; release | 4 h |
 
 Validation pack (Sia, 2026-11-24: "Include all four in validation pack"). Each runs on 1,
@@ -338,3 +340,23 @@ in one script and writes `docs/results/gas-validation.md`.
 | 2 | Onset of fluidisation: raise the airflow until the bed lifts | Minimum fluidisation velocity, Wen and Yu | F.7 | minutes |
 | 3 | Pore-pressure decay in a suddenly loaded fine-powder column | Exact diffusion (Terzaghi) solution | F.3 | minutes |
 | 4 | Fine-powder hopper discharge, gas on and off | Crewdson et al. (1977) | F.5 | hours (coarse mesh) |
+
+## Temperature (T series, decision 0136)
+
+Sia, 2026-11-26: temperature before the manual rebuild and the version 2 release; plan
+approved ("Go: T.0 to T.8 as planned"). Every test from T.1 on also runs on 2 and 4
+processors against serial (1e-10). Brief: `docs/wp/WP-T.md`. References:
+`docs/spec/thermal-references.md`.
+
+| WP | Title | Done when | ETA |
+| --- | --- | --- | --- |
+| T.0 | References, decision, `tools/thermal_reference.py` | `tests/test_thermal_reference.sh` passes; decision 0136 | 2 h |
+| T.1 | Grain conduction in a fixed bed: `celThermal`, field T, fixed, adiabatic and flux walls | Suddenly heated face against erfc within 1 %; linear steady profile on a 27 deg non-orthogonal mesh to 1e-10; energy to 1e-12 with adiabatic walls; `model none` bit for bit; 2/4 processors 1e-10 | 3 h |
+| T.2 | Temperature moves with the material: remap, free surface, outlet, inlet | Translating hot block keeps its energy to 1e-12, edges 2 cells or fewer; discharge energy balance (inside + out = start) 1e-12; uniform tank stays uniform exactly | 3 h |
+| T.2b | Temperature with immersed STL walls and bodies (split from T.2) | The small-cell mixing and covered-cell fill carry T; energy to 1e-12 in an STL hopper with an outlet | 2 h |
+| T.3 | Convective and heat-flux walls; Zehner-Schluender bed conductivity | Cooling slab at Bi 1 and 10 against the Carslaw-Jaeger series within 1 %; k_eff equals the closed form to 1e-12 | 2 h |
+| T.4 | Gas temperature and grain-gas exchange (Gunn); `equilibrium` option | Hot gas through a cold packed bed against Schumann within 1 % (planned 3 %, tightened: 20 % in h moves theta 3 %); equilibrium front speed within 1 %; uniform temperature under flow to 1e-12 | 5 h |
+| T.5 | Gas heat transport in the void | Flow between heated plates, Nu_Dh against 7.541 within 3 % | 3 h |
+| T.6 | Moving bed past a heated wall (validation) | Plug flow between heated plates against the slug-flow solution with the wall gap within 5 %; against Adapa et al. (2024) measured h within 20 %; mesh shown to Sia first | 2 h + 2 h runs |
+| T.7 | Gas density and viscosity with temperature; plastic heating (after the F.8 thread ends) | Sealed heated box keeps p/T to 1e-10; adiabatic shear rise beta W/(rho c) to 1e-10; T.4 and T.5 within 1 % | 4 h |
+| T.8 | Restart, MPI, tutorial `hotSiloDischarge` (planned as `hotBedCooling`), manual, thermal validation pack | Restart and 2/4 processors match serial to 1e-10 on T.4 and T.6; temperature costs at most 1.2x a gas-on step; `test_manual` passes | 3 h |

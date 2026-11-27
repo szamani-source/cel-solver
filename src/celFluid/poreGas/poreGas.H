@@ -127,6 +127,20 @@ Description
         pTolerance      1e-9;   // [Pa] largest correction when converged
                                 // (default 1e-14 p0)
         laplacian       "Gauss linear corrected";
+        parallelCheck   no;     // WP F.9a (decision 0134), debug: compare
+                                // every gas and solid field across each
+                                // processor cut (stale halos, one-sided
+                                // face values); prints "Parallel check"
+        parallelCheckEvery 1;   // ... every this many steps
+        liftCheck       yes;    // decision 0135: report the share of the
+                                // grain mass whose weight the gas carries
+                                // (a lifted or expanding bed is outside the
+                                // model's range); prints "Gas lift" at
+                                // write times, warns once past liftWarn
+        liftRatio       1;      // ... a cell is carried when the upward gas
+                                // force is at least this times its weight
+        liftWarn        0.01;   // ... warn when this share is carried
+        liftTime        0.01;   // ... for this long [s]
 
         // WP F.6, model gasFlow only, all optional:
         nCorr           1;      // pressure corrections per step (PISO)
@@ -383,6 +397,49 @@ class poreGas
             //  part -phi_g grad p less this (decision 0132)
             autoPtr<volVectorField> gasForce_;
 
+        // WP F.9: parallel consistency check (debug)
+
+            //- gasProperties parallelCheck (default no): after each solve,
+            //  compare every field's processor-boundary values with its
+            //  neighbour's (stale halo values, one-sided face values)
+            Switch parallelCheck_;
+
+            //- Every this many steps (gasProperties parallelCheckEvery,
+            //  default 1)
+            label parallelCheckEvery_;
+
+            //- Largest mismatch seen so far, and where
+            scalar parallelWorst_;
+
+        // Range of validity (decision 0135): the gas carrying the grains
+
+            //- gasProperties liftCheck (default yes): each step, the share
+            //  of the grain mass whose weight the gas carries
+            //  (poreGasLift.C)
+            Switch liftCheck_;
+
+            //- A cell counts as carried when the upward gas force on it is
+            //  at least liftRatio times its weight (default 1)
+            scalar liftRatio_;
+
+            //- Warn once the carried share of the grain mass passes this
+            //  (gasProperties liftWarn, default 0.01)
+            scalar liftWarn_;
+
+            //- ... and stays past it for this long [s] (gasProperties
+            //  liftTime, default 0.01): a short spike (an outlet opening)
+            //  is not a lift
+            scalar liftTime_;
+
+            //- Time the share last went past liftWarn (-1: not past it)
+            scalar liftSince_;
+
+            //- The warning was given
+            bool liftWarned_;
+
+            //- Carried share of the grain mass, last step
+            scalar liftShare_;
+
 
     // Private Member Functions (WP F.6, poreGasFlow.C)
 
@@ -473,6 +530,17 @@ public:
         const volScalarField& phiG() const noexcept { return phiG_; }
         const volScalarField& k() const noexcept { return k_; }
         const volScalarField& p() const noexcept { return *pPtr_; }
+
+        //- Gas mass flux through the faces of the last solve, relative to
+        //  the grains (Darcy-Ergun, and in the void Ug) [kg/s], out of the
+        //  owner (WP T.4: the gas temperature is carried by it)
+        const surfaceScalarField& massFlux() const noexcept
+        {
+            return massFlux_;
+        }
+
+        //- Superficial gas flux relative to the grains per cell [m/s]
+        const volVectorField& qGas() const noexcept { return qGas_; }
         const gasDragModel& dragModel() const noexcept { return *dragModel_; }
 
         //- Gas mass in the domain, all processors [kg]
@@ -544,6 +612,22 @@ public:
 
         //- Face pressures pFace() from p (WP F.4)
         void correctFacePressure();
+
+        //- Parallel consistency check (WP F.9, poreGasParallelCheck.C):
+        //  the largest mismatch of the processor-boundary values of the
+        //  gas and solid fields against their neighbours', relative to
+        //  each field's largest value; printed, and kept in
+        //  parallelWorst_
+        void checkParallel(const word& where);
+
+        //- Range-of-validity check (decision 0135, poreGasLift.C): the
+        //  share of the grain mass whose weight the gas carries; warns
+        //  once it passes liftWarn (the bed lifts or expands, which the
+        //  model does not represent), prints it at write times
+        void checkLift();
+
+        //- Carried share of the grain mass at the last step (decision 0135)
+        scalar liftShare() const noexcept { return liftShare_; }
 };
 
 

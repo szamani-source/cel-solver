@@ -916,6 +916,15 @@ void Foam::eulerianSolid::remap(const scalar dt)
     {
         remapField(mesh, geo, phi, dmInt, dmPatch, mNew, lim("epsPEq"), pc_());
     }
+    forAll(passengers_, k)
+    {
+        remapField
+        (
+            mesh, geo, phi, dmInt, dmPatch, mNew,
+            limiterFromWord(passengerLimiters_[k], materialProperties_),
+            passengers_[k]
+        );
+    }
 
     if (immersed_)
     {
@@ -1518,6 +1527,24 @@ void Foam::eulerianSolid::remapFreeSurface(const scalar dt)
         (
             mesh, geo, phi, dmInt, dmPatch, mNew, lim("epsPEq"), pc_(),
             &smooth_, anyIn ? &qIn : nullptr
+        );
+    }
+    forAll(passengers_, k)
+    {
+        // open inlets bring the field's own patch value (WP T.2)
+        volScalarField& f = passengers_[k];
+        List<scalarField> fIn(bm.size());
+        forAll(inletPatch_, j)
+        {
+            if (!inletOpen_[j]) continue;
+            const label patchi = inletPatch_[j];
+            fIn[patchi] = f.boundaryField()[patchi];
+        }
+        remapField
+        (
+            mesh, geo, phi, dmInt, dmPatch, mNew,
+            limiterFromWord(passengerLimiters_[k], materialProperties_), f,
+            &smooth_, anyIn ? &fIn : nullptr
         );
     }
     if (turned)

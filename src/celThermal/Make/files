@@ -1,0 +1,3 @@
+heatTransfer/heatTransfer.C
+
+LIB = $(FOAM_USER_LIBBIN)/libcelThermal
