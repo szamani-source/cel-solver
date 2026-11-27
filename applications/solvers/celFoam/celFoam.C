@@ -88,7 +88,13 @@ int main(int argc, char *argv[])
         // pressure acts on the material
         // WP F.4 (decision 0129): with a free surface the solid sees the
         // void pressure on the faces between material and void
-        if (solid.freeSurface())
+        if (gas->frictionOnly())
+        {
+            // WP F.8g (decision 0133): the pore pressure only lowers the
+            // friction; sigma stays the total stress
+            solid.setSupportPressure(gas->p());
+        }
+        else if (solid.freeSurface())
         {
             solid.setPorePressure(gas->p(), gas->pFace());
         }

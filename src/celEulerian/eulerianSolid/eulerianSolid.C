@@ -289,9 +289,25 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
     (
         materialProperties_.getOrDefault<Switch>("flowImpedance", false)
     ),
+    yieldShearJump_
+    (
+        materialProperties_.getOrDefault<Switch>("yieldShearJump", true)
+    ),
+    slowFlowJump_
+    (
+        materialProperties_.getOrDefault<Switch>("slowFlowJump", false)
+    ),
+    slowFlowMin_
+    (
+        materialProperties_.getOrDefault<scalar>("slowFlowMin", 0.01)
+    ),
     fullBlend_
     (
         materialProperties_.getOrDefault<Switch>("fullBlend", false)
+    ),
+    overfillStress_
+    (
+        materialProperties_.getOrDefault<Switch>("overfillStress", false)
     ),
     voidPlasticFlow_
     (
@@ -478,6 +494,42 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
     {
         Info<< "Normal jump cap at Mohr-Coulomb yield (rule 12)" << nl;
     }
+    princetonFr_ = materialProperties_.getOrDefault<scalar>("princetonFr", 0);
+    princetonR_ = materialProperties_.getOrDefault<scalar>("princetonR", 2);
+    princetonS_ = materialProperties_.getOrDefault<scalar>("princetonS", 5);
+    princetonMin_ = materialProperties_.getOrDefault<scalar>("princetonMin", 0.49);
+    princetonMax_ = materialProperties_.getOrDefault<scalar>("princetonMax", 0.64);
+    princetonRhoS_ = 0;
+    if (princetonFr_ < 0)
+    {
+        FatalIOErrorInFunction(materialProperties_)
+            << "princetonFr must be positive (0 = off)" << exit(FatalIOError);
+    }
+    if (princetonFr_ > 0)
+    {
+        princetonRhoS_ = materialProperties_.get<scalar>("rhoS");
+        if
+        (
+            !(princetonMin_ >= 0 && princetonMax_ > princetonMin_
+           && princetonMax_ < 1 && princetonRhoS_ > 0 && princetonS_ >= 0
+           && princetonR_ >= 0)
+        )
+        {
+            FatalIOErrorInFunction(materialProperties_)
+                << "princeton: needs 0 <= princetonMin < princetonMax < 1, "
+                << "rhoS > 0, princetonR and princetonS >= 0"
+                << exit(FatalIOError);
+        }
+        Info<< "Packing-dependent pressure (Princeton): Fr " << princetonFr_
+            << " Pa, r " << princetonR_ << ", s " << princetonS_
+            << ", solid fraction " << princetonMin_ << " to "
+            << princetonMax_ << ", rhoS " << princetonRhoS_ << nl;
+    }
+    if (overfillStress_)
+    {
+        Info<< "Overfilled cells take the excess as elastic volume strain "
+            << "(overfillStress)" << nl;
+    }
     if (fullBlend_)
     {
         if (!(blendVoid_[0] > 0 && blendVoid_[1] > blendVoid_[0]))
@@ -524,6 +576,43 @@ Foam::eulerianSolid::eulerianSolid(const fvMesh& mesh)
         }
         Info<< "Flow impedance (WP 3.6c): mu(I) tangent viscosity at faces "
             << "between flowing cells, plastic Hancock predictor" << nl;
+    }
+    if (!yieldShearJump_)
+    {
+        const dictionary& d = materialProperties_;
+        const word type(d.get<word>("type"));
+        if (type != "mohrCoulomb" && type != "druckerPrager")
+        {
+            FatalIOErrorInFunction(d)
+                << "yieldShearJump no needs type mohrCoulomb or druckerPrager"
+                << exit(FatalIOError);
+        }
+        if (capSinPhi_ == 0)
+        {
+            capSinPhi_ = Foam::sin(degToRad(d.get<scalar>("phi")));
+            capCCos_ =
+                d.getOrDefault<scalar>("c", 0)
+               *Foam::cos(degToRad(d.get<scalar>("phi")));
+        }
+        Info<< "No elastic shear jump beside yielding cells "
+            << "(yieldShearJump no, WP F.8j)" << nl;
+    }
+    if (slowFlowJump_)
+    {
+        if (yieldShearJump_)
+        {
+            FatalIOErrorInFunction(materialProperties_)
+                << "slowFlowJump yes needs yieldShearJump no"
+                << exit(FatalIOError);
+        }
+        if (slowFlowMin_ <= 0 || slowFlowMin_ > 1)
+        {
+            FatalIOErrorInFunction(materialProperties_)
+                << "slowFlowMin must lie in (0, 1], not " << slowFlowMin_
+                << exit(FatalIOError);
+        }
+        Info<< "Normal jump between yielding cells scaled by the Mach number, "
+            << "at least " << slowFlowMin_ << " (slowFlowJump, WP F.8k)" << nl;
     }
     if (spreadLayers_)
     {
@@ -1289,6 +1378,19 @@ void Foam::eulerianSolid::storeRemapMass()
             )
         );
     }
+}
+
+
+void Foam::eulerianSolid::setSupportPressure(const volScalarField& p)
+{
+    // the face masses of the remap as with a pore pressure, but no force
+    setPorePressure(p);
+    poreP_ = nullptr;
+    supportP_ = &p;
+    supportShift_.setSize(mesh_.nCells(), 0);
+    frictionScale_.setSize(mesh_.nCells(), 1);
+    Info<< "Pore pressure lowers the friction only (frictionOnly, "
+        << "WP F.8g): sigma is the total stress, no gas force" << nl;
 }
 
 

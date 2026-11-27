@@ -676,7 +676,9 @@ void faceStates
 //- Acoustic Riemann solution at a face with unit normal n (from L to R):
 //  face velocity vS and traction tS = sigma* & n. kj >= 0 replaces the
 //  shear jump coefficient zsL zsR/(zsL + zsR) of the traction (flow
-//  impedance, WP 3.6c); the velocity keeps the elastic impedances.
+//  impedance, WP 3.6c); the velocity keeps the elastic impedances. kn >= 0
+//  likewise replaces the normal jump coefficient zpL zpR/(zpL + zpR)
+//  (slowFlowJump, WP F.8k).
 inline void riemann
 (
     const vector& n,
@@ -684,7 +686,8 @@ inline void riemann
     const vector& vR, const symmTensor& sR, const scalar zpR, const scalar zsR,
     vector& vS,
     vector& tS,
-    const scalar kj = -1
+    const scalar kj = -1,
+    const scalar kn = -1
 )
 {
     const vector tL(sL & n);
@@ -703,7 +706,10 @@ inline void riemann
     const scalar zs = zsL + zsR;
 
     const scalar vn = (zpL*vnL + zpR*vnR + (tnR - tnL))/zp;
-    const scalar tn = (zpR*tnL + zpL*tnR + zpL*zpR*(vnR - vnL))/zp;
+    const scalar tn =
+        kn < 0
+      ? (zpR*tnL + zpL*tnR + zpL*zpR*(vnR - vnL))/zp
+      : (zpR*tnL + zpL*tnR)/zp + kn*(vnR - vnL);
     const vector vt((zsL*vtL + zsR*vtR + (ttR - ttL))/zs);
     const vector tt
     (
@@ -1367,12 +1373,13 @@ inline bool voidFace
     const scalar sT,
     vector& vS,
     vector& tS,
-    const scalar kj = -1
+    const scalar kj = -1,
+    const scalar kn = -1
 )
 {
     if (touchL && touchR)
     {
-        riemann(n, vL, sL, zpL, zsL, vR, sR, zpR, zsR, vS, tS, kj);
+        riemann(n, vL, sL, zpL, zsL, vR, sR, zpR, zsR, vS, tS, kj, kn);
         if ((tS & n) <= sT)
         {
             return true;
@@ -1720,6 +1727,22 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
     const scalar G = material_->shearModulus();
     const scalar K = M - 4.0*G/3.0;
 
+    // WP F.8g (decision 0133): support by a pore pressure that only lowers
+    // the friction: s = min(p, P) on the total stress of the step start
+    if (supportP_)
+    {
+        const scalarField& ps = supportP_->primitiveField();
+        const symmTensorField& sg = sigma_.primitiveField();
+        forAll(ps, celli)
+        {
+            const scalar P = -tr(sg[celli])/3;
+            const scalar sh = (P > 0 ? min(max(ps[celli], scalar(0)), P) : 0);
+            supportShift_[celli] = sh;
+            frictionScale_[celli] =
+                P > 0 ? max(1 - sh/P, scalar(0)) : (ps[celli] > 0 ? 0 : 1);
+        }
+    }
+
     // Outlets open at the start of the first step at or after their
     // opening time (WP 3.3, decision 0033)
     {
@@ -1924,8 +1947,17 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
               : 1;
             if (w > 0)
             {
-                e[celli] =
-                    w*flowViscosity(sigma_[celli], flowLaw_, cCot, sm[celli]);
+                // WP F.8g: with frictionOnly the law sees the effective
+                // stress sigma + lambda P I
+                const symmTensor sEff
+                (
+                    supportP_
+                  ? sigma_[celli]
+                  + (1 - frictionScale_[celli])
+                   *max(-tr(sigma_[celli])/3, scalar(0))*symmTensor::I
+                  : sigma_[celli]
+                );
+                e[celli] = w*flowViscosity(sEff, flowLaw_, cCot, sm[celli]);
             }
         }
         // Nonlocal fluidity (WP N.2, decision 0111; C.3, decision 0112): a
@@ -1993,6 +2025,81 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
         teta.ref().correctBoundaryConditions();
         tsinMob.ref().correctBoundaryConditions();
     }
+
+    // WP F.8j (decision 0137): yielding cells (1) with yieldShearJump no:
+    // stress within flowBand (in sin phi) of the static Mohr-Coulomb surface,
+    // partly filled cells too; with neighbour values on coupled patches
+    tmp<volScalarField> tyield;
+    const bool noYieldJump = !yieldShearJump_ && solveMomentum_;
+    if (noYieldJump)
+    {
+        tyield = workField<scalar>(mesh, "yielding", dimless);
+        scalarField& y = tyield.ref().primitiveFieldRef();
+        const scalar cCot = capSinPhi_ > 0 ? capCCos_/capSinPhi_ : 0;
+        forAll(y, celli)
+        {
+            y[celli] = 0;
+            if (fs && alpha_[celli] <= alphaEmpty)
+            {
+                continue;
+            }
+            const symmTensor sEff
+            (
+                supportP_
+              ? sref[celli]
+              + (1 - frictionScale_[celli])
+               *max(-tr(sref[celli])/3, scalar(0))*symmTensor::I
+              : sref[celli]
+            );
+            const vector ev(principal(sEff));
+            const scalar s1 = cmptMax(ev);
+            const scalar s3 = cmptMin(ev);
+            const scalar pm = cCot - 0.5*(s1 + s3);
+            if (pm <= 0 || 0.5*(s1 - s3) >= capSinPhi_*(1 - flowBand)*pm)
+            {
+                y[celli] = 1;
+            }
+        }
+        tyield.ref().correctBoundaryConditions();
+    }
+    // Shear jump coefficient of a face with a yielding side: the yielding
+    // side gives min(zs, 2 eta/delta) with a mu(I) viscosity, else 0; the
+    // other side zs; in series. -1 (elastic jump) when neither side yields
+    auto yieldJump =
+        [&]
+        (
+            const scalar zsL, const bool yL, const scalar etaL,
+            const scalar zsR, const bool yR, const scalar etaR,
+            const scalar delta
+        )
+    {
+        if (!yL && !yR)
+        {
+            return scalar(-1);
+        }
+        const scalar kL = yL ? (etaL > 0 ? min(zsL, 2*etaL/delta) : 0) : zsL;
+        const scalar kR = yR ? (etaR > 0 ? min(zsR, 2*etaR/delta) : 0) : zsR;
+        return (kL > 0 && kR > 0) ? kL*kR/(kL + kR) : scalar(0);
+    };
+    // Normal jump coefficient of a face between two yielding cells
+    // (slowFlowJump, WP F.8k): the elastic zpL zpR/(zpL + zpR) times the
+    // Mach number of the faster side, max |v|/c_p, between slowFlowMin and
+    // 1 (low-Mach scaling of the jump, as for Godunov schemes in slow flow)
+    const scalar cP = sqrt(M/rho0_);
+    auto slowJump =
+        [&]
+        (
+            const scalar zpL, const scalar zpR, const vector& vL, const vector& vR
+        )
+    {
+        if (zpL <= 0 || zpR <= 0)
+        {
+            return scalar(-1);
+        }
+        const scalar mach =
+            min(max(max(mag(vL), mag(vR))/cP, slowFlowMin_), scalar(1));
+        return mach*zpL*zpR/(zpL + zpR);
+    };
     const surfaceScalarField& deltaCoeffs = mesh.deltaCoeffs();
     const volScalarField* smoothPtr = fs ? &tsmooth() : nullptr;
     const volScalarField* eFacPtr = fs ? &teFac() : nullptr;
@@ -2166,7 +2273,9 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                     {
                         wallFace
                         (
-                            pS[i]/pmS[i], pu[i], ps[i], zp[P], zs[P], mu, v, t,
+                            pS[i]/pmS[i], pu[i], ps[i], zp[P], zs[P],
+                            mu*(supportP_ ? frictionScale_[P] : scalar(1)),
+                            v, t,
                             fi && teta()[P] > 0
                           ? min
                             (
@@ -2264,7 +2373,11 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
             }
             const symmTensor D(symm(gradU[celli])/VoP[celli]);
             symmTensor Dd(dev(D));
-            if (fi && teta()[celli] > 0)
+            if
+            (
+                (fi && teta()[celli] > 0)
+             || (noYieldJump && tyield()[celli] > 0.5)    // WP F.8j
+            )
             {
                 // Flowing cell: no elastic stress rate along the plastic
                 // flow direction m = (e1 e1 - e3 e3)/sqrt(2) while loading
@@ -2409,6 +2522,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
         vector t;
         bool contact = true;
         scalar kj = -1;
+        scalar kn = -1;
         bool bothFlow = false;
         scalar capSin = capSinPhi_;
         if (fi)
@@ -2422,6 +2536,21 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                 if (eN > 0) capSin = max(capSin, tsinMob()[N]);
             }
         }
+        if (noYieldJump)
+        {
+            const bool yP = tyield()[P] > 0.5, yN = tyield()[N] > 0.5;
+            kj = yieldJump
+            (
+                zs[P], yP, fi ? teta()[P] : 0,
+                zs[N], yN, fi ? teta()[N] : 0,
+                1/deltaCoeffs[facei]
+            );
+            bothFlow = bothFlow || (yP && yN);
+            if (slowFlowJump_ && yP && yN)
+            {
+                kn = slowJump(zp[P], zp[N], UO()[facei], UN()[facei]);
+            }
+        }
         if (fs)
         {
             const scalar aP = alpha_[P], aN = alpha_[N];
@@ -2432,7 +2561,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                 touches(aP, lean_[P], inLines(P, Sf[facei])),
                 UN()[facei], sN()[facei], zp[N], zs[N], aN > alphaEmpty,
                 touches(aN, lean_[N], inLines(N, -Sf[facei])),
-                tensileStrength_, vS[facei], t, kj
+                tensileStrength_, vS[facei], t, kj, kn
             );
         }
         else
@@ -2442,7 +2571,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                 n,
                 UO()[facei], sO()[facei], zp[P], zs[P],
                 UN()[facei], sN()[facei], zp[N], zs[N],
-                vS[facei], t, kj
+                vS[facei], t, kj, kn
             );
         }
         if (shearCap_ && contact && solveMomentum_ && !bothFlow)
@@ -2531,11 +2660,15 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
             {
                 srn = sref.boundaryField()[patchi].patchNeighbourField();
             }
-            scalarField etan, smn;
+            scalarField etan, smn, yn;
             if (fi)
             {
                 etan = teta().boundaryField()[patchi].patchNeighbourField();
                 smn = tsinMob().boundaryField()[patchi].patchNeighbourField();
+            }
+            if (noYieldJump)
+            {
+                yn = tyield().boundaryField()[patchi].patchNeighbourField();
             }
             forAll(fc, i)
             {
@@ -2543,6 +2676,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                 vector t;
                 bool contact = true;
                 scalar kj = -1;
+                scalar kn = -1;
                 bool bothFlow = false;
                 scalar capSin = capSinPhi_;
                 if (fi)
@@ -2560,6 +2694,21 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                         if (eN > 0) capSin = max(capSin, smn[i]);
                     }
                 }
+                if (noYieldJump)
+                {
+                    const bool yP = tyield()[fc[i]] > 0.5, yN = yn[i] > 0.5;
+                    kj = yieldJump
+                    (
+                        zs[fc[i]], yP, fi ? teta()[fc[i]] : 0,
+                        zsn[i], yN, fi ? etan[i] : 0,
+                        1/deltaCoeffs.boundaryField()[patchi][i]
+                    );
+                    bothFlow = bothFlow || (yP && yN);
+                    if (slowFlowJump_ && yP && yN)
+                    {
+                        kn = slowJump(zp[fc[i]], zpn[i], puo[i], pun[i]);
+                    }
+                }
                 if (fs)
                 {
                     const scalar aP = alpha_[fc[i]];
@@ -2571,7 +2720,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                         touches(aP, lean_[fc[i]], inLines(fc[i], pS[i])),
                         pun[i], psn[i], zpn[i], zsn[i], aN > alphaEmpty,
                         touches(aN, leanNbr[patchi][i], inLinesNbr(patchi, i, -pS[i])),
-                        tensileStrength_, pvS[i], t, kj
+                        tensileStrength_, pvS[i], t, kj, kn
                     );
                 }
                 else
@@ -2581,7 +2730,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                         n,
                         puo[i], pso[i], zp[fc[i]], zs[fc[i]],
                         pun[i], psn[i], zpn[i], zsn[i],
-                        pvS[i], t, kj
+                        pvS[i], t, kj, kn
                     );
                 }
                 if (shearCap_ && contact && solveMomentum_ && !bothFlow)
@@ -2706,7 +2855,9 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
             {
                 wallFace
                 (
-                    n, vL, pso[i], zp[P], zs[P], wallFriction_[p.name()],
+                    n, vL, pso[i], zp[P], zs[P],
+                    wallFriction_[p.name()]
+                   *(supportP_ ? frictionScale_[P] : scalar(1)),
                     v, t,
                     fi && teta()[P] > 0
                   ? min(zs[P], teta()[P]*deltaCoeffs.boundaryField()[patchi][i])
@@ -3224,6 +3375,19 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
             hOld.epsPEq = epsPEq[celli];
             hOld.pc = pc_.valid() ? pc_()[celli] : 0;
 
+            // WP F.8g: the constitutive update sees sigma + s I with
+            // s = lambda P_trial (lambda = min(p/P, 1) of the step start,
+            // P_trial the elastic trial mean pressure), so a fully
+            // supported cell keeps an elastic, isotropic total stress
+            const scalar shift = supportP_
+              ? (1 - frictionScale_[celli])
+               *max(-tr(sigma[celli])/3 - K*tr(dEps), scalar(0))
+              : 0;
+            if (shift != 0)
+            {
+                sigma[celli] += shift*symmTensor::I;
+            }
+
             symmTensor sNew;
             if (fluidity_.valid())
             {
@@ -3320,7 +3484,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
                 }
             }
 
-            sigma[celli] = sNew;
+            sigma[celli] = sNew - shift*symmTensor::I;
             symmTensor e(constitutiveModel::fromVoigt(hNew.epsP));
             e.xy() *= 0.5;
             e.yz() *= 0.5;
@@ -3355,6 +3519,30 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
 
         // 6. Lagrangian density
         rho[celli] = m[celli]/VL;
+
+        // WP F.8f (decision 0133): packing-dependent frictional pressure
+        // (Princeton, Breard et al. 2019): the effective mean stress is at
+        // most Pc(solid fraction of the filled part); above it the stress
+        // is scaled towards the apex (the grains cannot carry it at this
+        // packing and the cell compacts)
+        const scalar aP = freeSurface_ ? alphaL_[celli] : scalar(1);
+        if (princetonFr_ > 0 && aP > 0 && m[celli] > 0)
+        {
+            const scalar es = m[celli]/(VL*max(aP, SMALL)*princetonRhoS_);
+            scalar Pc = 0;
+            if (es > princetonMin_)
+            {
+                const scalar gap = max(princetonMax_ - es, 1e-6);
+                Pc = princetonFr_*Foam::pow(es - princetonMin_, princetonR_)
+                    /Foam::pow(gap, princetonS_);
+            }
+            symmTensor& s = sigma[celli];
+            const scalar P = -tr(s)/3;
+            if (P > Pc)
+            {
+                s *= (P > 0 ? Pc/P : 0);
+            }
+        }
     }
 
     rho_.correctBoundaryConditions();

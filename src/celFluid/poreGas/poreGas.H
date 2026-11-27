@@ -338,6 +338,38 @@ class poreGas
             //  (K + e rhoG/dt); null when off
             autoPtr<gasDragModel> inertialDrag_;
 
+        // WP F.8: gas carried across the free surface (decision 0133)
+
+            //- The surface's own motion carries gas across faces between a
+            //  gas cell and a void cell (the vacated or newly filled part
+            //  of the cell exchanges gas with the void), as on every other
+            //  face; no: only grains crossing displace gas there (F.4)
+            Switch surfaceCarry_;
+
+            //- Smallest gas fraction of the filled part (WP F.8, F.8c,
+            //  decision 0133): keyword eMin, default 0.2
+            scalar eMin_;
+
+        // WP F.8e: pore pressure as an advected-diffused field (decision
+        // 0133, route B; Iverson & Denlinger 2001, Gueugneau et al. 2017,
+        // Aravena et al. 2021)
+
+            //- gasProperties diffusivity [m^2/s]; 0 (default): off. When
+            //  set, the pore pressure moves with the grains and diffuses
+            //  with this diffusivity: the storage is rho_g0 k/(mu kappa)
+            //  per unit of filled volume, and the grains' volume change
+            //  does not act on it (no compression or suction)
+            scalar kappa_;
+
+            //- gasProperties frictionOnly (WP F.8g, needs diffusivity):
+            //  the pore pressure only lowers the friction of the grains
+            //  (Gueugneau 2017, Aravena 2021) instead of acting as a force
+            Switch frictionOnly_;
+
+            //- WP F.8h: total mean pressure of each cell at the last solve
+            //  (frictionOnly carries the support ratio p/P); empty: not set
+            scalarField Pprev_;
+
             //- Superficial flux relative to the grains through each face
             //  at the end of the last step, q.n [m/s], and 1 on the faces
             //  that were void flow faces then (their flux is absolute)
@@ -453,6 +485,7 @@ public:
     //- Cells with alpha below this are void (no permeability)
     static constexpr scalar alphaMin = 1e-6;
 
+
     //- Ergun-Wen-Yu switch: Ergun below this gas fraction (Gidaspow)
     static constexpr scalar eSwitch = 0.8;
 
@@ -518,6 +551,16 @@ public:
 
         //- Two-way coupled with the solid (WP F.3)
         bool coupled() const noexcept { return coupled_; }
+
+        //- WP F.8g: the pore pressure only lowers the friction
+        bool frictionOnly() const noexcept { return frictionOnly_; }
+
+        //- WP F.8i: the zero pressure on the material's surface (route B
+        //  with frictionOnly and a free surface)
+        bool drainAtSurface() const noexcept
+        {
+            return frictionOnly_ && kappa_ > 0 && coupled_ && freeSurface_;
+        }
 
         //- Face pressures for the solid (WP F.4): linear between cells,
         //  the void pressure (0 gauge) on faces between material and void
