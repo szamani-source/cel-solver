@@ -185,6 +185,23 @@ against the Abaqus benchmark solution: both the hex8 bodies and the Eulerian wed
 1 %. The Eulerian wedge smears the thin lip at the impact face (first order in the cell size); use a
 Lagrangian body for thin flanges.</p>
 
+<h2 id="thermal">Temperature (version 2)</h2>
+<p>Each temperature package has a closed form or a published case (decision 0136); the pack
+<code>tests/validation/thermal</code> runs the last three on 1, 2 and 4 processors (they agree to
+\(10^{-13}\)).</p>
+<table>
+<thead><tr><th>Check</th><th>Reference</th><th>Result</th><th>Test</th></tr></thead>
+<tbody>
+<tr><td>Conduction in a bar held hot at one end</td><td>erfc solution</td><td>within 0.012 %</td><td>CI <code>test_conduction.sh</code></td></tr>
+<tr><td>Temperature carried with the material</td><td>exact transport, inlet and outlet balance</td><td>energy to \(2\times10^{-14}\)</td><td>CI <code>test_carried_temperature.sh</code></td></tr>
+<tr><td>Slab cooled by convection, Bi 1 and 10</td><td>Carslaw and Jaeger series</td><td>within 0.021 %</td><td>CI <code>test_thermal_walls.sh</code></td></tr>
+<tr><td>Hot air into a cold packed column</td><td>Schumann <a class="cite" href="references.html#ref-schumann1929">Schumann 1929</a> with Gunn's h <a class="cite" href="references.html#ref-gunn1978">Gunn 1978</a></td><td>within 0.38 % of the step</td><td>CI <code>test_gas_heat.sh</code></td></tr>
+<tr><td>Laminar air between hot plates</td><td>developed Nu 7.5407</td><td>&minus;1.1 %</td><td>CI <code>test_void_heat.sh</code></td></tr>
+<tr><td>Ceramic particles flowing between heated plates</td><td><a class="cite" href="references.html#ref-adapa2024">Adapa et al. 2024</a>: slug flow with the measured near-wall gap; their 225&ndash;350 W/(m&sup2; K)</td><td>mean h 291 against 293 W/(m&sup2; K); local Nu within 0.45 %</td><td>CI <code>test_moving_bed_heat.sh</code></td></tr>
+<tr><td>Restart, 2 and 4 processors</td><td>continuous serial run</td><td>within \(3\times10^{-13}\)</td><td>CI <code>test_thermal_restart_mpi.sh</code></td></tr>
+</tbody>
+</table>
+
 <h2 id="verification">Verification underneath</h2>
 <ul>
 <li>Material models: C++ against the Python reference to \(10^{-12}\) to \(10^{-15}\) on hundreds of strain paths.</li>

@@ -1,0 +1,29 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  celFoam tutorial hotSiloDischarge (WP T.8)
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    object      T;
+}
+// Temperature of the grains [K]. setFields: 423.15 (150 C) in the lower layer,
+// 293.15 (20 C) above it. The patch types are the thermal boundary conditions;
+// the left and right walls are convective (constant/thermalProperties walls).
+
+dimensions      [0 0 0 1 0 0 0];
+
+internalField   uniform 293.15;
+
+boundaryField
+{
+    ".*"
+    {
+        type    zeroGradient;   // adiabatic (floor, lid) or overridden (walls)
+    }
+    frontAndBack
+    {
+        type    empty;
+    }
+}

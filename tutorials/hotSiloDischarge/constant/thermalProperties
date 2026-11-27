@@ -1,0 +1,29 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  celFoam tutorial hotSiloDischarge (WP T.8)
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      thermalProperties;
+}
+// Temperature of the grains (decision 0136). Dry quartz sand: specific heat
+// 800 J/(kg K) (Incropera et al., Fundamentals of Heat and Mass Transfer,
+// Table A.3, sand); quartz grains 3 W/(m K) in air, so the bed conducts
+// about 0.25 W/(m K) (Zehner-Schluender, tools/thermal_reference.py).
+
+model        equilibrium;     // one temperature (no pore gas in this case)
+c            800;             // [J/(kg K)]
+conductivity zehnerSchlunder; // from the packing in each cell (field kBed)
+kParticle    3;               // [W/(m K)] quartz
+kGas         0.02569;         // [W/(m K)] air at 20 C
+rhoP         2650;            // [kg/m^3] quartz
+limiter      MC;              // remap limiter of T (the default)
+voidT        293.15;          // written in empty cells [K]
+
+walls
+{
+    left  { h 10; Tinf 293.15; }   // still air outside a thin steel wall
+    right { h 10; Tinf 293.15; }
+}

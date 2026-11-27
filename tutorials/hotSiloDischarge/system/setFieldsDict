@@ -1,0 +1,39 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  celFoam tutorial hotSiloDischarge (WP T.8)
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      setFieldsDict;
+}
+// Stress-free fill of the tank to H = 0.6 m; the lower half (y < 0.3 m) at
+// 150 C, the upper half at 20 C.
+defaultFieldValues
+(
+    volScalarFieldValue alpha 0
+    volScalarFieldValue rho 0
+    volScalarFieldValue T 293.15
+);
+regions
+(
+    boxToCell
+    {
+        box (-1 -1 -1) (1 0.6 1);
+        fieldValues
+        (
+            volScalarFieldValue alpha 1
+            volScalarFieldValue rho 1800
+        );
+    }
+    // The hot lower layer, 150 C
+    boxToCell
+    {
+        box (-1 -1 -1) (1 0.3 1);
+        fieldValues
+        (
+            volScalarFieldValue T 423.15
+        );
+    }
+);
