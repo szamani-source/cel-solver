@@ -1,7 +1,7 @@
 #!/bin/bash
 # WP F.8k done-when (decision 0135): dry dam break, plain Mohr-Coulomb with
-# yieldShearJump no and slowFlowJump yes, run-out on 10, 5 and 2.5 mm cells
-# within 5 % of the 2.5 mm one at Courant 0.4. About 2.5 h on 4 cores.
+# yieldShearJump no and slowFlowJump yes, run-out (front at 20 mm thickness)
+# on 10, 5 and 2.5 mm cells within 5 % of the 2.5 mm one at Courant 0.4. About 2.5 h on 4 cores.
 #
 #   tests/manual/test_collapse_convergence.sh            # 10 5 2.5 mm
 #   tests/manual/test_collapse_convergence.sh 10 5       # chosen meshes

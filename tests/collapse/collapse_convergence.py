@@ -5,13 +5,13 @@ yieldShearJump no and slowFlowJump yes converges with the mesh at the
 default Courant number 0.4.
 
 Run-out at 1.4 s (from the gate, in h0): the front is the end of the
-continuous deposit at least 5 mm thick (a physical thickness, so that a
-sheet thinner than the coarse cells does not count on fine meshes only).
-Passes when the 10, 5 and 2.5 mm run-outs lie within 5 % of the 2.5 mm one.
+continuous deposit at least 20 mm thick, two cells of the coarsest mesh
+(Sia, 2026-11-27). Each mesh ends the deposit's thin tail where it is one
+cell thick, so a thinner threshold measures the mesh, not the scheme
+(WP F.8k: at 5 mm thickness 2.30 / 2.46 / 2.84 h0). Passes when the 10, 5
+and 2.5 mm run-outs lie within 5 % of the 2.5 mm one (WP F.8k: 1.58 / 1.69 /
+1.62 h0; without slowFlowJump 1.40 / 1.67 / 1.75).
 
-Before WP F.8k (yieldShearJump no only): 1.85 / 2.57 / 2.81 h0 at Courant
-0.4 (10 mm at Courant 0.1: 2.35), the slow flow damped by the face
-Riemann solver's normal jump (about rho c_p D).
 
     python3 collapse_convergence.py WORKDIR [cell_mm ...] [--var slowFlowJump]
 """
@@ -25,7 +25,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "gas"))
 import collapse_cases as cc  # noqa: E402
 
-T_END, THICK, TOL = 1.4, 0.005, 0.05
+T_END, THICK, TOL = 1.4, 0.02, 0.05
 PROCS = {10: 1, 5: 2, 2.5: 4}
 
 

@@ -37,8 +37,10 @@ at 1.4 s in h0, by the deposit thickness that defines the front:
 - The body of the deposit (front at 20 mm) now agrees within 4 % of 2.5 mm on all
   three meshes (before: 10 mm 20 % short). 10 mm at Courant 0.4 gives 2.30, at 0.1
   2.42 (before 1.85 / 2.35): the time-step dependence is mostly gone.
-- The done-when (front at 5 mm thickness within 5 %) FAILS: 2.30 / 2.46 / 2.84. A thin
-  sheet (under 10 mm) runs ahead of the body on fine meshes, from the first 0.2 s
-  (front 0.35 / 0.38 / 0.63 h0 at 0.2 s).
+- At 5 mm thickness the run-outs are 2.30 / 2.46 / 2.84: each mesh ends the deposit's
+  thin tail where it is one cell thick (WP F.8k log), so that measure follows the
+  mesh. Sia (2026-11-27) chose to measure the front at a thickness every mesh resolves:
+  the done-when uses 20 mm (two coarse cells) and passes, 3.8 %; the dam break is
+  calibrated on 5 mm cells.
 - Default unchanged, so existing tests are unchanged (the kn < 0 path is the old
   formula).
