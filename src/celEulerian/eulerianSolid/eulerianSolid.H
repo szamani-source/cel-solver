@@ -256,12 +256,52 @@ class eulerianSolid
         //  between two flowing cells and uses phi_m elsewhere
         Switch flowImpedance_;
 
+        //- WP F.8j (decision 0137): materialProperties yieldShearJump no
+        //  (Mohr-Coulomb or Drucker-Prager; default yes). At a face beside a
+        //  yielding cell (stress within 3 % in sin(phi) of the static
+        //  Mohr-Coulomb surface, partly filled cells too) the yielding side
+        //  adds no elastic shear jump (zs) to the face traction: only its
+        //  mu(I) viscosity with flowImpedance, else none. Elastic cells keep
+        //  zs. The Riemann solver's shear damping, about rho c_s D, set the
+        //  run-out of the dry dam break (it fell with E and grew 35-50 %
+        //  from 10 to 5 mm cells)
+        Switch yieldShearJump_;
+
+        //- WP F.8k (decision 0138): materialProperties slowFlowJump yes
+        //  (needs yieldShearJump no; default no). At a face between two
+        //  yielding cells the normal jump coefficient zpL zpR/(zpL + zpR) of
+        //  the Riemann solver is scaled by the Mach number max |v|/c_p of the
+        //  faster side, kept between slowFlowMin (default 0.01) and 1: the
+        //  low-Mach correction of Godunov schemes. Waves in elastic material
+        //  and impacts (Mach near 1) keep the full jump
+        Switch slowFlowJump_;
+        scalar slowFlowMin_;
+
         //- WP 3.6h (decision 0049): materialProperties fullBlend yes (with
         //  freeSurface). Instead of the nearly-full snap (decisions 0044,
         //  0045), cells with void between 1e-4 and 1e-2 blend the full and
         //  partly filled rules with a weight that falls from 1 to 0 in
         //  log(void): face states, stress predictor and flow viscosity
         Switch fullBlend_;
+
+        //- WP F.8c (decision 0133): materialProperties overfillStress yes.
+        //  A cell the remap overfills (alpha above 1 before the clip)
+        //  takes the excess as an elastic volume strain ln(alpha) (mean
+        //  stress -K ln(alpha)) instead of a stress-free densification
+        Switch overfillStress_;
+
+        //- WP F.8f (decision 0133): packing-dependent frictional pressure
+        //  (Princeton / Srivastava-Sundaresan, as Breard et al. 2019).
+        //  materialProperties princetonFr > 0 turns it on: the effective
+        //  mean stress of a cell is at most
+        //      Pc = Fr (es - esMin)^r / (esMax - es)^s,  es = rho/(alpha rhoS)
+        //  (0 below esMin); a stress above it is scaled towards the apex
+        scalar princetonFr_;
+        scalar princetonR_;
+        scalar princetonS_;
+        scalar princetonMin_;
+        scalar princetonMax_;
+        scalar princetonRhoS_;
 
         //- A.4 (decision 0095): materialProperties voidPlasticFlow; in a
         //  partly filled cell the plastic normal strain the material takes
@@ -324,6 +364,18 @@ class eulerianSolid
         //- Extra force of the pore gas on each cell's grains [N] (WP F.7:
         //  the reaction of the pore gas inertia); null: none
         const volVectorField* gasForce_ = nullptr;
+
+        //- WP F.8g (decision 0133): pore pressure that only lowers the
+        //  friction (Gueugneau 2017, Aravena 2021). sigma stays the total
+        //  stress; each step the constitutive update and the wall friction
+        //  see sigma + s I, s = min(p, P) (P the total mean pressure), and
+        //  no gas force acts. Null: off
+        const volScalarField* supportP_ = nullptr;
+
+        //- s of each cell this step [Pa] and the wall friction factor
+        //  1 - s/P
+        scalarField supportShift_;
+        scalarField frictionScale_;
 
         //- Mass carried across each face by the last remap [kg], out of
         //  the owner (internal and coupled faces; WP F.3, for the gas
@@ -639,6 +691,10 @@ public:
         //- An extra force of the gas on the grains of each cell [N],
         //  added with the pore pressure's (WP F.7)
         void setGasForce(const volVectorField& f) { gasForce_ = &f; }
+
+        //- Pore pressure that only lowers the friction (WP F.8g): sigma
+        //  stays total, no gas force; the remap keeps its face masses
+        void setSupportPressure(const volScalarField& p);
 
         //- Surface load on a traction patch at time t [Pa] (0 if none)
         scalar loadPressure(const word& patch, const scalar t) const;

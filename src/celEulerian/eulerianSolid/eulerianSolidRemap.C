@@ -1368,6 +1368,9 @@ void Foam::eulerianSolid::remapFreeSurface(const scalar dt)
     const scalar Kbulk =
         material().waveModulus() - 4.0*material().shearModulus()/3.0;
     boolList dust(nCells, false);
+    // WP F.8c (decision 0133): material volume over a full cell (alpha
+    // before the clip, above 1)
+    scalarField overfill(nCells, 1.0);
     // With mu(I) dilatancy (WP 3.6g, decision 0048) the stress-implied
     // density is that of the dilated material, rho0 exp(-tr(epsP))
     const auto* law = material().kernel().frictionLaw();
@@ -1390,6 +1393,7 @@ void Foam::eulerianSolid::remapFreeSurface(const scalar dt)
             continue;
         }
         scalar a = (AL[celli] - vOut[celli])/Vt[celli];
+        overfill[celli] = max(a, scalar(1));
         a = min(max(a, scalar(0)), scalar(1));
         if
         (
@@ -1559,6 +1563,22 @@ void Foam::eulerianSolid::remapFreeSurface(const scalar dt)
         {
             U[celli] = Zero;
             sigma[celli] = Zero;
+        }
+    }
+    if (overfillStress_)
+    {
+        // WP F.8c (decision 0133): the clip above kept the mass of an
+        // overfilled cell in its volume, a compaction no strain saw; the
+        // material takes it as an elastic volume strain ln(alpha) instead,
+        // so its stress pushes the excess back out (without it the packing
+        // densified with no stress, by 20 % in a long fluidised flow)
+        forAll(sigma, celli)
+        {
+            if (overfill[celli] > 1 && mNew[celli] > 0 && !dust[celli])
+            {
+                sigma[celli] -=
+                    Kbulk*Foam::log(overfill[celli])*symmTensor::I;
+            }
         }
     }
     U_.correctBoundaryConditions();

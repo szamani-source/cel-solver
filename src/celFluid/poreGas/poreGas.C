@@ -248,6 +248,10 @@ Foam::poreGas::poreGas(const eulerianSolid& solid, const IOobject& io)
     divUg_(dict_.getOrDefault<string>("divUg", "Gauss upwind")),
     USolverDict_(),
     poreInertia_(flow_ && dict_.getOrDefault<Switch>("poreInertia", true)),
+    surfaceCarry_(dict_.getOrDefault<Switch>("surfaceCarry", false)),
+    eMin_(dict_.getOrDefault<scalar>("eMin", 0.2)),
+    kappa_(dict_.getOrDefault<scalar>("diffusivity", 0)),
+    frictionOnly_(dict_.getOrDefault<Switch>("frictionOnly", false)),
     parallelCheck_(dict_.getOrDefault<Switch>("parallelCheck", false)),
     parallelCheckEvery_
     (
@@ -377,6 +381,35 @@ Foam::poreGas::poreGas(const eulerianSolid& solid, const IOobject& io)
             << " void cells" << endl;
     }
     correctFacePressure();
+    if (freeSurface_ && surfaceCarry_)
+    {
+        Info<< "Pore gas (WP F.8): the moving surface carries gas to and "
+            << "from the void (surfaceCarry)" << endl;
+    }
+    if (kappa_ < 0 || (kappa_ > 0 && flow_))
+    {
+        FatalIOErrorInFunction(dict_)
+            << "diffusivity must be positive and needs model poreGas"
+            << exit(FatalIOError);
+    }
+    if (kappa_ > 0)
+    {
+        Info<< "Pore gas (WP F.8e): pore pressure advected with the grains "
+            << "and diffused with diffusivity " << kappa_ << " m^2/s "
+            << "(no compression or suction by the grains; gas mass is not "
+            << "conserved)" << endl;
+    }
+    if (frictionOnly_ && !(kappa_ > 0 && coupled_))
+    {
+        FatalIOErrorInFunction(dict_)
+            << "frictionOnly needs diffusivity > 0 and coupled yes"
+            << exit(FatalIOError);
+    }
+    if (eMin_ != 0.2)
+    {
+        Info<< "Pore gas (WP F.8c): gas fraction of the filled part at "
+            << "least eMin = " << eMin_ << endl;
+    }
 
     Info<< "Pore gas coupling (WP F.3): "
         << (coupled_ ? "two-way (effective stress, gas carried by the grains)"
@@ -449,7 +482,13 @@ void Foam::poreGas::correctFractions()
         }
         else
         {
-            eM_[celli] = 1 - rho[celli]/(alpha[celli]*rhoP_);
+            // WP F.8 (decision 0133): at least eMin (default 0.2). The remap can
+            // leave a nearly empty cell with more mass than alpha holds
+            // (rho/alpha > rhoP); its gas fraction then went negative,
+            // its permeability 0, and the gas in it was shut in (the
+            // pressure diverged at a thin spreading front)
+            eM_[celli] =
+                max(1 - rho[celli]/(alpha[celli]*rhoP_), eMin_);
             k[celli] =
                 dragModel_->permeability(eM_[celli], d_, mu_, rhoG_);
         }
@@ -501,6 +540,9 @@ void Foam::poreGas::faceCoefficients
     const fvMesh& mesh = solid_.mesh();
     const volScalarField& p = *pPtr_;
     const scalar RT = Rair*T_;
+    // WP F.8 (decision 0133): the face gas density from at least 1e-3 p0,
+    // so a diverging iterate (gauge p below -p0) cannot make it negative
+    const scalar pFloor = 1e-3*p0_;
     const surfaceScalarField& w = mesh.weights();
     const surfaceVectorField nf(mesh.Sf()/mesh.magSf());
     const surfaceScalarField& dc = mesh.nonOrthDeltaCoeffs();
@@ -559,13 +601,68 @@ void Foam::poreGas::faceCoefficients
             dT = 0;
             return;
         }
-        const scalar rho = (flow_ ? p0_ + pV : p0_)/RT;
+        const scalar rho = max(flow_ ? p0_ + pV : p0_, pFloor)/RT;
         const gasDragModel& drag = *lawPtr;
         dS = rho*drag.mobility(eP, G, d_, mu_, rho)/fP;
         dT = rho*drag.tangentMobility(eP, G, d_, mu_, rho)/fP;
     };
     const scalarField& vd = void_.primitiveField();
     const bool fs = freeSurface_;
+
+    // WP F.8i (decision 0133): with frictionOnly the gas drains over the
+    // flow depth. Along gravity each cell's pressure sits at the centroid of
+    // its material, taken as lying on the cell's lower face (alpha D/2 up),
+    // and the zero pressure on the material's surface (alpha D up), not on
+    // the cell's top face. So, as fractions of the centre distance |d| (D
+    // across a vertical face): a vertical face between a lower cell L and an
+    // upper cell U spans 1 - alpha_L/2 + alpha_U/2 (1 between full cells),
+    // and a gas cell C under a void cell drains over alpha_C/2 (not 1/2).
+    // Faces within 45 degrees of vertical only; bounded below by 0.1
+    const bool atSurface = fs && drainAtSurface() && mag(solid_.g()) > 0;
+    const vector gHat =
+        atSurface ? vector(solid_.g()/mag(solid_.g())) : vector::zero;
+    const scalarField& aF = solid_.alpha().primitiveField();
+    const vectorField& Cc = mesh.C().primitiveField();
+    // Centre distance vectors P to N of the internal faces
+    vectorField dCN(own.size(), Zero);
+    if (atSurface)
+    {
+        forAll(dCN, facei)
+        {
+            dCN[facei] = Cc[nei[facei]] - Cc[own[facei]];
+        }
+    }
+    auto clip01 = [](const scalar a) { return min(max(a, scalar(0)), scalar(1)); };
+    // Span of a gas face from P to N (d = C_N - C_P) over |d|
+    auto layerDist =
+        [&](const vector& d, const scalar aP, const scalar aN)
+    {
+        if (!atSurface)
+        {
+            return scalar(1);
+        }
+        const scalar c = (d & gHat)/max(mag(d), VSMALL);
+        if (c > 0.7)            // N below P
+        {
+            return max(1 - 0.5*clip01(aN) + 0.5*clip01(aP), 0.1);
+        }
+        if (c < -0.7)           // N above P
+        {
+            return max(1 - 0.5*clip01(aP) + 0.5*clip01(aN), 0.1);
+        }
+        return scalar(1);
+    };
+    // Factor on the gas cell's distance to a void face (d from the gas cell
+    // C towards the void cell): alpha_C when the void lies above
+    auto voidDist =
+        [&](const vector& d, const scalar aC)
+    {
+        if (atSurface && (d & gHat) < -0.7*mag(d))
+        {
+            return max(clip01(aC), 0.1);
+        }
+        return scalar(1);
+    };
 
     // Face gradient magnitude from the interpolated gradient g and the
     // normal derivative gn
@@ -594,7 +691,7 @@ void Foam::poreGas::faceCoefficients
                     // momentum equation; none without (F.4)
                     DS[facei] =
                         flow_
-                      ? (p0_ + wf*p[P] + (1 - wf)*p[N])/RT
+                      ? max(p0_ + wf*p[P] + (1 - wf)*p[N], pFloor)/RT
                        *rAUfPtr_()[facei]
                       : 0;
                     DT[facei] = DS[facei];
@@ -602,7 +699,9 @@ void Foam::poreGas::faceCoefficients
                 }
                 const bool ownGas = vd[P] < 0.5;
                 const label C = ownGas ? P : N;
-                const scalar fC = ownGas ? 1 - wf : wf;
+                const scalar fC =
+                    (ownGas ? 1 - wf : wf)
+                   *voidDist(ownGas ? dCN[facei] : -dCN[facei], aF[C]);
                 // The void side is at 0 without gas flow (F.4)
                 const scalar gn = (p[N] - p[P])*dc[facei]/max(fC, SMALL);
                 const vector gI = inertia ? gI_[facei] : Zero;
@@ -622,10 +721,16 @@ void Foam::poreGas::faceCoefficients
             face
             (
                 eM[P], k[P], eM[N], k[N], wf,
-                (p0_ + wf*p[P] + (1 - wf)*p[N])/RT,
+                max(p0_ + wf*p[P] + (1 - wf)*p[N], pFloor)/RT,
                 mag3(g, nf[facei], gn),
                 DS[facei], DT[facei]
             );
+            if (atSurface)
+            {
+                const scalar f = layerDist(dCN[facei], aF[P], aF[N]);
+                DS[facei] /= f;
+                DT[facei] /= f;
+            }
         }
     }
 
@@ -653,6 +758,19 @@ void Foam::poreGas::faceCoefficients
                 fs ? void_.boundaryField()[patchi].patchNeighbourField()
                    : tmp<scalarField>::New(DS.size(), Zero)
             );
+            const scalarField aN
+            (
+                atSurface
+              ? solid_.alpha().boundaryField()[patchi].patchNeighbourField()
+              : tmp<scalarField>::New(DS.size(), Zero)
+            );
+            // Centre to neighbour centre across the cut
+            const vectorField dB
+            (
+                atSurface
+              ? vectorField(mesh.boundary()[patchi].delta())
+              : vectorField(DS.size(), Zero)
+            );
             const vectorField gIB
             (
                 inertia
@@ -668,7 +786,7 @@ void Foam::poreGas::faceCoefficients
                     {
                         DS[i] =
                             flow_
-                          ? (p0_ + wf[i]*p[P] + (1 - wf[i])*pN[i])/RT
+                          ? max(p0_ + wf[i]*p[P] + (1 - wf[i])*pN[i], pFloor)/RT
                            *rAUfPtr_().boundaryField()[patchi][i]
                           : 0;
                         DT[i] = DS[i];
@@ -680,7 +798,7 @@ void Foam::poreGas::faceCoefficients
                         // The gas side is across the cut: the neighbour
                         // processor's face takes its mobility; this side
                         // must give the same coefficient
-                        const scalar fC = wf[i];
+                        const scalar fC = wf[i]*voidDist(-dB[i], aN[i]);
                         const scalar gn = (pN[i] - p[P])*dcB[i]/max(fC, SMALL);
                         faceVoid
                         (
@@ -691,7 +809,7 @@ void Foam::poreGas::faceCoefficients
                     }
                     else
                     {
-                        const scalar fC = 1 - wf[i];
+                        const scalar fC = (1 - wf[i])*voidDist(dB[i], aF[P]);
                         const scalar gn = (pN[i] - p[P])*dcB[i]/max(fC, SMALL);
                         faceVoid
                         (
@@ -709,10 +827,16 @@ void Foam::poreGas::faceCoefficients
                 face
                 (
                     eM[P], k[P], eN[i], kN[i], wf[i],
-                    (p0_ + wf[i]*p[P] + (1 - wf[i])*pN[i])/RT,
+                    max(p0_ + wf[i]*p[P] + (1 - wf[i])*pN[i], pFloor)/RT,
                     mag3(g, n[i], gn),
                     DS[i], DT[i]
                 );
+                if (atSurface)
+                {
+                    const scalar f = layerDist(dB[i], aF[P], aN[i]);
+                    DS[i] /= f;
+                    DT[i] /= f;
+                }
             }
         }
         else
@@ -743,7 +867,7 @@ void Foam::poreGas::faceCoefficients
                     // Gas flow in the void (WP F.6): rho_g 1/A
                     DS[i] =
                         (!shut && flow_)
-                      ? (p0_ + pB[i])/RT
+                      ? max(p0_ + pB[i], pFloor)/RT
                        *rAUfPtr_().boundaryField()[patchi][i]
                       : 0;
                     DT[i] = DS[i];
@@ -752,7 +876,7 @@ void Foam::poreGas::faceCoefficients
                 face
                 (
                     eM[P], k[P], eM[P], k[P], 1,
-                    (p0_ + pB[i])/RT,
+                    max(p0_ + pB[i], pFloor)/RT,
                     mag3(gradP[P] - gIB[i], n[i], gn[i] - (n[i] & gIB[i])),
                     DS[i], DT[i]
                 );
@@ -784,6 +908,17 @@ void Foam::poreGas::solve(const scalar dt)
     // gas (inside a body) get 1/RT so the matrix stays regular; they have
     // no mobility, so their p never changes and they hold no mass.
     scalarField S(open*phiG/RT);
+    if (kappa_ > 0)
+    {
+        // WP F.8e: storage that gives the Darcy term the diffusivity kappa
+        // in the filled part of each cell
+        const scalarField& alpha = solid_.alpha().primitiveField();
+        const scalarField& kc = k_.primitiveField();
+        forAll(S, celli)
+        {
+            S[celli] = open[celli]*alpha[celli]*rhoG_*kc[celli]/(mu_*kappa_);
+        }
+    }
     forAll(S, celli)
     {
         if (S[celli] <= 0)
@@ -809,7 +944,216 @@ void Foam::poreGas::solve(const scalar dt)
     //   S Vo/dt (p - pOld) + X/dt + sum(Darcy flux out) = 0.
     scalarField X(p.size(), Zero);
     scalar carriedOut = 0;      // through non-coupled faces (WP F.4) [kg]
-    if (coupled_ && solid_.mesh().time().timeIndex() > 0)
+    // WP F.8h (decision 0133): with frictionOnly the grains carry the
+    // support ratio lambda = p/P (P the total mean pressure), as Gueugneau
+    // et al. (2017) carry p/(rho g h): a cell keeps its lambda when its
+    // load changes (p follows P), and material crossing a face brings its
+    // lambda, reconstructed to the face to second order and bounded by the
+    // two cells' values. The target p = lambda P then diffuses (kappa).
+    const bool carryRatio =
+        kappa_ > 0 && coupled_ && frictionOnly_ && fs;
+    scalarField Pnow;
+    if (carryRatio)
+    {
+        Pnow = max(-tr(solid_.sigma().primitiveField())/3, scalar(0));
+        if (Pprev_.size() != Pnow.size())
+        {
+            Pprev_ = Pnow;
+        }
+    }
+    if (carryRatio && solid_.mesh().time().timeIndex() > 0)
+    {
+        const labelUList& own = mesh.owner();
+        const labelUList& nei = mesh.neighbour();
+        const scalarField& dm = solid_.remapMass().primitiveField();
+        const scalarField& rhoC = solid_.rho().primitiveField();
+        const scalarField& alpha = solid_.alpha().primitiveField();
+        auto bulk = [&](const label c)
+        {
+            return alpha[c] > alphaMin ? rhoC[c]/alpha[c] : rhoP_;
+        };
+        volScalarField lam
+        (
+            IOobject
+            (
+                "supportRatio",
+                mesh.time().timeName(),
+                mesh,
+                IOobject::NO_READ,
+                IOobject::NO_WRITE,
+                IOobject::NO_REGISTER
+            ),
+            mesh,
+            dimensionedScalar(dimless, Zero),
+            fvPatchFieldBase::zeroGradientType()
+        );
+        scalarField& li = lam.primitiveFieldRef();
+        forAll(li, c)
+        {
+            li[c] =
+                Pprev_[c] > 0 ? min(max(pOld[c], scalar(0))/Pprev_[c], scalar(1))
+              : (pOld[c] > 0 ? 1 : 0);
+        }
+        lam.correctBoundaryConditions();
+        const volVectorField gLam(fvc::grad(lam));
+        const vectorField& gl = gLam.primitiveField();
+        const vectorField& C = mesh.C().primitiveField();
+        const vectorField& Cf = mesh.Cf().primitiveField();
+        // face value from the donor, second order, within the two cells
+        auto faceLam = [](scalar ld, scalar lr, const vector& g, const vector& d)
+        {
+            const scalar lf = ld + (g & d);
+            return min(max(lf, min(ld, lr)), max(ld, lr));
+        };
+        scalarField Fin(X.size(), Zero), FinL(X.size(), Zero);
+        forAll(own, facei)
+        {
+            const scalar m = dm[facei];
+            if (m == 0)
+            {
+                continue;
+            }
+            const label d = m > 0 ? own[facei] : nei[facei];
+            const label r = m > 0 ? nei[facei] : own[facei];
+            const scalar F = mag(m)/bulk(d);
+            Fin[r] += F;
+            FinL[r] += F*faceLam(li[d], li[r], gl[d], Cf[facei] - C[d]);
+        }
+        forAll(mesh.boundary(), patchi)
+        {
+            if (!mesh.boundary()[patchi].coupled())
+            {
+                continue;
+            }
+            const labelUList& fc = mesh.boundary()[patchi].faceCells();
+            const scalarField& pdm =
+                solid_.remapMass().boundaryField()[patchi];
+            const scalarField lN
+            (
+                lam.boundaryField()[patchi].patchNeighbourField()
+            );
+            const vectorField gN
+            (
+                gLam.boundaryField()[patchi].patchNeighbourField()
+            );
+            const vectorField CN
+            (
+                mesh.C().boundaryField()[patchi].patchNeighbourField()
+            );
+            const vectorField& Cfp = mesh.Cf().boundaryField()[patchi];
+            const scalarField rN
+            (
+                solid_.rho().boundaryField()[patchi].patchNeighbourField()
+            );
+            const scalarField aN
+            (
+                solid_.alpha().boundaryField()[patchi].patchNeighbourField()
+            );
+            forAll(fc, i)
+            {
+                if (pdm[i] < 0)
+                {
+                    const label r = fc[i];
+                    const scalar F =
+                        -pdm[i]/(aN[i] > alphaMin ? rN[i]/aN[i] : rhoP_);
+                    Fin[r] += F;
+                    FinL[r] += F*faceLam(lN[i], li[r], gN[i], Cfp[i] - CN[i]);
+                }
+            }
+        }
+        const scalarField& Vc = mesh.V().field();
+        forAll(X, r)
+        {
+            scalar l = li[r];
+            if (Fin[r] > 0)
+            {
+                const scalar Vf = max(alpha[r], alphaMin)*Vc[r];
+                const scalar w = min(Fin[r]/Vf, scalar(1));
+                l = w*FinL[r]/Fin[r] + (1 - w)*li[r];
+            }
+            const scalar target = (vd[r] > 0.5 ? 0 : l*Pnow[r]);
+            X[r] = -S[r]*Vc[r]*(target - pOld[r]);
+        }
+    }
+    else if (kappa_ > 0 && coupled_ && solid_.mesh().time().timeIndex() > 0)
+    {
+        // WP F.8e: the material crossing a face (its bulk volume, mass over
+        // the donor's bulk density) brings the donor's pressure into the
+        // receiving cell; the cell it leaves keeps its own (upwind
+        // advection, non-conservative as dp/dt + u.grad p)
+        const labelUList& own = mesh.owner();
+        const labelUList& nei = mesh.neighbour();
+        const scalarField& dm = solid_.remapMass().primitiveField();
+        const scalarField& rhoC = solid_.rho().primitiveField();
+        const scalarField& alpha = solid_.alpha().primitiveField();
+        auto bulk = [&](const label c)
+        {
+            return alpha[c] > alphaMin ? rhoC[c]/alpha[c] : rhoP_;
+        };
+        scalarField Fin(X.size(), Zero), FinP(X.size(), Zero);
+        forAll(own, facei)
+        {
+            const scalar m = dm[facei];
+            if (m == 0)
+            {
+                continue;
+            }
+            const label d = m > 0 ? own[facei] : nei[facei];
+            const label r = m > 0 ? nei[facei] : own[facei];
+            const scalar F = mag(m)/bulk(d);
+            Fin[r] += F;
+            FinP[r] += F*pOld[d];
+        }
+        forAll(mesh.boundary(), patchi)
+        {
+            if (!mesh.boundary()[patchi].coupled())
+            {
+                continue;
+            }
+            const labelUList& fc = mesh.boundary()[patchi].faceCells();
+            const scalarField& pdm =
+                solid_.remapMass().boundaryField()[patchi];
+            const scalarField pN
+            (
+                p.boundaryField()[patchi].patchNeighbourField()
+            );
+            const scalarField rN
+            (
+                solid_.rho().boundaryField()[patchi].patchNeighbourField()
+            );
+            const scalarField aN
+            (
+                solid_.alpha().boundaryField()[patchi].patchNeighbourField()
+            );
+            forAll(fc, i)
+            {
+                // Material coming in from the neighbour processor
+                if (pdm[i] < 0)
+                {
+                    const label r = fc[i];
+                    const scalar F =
+                        -pdm[i]/(aN[i] > alphaMin ? rN[i]/aN[i] : rhoP_);
+                    Fin[r] += F;
+                    FinP[r] += F*pN[i];
+                }
+            }
+        }
+        // Convex mix of the cell's own pressure and the incoming ones by
+        // volume, so that the advected p stays bounded however much comes
+        // in (WP F.8g: fast flows into nearly empty cells)
+        const scalarField& Vc = mesh.V().field();
+        forAll(X, r)
+        {
+            if (Fin[r] > 0)
+            {
+                const scalar Vf = max(alpha[r], alphaMin)*Vc[r];
+                const scalar w = min(Fin[r]/Vf, scalar(1));
+                const scalar target = w*FinP[r]/Fin[r] + (1 - w)*pOld[r];
+                X[r] = -S[r]*Vc[r]*(target - pOld[r]);
+            }
+        }
+    }
+    else if (coupled_ && solid_.mesh().time().timeIndex() > 0)
     {
         const scalarField Vo(open*mesh.V().field());
         const labelUList& own = mesh.owner();
@@ -826,8 +1170,19 @@ void Foam::poreGas::solve(const scalar dt)
         // With gas flow in the void (WP F.6) the gas there moves by its
         // own velocity: on faces of void cells only the grains crossing
         // displace gas
+        // With surfaceCarry (WP F.8, decision 0133) the surface's own
+        // motion carries gas too: the part of a cell that the material
+        // leaves fills with gas from the void across the surface face, and
+        // material rising into a cell pushes the gas there into the void,
+        // without a pressure drop through the grains. Only faces between
+        // two void cells (gas flow there moves by its own velocity) keep
+        // the grains-only rule.
         auto surfaceFace = [&](const bool vA, const bool vB)
         {
+            if (surfaceCarry_)
+            {
+                return fs && flow_ && vA && vB;
+            }
             return fs && (flow_ ? (vA || vB) : vA != vB);
         };
         forAll(own, facei)
@@ -1402,6 +1757,10 @@ void Foam::poreGas::solve(const scalar dt)
     if (fs)
     {
         netIn_ -= returnReduce(carriedOut, sumOp<scalar>());
+    }
+    if (carryRatio)
+    {
+        Pprev_ = Pnow;
     }
     correctFacePressure();
 

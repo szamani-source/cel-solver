@@ -40,7 +40,15 @@ void Cap::apply
     History& h
 ) const
 {
-    const double pc = h.pc > 0 ? h.pc : std::max(-meanStress(sigOld), p0_);
+    // p_c is at least capP0 and at least the old stress's P (the old stress
+    // lies inside the cap). A p_c of 0 means "not set": fed material, or a
+    // cell not loaded yet. The remap mixes such cells into loaded ones by
+    // mass (and with a limiter), so p_c can arrive anywhere between 0 and
+    // the loaded value, and which one can hinge on round-off. Taking the
+    // largest of the three is continuous in p_c and gives a cell that was
+    // never loaded p_c = max(P, capP0), as before (WP F.8, decision 0133).
+    const double pc =
+        std::max(h.pc, std::max(-meanStress(sigOld), p0_));
     h.pc = pc;
     const double P = -meanStress(sig);
     if (!(P > pc))
