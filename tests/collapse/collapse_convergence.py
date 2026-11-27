@@ -53,6 +53,7 @@ def runout(path):
 
 
 def main():
+    cc.FLOOR = 19.0     # the runs of WP F.8k (floor 22 deg came later)
     args = sys.argv[1:]
     work = args.pop(0)
     extra = "slowFlowJump yes;"
@@ -68,7 +69,7 @@ def main():
         cc.MC = material(extra)
         path = f"{work}/conv_{mm:g}"
         if not os.path.isdir(f"{path}/system"):
-            cc.make(path, gas=False, decomp=(PROCS.get(mm, 1), 1, 1), end=T_END)
+            cc.make(path, gas=False, decomp=(PROCS.get(mm, 1), 1, 1), end=T_END, slow=False)
         secs = cc.run(path, PROCS.get(mm, 1))
         cc.MC = base
         h = runout(path)

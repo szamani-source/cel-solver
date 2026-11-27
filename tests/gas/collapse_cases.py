@@ -77,7 +77,15 @@ E_MOD = 1.0e6
 PHI = 24.0
 MU2 = math.tan(math.radians(33.0))
 I0 = 0.3
-FLOOR = 19.0
+FLOOR = 22.0
+# WP F.8k (decision 0135, Sia 2026-11-27): the dam break runs with
+# yieldShearJump no and slowFlowJump yes (SLOW_FLOW); with the face damping
+# of slow flow gone the dry column ran 3.27 h0 on 5 mm cells with
+# Gueugneau's 19 deg floor (+26 %), 2.73 h0 (+5 %) with 22 deg, which Sia
+# chose. The v1 dry reference (make(cap=False), check B) keeps 19 deg and
+# the v1 options
+FLOOR_V1 = 19.0
+SLOW_FLOW = "yieldShearJump no;\nslowFlowJump yes;"
 DRY_RUNOUT = 1.05 / 0.4                  # x/h0, pressure-balanced (Breard et al. 2019)
 P_FRAC = 1.0                          # initial pore pressure / weight (Roche 2008: fully supported)
 T_SCALE = math.sqrt(H0 / G_ACC)
@@ -96,7 +104,7 @@ ARAVENA_RUNOUT = 3.8                  # x/h0, a = 2, horizontal
 # diffusing (gasProperties diffusivity, model poreGas), as Gueugneau et al.
 # (2017) and Aravena et al. (2021). KAPPA_FIT is fitted to Roche's run-out
 # (Aravena fit 0.015 m^2/s); kappa_theory() is k p0 / (mu e).
-KAPPA_FIT = 0.015
+KAPPA_FIT = 0.22                      # F.8h refit on 5 mm cells (theory k p0/(mu e) 0.11)
 # F.8g: route B as published, the pore pressure only lowers the friction
 FRICTION_ONLY = True
 # Expanded (fluidised) packing: soft until compacted (decision 0133): the
@@ -135,12 +143,16 @@ def describe():
 
 
 def make(path, *, gas=True, decomp=(1, 1, 1), end=T_END, extra_gas="", cap=True, kappa=KAPPA_FIT,
-         friction_only=None):
+         friction_only=None, slow=None):
     """kappa > 0: route B (model poreGas, diffusivity kappa); kappa = 0: the
     compressible gas of F.8c (model gasFlow, surfaceCarry yes).
     friction_only (route B only, F.8g): the pore pressure only lowers the
     friction (gasProperties frictionOnly); sigma starts as the total stress,
-    isotropic -rho_b g (H0 - y)."""
+    isotropic -rho_b g (H0 - y). slow (default: with the cap) adds SLOW_FLOW
+    (WP F.8k); cap=False is the v1 material with the 19 deg floor."""
+    if slow is None:
+        slow = cap
+    floor = FLOOR if cap else FLOOR_V1
     if friction_only is None:
         friction_only = FRICTION_ONLY and kappa > 0
     if friction_only:
@@ -155,10 +167,11 @@ def make(path, *, gas=True, decomp=(1, 1, 1), end=T_END, extra_gas="", cap=True,
     inflow = f"inflow {{ floorRes {supply()!r}; }}\n" if gas else ""
     route = f"diffusivity {kappa!r};\n" if kappa > 0 else "surfaceCarry yes;\n"
     fl._common(path, rho=RHO_B, E=E_MOD, extra_gas=route + inflow + extra_gas,
-               material=MC if cap else MC.split("capLambda")[0].rstrip("\n"),
+               material=(MC if cap else MC.split("capLambda")[0].rstrip("\n"))
+               + ("\n" + SLOW_FLOW if slow else ""),
                walls=f"    left {{ friction 0; }}\n    right {{ friction 0; }}\n"
-                     f"    bottom {{ friction {FLOOR!r}; }}"
-                     + (f"\n    floorRes {{ friction {FLOOR!r}; }}" if gas else ""))
+                     f"    bottom {{ friction {floor!r}; }}"
+                     + (f"\n    floorRes {{ friction {floor!r}; }}" if gas else ""))
     if gas and kappa > 0:
         pc.write(g, open(g).read().replace("model   gasFlow;", "model   poreGas;"))
     k0 = 0.3 / 0.7

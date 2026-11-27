@@ -66,10 +66,10 @@ def main():
     wd = f"{work}/frictionless"
     cc.MC = base_mc.replace(f"phi {cc.PHI!r};", "phi 0.5;").replace(
         f"mu2 {cc.MU2!r};", f"mu2 {math.tan(math.radians(1.0))!r};")
-    floor = cc.FLOOR
-    cc.FLOOR = 0.0
-    cc.make(wd, gas=False, cap=False, end=END)
-    cc.FLOOR = floor
+    floor = cc.FLOOR_V1
+    cc.FLOOR_V1 = 0.0
+    cc.make(wd, gas=False, cap=False, end=END, slow=True)
+    cc.FLOOR_V1 = floor
     cc.MC = base_mc
     cc.run(wd)
     fi, fd = fronts(wi), fronts(wd)
