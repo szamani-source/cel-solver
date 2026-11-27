@@ -110,12 +110,11 @@ void Foam::poreGas::initFlow()
     // Mass flux of the starting velocity through the void faces, for the
     // convection of the first step (a restart starts from Ug)
     {
-        const scalar RT = Rair*T_;
         const volScalarField& p = *pPtr_;
         const surfaceScalarField rhof
         (
             (linearInterpolate(p) + dimensionedScalar(dimPressure, p0_))
-           /dimensionedScalar(dimPressure/dimDensity, RT)
+           /linearInterpolate(RT_)
         );
         massFlux_ = voidFaces()*rhof*(linearInterpolate(*UgPtr_) & mesh.Sf());
     }
@@ -209,7 +208,7 @@ void Foam::poreGas::predictMomentum(const scalar dt, const scalarField& pOld)
     const fvMesh& mesh = solid_.mesh();
     volVectorField& U = *UgPtr_;
     const volScalarField& p = *pPtr_;
-    const scalar RT = Rair*T_;
+    const scalarField& RT = RT_.primitiveField();      // WP T.7
     const scalarField& vd = void_.primitiveField();
 
     // Velocities of the cells that are not solved: grain velocity plus
@@ -243,7 +242,7 @@ void Foam::poreGas::predictMomentum(const scalar dt, const scalarField& pOld)
         const surfaceScalarField rhof
         (
             (linearInterpolate(p) + dimensionedScalar(dimPressure, p0_))
-           /dimensionedScalar(dimPressure/dimDensity, RT)
+           /linearInterpolate(RT_)
         );
         phiOld_.reset(new surfaceScalarField("phiUgOld", massFlux_/rhof));
     }
@@ -254,7 +253,7 @@ void Foam::poreGas::predictMomentum(const scalar dt, const scalarField& pOld)
         mesh,
         dimensionedScalar(dimDensity/dimTime, Zero)
     );
-    rhoDt.field() = (p0_ + pOld)/(RT*dt);
+    rhoDt.field() = (p0_ + pOld)/(RT*dt);     // R T per cell (WP T.7)
 
     volScalarField::Internal divM
     (
@@ -274,12 +273,8 @@ void Foam::poreGas::predictMomentum(const scalar dt, const scalarField& pOld)
         IStringStream is(laplacian_);
         tLap = fv::laplacianScheme<vector, scalar>::New(mesh, is);
     }
-    const surfaceScalarField muf
-    (
-        IOobject("gasMu", mesh.time().timeName(), mesh),
-        mesh,
-        dimensionedScalar(dimDynamicViscosity, mu_)
-    );
+    // Viscosity per cell (WP T.7), linear to the faces
+    const surfaceScalarField muf("gasMuf", linearInterpolate(muG_));
 
     UEqnPtr_.reset
     (
@@ -331,7 +326,6 @@ void Foam::poreGas::flowFluxes()
     const volVectorField& U = *UgPtr_;
     const volScalarField& p = *pPtr_;
     const fvVectorMatrix& UEqn = UEqnPtr_();
-    const scalar RT = Rair*T_;
 
     rAUPtr_.reset(new volScalarField("rAUg", 1/UEqn.A()));
     rAUPtr_->correctBoundaryConditions();
@@ -344,7 +338,7 @@ void Foam::poreGas::flowFluxes()
     const surfaceScalarField rhof
     (
         (linearInterpolate(p) + dimensionedScalar(dimPressure, p0_))
-       /dimensionedScalar(dimPressure/dimDensity, RT)
+       /linearInterpolate(RT_)
     );
     // Face flux of H/A with the time derivative's part from the old face
     // flux instead of the interpolated old velocity (ddtCorr): rho_f/dt
@@ -429,7 +423,6 @@ void Foam::poreGas::startInertia(const scalar dt)
         return;
     }
     const fvMesh& mesh = solid_.mesh();
-    const scalar RT = Rair*T_;
     const volScalarField& p = *pPtr_;
 
     inertialDrag_.reset(new inertialGasDrag(*dragModel_, dt));
@@ -516,7 +509,7 @@ void Foam::poreGas::startInertia(const scalar dt)
     const surfaceScalarField rhof
     (
         (linearInterpolate(p) + dimensionedScalar(dimPressure, p0_))
-       /dimensionedScalar(dimPressure/dimDensity, RT)
+       /linearInterpolate(RT_)
     );
     const surfaceVectorField nf(mesh.Sf()/mesh.magSf());
     const dimensionedScalar dtD(dimTime, dt);
@@ -622,12 +615,12 @@ void Foam::poreGas::endInertia(const scalar dt)
         return;
     }
     const fvMesh& mesh = solid_.mesh();
-    const scalar RT = Rair*T_;
+    const scalarField& RT = RT_.primitiveField();      // WP T.7
     const volScalarField& p = *pPtr_;
     const surfaceScalarField rhof
     (
         (linearInterpolate(p) + dimensionedScalar(dimPressure, p0_))
-       /dimensionedScalar(dimPressure/dimDensity, RT)
+       /linearInterpolate(RT_)
     );
     qnOld_() = massFlux_/(rhof*mesh.magSf());
     voidFaceOld_() = voidFaces();
@@ -651,7 +644,7 @@ void Foam::poreGas::endInertia(const scalar dt)
             continue;
         }
         f[celli] =
-          - mesh.V()[celli]*open[celli]*(p0_ + pc[celli])/(RT*dt)
+          - mesh.V()[celli]*open[celli]*(p0_ + pc[celli])/(RT[celli]*dt)
            *(qGas_[celli] - qCellOld_[celli]);
     }
 }

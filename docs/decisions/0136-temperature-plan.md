@@ -148,3 +148,37 @@ fluxes; the gas is isothermal at the case temperature.
   take the mean of their open neighbours as a ghost for the remap's reconstruction.
   `tutorials/stlHopper` with a hot layer: energy 1.8e-14, T within the start's range,
   uniform T kept to 2e-13.
+- T.7 (2026-11-27): gas properties from the gas temperature and plastic heating, both
+  opt-in in thermalProperties so every earlier result is unchanged.
+  - `variableGas yes`: the pore gas is an ideal gas at its own temperature (Tg, or T
+    with equilibrium). poreGas keeps R T and mu per cell (`gasRT`, `gasMu`; uniform
+    at gasProperties T otherwise). The gas solve's storage, face densities, carried
+    gas, inflow (U is the volume flux at p0 and the inflow's temperature) and the void
+    momentum (rho/dt, viscosity) use them; gas crossing a face takes the donor's R T,
+    so the gas mass is conserved exactly with any temperature field. After each heat
+    step `poreGas::setGasTemperature` changes each cell's p so that (p0 + p)/(R T)
+    stays (constant gas mass at the new temperature), and the last step's pressure
+    too so that the next first guess has no jump. Viscosity by Sutherland (as
+    before), gas conductivity by Sutherland's law for air (S = 194 K, White, Viscous
+    Fluid Flow, Table 1-3) scaled from kGas at the case temperature. The gas heat
+    capacity stays c_g (pressure work neglected, low Mach number).
+  - `plasticHeating beta`: beta sigma : d(epsP) per unit material volume (stress after
+    the Lagrange step's update, epsP before and after it) heats the material where it
+    is; with equilibrium the gas shares it. celFoam prints `Plastic heat` and the
+    balance subtracts it. For J2 plasticity the work is sigma_y d(epsPEq).
+  - Energy fix found by the T.7 heated box: the gas heat is now carried before the
+    conduction step, not after it. The gas moved in the gas solve at the start-of-step
+    temperatures; carrying it after conduction lost energy of the order of the gas
+    flux times conduction's change (1e-7 of the energy in 0.3 s in the heated box;
+    in T.4 it was the 1e-9 drift seen while the flow settled). Advection sub-steps
+    also use the capacity at the end of each sub-step (exact when sub-cycled).
+  - Gunn's Nusselt number has Re^0.2: in a uniform box at rest the round-off of the
+    gas flux (Re about 1e-12) changes Nu by a few tenths of a percent from cell to
+    cell, and with variableGas that starts small flows. Physical results are not
+    affected; the p/T check uses one cell.
+  - Plastic heat capacity: the Lagrange step sets the material density to m/V_L, so
+    the heat capacity and material volume used for the plastic heat are taken before
+    the Lagrange step (`heatTransfer::beforeLagrange`); taking them after gave a
+    2e-10 energy balance error in the hot silo, now 1e-14.
+  - `hotSiloDischarge` moved to `tutorials/solidFluidThermal/` (decision 0140) with
+    its README in the common layout; `tests/test_thermal_tutorials.sh` checks it.

@@ -93,7 +93,7 @@ Foam::heatTransfer::heatTransfer
 (
     eulerianSolid& solid,
     const IOobject& io,
-    const poreGas* gas
+    poreGas* gas
 )
 :
     solid_(solid),
@@ -163,7 +163,11 @@ Foam::heatTransfer::heatTransfer
         fvPatchFieldBase::zeroGradientType()
     ),
     nSub_(1),
-    nSubAdv_(1)
+    nSubAdv_(1),
+    variableGas_(dict_.getOrDefault<Switch>("variableGas", false)),
+    beta_(dict_.getOrDefault<scalar>("plasticHeating", 0)),
+    plasticHeat_(0),
+    epsPOld_()
 {
     if (rhoP_ <= 0 && gas_)
     {
@@ -267,6 +271,23 @@ Foam::heatTransfer::heatTransfer
             }
         }
     }
+    if (variableGas_ && !gas_)
+    {
+        FatalIOErrorInFunction(dict_)
+            << "variableGas needs the pore gas (constant/gasProperties)"
+            << exit(FatalIOError);
+    }
+    if (beta_ < 0 || beta_ > 1)
+    {
+        FatalIOErrorInFunction(dict_)
+            << "plasticHeating must be within 0 to 1" << exit(FatalIOError);
+    }
+    // WP T.7: the gas at its own temperature from the start (the starting
+    // p is the gas pressure at that temperature: nothing is rescaled)
+    if (variableGas_)
+    {
+        gas_->setGasTemperature(gasTemperature(), false);
+    }
     correctK();
 
     energy0_ = energy();
@@ -291,6 +312,17 @@ Foam::heatTransfer::heatTransfer
         Info<< "Gas heat (WP T.4): " << (twoT() ? "own temperature Tg, "
             "Gunn grain-gas exchange" : "in equilibrium with the grains")
             << ", cGas = " << cg_ << " J/(kg K)" << nl;
+        Info<< "Gas properties (WP T.7): "
+            << (
+                   variableGas_
+                 ? "ideal gas at the gas temperature (variableGas)"
+                 : "at the case temperature T of gasProperties"
+               )
+            << nl;
+    }
+    if (beta_ > 0)
+    {
+        Info<< "Plastic heating (WP T.7): beta = " << beta_ << nl;
     }
     Info<< endl;
     Info().precision(oldPrecision);
@@ -300,7 +332,7 @@ Foam::heatTransfer::heatTransfer
 Foam::autoPtr<Foam::heatTransfer> Foam::heatTransfer::New
 (
     eulerianSolid& solid,
-    const poreGas* gas
+    poreGas* gas
 )
 {
     IOobject io(thermalPropertiesIO(solid.mesh()));
@@ -375,6 +407,8 @@ void Foam::heatTransfer::correctK()
         const scalarField& rho = solid_.rho().primitiveField();
         const tmp<scalarField> tA(fill());
         const scalarField& a = tA();
+        const tmp<scalarField> tkG(kGasField());     // WP T.7
+        const scalarField& kG = tkG();
         forAll(k, celli)
         {
             if (rho[celli] <= 0 || a[celli] <= 0)
@@ -388,12 +422,12 @@ void Foam::heatTransfer::correctK()
             if (twoT())
             {
                 scalar kg, ks;
-                zehnerSchlunderParts(1 - phiS, kGas_, kParticle_, kg, ks);
+                zehnerSchlunderParts(1 - phiS, kG[celli], kParticle_, kg, ks);
                 k[celli] = ks;
             }
             else
             {
-                k[celli] = zehnerSchlunder(1 - phiS, kGas_, kParticle_);
+                k[celli] = zehnerSchlunder(1 - phiS, kG[celli], kParticle_);
             }
         }
     }
@@ -404,14 +438,40 @@ void Foam::heatTransfer::correctK()
     if (twoT())
     {
         const scalarField& phiS = gas_->phiS().primitiveField();
+        const tmp<scalarField> tkG(kGasField());     // WP T.7
+        const scalarField& kG = tkG();
         scalarField& kg = kGasCell_.primitiveFieldRef();
         forAll(kg, celli)
         {
             kg[celli] =
-                (1 - Foam::sqrt(min(max(phiS[celli], scalar(0)), 1.0)))*kGas_;
+                (1 - Foam::sqrt(min(max(phiS[celli], scalar(0)), 1.0)))
+               *kG[celli];
         }
         kGasCell_.correctBoundaryConditions();
     }
+}
+
+
+Foam::tmp<Foam::scalarField> Foam::heatTransfer::kGasField() const
+{
+    // WP T.7: kGas at the case temperature (gasProperties T) scaled by
+    // Sutherland's law for the conductivity of air, S = 194 K (White,
+    // Viscous Fluid Flow, Table 1-3), with variableGas
+    if (!variableGas_ || !gas_)
+    {
+        return tmp<scalarField>::New(mesh_.nCells(), kGas_);
+    }
+    const scalar S = 194;
+    auto law = [S](const scalar T) { return Foam::pow(T, 1.5)/(T + S); };
+    const scalar ref = law(gas_->T());
+    const scalarField& Tgas = gasTemperature().primitiveField();
+    tmp<scalarField> tk(new scalarField(Tgas.size()));
+    scalarField& k = tk.ref();
+    forAll(k, celli)
+    {
+        k[celli] = kGas_*law(Tgas[celli])/ref;
+    }
+    return tk;
 }
 
 
@@ -466,7 +526,8 @@ Foam::tmp<Foam::scalarField> Foam::heatTransfer::gasCapacity() const
     {
         return tmp<scalarField>::New(mesh_.nCells(), Zero);
     }
-    const scalar RT = poreGas::Rair*gas_->T();
+    // R T per cell (WP T.7)
+    const scalarField& RT = gas_->RT().primitiveField();
     return tmp<scalarField>::New
     (
         gas_->phiG().primitiveField()
@@ -779,8 +840,53 @@ Foam::scalar Foam::heatTransfer::conduct
 }
 
 
+void Foam::heatTransfer::beforeLagrange()
+{
+    if (beta_ > 0)
+    {
+        epsPOld_ = solid_.epsP().primitiveField();
+        // The heat capacity and material volume at the start of the step:
+        // the Lagrange step keeps each cell's mass but sets rho = m/V_L,
+        // so capacity() before the remap would not be m c (WP T.7)
+        CPre_ = capacity();
+        if (gas_ && !twoT())
+        {
+            CPre_ += gasCapacity();
+        }
+        VMat_ = fill()*solid_.openVolume();
+    }
+}
+
+
 void Foam::heatTransfer::beforeRemap()
 {
+    // WP T.7: plastic heating. The Lagrange step's plastic work per unit
+    // material volume sigma : d(epsP) (stress after the update), times
+    // beta, heats the material where it is (fill times the open volume at
+    // the start of the step is the material's volume, the capacity is that
+    // of the step's start, m c); with equilibrium the gas shares it
+    if (beta_ > 0 && epsPOld_.size() == mesh_.nCells())
+    {
+        const symmTensorField& sig = solid_.sigma().primitiveField();
+        const symmTensorField& epsP = solid_.epsP().primitiveField();
+        const scalarField& C = CPre_;
+        scalarField& T = T_.primitiveFieldRef();
+        scalar added = 0;
+        forAll(T, celli)
+        {
+            if (C[celli] <= VSMALL || VMat_[celli] <= 0)
+            {
+                continue;
+            }
+            const scalar dE =
+                beta_*(sig[celli] && (epsP[celli] - epsPOld_[celli]))
+               *VMat_[celli];
+            T[celli] += dE/C[celli];
+            added += dE;
+        }
+        plasticHeat_ += returnReduce(added, sumOp<scalar>());
+        T_.correctBoundaryConditions();
+    }
     TOld_ = T_.primitiveField();
 }
 
@@ -827,6 +933,12 @@ void Foam::heatTransfer::afterRemap()
         }
     }
     T_.correctBoundaryConditions();
+
+    // WP T.7: the gas in each cell at its moved temperature (equilibrium)
+    if (variableGas_ && !twoT())
+    {
+        gas_->setGasTemperature(T_, true);
+    }
 }
 
 
@@ -875,7 +987,8 @@ void Foam::heatTransfer::totalGasFlux(surfaceScalarField& F, const scalar dt)
     {
         return;
     }
-    const scalar RT = poreGas::Rair*gas_->T();
+    // R T per cell, the donor's (WP T.7)
+    const scalarField& RT = gas_->RT().primitiveField();
     const scalar p0 = gas_->p0();
     const scalar rhoP = gas_->rhoP();
     const labelUList& own = mesh_.owner();
@@ -895,7 +1008,8 @@ void Foam::heatTransfer::totalGasFlux(surfaceScalarField& F, const scalar dt)
           ? -dm[facei]/rhoP
           : dt*phiL[facei] - dm[facei]/rhoP;
         const scalar pd = G > 0 ? p[own[facei]] : p[nei[facei]];
-        Fi[facei] += G*(p0 + pd)/RT/dt;
+        const scalar RTd = G > 0 ? RT[own[facei]] : RT[nei[facei]];
+        Fi[facei] += G*(p0 + pd)/RTd/dt;
     }
     forAll(mesh_.boundary(), patchi)
     {
@@ -908,6 +1022,7 @@ void Foam::heatTransfer::totalGasFlux(surfaceScalarField& F, const scalar dt)
         const scalarField& pPhi = solid_.phiL().boundaryField()[patchi];
         const scalarField& pdm = solid_.remapMass().boundaryField()[patchi];
         const scalarField pN(gas_->p().boundaryField()[patchi].patchNeighbourField());
+        const scalarField RTN(gas_->RT().boundaryField()[patchi].patchNeighbourField());
         const scalarField vN
         (
             gas_->voidCells().boundaryField()[patchi].patchNeighbourField()
@@ -922,7 +1037,8 @@ void Foam::heatTransfer::totalGasFlux(surfaceScalarField& F, const scalar dt)
               ? -pdm[i]/rhoP
               : dt*pPhi[i] - pdm[i]/rhoP;
             const scalar pd = G > 0 ? p[fc[i]] : pN[i];
-            Fp[i] += G*(p0 + pd)/RT/dt;
+            const scalar RTd = G > 0 ? RT[fc[i]] : RTN[i];
+            Fp[i] += G*(p0 + pd)/RTd/dt;
         }
     }
 }
@@ -940,15 +1056,22 @@ Foam::scalar Foam::heatTransfer::advect
     // so a uniform temperature stays uniform under any flow; the heat that
     // crosses non-coupled boundaries is returned (in at the patch value,
     // out at the cell's). Sub-cycled to inflow Courant 0.5.
+    // C is the capacity at the end of the step. The gas mass, and so C,
+    // changed over the step by c_g dt (net inflow); a sub-step k of n ends
+    // at C - c_g h (n - 1 - k) (net inflow), which keeps the energy exactly
+    // when it is sub-cycled (WP T.7; one sub-step: C itself)
     const labelUList& own = mesh_.owner();
     const labelUList& nei = mesh_.neighbour();
     const scalarField& Fi = F.primitiveField();
 
     scalarField sumIn(mesh_.nCells(), Zero);
+    scalarField netIn(mesh_.nCells(), Zero);
     forAll(own, facei)
     {
         if (Fi[facei] > 0) sumIn[nei[facei]] += Fi[facei];
         else sumIn[own[facei]] -= Fi[facei];
+        netIn[nei[facei]] += Fi[facei];
+        netIn[own[facei]] -= Fi[facei];
     }
     forAll(mesh_.boundary(), patchi)
     {
@@ -958,6 +1081,7 @@ Foam::scalar Foam::heatTransfer::advect
         forAll(fc, i)
         {
             if (Fp[i] < 0) sumIn[fc[i]] -= Fp[i];
+            netIn[fc[i]] -= Fp[i];
         }
     }
     scalar rate = 0;
@@ -1020,11 +1144,14 @@ Foam::scalar Foam::heatTransfer::advect
             }
         }
         scalarField& Tw = Tfield.primitiveFieldRef();
+        const label left = nSubAdv_ - 1 - n;
         forAll(Tw, celli)
         {
             if (C[celli] > VSMALL)
             {
-                Tw[celli] += dE[celli]/C[celli];
+                const scalar Ck =
+                    left > 0 ? C[celli] - cg_*h*left*netIn[celli] : C[celli];
+                Tw[celli] += dE[celli]/(Ck > VSMALL ? Ck : C[celli]);
             }
         }
     }
@@ -1049,10 +1176,12 @@ void Foam::heatTransfer::exchange
     const tmp<scalarField> tV(solid_.openVolume());
     const scalarField& V = tV();
     const scalar d = gas_->d();
-    const scalar mu = gas_->mu();
-    const scalar RT = poreGas::Rair*gas_->T();
+    // Viscosity, R T and conductivity per cell (WP T.7)
+    const scalarField& mu = gas_->muField().primitiveField();
+    const scalarField& RT = gas_->RT().primitiveField();
+    const tmp<scalarField> tkG(kGasField());
+    const scalarField& kG = tkG();
     const scalarField& p = gas_->p().primitiveField();
-    const scalar Pr = mu*cg_/kGas_;
     scalarField& Ts = T_.primitiveFieldRef();
     scalarField& Tg = Tg_->primitiveFieldRef();
     forAll(Ts, celli)
@@ -1064,12 +1193,13 @@ void Foam::heatTransfer::exchange
         const scalar phiSm =
             min(max(rho[celli]/(a[celli]*rhoP_), scalar(1e-6)), 0.9);
         const scalar e = 1 - phiSm;
-        const scalar rhoG = (gas_->p0() + p[celli])/RT;
-        const scalar Re = rhoG*mag(q[celli])*d/mu;
+        const scalar rhoG = (gas_->p0() + p[celli])/RT[celli];
+        const scalar Re = rhoG*mag(q[celli])*d/mu[celli];
+        const scalar Pr = mu[celli]*cg_/kG[celli];
         const scalar Nu =
             (7 - 10*e + 5*e*e)*(1 + 0.7*Foam::pow(Re, 0.2)*Foam::cbrt(Pr))
           + (1.33 - 2.4*e + 1.2*e*e)*Foam::pow(Re, 0.7)*Foam::cbrt(Pr);
-        const scalar hAs = Nu*kGas_/d*6*(rho[celli]/rhoP_)/d;  // W/(m^3 K)
+        const scalar hAs = Nu*kG[celli]/d*6*(rho[celli]/rhoP_)/d;  // W/(m^3 K)
         const scalar H = hAs*V[celli];
         const scalar mean = (Cs[celli]*Ts[celli] + Cg[celli]*Tg[celli])
                            /(Cs[celli] + Cg[celli]);
@@ -1122,13 +1252,21 @@ void Foam::heatTransfer::solve(const scalar dt)
     if (!twoT())
     {
         const scalarField C(tCs() + tCg());
+        // Carried first (WP T.7): the gas moved in the gas solve at the
+        // temperatures of the start of the step, which conduction would
+        // change before the advection (an energy error of the order of the
+        // flux times the conduction's change, decision 0136)
+        carriedIn_ += advect(T_, F, C, dt);
         nSub_ = nSubCycles(dt, stableDeltaT(kCell_, tAVol(), C));
         const scalar h = dt/nSub_;
         for (label n = 0; n < nSub_; ++n)
         {
             heatIn_ += conduct(T_, kCell_, tAVol(), C, true, h);
         }
-        carriedIn_ += advect(T_, F, C, dt);
+        if (variableGas_)
+        {
+            gas_->setGasTemperature(T_, true);      // WP T.7
+        }
         return;
     }
 
@@ -1143,12 +1281,13 @@ void Foam::heatTransfer::solve(const scalar dt)
         )
     );
     const scalar h = dt/nSub_;
+    // Carried first, as with equilibrium (WP T.7)
+    carriedIn_ += advect(Tg_(), F, tCg(), dt);
     for (label n = 0; n < nSub_; ++n)
     {
         heatIn_ += conduct(T_, kCell_, tAVol(), tCs(), true, h);
         heatIn_ += conduct(Tg_(), kGasCell_, tOne(), tCg(), false, h);
     }
-    carriedIn_ += advect(Tg_(), F, tCg(), dt);
     exchange(dt, tCs(), tCg());
 
     // Void cells of a poreGas (not gasFlow) case are the atmosphere
@@ -1165,6 +1304,12 @@ void Foam::heatTransfer::solve(const scalar dt)
         }
         Tg_->correctBoundaryConditions();
     }
+
+    // WP T.7: each cell's gas pressure follows its new temperature
+    if (variableGas_)
+    {
+        gas_->setGasTemperature(Tg_(), true);
+    }
 }
 
 
@@ -1174,9 +1319,20 @@ void Foam::heatTransfer::report() const
     const label oldPrecision = Info().precision(16);
     Info<< "Thermal energy  = " << E << nl
         << "Heat in         = " << heatIn_ << nl
-        << "Heat carried in = " << carriedIn_ << nl
-        << "Energy balance  = " << E - energy0_ - heatIn_ - carriedIn_
-        << " (energy - start - heat in - carried in)" << endl;
+        << "Heat carried in = " << carriedIn_ << nl;
+    if (beta_ > 0)
+    {
+        Info<< "Plastic heat    = " << plasticHeat_ << nl
+            << "Energy balance  = "
+            << E - energy0_ - heatIn_ - carriedIn_ - plasticHeat_
+            << " (energy - start - heat in - carried in - plastic heat)"
+            << endl;
+    }
+    else
+    {
+        Info<< "Energy balance  = " << E - energy0_ - heatIn_ - carriedIn_
+            << " (energy - start - heat in - carried in)" << endl;
+    }
     Info().precision(oldPrecision);
 }
 
