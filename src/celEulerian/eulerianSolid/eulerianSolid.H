@@ -250,7 +250,7 @@ class eulerianSolid
         //  between two flowing cells and uses phi_m elsewhere
         Switch flowImpedance_;
 
-        //- WP F.8j (decision 0134): materialProperties yieldShearJump no
+        //- WP F.8j (decision 0137): materialProperties yieldShearJump no
         //  (Mohr-Coulomb or Drucker-Prager; default yes). At a face beside a
         //  yielding cell (stress within 3 % in sin(phi) of the static
         //  Mohr-Coulomb surface, partly filled cells too) the yielding side
@@ -261,7 +261,7 @@ class eulerianSolid
         //  from 10 to 5 mm cells)
         Switch yieldShearJump_;
 
-        //- WP F.8k (decision 0135): materialProperties slowFlowJump yes
+        //- WP F.8k (decision 0138): materialProperties slowFlowJump yes
         //  (needs yieldShearJump no; default no). At a face between two
         //  yielding cells the normal jump coefficient zpL zpR/(zpL + zpR) of
         //  the Riemann solver is scaled by the Mach number max |v|/c_p of the

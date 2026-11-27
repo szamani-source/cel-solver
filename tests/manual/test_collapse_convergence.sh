@@ -1,5 +1,5 @@
 #!/bin/bash
-# WP F.8k done-when (decision 0135): dry dam break, plain Mohr-Coulomb with
+# WP F.8k done-when (decision 0138): dry dam break, plain Mohr-Coulomb with
 # yieldShearJump no and slowFlowJump yes, run-out (front at 20 mm thickness)
 # on 10, 5 and 2.5 mm cells within 5 % of the 2.5 mm one at Courant 0.4. About 2.5 h on 4 cores.
 #

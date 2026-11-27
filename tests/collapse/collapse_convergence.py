@@ -1,4 +1,4 @@
-"""WP F.8k done-when (decision 0135): the dry dam break of the fluidised
+"""WP F.8k done-when (decision 0138): the dry dam break of the fluidised
 dam-break case (tests/gas/collapse_cases.py: column 0.2 x 0.4 m, floor
 19 deg, E 1 MPa) with plain Mohr-Coulomb (phi 24 deg, c 0, no mu(I)),
 yieldShearJump no and slowFlowJump yes converges with the mesh at the

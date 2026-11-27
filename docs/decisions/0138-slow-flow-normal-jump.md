@@ -1,10 +1,10 @@
-# 0135 Mach-scaled normal jump between yielding cells (WP F.8k)
+# 0138 Mach-scaled normal jump between yielding cells (WP F.8k)
 
 Date: 2026-11-27. Status: opt-in, under test (Sia chose "add the slow-flow fix").
 
 ## Context
 
-After decision 0134 the plain Mohr-Coulomb dry dam break still ran 1.85 / 2.57 / 2.81 h0
+After decision 0137 the plain Mohr-Coulomb dry dam break still ran 1.85 / 2.57 / 2.81 h0
 on 10 / 5 / 2.5 mm cells (front at 5 mm deposit thickness), and 10 mm changed with the
 time step (2.35 h0 at Courant 0.1). Tests in WP F.8j: a block translates exactly and
 stops on a rough floor at 0.990 m (exact 0.992); first-order face states halve the

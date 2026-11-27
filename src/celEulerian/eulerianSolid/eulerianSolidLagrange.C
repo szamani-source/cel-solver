@@ -2026,7 +2026,7 @@ void Foam::eulerianSolid::lagrangeStep(const scalar dt)
         tsinMob.ref().correctBoundaryConditions();
     }
 
-    // WP F.8j (decision 0134): yielding cells (1) with yieldShearJump no:
+    // WP F.8j (decision 0137): yielding cells (1) with yieldShearJump no:
     // stress within flowBand (in sin phi) of the static Mohr-Coulomb surface,
     // partly filled cells too; with neighbour values on coupled patches
     tmp<volScalarField> tyield;

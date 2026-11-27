@@ -1,4 +1,4 @@
-# 0134 No elastic shear jump beside yielding cells (WP F.8j)
+# 0137 No elastic shear jump beside yielding cells (WP F.8j)
 
 Date: 2026-11-26. Status: accepted as an opt-in (Sia approved the dry-case trial).
 
@@ -22,5 +22,5 @@ drops the elastic stress increment along the flow direction in yielding cells.
 
 - Plain Mohr-Coulomb dry run-out 10 / 5 mm: 1.08 / 1.56 h0 before, 1.85 / 2.59 after.
   Run-out grows, but the mesh dependence (+40 %) stays: shear damping was not the
-  whole cause. The rest is the normal jump in slow flow (decision 0135).
+  whole cause. The rest is the normal jump in slow flow (decision 0138).
 - Default unchanged, so every existing test is unchanged.

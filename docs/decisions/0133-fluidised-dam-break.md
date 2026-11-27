@@ -319,7 +319,7 @@ another. F.8 cannot pass on more than one mesh until that is addressed; for Sia 
 - `surfaceCarry` and the soft-bed cap stay case options until F.8b shows they are right
   against the paper.
 
-## F.8k (2026-11-27): recalibration with slowFlowJump (decision 0135)
+## F.8k (2026-11-27): recalibration with slowFlowJump (decision 0138)
 
 Sia chose a 22 deg floor (dry 5 mm: 3.27 h0 with Gueugneau's 19 deg, 2.73 with 22) and
 5 mm cells with the front at 5 mm deposit thickness. With the face damping of slow flow

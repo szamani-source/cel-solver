@@ -78,7 +78,7 @@ PHI = 24.0
 MU2 = math.tan(math.radians(33.0))
 I0 = 0.3
 FLOOR = 22.0
-# WP F.8k (decision 0135, Sia 2026-11-27): the dam break runs with
+# WP F.8k (decision 0138, Sia 2026-11-27): the dam break runs with
 # yieldShearJump no and slowFlowJump yes (SLOW_FLOW); with the face damping
 # of slow flow gone the dry column ran 3.27 h0 on 5 mm cells with
 # Gueugneau's 19 deg floor (+26 %), 2.73 h0 (+5 %) with 22 deg, which Sia

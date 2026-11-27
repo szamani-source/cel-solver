@@ -33,7 +33,7 @@ pore pressure only lowers the friction, internal and floor, as Gueugneau
 et al. (2017) and Aravena et al. (2021); 10 mm: run-out 5.67 h0, front
 1.04 sqrt(g h0) (-26 %); theoretical kappa 3.88 h0.
 
-WP F.8k (decisions 0134, 0135; Sia 2026-11-27): the grains run with
+WP F.8k (decisions 0137, 0138; Sia 2026-11-27): the grains run with
 yieldShearJump no and slowFlowJump yes, floor 22 deg, kappa the theoretical
 k p0/(mu e) = 0.11 m^2/s (no fitted parameter), measured on 5 mm cells with
 the front at 5 mm deposit thickness: run-out 6.24 h0 (+8.5 %), front
