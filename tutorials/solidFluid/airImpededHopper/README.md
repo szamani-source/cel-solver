@@ -48,7 +48,8 @@ on walls (no gas through them). All keywords are in the manual (case setup, gas)
 - After each solid step the pore gas pressure is solved implicitly over the same step
   (WP F.2, decision 0127): gas mass balance with the flux law q = -lambda grad p, the
   mobility lambda from the drag law at each face, Newton iterations with Anderson
-  acceleration to `pTolerance` (1e-6 Pa by default), PCG for each correction.
+  acceleration to `pTolerance` (1e-4 Pa by default, decision 0141), PCG for each
+  correction; the gas mass is conserved to round-off whatever the tolerance.
 - Coupling (WP F.3, decision 0128): sigma is the effective stress; the grains feel
   -grad p through the face pressures, and their volume change and motion carry and
   squeeze the gas (gas mass conserved to round-off).
@@ -84,7 +85,7 @@ for bit.
 
 The outlet opens at 0.15 s. Dry, the hopper settles into a steady rate of
 74.4 kg/(m s) (Beverloo's slot rate 75.1). With the gas, the 0.2 mm sand flows at
-54.6 kg/(m s), 27 % slower (run of 2026-11-27).
+54.3 kg/(m s), 27 % slower (run of 2026-11-28).
 
 ![Grain speed and gas pressure](snapshots.png)
 
@@ -101,4 +102,6 @@ published experiments (Hsiau et al. 2010; Crewdson et al. 1977). At 0.1 mm (`./A
 weight of about 2 % of the grains, which would loosen there in reality, and the model
 keeps them at their packed density, so read the 0.1 mm rate as an estimate.
 
-Gas on costs about 1.6 times a dry step here (70 s against 43 s on one core).
+Gas on costs about 1.3 times a dry step here (56 s against 42 s on one core) at the
+default `pTolerance` of 1e-4 Pa (decision 0141; 1.4 times on the 8,704-cell version of
+this hopper, `tests/manual/test_gas_scaling.sh`).

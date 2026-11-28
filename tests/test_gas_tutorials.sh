@@ -7,8 +7,9 @@
 #     figure a README shows exists, and each README shows at least one.
 # [2] Short runs from a copy: airImpededHopper (with gas and dry/) to 0.2 s,
 #     past the outlet opening; fluidisedDamBreak (fluidised, 10 mm) to 0.04 s,
-#     whose fields equal those of tests/gas/collapse_cases.py's case to the
-#     last digit. Each ends with "End" and no NaN. About 2 minutes.
+#     whose fields equal those of tests/gas/collapse_cases.py's case (at the
+#     default pTolerance) to the last digit. Each ends with "End" and no NaN.
+#     About 2 minutes.
 set -u
 root="$(cd "$(dirname "$0")/.." && pwd)"
 tut="$root/tutorials/solidFluid"
@@ -74,7 +75,7 @@ import numpy as np
 import collapse_cases as cc
 import pore_cases as pc
 ref = f"{work}/ref"
-cc.make(ref, end=0.04)
+cc.make(ref, end=0.04, extra_gas="pTolerance 0.0001;\n")   # the default the tutorial runs with
 cc.run(ref)
 d = max(float(np.abs(np.asarray(pc.field(ref, "0.04", f), float)
                      - np.asarray(pc.field(f"{work}/dam", "0.04", f), float)).max())

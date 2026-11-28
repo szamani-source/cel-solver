@@ -85,11 +85,11 @@ ratios, is written in `<time>/uniform/poreGas`, WP F.9).
 
 The front of the deposit (the end of the continuous material from the gate; grains
 sprayed ahead do not count) against time, in Roche's units, from the run of this
-tutorial as shipped (10 mm, 2026-11-27):
+tutorial as shipped (10 mm, default `pTolerance`, 2026-11-28):
 
 | | Run-out from the gate | Front speed, t/sqrt(h0/g) 1.5 to 4 |
 | --- | --- | --- |
-| Fluidised, 10 mm (this run) | 5.05 h0 (-12 % of 5.75) | 2.12 m/s (-24 % of sqrt(2 g h0) = 2.80) |
+| Fluidised, 10 mm (this run) | 4.90 h0 (-15 % of 5.75) | 2.13 m/s (-24 % of sqrt(2 g h0) = 2.80) |
 | Dry, 10 mm (this run) | 2.85 h0 (+8 % of 2.63, Breard et al. 2019) | 1.24 m/s |
 | Fluidised, 5 mm (WP F.8k, `tests/manual/test_fluidised_collapse.sh`) | 6.24 h0 (+8.5 %) | 2.26 m/s (-19.5 %) |
 | Dry, 5 mm (WP F.8k) | 2.73 h0 (+5 %) | |

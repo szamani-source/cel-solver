@@ -1,6 +1,6 @@
 # WP F.9: Restart, MPI, tutorial, manual, v2.0.0
 
-State: in progress (F.9a, F.9b done; F.9c restart, MPI, cost, tutorials in progress)
+State: in progress (F.9a, F.9b, F.9c done; manual chapter, validation pack, release next)
 Branch: assigned by the thread
 
 ## Goal
@@ -43,7 +43,8 @@ Newest first. Each entry: date, what was done, what was learned, exact next step
   1e-12): run-out 4.88-5.73 h0, 2/4 processors 5.50/5.10. Scaling (8,704-cell hopper):
   4 processors 2.96x, gas 1.94x dry (pTolerance 1e-9 Pa, 11 solves per step); 1.50x at
   1e-4 Pa. Tutorials `tutorials/solidFluid/airImpededHopper`, `fluidisedDamBreak`,
-  `tests/test_gas_tutorials.sh`. Asked Sia: default pTolerance; outcome comparison of
-  the dam break. Next: apply the answers, then manual chapter, validation pack, release.
+  `tests/test_gas_tutorials.sh`. Sia chose: default pTolerance 1e-4 Pa (gas 1.37x dry,
+  4 processors 2.75x; tests keep 1e-14 p0 via pore_cases.TEST_PTOL) and the dam break's
+  processor counts compared by outcome. Next: manual chapter, validation pack, release.
 
 - 2026-11-24: brief written in WP F.0. Next: start when the package before it has merged.

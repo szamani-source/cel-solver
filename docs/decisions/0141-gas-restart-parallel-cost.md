@@ -65,7 +65,10 @@ coordinator): wrap up without serial waiting; the gas tutorials go in
    1e-10 and reports how long the dam break stays within 1e-10;
    `tests/manual/test_fluidised_collapse.sh` keeps its 1e-10 check over the whole run
    and fails it. Comparing the dam break's processor counts by outcome (run-out, front
-   speed) instead would relax that test, so it is Sia's call (asked 2026-11-27).
+   speed) instead would relax that test, so it was Sia's call: **Sia chose (2026-11-27)
+   to compare by outcome**: `tests/gas/collapse_checks.py` C now checks run-out within
+   10 % and front speed within 5 % of serial on 2 and 4 processors (cell-by-cell
+   difference still printed).
 3. **Cost and speed-up** (`tests/manual/test_gas_scaling.sh`: the F.5 hopper refined to
    64 columns, 8,704 cells, 0.2 mm grains, T0 rules, outlet open from the start, 200
    steps, idle 4-core machine): dry 45.5 ms per step, gas 88.2 ms (1.94 times: fails
@@ -75,10 +78,16 @@ coordinator): wrap up without serial waiting; the gas tutorials go in
    `pTolerance` 1e-6 / 1e-4 / 1e-2 Pa: 7.3 / 4.8 / 2.9 solves, 1.68 / 1.50 / 1.38 times
    dry; gas mass conserved to 5e-14 in every case (the conservative finish), pressures
    within 0.04 Pa of 49 Pa at 1e-4 (the T0 rules' round-off flips give the same order).
-   The default is Sia's call (asked 2026-11-27); until then it stays 1e-9 Pa.
+   **Sia chose (2026-11-27) to loosen the default to `pTolerance` 1e-4 Pa.** With it,
+   on an idle machine (2026-11-28): dry 43.8 ms, gas 59.9 ms per step (1.37 times,
+   passes 1.5); gas on 2 processors 1.64 times serial, on 4 processors 2.75 times
+   (passes 2.5). The tests keep the old tolerance, 1e-14 p0, set explicitly in
+   `tests/gas/pore_cases.py` (`TEST_PTOL`): with the new default their parallel
+   comparisons (1e-10) part by up to 4e-6 and the U_mf onset time moves by 0.01 s, so
+   they need converged solves; the scaling test and the tutorials run at the default.
 4. **Tutorials** in `tutorials/solidFluid/` (decision 0140 layout: Setup, Numerics, How
    to run, Expected results, figures):
-   - `airImpededHopper`: the F.5 hopper with gas and dry. Default 0.2 mm grains: 54.6
+   - `airImpededHopper`: the F.5 hopper with gas and dry. Default 0.2 mm grains: 54.3
      against 74.4 kg/(m s) dry (-27 %), about 2 minutes. At 0.1 mm (-64 %) the lift
      check warns from 0.23 s (the gas carries about 2 % of the grains above the outlet
      with the T0 rules; the F.9b validity test uses plain Mohr-Coulomb, 0.06 %), so
@@ -90,6 +99,8 @@ coordinator): wrap up without serial waiting; the gas tutorials go in
 ## Consequences
 
 - Every gas run restarts exactly; `uniform/poreGas` must be kept with the fields.
-- The cell-by-cell parallel match holds for the hopper and for the first steps of the
-  dam break; whether the dam break is compared by outcome after that is open.
-- The 1.5 times cost target is met only with a looser `pTolerance`.
+- The cell-by-cell parallel match holds for the hopper; the dam break is compared by
+  outcome (run-out, front speed).
+- The 1.5 times cost target is met with the new default `pTolerance` 1e-4 Pa (Sia);
+  results of user cases change below that tolerance (the gas mass is conserved to
+  round-off either way). Set `pTolerance 1e-9` (or tighter) for parallel comparisons.

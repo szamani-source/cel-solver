@@ -43,8 +43,9 @@ def per_step(path):
 
 def case(path, *, gas, n, end):
     dc = {1: (1, 1, 1), 2: (2, 1, 1), 4: (2, 2, 1)}[n]
+    # the user default pTolerance (1e-4 Pa, decision 0141), not the tests' 1e-14 p0
     hc.make_hopper(path, d=D, end=end, write_interval=end, gas=gas, decomp=dc, ncol=NCOL,
-                   open_time=0.0)
+                   open_time=0.0, extra_gas="pTolerance 0.0001;\n")
     pc.run(path, n, set_fields=True)
     return per_step(path)
 
