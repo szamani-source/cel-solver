@@ -1,0 +1,15 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      materialProperties;
+}
+
+// No material (alpha 0 everywhere); the solid's stiffness only sets the time
+// step (about 4e-5 s; gasFlow is not stable at 2e-4 s on these cells)
+rho 1590.0;
+freeSurface yes;
+type linearElastic;
+E 3300.0;
+nu 0.3;

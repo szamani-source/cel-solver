@@ -1,0 +1,18 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      materialProperties;
+}
+
+// Plug flow of CARBO HSP 40/70 particles between plates: fed through the inlet
+// at 1 m/s, out through the open outlet; no gravity and no wall friction
+rho 2090.0;             // flowing bulk density [kg/m^3] (Adapa et al., Table 5)
+freeSurface yes;
+type linearElastic;
+E 1e4;
+nu 0.3;
+walls { wall { friction 0; } mid { friction 0; } }
+outlets { outlet { friction 0; openTime 0; } }
+inlets { inlet { speed 1.0; startTime 0; endTime 100; density 2090.0; friction 0; } }
