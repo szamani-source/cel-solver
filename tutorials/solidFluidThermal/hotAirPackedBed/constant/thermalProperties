@@ -1,0 +1,19 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      thermalProperties;
+}
+
+// Grains and gas each have their own temperature (T and Tg), exchanging heat
+// with Gunn's (1978) coefficient (decision 0136)
+model        twoTemperature;
+c            5.0;       // grain specific heat [J/(kg K)]: kept small so the front
+                        // crosses the column in seconds (the dimensionless result
+                        // does not depend on it)
+conductivity constant;
+k            0;         // no conduction: the Peclet number is about 1e4
+kGas         0.02569;   // air [W/(m K)]
+cGas         1006.0;    // air [J/(kg K)]
+// variableGas yes;     // gas density, viscosity, conductivity from Tg (WP T.7)

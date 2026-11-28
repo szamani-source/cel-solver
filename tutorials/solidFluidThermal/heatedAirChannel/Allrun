@@ -1,0 +1,23 @@
+#!/bin/sh
+# Air heated between two plates at a fixed temperature (WP TU.3; the T.5 Graetz case, decision 0136).
+#   ./Allrun            # serial
+#   ./Allrun 4          # on 4 processors
+# Then: python3 plot.py   (needs numpy and matplotlib)
+cd "${0%/*}" || exit
+. ${WM_PROJECT_DIR:?}/bin/tools/RunFunctions
+
+nProcs="${1:-1}"
+
+restore0Dir
+runApplication blockMesh
+python3 initFields.py > log.initFields
+if [ "$nProcs" -gt 1 ]
+then
+    foamDictionary -entry numberOfSubdomains -set "$nProcs" system/decomposeParDict > /dev/null
+    foamDictionary -entry coeffs.n -set "($nProcs 1 1)" system/decomposeParDict > /dev/null
+    runApplication decomposePar
+    runParallel celFoam
+    runApplication reconstructPar
+else
+    runApplication celFoam
+fi

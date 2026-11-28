@@ -1,0 +1,15 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      thermalProperties;
+}
+
+// The gas temperature Tg is solved in the void (decision 0136)
+model        twoTemperature;
+c            1000;
+conductivity constant;
+k            0;
+kGas         0.02569;   // air [W/(m K)]
+cGas         1006.0;    // air [J/(kg K)]

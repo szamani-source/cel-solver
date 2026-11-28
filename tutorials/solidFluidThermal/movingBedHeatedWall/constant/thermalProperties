@@ -1,0 +1,20 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      thermalProperties;
+}
+
+// One temperature per cell (decision 0136)
+model        equilibrium;
+c            11.0;      // 1100 J/(kg K) scaled by 0.01 m/s / 1 m/s: the bed moves
+                        // 100 times faster than in the experiment with the same
+                        // Peclet number, so the run is short
+conductivity constant;
+k            0.28;      // flowing bed k_eff [W/(m K)] (Adapa et al., Table 5)
+voidT        753.15;    // written in empty cells [K]
+walls
+{
+    wall { q 5000.0; }  // heat flux into the bed [W/m^2]
+}
