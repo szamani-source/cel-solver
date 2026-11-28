@@ -1,0 +1,20 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      gasProperties;
+}
+
+// Air in the pores of a rigid packed column (decision 0127)
+model   poreGas;        // Darcy-Forchheimer gas in the pores
+rhoP    2650.0;         // grain density [kg/m^3]: gas fraction 1 - rho/rhoP = 0.4
+d       0.02;           // grain diameter [m]
+T       293.15;         // gas temperature of the gas solve [K]
+p0      101325.0;       // ambient pressure [Pa]; p is the gauge pressure
+drag    ergunWenYu;     // drag law
+coupled no;             // the gas does not push the grains (rigid bed)
+inflow
+{
+    left 1.0;           // superficial air speed in through the left face [m/s]
+}

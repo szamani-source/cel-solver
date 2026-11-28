@@ -1,0 +1,18 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      gasProperties;
+}
+
+// The whole channel is void: the air is solved with its own momentum
+// equation there (model gasFlow, decision 0131)
+model   gasFlow;
+rhoP    2650.0;
+d       0.001;
+T       293.15;         // gas temperature of the gas solve [K]
+p0      101325.0;
+drag    ergunWenYu;     // not used: no material
+coupled yes;
+pTolerance 1e-9;        // gauge pressure tolerance [Pa]

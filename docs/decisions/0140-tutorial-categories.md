@@ -39,3 +39,19 @@ from older versions of the solver.
   README.md, INSTALL.md and the manual's quick start changed accordingly.
 - The gas and temperature tutorials go into `solidFluid/` and `solidFluidThermal/` with
   the same README sections; a test like `tests/test_solid_tutorials.sh` can cover them.
+
+## TU.3: solid-fluid-temperature set (2026-11-28)
+
+- `tutorials/solidFluidThermal/` holds the three validated temperature cases as
+  templates, beside `hotSiloDischarge` (moved there in T.7): `hotAirPackedBed`
+  (T.4, Schumann), `movingBedHeatedWall` (T.6, Adapa et al. 2024) and
+  `heatedAirChannel` (T.5, Graetz). Their dictionaries are those of the done-when
+  tests, with comments; each `plot.py` carries its own copy of the reference
+  solution (tools/ is not installed with the tutorials) and prints the comparison.
+- `heatedAirChannel` starts from the Poiseuille profile: `initFields.py` writes it
+  from the channel size and cell counts, so the case works on another mesh.
+- No new physics case: the temperature series has no validated case with gas and a
+  moving bed together; `hotSiloDischarge` stays the flowing example.
+- `tests/test_thermal_tutorials.sh` runs a short stretch of each new case (about 20 s)
+  and checks the energy balance; the full checks stay in the done-when tests and the
+  thermal validation pack.

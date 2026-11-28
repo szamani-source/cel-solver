@@ -244,7 +244,7 @@ only, solid-fluid, solid-fluid-temperature), then the manual rebuild. Brief:
 | --- | --- | --- | --- |
 | TU.1 | Solid-only tutorials in `tutorials/solid/` | `tests/test_solid_tutorials.sh` passes (index, README sections, figures, short run of every case) | 3 h + runs |
 | TU.2 | Solid-fluid tutorials in `tutorials/solidFluid/` | the same checks for that folder | after F.8 |
-| TU.3 | Solid-fluid-temperature tutorials in `tutorials/solidFluidThermal/` | the same checks for that folder | after T.7 |
+| TU.3 | Solid-fluid-temperature tutorials in `tutorials/solidFluidThermal/` | the same checks for that folder | Done 2026-11-28 (hotAirPackedBed, movingBedHeatedWall, heatedAirChannel, hotSiloDischarge) |
 
 ## User manual (M series, decision 0116)
 
