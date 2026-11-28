@@ -111,6 +111,73 @@ int main(int argc, char *argv[])
 
     // Restart (decision 0117): started from a written time (controlDict
     // startFrom latestTime), the fields come from that time; no fill
+    const scalarList box(dict.get<scalarList>("fill"));
+    const labelListList& cp = mesh.cellPoints();
+    // Points in the fill frame (WP G.3): x' = x cos a + y sin a,
+    // y' = -x sin a + y cos a, a = fillAngle
+    pointField fillPts(mesh.points());
+    if (dict.found("fillAngle"))
+    {
+        const scalar fa =
+            dict.get<scalar>("fillAngle")*constant::mathematical::pi/180;
+        const scalar ca = Foam::cos(fa), sa = Foam::sin(fa);
+        forAll(fillPts, pi)
+        {
+            const point& q = mesh.points()[pi];
+            fillPts[pi] =
+                point(q.x()*ca + q.y()*sa, -q.x()*sa + q.y()*ca, q.z());
+        }
+    }
+    if (dict.found("fillSlope"))
+    {
+        const scalar ts = Foam::tan
+        (
+            dict.get<scalar>("fillSlope")*constant::mathematical::pi/180
+        );
+        forAll(fillPts, pi)
+        {
+            fillPts[pi].y() += fillPts[pi].x()*ts;
+        }
+    }
+    // Fill fraction of a cell below yTop (inside fill and fillRight)
+    auto fillFrac = [&](const label celli, const scalar yTop) -> scalar
+    {
+        const boundBox bb(fillPts, cp[celli], false);
+        const scalar hx = bb.max().x() - bb.min().x();
+        const scalar hy = bb.max().y() - bb.min().y();
+        scalar fx =
+            min(max((min(bb.max().x(), box[2]) - max(bb.min().x(), box[0]))/hx, 0), 1);
+        const scalar fy =
+            min(max((min(bb.max().y(), yTop) - max(bb.min().y(), box[1]))/hy, 0), 1);
+        if (dict.found("fillRight"))
+        {
+            const List<vector2D> xr(dict.get<List<vector2D>>("fillRight"));
+            const scalar yc = 0.5*(bb.min().y() + bb.max().y());
+            scalar xl = xr.last().y();
+            if (yc <= xr.first().x())
+            {
+                xl = xr.first().y();
+            }
+            for (label k = 1; k < xr.size(); ++k)
+            {
+                if (yc >= xr[k-1].x() && yc <= xr[k].x())
+                {
+                    const scalar w =
+                        (yc - xr[k-1].x())/max(xr[k].x() - xr[k-1].x(), SMALL);
+                    xl = xr[k-1].y() + w*(xr[k].y() - xr[k-1].y());
+                    break;
+                }
+            }
+            fx *= min(max((xl - bb.min().x())/hx, 0), 1);
+        }
+        scalar a = fx*fy;
+        // round-off of the fill frame (fillAngle, fillSlope: turned points)
+        // leaves slivers of 1e-9 next to the fill; treat them as empty/full
+        const scalar tol = (dict.found("fillAngle") || dict.found("fillSlope")) ? 1e-6 : 1e-12;
+        a = a >= 1 - tol ? 1 : (a > tol ? a : 0);
+        return a;
+    };
+
     const bool restart = runTime.value() > 0;
     if (restart)
     {
@@ -119,74 +186,14 @@ int main(int argc, char *argv[])
     else
     {
         // Initial state
-        const scalarList box(dict.get<scalarList>("fill"));
         const vector U0(dict.get<vector>("U0"));
         scalarField& alpha = solid.alphaRef().primitiveFieldRef();
         scalarField& rho = solid.rhoRef().primitiveFieldRef();
         vectorField& U = solid.URef().primitiveFieldRef();
         symmTensorField& s = solid.sigmaRef().primitiveFieldRef();
-        const labelListList& cp = mesh.cellPoints();
-        // Points in the fill frame (WP G.3): x' = x cos a + y sin a,
-        // y' = -x sin a + y cos a, a = fillAngle
-        pointField fillPts(mesh.points());
-        if (dict.found("fillAngle"))
-        {
-            const scalar fa =
-                dict.get<scalar>("fillAngle")*constant::mathematical::pi/180;
-            const scalar ca = Foam::cos(fa), sa = Foam::sin(fa);
-            forAll(fillPts, pi)
-            {
-                const point& q = mesh.points()[pi];
-                fillPts[pi] =
-                    point(q.x()*ca + q.y()*sa, -q.x()*sa + q.y()*ca, q.z());
-            }
-        }
-        if (dict.found("fillSlope"))
-        {
-            const scalar ts = Foam::tan
-            (
-                dict.get<scalar>("fillSlope")*constant::mathematical::pi/180
-            );
-            forAll(fillPts, pi)
-            {
-                fillPts[pi].y() += fillPts[pi].x()*ts;
-            }
-        }
         forAll(alpha, celli)
         {
-            const boundBox bb(fillPts, cp[celli], false);
-            const scalar hx = bb.max().x() - bb.min().x();
-            const scalar hy = bb.max().y() - bb.min().y();
-            scalar fx =
-                min(max((min(bb.max().x(), box[2]) - max(bb.min().x(), box[0]))/hx, 0), 1);
-            const scalar fy =
-                min(max((min(bb.max().y(), box[3]) - max(bb.min().y(), box[1]))/hy, 0), 1);
-            if (dict.found("fillRight"))
-            {
-                const List<vector2D> xr(dict.get<List<vector2D>>("fillRight"));
-                const scalar yc = 0.5*(bb.min().y() + bb.max().y());
-                scalar xl = xr.last().y();
-                if (yc <= xr.first().x())
-                {
-                    xl = xr.first().y();
-                }
-                for (label k = 1; k < xr.size(); ++k)
-                {
-                    if (yc >= xr[k-1].x() && yc <= xr[k].x())
-                    {
-                        const scalar w =
-                            (yc - xr[k-1].x())/max(xr[k].x() - xr[k-1].x(), SMALL);
-                        xl = xr[k-1].y() + w*(xr[k].y() - xr[k-1].y());
-                        break;
-                    }
-                }
-                fx *= min(max((xl - bb.min().x())/hx, 0), 1);
-            }
-            scalar a = fx*fy;
-            // round-off of the fill frame (fillAngle, fillSlope: turned points)
-            // leaves slivers of 1e-9 next to the fill; treat them as empty/full
-            const scalar tol = (dict.found("fillAngle") || dict.found("fillSlope")) ? 1e-6 : 1e-12;
-            a = a >= 1 - tol ? 1 : (a > tol ? a : 0);
+            const scalar a = fillFrac(celli, box[3]);
             alpha[celli] = a;
             rho[celli] = rho0*a;
             U[celli] = a > 0 ? U0 : Zero;
@@ -199,6 +206,8 @@ int main(int argc, char *argv[])
             {
                 // weight above the centre per area over alpha (material stress)
                 const scalar K0 = dict.get<scalar>("initK0");
+                const boundBox bb(fillPts, cp[celli], false);
+                const scalar hy = bb.max().y() - bb.min().y();
                 const scalar above =
                     rho0*max(box[3] - bb.max().y(), 0) + 0.5*rho[celli]*hy;
                 const scalar syy = -gMag*above/a;
@@ -496,6 +505,59 @@ int main(int argc, char *argv[])
         }
         label nextCk =
             ckEvery > 0 ? label(std::floor(runTime.value()/ckEvery + 1e-9)) + 1 : 0;
+        // Staged filling (layer-by-layer gravity activation): fillStages
+        // ((t1 y1) (t2 y2) ...) raises the fill top to yk at time tk; the
+        // added material starts at rest and stress-free on the settled fill
+        const List<vector2D> stages
+        (
+            dict.getOrDefault<List<vector2D>>("fillStages", List<vector2D>())
+        );
+        label nextStage = 0;
+        while
+        (
+            nextStage < stages.size()
+         && stages[nextStage].x() <= runTime.value() + 1e-12
+        )
+        {
+            ++nextStage;
+        }
+        auto addLayer = [&](const scalar yTop)
+        {
+            scalarField& alpha = solid.alphaRef().primitiveFieldRef();
+            scalarField& rho = solid.rhoRef().primitiveFieldRef();
+            vectorField& U = solid.URef().primitiveFieldRef();
+            symmTensorField& s = solid.sigmaRef().primitiveFieldRef();
+            label n = 0;
+            forAll(alpha, celli)
+            {
+                const scalar a = fillFrac(celli, yTop);
+                if (a > alpha[celli] + 1e-6)
+                {
+                    // keep the settled material's stress in a partly
+                    // filled cell, scaled to the new material fraction
+                    if (alpha[celli] > 1e-6)
+                    {
+                        s[celli] *= alpha[celli]/a;
+                        U[celli] *= alpha[celli]/a;
+                    }
+                    else
+                    {
+                        s[celli] = Zero;
+                        U[celli] = Zero;
+                    }
+                    rho[celli] += rho0*(a - alpha[celli]);
+                    alpha[celli] = a;
+                    ++n;
+                }
+            }
+            solid.alphaRef().correctBoundaryConditions();
+            solid.rhoRef().correctBoundaryConditions();
+            solid.URef().correctBoundaryConditions();
+            solid.sigmaRef().correctBoundaryConditions();
+            Info<< "Fill stage: top " << yTop << " m at t = "
+                << runTime.value() << " s, " << returnReduce(n, sumOp<label>())
+                << " cells" << endl;
+        };
         Pstream::broadcast(restartStep);
         label step = restartStep;
         if (!restart)
@@ -514,11 +576,24 @@ int main(int argc, char *argv[])
             {
                 target = min(target, nextCk*ckEvery);
             }
+            if (nextStage < stages.size())
+            {
+                target = min(target, stages[nextStage].x());
+            }
             dtk = min(dtk, target - runTime.value());
             runTime.setDeltaT(dtk);
             ++runTime;
             cycle(dtk);
             record(++step);
+            if
+            (
+                nextStage < stages.size()
+             && runTime.value() >= stages[nextStage].x() - 1e-12
+            )
+            {
+                addLayer(stages[nextStage].y());
+                ++nextStage;
+            }
             if (next < wt.size() && runTime.value() >= wt[next] - 1e-12)
             {
                 writeCells("cells_" + Foam::name(wt[next]));
