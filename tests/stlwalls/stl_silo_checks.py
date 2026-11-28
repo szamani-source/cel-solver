@@ -19,7 +19,7 @@ so each tank is run three times with maxCo 0.40, 0.38, 0.36 (a different
 round-off history each) and the mean rates are compared.
 
 1. Flat tank with STL walls: side walls and floor are STL bodies (the
-   tutorials/stlSilo tank: walls cut cells at a quarter and three quarters,
+   tutorials/solid/stlSilo tank: walls cut cells at a quarter and three quarters,
    floor at y = 0.0125 with a 0.06 m gap over the mesh outlet patch). No
    material leaves while the outlet is closed (mass to 1e-12), tank plus
    discharged constant to 1e-10, and the mean rate within 5 % of the mean

@@ -10,7 +10,7 @@ fields at T_END (rho, U, sigma, epsP, epsPEq, alpha), the body state and the
 mass counters must be identical (bit for bit), and so must the appended
 lines of postProcessing/bodyForces.dat after the restart time.
 
-Cases (the T0 tank of tutorials/siloDischarge, E 0.1 MPa, 10 mm cells):
+Cases (the T0 tank of tutorials/solid/siloDischarge, E 0.1 MPa, 10 mm cells):
   silo     outlet opens at 0.3 s, restart at 0.4 s while it discharges, end
            0.5 s (flow impedance, outlet, damping switched off at opening)
   bodies   tank filled to 0.3 m, outlet closed; a free steel block (rigid,
@@ -60,7 +60,7 @@ def set_entry(path, rel, key, value):
 
 
 def make_silo(path, t_restart, t_end, fill=0.6, open_time=0.3):
-    shutil.copytree(f"{ROOT}/tutorials/siloDischarge", path,
+    shutil.copytree(f"{ROOT}/tutorials/solid/siloDischarge", path,
                     ignore=shutil.ignore_patterns("*.png", "*.py", "README.md"))
     set_entry(path, "constant/materialProperties", "E", "1e5")
     s = open(f"{path}/constant/materialProperties").read()

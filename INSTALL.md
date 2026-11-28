@@ -191,22 +191,27 @@ After the by-hand build, loading OpenFOAM (step 2) is all that is needed.
 
 ```bash
 celfoam tutorials ~/celfoam-cases          # copies all tutorials there
-cd ~/celfoam-cases/siloDischarge
+cd ~/celfoam-cases/solid/siloDischarge
 celfoam ./Allrun                           # tank: settle, open, discharge (about 11 min)
 celfoam python3 plot.py                    # snapshots.png, mass.png (needs matplotlib)
 ```
+
+The tutorials are grouped by category: `solid/` (solid only), `solidFluid/` (with gas)
+and `solidFluidThermal/` (with gas and temperature). The solid ones
+(`tutorials/solid/README.md` lists them with run times):
 
 | Tutorial | What | Time |
 | --- | --- | --- |
 | `smokeBox` | 10 x 10 x 10 elastic box, checks the install | seconds |
 | `siloDischarge` | 2D tank discharging through a floor opening (T0) | about 11 min (`./Allrun 0.1`: 40 s) |
-| `siloCohesion`, `siloFed` | cohesive material; a tank fed from the top while it discharges | 7 to 11 min |
-| `stlTank`, `stlSilo`, `stlHopper` | walls from STL files | 2 to 10 min |
-| `rigidBodyMotion` | a rigid body in the material | minutes |
+| `siloCohesion`, `siloFed` | cohesive material; a tank fed from the top while it discharges | 7 to 60 min |
+| `stlSilo`, `stlHopper` | walls from STL files | 2 to 10 min |
 | `coutoHopper` | the validated Couto wheat silo (axisymmetric, MC or DP) | 2 h (standard) or 8 h (fine) on 4 cores |
 | `setupPlaneTank` | a plane tank written by `celfoam setup` from a short YAML file | about 1 h (`./Allrun 0.1`: minutes) |
+| `stripFooting` | a rigid footing pushed into clay (coupled Eulerian-Lagrangian) | about 1 min |
+| `rigidBodyMotion` | prescribed rigid bodies from STL files | seconds |
 
-Most tutorial folders have a `README.md`. Results are standard OpenFOAM time folders: open
+Every tutorial folder has a `README.md`. Results are standard OpenFOAM time folders: open
 them in ParaView with `touch case.foam && paraview case.foam`.
 
 Parallel runs: `celfoam mpirun -np 4 celFoam -parallel` after `decomposePar`, as in any
@@ -220,7 +225,7 @@ Any Linux with Docker or Podman (no OpenFOAM on the host):
 ```bash
 ./install.sh --container           # builds image celfoam:1.1.0, installs a celfoam command
 celfoam tutorials cases            # same commands as above
-cd cases/coutoHopper && celfoam ./Allrun mc mesh
+cd cases/solid/coutoHopper && celfoam ./Allrun mc mesh
 ```
 
 The image is built from the same pinned OpenFOAM v2512 image CI uses (`Dockerfile`), so

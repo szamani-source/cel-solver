@@ -71,7 +71,7 @@ fields() {
 }
 
 echo "== A. defaults, no time directory"
-cp -r "$root/tutorials/smokeBox" "$work/A"
+cp -r "$root/tutorials/solid/smokeBox" "$work/A"
 cd "$work/A"
 blockMesh > log.blockMesh 2>&1
 celFoam > log.celFoam 2>&1
@@ -82,7 +82,7 @@ grep -q '^internalField *uniform 1800;' "$last/rho" \
     || { echo "FAIL: default rho not uniform 1800"; exit 1; }
 
 echo "== B. setFields, serial"
-cp -r "$root/tutorials/smokeBox" "$work/B"
+cp -r "$root/tutorials/solid/smokeBox" "$work/B"
 cd "$work/B"
 cp -r 0.orig 0
 blockMesh > log.blockMesh 2>&1

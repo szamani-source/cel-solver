@@ -38,7 +38,7 @@ Mohr-Coulomb friction angle 35&deg;, no cohesion</td></tr>
 
 <p>Load OpenFOAM and build celFoam first (<a href="install.html">Installation</a>). Then:</p>
 
-<pre><code>cd tutorials/siloDischarge
+<pre><code>cd tutorials/solid/siloDischarge
 ./Allrun              # E = 10 MPa, about 11 minutes
 python3 plot.py       # pictures and the discharge rate</code></pre>
 
@@ -189,12 +189,15 @@ solvers in more detail.</p>
 <ul>
 <li>Change the outlet width in <code>system/blockMeshDict</code> (vertices 1, 2, 9, 10 and the
 block cell counts) and see the rate change with \(D^{3/2}\).</li>
-<li>Try the other tutorials:
+<li>Try the other tutorials (solid only in <code>tutorials/solid/</code>, listed in its
+<code>README.md</code>):
 <code>siloCohesion</code> (cohesive material that arches over the outlet),
 <code>siloFed</code> (material fed in at the top while the tank empties),
-<code>hotSiloDischarge</code> (hot sand under cold sand: temperature carried by the flow, cooled walls),
-<code>stlSilo</code>, <code>stlHopper</code>, <code>stlTank</code> (walls from STL surfaces),
-<code>rigidBodyMotion</code> (a body pushed through the material).</li>
+<code>stlSilo</code>, <code>stlHopper</code> (walls from STL surfaces),
+<code>coutoHopper</code> (the validated wheat silo on the axisymmetric wedge),
+<code>stripFooting</code> (a rigid footing pushed into clay),
+<code>rigidBodyMotion</code> (prescribed rigid bodies);
+with temperature, <code>tutorials/solidFluidThermal/hotSiloDischarge</code> (hot sand under cold sand: temperature carried by the flow, cooled walls).</li>
 <li>Read <a href="meshing.html">Meshing</a> before building your own geometry.</li>
 </ul>
 
