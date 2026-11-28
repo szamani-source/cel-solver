@@ -1,6 +1,6 @@
 """WP T.2b done-when: temperature with immersed STL walls (decision 0136).
 
-tutorials/stlHopper (the T0 tank with two STL hopper walls at 60 deg down to
+tutorials/solid/stlHopper (the T0 tank with two STL hopper walls at 60 deg down to
 the 0.06 m outlet; E 0.1 MPa) with thermalProperties model equilibrium,
 c 800 J/(kg K), k 0.25 W/(m K); the STL walls are adiabatic. The outlet opens
 at 0.3 s; t = 1.5 s (the hopper is a third empty).
@@ -36,7 +36,7 @@ END = 1.5
 
 
 def make(path, layered):
-    shutil.copytree(os.path.join(ROOT, "tutorials", "stlHopper"), path)
+    shutil.copytree(os.path.join(ROOT, "tutorials", "solid", "stlHopper"), path)
     cd = f"{path}/system/controlDict"
     txt = open(cd).read()
     txt = re.sub(r"^endTime\s+[^;]+;", f"endTime         {END!r};", txt, flags=re.M)

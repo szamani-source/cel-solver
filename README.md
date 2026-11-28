@@ -20,7 +20,7 @@ Step by step, with the packages per distribution: **[INSTALL.md](INSTALL.md)**. 
 ```bash
 source /usr/lib/openfoam/openfoam2512/etc/bashrc   # OpenFOAM v2512 loaded
 ./install.sh                                       # build, install, smoke test
-celfoam tutorials ~/cases && cd ~/cases/siloDischarge && celfoam ./Allrun
+celfoam tutorials ~/cases && cd ~/cases/solid/siloDischarge && celfoam ./Allrun
 ```
 
 or `./install.sh --container` without OpenFOAM on the host.

@@ -49,7 +49,7 @@ then
     exit 0
 fi
 
-cp -r "$root/tutorials/smokeBox" "$work/"
+cp -r "$root/tutorials/solid/smokeBox" "$work/"
 cd "$work/smokeBox"
 blockMesh > log.blockMesh 2>&1
 mp=constant/materialProperties

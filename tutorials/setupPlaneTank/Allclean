@@ -1,4 +1,0 @@
-#!/bin/sh
-# Removes the written case; keeps planeTank.yaml.
-cd "${0%/*}" || exit
-rm -rf case

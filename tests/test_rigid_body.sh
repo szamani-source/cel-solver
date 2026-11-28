@@ -1,6 +1,6 @@
 #!/bin/bash
 # WP 4.1: rigid bodies read from STL move on their prescribed paths.
-# tutorials/rigidBodyMotion: a fixed 45 degree wall, a cube pushed down with
+# tutorials/solid/rigidBodyMotion: a fixed 45 degree wall, a cube pushed down with
 # a velocity ramp (table), a cube translating and spinning about an edge.
 # Checks (tests/rigidBody/check_motion.py): centre, rotation, velocity and
 # omega against the exact path to 1e-12, the written STL to 1e-7, the fixed
@@ -10,14 +10,14 @@ root="$(cd "$(dirname "$0")/.." && pwd)"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
-cp -r "$root/tutorials/rigidBodyMotion" "$work/serial"
+cp -r "$root/tutorials/solid/rigidBodyMotion" "$work/serial"
 cd "$work/serial"
 cp -r 0.orig 0
 blockMesh > log.blockMesh 2>&1
 celFoam > log.celFoam 2>&1
 grep -q '^End' log.celFoam
 
-cp -r "$root/tutorials/rigidBodyMotion" "$work/parallel"
+cp -r "$root/tutorials/solid/rigidBodyMotion" "$work/parallel"
 cd "$work/parallel"
 cp -r 0.orig 0
 blockMesh > log.blockMesh 2>&1

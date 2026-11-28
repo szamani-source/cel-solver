@@ -36,9 +36,9 @@ jobs:
           celfoam version
           celfoam test
           cd /tmp && celfoam tutorials t
-          (cd t/smokeBox && celfoam ./Allrun && grep -q "^End" log.celFoam)
-          (cd t/coutoHopper && celfoam ./Allrun mc mesh | tee mesh.log && grep -q "Mesh OK" mesh.log)
-          (cd t/siloDischarge && grep -q celFoam Allrun)
+          (cd t/solid/smokeBox && celfoam ./Allrun && grep -q "^End" log.celFoam)
+          (cd t/solid/coutoHopper && celfoam ./Allrun mc mesh | tee mesh.log && grep -q "Mesh OK" mesh.log)
+          (cd t/solid/siloDischarge && grep -q celFoam Allrun)
           celfoam manual | grep -q index.html
           test -f "/opt/celfoam-$(cat "$GITHUB_WORKSPACE/VERSION")/docs/manual/index.html"
           celfoam setup --describe flatBottom | grep -q outletDiameter
@@ -63,4 +63,4 @@ jobs:
           celfoam version
           mkdir -p /tmp/c && cd /tmp/c
           celfoam tutorials t
-          cd t/coutoHopper && celfoam ./Allrun mc mesh | tee mesh.log && grep -q "Mesh OK" mesh.log
+          cd t/solid/coutoHopper && celfoam ./Allrun mc mesh | tee mesh.log && grep -q "Mesh OK" mesh.log

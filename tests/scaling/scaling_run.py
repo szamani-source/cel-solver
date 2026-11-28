@@ -1,4 +1,4 @@
-"""WP 6.3a: parallel scaling of celFoam on the T0 tank (tutorials/siloDischarge,
+"""WP 6.3a: parallel scaling of celFoam on the T0 tank (tutorials/solid/siloDischarge,
 E 10 MPa, T0 rule set). Run by tests/manual/test_scaling.sh:
 
     python3 scaling_run.py WORKDIR [--cells 10,5] [--procs 1,2,4]
@@ -40,7 +40,7 @@ def sub(fn, pat, rep):
 
 def case(work, mm, n):
     path = f"{work}/tank{mm}mm_np{n}"
-    shutil.copytree(f"{ROOT}/tutorials/siloDischarge", path,
+    shutil.copytree(f"{ROOT}/tutorials/solid/siloDischarge", path,
                     ignore=shutil.ignore_patterns("*.png", "*.py", "README.md"))
     f = 10 // mm
     bm = f"{path}/system/blockMeshDict"
