@@ -1,0 +1,24 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      gasProperties;
+}
+// Gas in the pores of the grains (version 2, decisions 0125-0130). Without
+// this file celFoam runs the dry solid exactly as version 1.
+
+model    poreGas;       // pore pressure only (Darcy-Forchheimer through the
+                        // grains, void at p0); gasFlow adds gas momentum in
+                        // the void and the pores (WP F.6, F.7)
+rhoP     2650.0;        // grain (particle) density [kg/m^3]; the solids
+                        // fraction is rho/rhoP, the gas fraction 1 - rho/rhoP
+d            0.0002;    // grain diameter [m] (0.2 mm fine sand); sets the
+                        // permeability, ./Allrun <d in mm> changes it
+T        293.15;        // gas temperature [K]
+p0       101325.0;      // reference (atmospheric) pressure [Pa]; p is gauge
+drag     ergunWenYu;    // drag law: ergunWenYu (default, Gidaspow), ergun,
+                        // wenYu, diFelice, syamlalOBrien, beetstra
+coupled  yes;           // two-way: the gas pressure gradient acts on the
+                        // grains (sigma is the effective stress) and the
+                        // grains carry and squeeze the gas

@@ -1,0 +1,29 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      gasProperties;
+}
+// Fluidised glass beads (Roche et al. 2008; WP F.8, decision 0133): the pore
+// pressure is carried with the grains and diffuses (route B, Iverson and
+// Denlinger 2001, Gueugneau et al. 2017, Aravena et al. 2021), and only
+// lowers the friction of the grains.
+
+model        poreGas;
+rhoP         2500.0;        // glass density [kg/m^3]
+d            7.5e-05;       // bead diameter [m] (75 um)
+T            293.15;        // [K]
+p0           101325.0;      // [Pa]; p is gauge
+drag         ergunWenYu;
+coupled      yes;
+diffusivity  0.11;          // pore pressure diffusivity [m^2/s]: the packing's
+                            // k p0/(mu e) = 0.110, no fit (WP F.8k)
+frictionOnly yes;           // p only lowers the friction: the grains carry
+                            // the support ratio p/P (P the mean total stress)
+inflow
+{
+    floorRes 0.006478660196634505;  // air blown through the reservoir floor
+                                    // [m/s at p0]: carries the column's weight
+                                    // (Darcy), as Roche's porous plate
+}

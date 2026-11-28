@@ -1,0 +1,13 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      topoSetDict;
+}
+
+actions
+(
+    { name floorRes; type faceSet; action new; source patchToFace; patch bottom; }
+    { name floorRes; type faceSet; action subset; source boxToFace; box (-1 -1 -1) (0.2 0.001 1); }
+);

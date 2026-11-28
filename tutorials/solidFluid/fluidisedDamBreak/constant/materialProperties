@@ -1,0 +1,36 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      materialProperties;
+}
+// Glass beads, expanded packing (gas fraction 0.42)
+rho            1450.0000000000002;   // bulk density (1 - 0.42) x 2500 [kg/m^3]
+freeSurface    yes;
+
+type           mohrCoulomb;
+E              1000000.0;   // [Pa]
+nu             0.3;
+phi            24.0;        // static angle of the beads (Gueugneau et al. 2017)
+c              0;
+psi            0;
+mu2            0.6494075931975106;  // mu(I): tan 33 deg, I0 0.3 (Jop et al. 2006)
+I0             0.3;
+d              7.5e-05;
+rhoS           2500.0;
+flowImpedance  yes;         // decision 0050
+fullBlend      yes;         // decision 0049
+capLambda      0.0044;      // compaction cap (WP K.1): the expanded packing
+capP0          1.0;         // is soft until compacted (decision 0133)
+overfillStress yes;         // an overfilled cell pushes back (WP F.8c)
+yieldShearJump no;          // no elastic shear jump between yielding cells (0137)
+slowFlowJump   yes;         // normal jump scaled by the Mach number (0138)
+
+walls
+{
+    left     { friction 0; }      // smooth glass side walls
+    right    { friction 0; }
+    bottom   { friction 22.0; }   // channel floor [deg] (Sia, WP F.8k)
+    floorRes { friction 22.0; }   // the reservoir's porous floor
+}

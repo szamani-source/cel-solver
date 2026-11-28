@@ -1,0 +1,7 @@
+#!/bin/sh
+cd "${0%/*}" || exit
+. ${WM_PROJECT_DIR:?}/bin/tools/CleanFunctions
+cleanCase
+rm -rf 0 dry
+rm -f cellSize front.txt damBreak.foam   # the PNGs are kept: README shows them
+sed -i "s/([0-9]* [0-9]* 1) simpleGrading/(300 45 1) simpleGrading/" system/blockMeshDict

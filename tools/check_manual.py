@@ -315,7 +315,9 @@ def check_required(pages):
 # not user input.
 STATE_KEYS = {"discharged", "charged", "lostMass", "nHandOver", "vStar", "bodyMassIn",
               "rotation", "surfacePoints", "surfU", "tHex", "elements", "x", "v",
-              "sigmaV", "Qhg", "history", "workInt", "workExt"}
+              "sigmaV", "Qhg", "history", "workInt", "workExt",
+              # <time>/uniform/poreGas (WP F.9c, decision 0141)
+              "netIn", "voidIn", "dtOld", "pOldOld", "Pprev", "liftSince", "liftWarned"}
 
 
 def code_keywords():

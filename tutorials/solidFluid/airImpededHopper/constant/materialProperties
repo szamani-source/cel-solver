@@ -1,0 +1,41 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      materialProperties;
+}
+// Quartz sand packed at gas fraction 0.40 (bulk density 0.6 x 2650)
+rho          1590.0;
+freeSurface  yes;       // material plus void
+
+type         mohrCoulomb;
+E            1e6;       // [Pa]; soft to keep the time step long (the rate
+                        // does not depend on E, decision 0036)
+nu           0.3;
+phi          30;        // friction angle [deg]
+c            0;
+psi          1;         // low dilation (Sia, 2026-11-19)
+sigmaT       0;
+fullBlend    yes;       // blend full / partly filled rules (decision 0049)
+
+// v1's T0 rule set for flowing grains (decision 0050): mu(I) friction with
+// the grain diameter of the case, and the flow rules
+mu2          0.8412;
+I0           0.279;
+d            0.0002;    // the same as gasProperties d
+rhoS         2650.0;
+shearCap     yes;
+spreadLayers yes;
+flowImpedance yes;
+normalCap    yes;
+
+walls
+{
+    hopperWall { friction 20.0; }   // wall friction angle [deg]
+    binWall    { friction 20.0; }
+}
+outlets
+{
+    outlet { friction 20.0; openTime 0.15; }   // a wall until 0.15 s
+}

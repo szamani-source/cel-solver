@@ -124,7 +124,7 @@ Description
         }
         nOuter          50;     // Newton iterations per step, at most
         nAnderson       5;      // Anderson acceleration depth (0 off)
-        pTolerance      1e-9;   // [Pa] largest correction when converged
+        pTolerance      1e-4;   // [Pa] error left when converged (decision 0141)
                                 // (default 1e-14 p0)
         laplacian       "Gauss linear corrected";
         parallelCheck   no;     // WP F.9a (decision 0134), debug: compare
@@ -624,6 +624,15 @@ public:
 
         //- Face pressures pFace() from p (WP F.4)
         void correctFacePressure();
+
+        //- Restart state (WP F.9, decision 0141) to <time>/uniform/poreGas
+        //  (each processor): the gas totals, the last step's length and
+        //  pressure (first guess), the support pressures of frictionOnly
+        //  and the lift check's clock; call at write times
+        void writeState() const;
+
+        //- Read it back from the start time if present (constructor)
+        void readState();
 
         //- Parallel consistency check (WP F.9, poreGasParallelCheck.C):
         //  the largest mismatch of the processor-boundary values of the

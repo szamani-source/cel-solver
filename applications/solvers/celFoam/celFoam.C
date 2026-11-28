@@ -261,6 +261,10 @@ int main(int argc, char *argv[])
                 thermal->report();
             }
             solid.writeState();     // WP 6.2: restart state (decision 0081)
+            if (gas)
+            {
+                gas->writeState();  // WP F.9: restart state (decision 0141)
+            }
             bodies.write();
             forAll(solid.bodyNames(), b)
             {
