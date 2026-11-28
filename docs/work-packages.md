@@ -234,6 +234,18 @@ Sia (2026-11-20): needed before the Linux install, with cohesion and compaction.
 | K.7 | 4 mm Couto with the cap, MC and DP (dropped 2026-11-24, decision 0124) | At rest GA0-GA5 against Couto; discharge inside 110-131 kg/s |
 
 
+## Tutorials (TU series, decision 0140)
+
+Sia, 2026-11-26: tutorial cases from the validated cases, in three categories (solid
+only, solid-fluid, solid-fluid-temperature), then the manual rebuild. Brief:
+`docs/wp/WP-TU.1.md`.
+
+| WP | Title | Done when | ETA |
+| --- | --- | --- | --- |
+| TU.1 | Solid-only tutorials in `tutorials/solid/` | `tests/test_solid_tutorials.sh` passes (index, README sections, figures, short run of every case) | 3 h + runs |
+| TU.2 | Solid-fluid tutorials in `tutorials/solidFluid/` | the same checks for that folder | after F.8 |
+| TU.3 | Solid-fluid-temperature tutorials in `tutorials/solidFluidThermal/` | the same checks for that folder | after T.7 |
+
 ## User manual (M series, decision 0116)
 
 Sia (2026-11-22): a comprehensive user manual as HTML pages: setup, theory with

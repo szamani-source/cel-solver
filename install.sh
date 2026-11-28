@@ -146,6 +146,7 @@ if [ "$src" != "$prefix" ]; then
         --exclude=.git --exclude='*/Make/linux64*' --exclude=lnInclude --exclude='*.o' \
         --exclude='*.dep' --exclude='tests/*.log' --exclude=__pycache__ --exclude=platforms \
         --exclude='tutorials/*/log.*' --exclude='tutorials/*/processor*' --exclude='tutorials/*/run' \
+        --exclude='tutorials/*/*/log.*' --exclude='tutorials/*/*/processor*' --exclude='tutorials/*/*/run' \
         .) | $SUDO tar -xf - -C "$prefix"
 fi
 

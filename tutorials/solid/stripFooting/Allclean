@@ -1,0 +1,4 @@
+#!/bin/sh
+# Remove the generated case and report; the PNGs are kept (README shows them).
+cd "${0%/*}" || exit
+rm -rf run

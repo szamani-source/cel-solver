@@ -60,7 +60,7 @@ wmake "$root/tests/constitutive/wrapperCheck" > "$work/log.wmake" 2>&1 \
     || { tail -n 40 "$work/log.wmake"; exit 1; }
 celConstitutiveWrapperCheck
 
-cp -r "$root/tutorials/smokeBox" "$work/"
+cp -r "$root/tutorials/solid/smokeBox" "$work/"
 cd "$work/smokeBox"
 blockMesh > log.blockMesh 2>&1
 celFoam > log.celFoam 2>&1

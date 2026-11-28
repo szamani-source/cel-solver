@@ -38,7 +38,7 @@ case "${1:-}" in
         mkdir -p "$dest"
         cp -r "$prefix"/tutorials/* "$dest"/
         echo "tutorials copied to $dest. Each has a README.md; start with:"
-        echo "  cd $dest/siloDischarge && celfoam ./Allrun"
+        echo "  cd $dest/solid/siloDischarge && celfoam ./Allrun"
         ;;
     manual)
         page="$prefix/docs/manual/index.html"

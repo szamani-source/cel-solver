@@ -3,7 +3,7 @@
 set -eu
 root="$(cd "$(dirname "$0")/.." && pwd)"
 work="$(mktemp -d)"
-cp -r "$root/tutorials/smokeBox" "$work/"
+cp -r "$root/tutorials/solid/smokeBox" "$work/"
 cd "$work/smokeBox"
 
 blockMesh > log.blockMesh 2>&1
