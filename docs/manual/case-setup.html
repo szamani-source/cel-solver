@@ -302,7 +302,7 @@ coupled yes;            // gas pressure acts on the solid</code></pre>
 <tr><td><code>inflow</code></td><td>none</td><td>Sub-dictionary <code>patch speed;</code>: air blown in through that patch at a superficial speed in m/s (at <code>p0</code>, <code>T</code>); the patch must be <code>fixedGradient</code> in <code>0/p</code>. The speed is a Function1 of time, so it can ramp: <code>bottom table ((0 0) (0.3 0.05));</code></td></tr>
 <tr><td><code>nOuter</code></td><td>50</td><td>Most Newton iterations of the gas pressure per step</td></tr>
 <tr><td><code>nAnderson</code></td><td>5</td><td>Depth of the Anderson acceleration of those iterations (0 off)</td></tr>
-<tr><td><code>pTolerance</code></td><td>1e-14 <code>p0</code></td><td>Converged when the error left (the last correction, or the next one estimated from the last two) is below this, Pa</td></tr>
+<tr><td><code>pTolerance</code></td><td>1e-4</td><td>Converged when the error left (the last correction, or the next one estimated from the last two) is below this, Pa (until version 2.0: 1e-14 <code>p0</code>, about 1e-9 Pa; decision 0141). Parallel comparisons use 1e-12</td></tr>
 <tr><td><code>laplacian</code></td><td><code>"Gauss linear corrected"</code></td><td>Discretisation of the gas flux (corrected for non-orthogonal cells)</td></tr>
 <tr><td><code>solver</code></td><td>PCG, DIC, <code>relTol 1e-3</code></td><td>Sub-dictionary for the linear solver of each correction, as in <code>fvSolution</code></td></tr>
 <tr><td><code>nCorr</code></td><td>1</td><td><code>gasFlow</code>: pressure corrections per step (PISO)</td></tr>

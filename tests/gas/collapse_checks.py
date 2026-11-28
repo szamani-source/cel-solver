@@ -193,11 +193,21 @@ def main(work, only):
                 print(f"    within 1e-10 up to t = {last_ok} s ({last_ok / cc.T_SCALE:.1f} sqrt(h0/g))")
             if cc.KAPPA_FIT > 0:
                 drift = 0.0     # route B: pressure, not gas mass, is carried
-            report(f"{n} processors", worst <= 1e-10 and drift <= 1e-12,
-                   f"p, Ug, U within {worst:.1e} of their largest"
+            # WP F.9c (Sia, 2026-11-27, decision 0141): the column starts at
+            # zero effective stress, where round-off decides yield (a serial
+            # run with E changed by 1e-13 departs as fast, run-out 4.88-5.73
+            # h0 on 10 mm), so the processor counts are compared by outcome:
+            # run-out within 10 %, front speed within 5 % of serial
+            hn, h1 = cc.deposit_history(w), cc.deposit_history(w1)
+            ro1, ron = (h1[-1, 1] - cc.X0) / cc.H0, (hn[-1, 1] - cc.X0) / cc.H0
+            u1, un = cc.front_speed(h1), cc.front_speed(hn)
+            report(f"{n} processors", len(done) == len(pc.times(w1)) and abs(ron / ro1 - 1) <= 0.10
+                   and abs(un / u1 - 1) <= 0.05 and drift <= 1e-12,
+                   f"run-out {ron:.2f} against {ro1:.2f} h0 ({100 * (ron / ro1 - 1):+.1f} %), front "
+                   f"speed {un:.3f} against {u1:.3f} m/s ({100 * (un / u1 - 1):+.1f} %); cell by cell "
+                   f"within {worst:.1e}"
                    + (f" (first above 1e-10 at t = {first[0]} s: {first[1]:.1e})" if first else "")
-                   + f"; gas mass {drift:.1e}; {secs[f'gas{n}']:.0f} s; {len(done)} of "
-               f"{len(pc.times(w1))} writes")
+                   + f"; {secs[f'gas{n}']:.0f} s; {len(done)} of {len(pc.times(w1))} writes")
 
     if "K" in only:
         print("\nK: cost per step, gas on against gas off (report; F.9 target 1.5x)")

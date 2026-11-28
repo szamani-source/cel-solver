@@ -204,7 +204,7 @@ Foam::poreGas::poreGas(const eulerianSolid& solid, const IOobject& io)
     inflow_(),
     nOuter_(dict_.getOrDefault<label>("nOuter", 50)),
     nAnderson_(dict_.getOrDefault<label>("nAnderson", 5)),
-    pTol_(dict_.getOrDefault<scalar>("pTolerance", 1e-14*p0_)),
+    pTol_(dict_.getOrDefault<scalar>("pTolerance", 1e-4)),   // Pa (Sia, decision 0141)
     laplacian_
     (
         dict_.getOrDefault<string>("laplacian", "Gauss linear corrected")

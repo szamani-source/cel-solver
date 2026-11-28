@@ -124,7 +124,7 @@ Description
         }
         nOuter          50;     // Newton iterations per step, at most
         nAnderson       5;      // Anderson acceleration depth (0 off)
-        pTolerance      1e-9;   // [Pa] largest correction when converged
+        pTolerance      1e-4;   // [Pa] error left when converged (decision 0141)
                                 // (default 1e-14 p0)
         laplacian       "Gauss linear corrected";
         parallelCheck   no;     // WP F.9a (decision 0134), debug: compare

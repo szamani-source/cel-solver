@@ -33,6 +33,10 @@ def write(path, text):
         f.write(text)
 
 
+# pTolerance of the test cases [Pa] (decision 0141)
+TEST_PTOL = 1e-14 * P0
+
+
 def make_case(path, *, size, cells, e, d, end, write_interval, p_patches,
               inflow=None, p_set=None, skew=0.0, decomp=(1, 1, 1), E=1.0e6,
               extra_gas="", coupled=False):
@@ -126,6 +130,11 @@ nu 0.3;
     inl = ""
     if inflow:
         inl = "inflow\n{\n" + "".join(f"    {k} {v!r};\n" for k, v in inflow.items()) + "}\n"
+    # The tests keep the pressure tolerance they were written with (1e-14 p0,
+    # the default before version 2.0; decision 0141 loosened the default to
+    # 1e-4 Pa for speed): their parallel comparisons and thresholds need
+    # converged solves. A test's own pTolerance in extra_gas wins.
+    ptol = "" if "pTolerance" in extra_gas else f"pTolerance {TEST_PTOL!r};\n"
     write(f"{path}/constant/gasProperties", HEADER.format(cls="dictionary", obj="gasProperties") + f"""
 model   poreGas;
 rhoP    {RHOP!r};
@@ -134,7 +143,7 @@ T       {T!r};
 p0      {P0!r};
 drag    ergunWenYu;
 coupled {'yes' if coupled else 'no'};
-{inl}{extra_gas}""")
+{ptol}{inl}{extra_gas}""")
 
 
 def sh(path, cmd, log, env=None):
