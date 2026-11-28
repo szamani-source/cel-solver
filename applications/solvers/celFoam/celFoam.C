@@ -198,6 +198,11 @@ int main(int argc, char *argv[])
 
         const scalar dt = runTime.deltaTValue();
 
+        if (thermal)
+        {
+            thermal->beforeLagrange();  // WP T.7: plastic strain before
+        }
+
         solid.lagrangeStep(dt);     // WP 2.3
 
         moveBodies(solid, bodies);  // WP 4.1, 4.3d: bodies to t

@@ -42,7 +42,7 @@ restart and MPI. Plan approved by Sia 2026-11-26 (decision 0136).
 - 2026-11-26: T.8 done. `tests/test_thermal_restart_mpi.sh` (about 2.5 min): T.4
   column and T.6 bed restarted and on 2/4 processors within 3e-13; temperature
   1.0-1.1x a gas-on step (capacities and limits now computed once per step).
-  Tutorial `tutorials/hotSiloDischarge` (T0 tank, 150 C layer under 20 C, cooled
+  Tutorial `tutorials/solidFluidThermal/hotSiloDischarge` (T0 tank, 150 C layer under 20 C, cooled
   walls, Zehner-Schluender; README, plot.py; `tests/test_hot_silo_tutorial.sh`,
   22 s). Validation pack `tests/validation/thermal` (Allrun, about 5 min): T.4,
   T.5, T.6 on 1/2/4 processors. Manual: case setup, quick start, Validation
@@ -98,3 +98,12 @@ restart and MPI. Plan approved by Sia 2026-11-26 (decision 0136).
   against marching (1e-4). Original Gunn, Zehner-Schluender and Kuipers papers are not
   readable from the container; formulas taken from three open papers that agree.
   Sullivan and Sabersky unreadable: T.6 now uses Adapa et al. (2024). Next: T.1.
+- T.7 (2026-11-27, after the dam-break thread finished its code; branched from it):
+  `variableGas` and `plasticHeating` (decision 0136 notes). The sealed-box check
+  uses one cell: in a uniform box Gunn's Re^0.2 turns the round-off of the gas flux
+  into cell-to-cell differences of Nu, which start small flows. The heated box found
+  an energy leak in T.4's order of operations (conduction before the gas heat was
+  carried); fixed by carrying first. The von Mises box shows that the stress update
+  is skipped where the strain increment is exactly zero (12 of 16 cells return in the
+  first step, the rest in the second), so the closed form is checked on the cells
+  that returned. Temperature series complete.

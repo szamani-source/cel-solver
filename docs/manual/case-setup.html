@@ -354,7 +354,7 @@ share, and not once the gas carries all of it.</p>
 </table>
 
 
-<h2 id="thermal">Temperature (version 2, in progress): constant/thermalProperties</h2>
+<h2 id="thermal">Temperature (version 2): constant/thermalProperties</h2>
 <p>Temperature in the granular material (decision 0136, packages T.1 to T.8). Without this file,
 or with <code>model none</code>, celFoam runs exactly as without temperature. With it the start
 time must hold the field <code>0/T</code> (kelvin); its patch types are the thermal boundary
@@ -389,6 +389,8 @@ walls
 <tr><td><code>limiter</code></td><td><code>MC</code></td><td>Remap limiter of T (WP T.2, T.6): the temperature moves with the material, mass weighted, so its heat is conserved exactly. <code>MC</code> (as rho, U and sigma) keeps smooth temperature profiles smooth; <code>superbee</code> keeps a sharp hot-cold front within 2 cells (MC: 5) but turns a smooth slope into steps over a long run (a heated bed moving 200 cells: local Nu off by 20 %); <code>upwind</code> and <code>minmod</code> also work</td></tr>
 <tr><td><code>cGas</code></td><td>1006</td><td>Specific heat of the gas at constant pressure, J/(kg K) (WP T.4; air)</td></tr>
 <tr><td><code>TgVoid</code></td><td><code>voidT</code></td><td>Gas temperature held in empty cells of a <code>poreGas</code> case (the surrounding atmosphere), K (WP T.4)</td></tr>
+<tr><td><code>variableGas</code></td><td><code>no</code></td><td>With the pore gas (WP T.7): the gas is an ideal gas at its own temperature (<code>Tg</code>, or <code>T</code> with <code>equilibrium</code>): density (p0 + p)/(R T), Sutherland viscosity and conductivity (<code>kGas</code> is its value at the case temperature <code>T</code> of gasProperties). After each heat step the gas pressure of each cell follows its temperature at constant gas mass, so heated gas expands into its neighbours. The gas heat capacity stays <code>cGas</code> (pressure work neglected). Off, the gas properties stay at the case temperature</td></tr>
+<tr><td><code>plasticHeating</code></td><td>0</td><td>Share beta (0 to 1) of the plastic work that heats the material (WP T.7): each step adds beta sigma : d(epsP) per unit material volume; for a von Mises material that is beta sigma<sub>y</sub> d(epsPEq). The Taylor-Quinney coefficient of metals is about 0.9; for sand it is the frictional work. celFoam prints the plastic heat and includes it in the energy balance</td></tr>
 <tr><td><code>voidT</code></td><td>293.15</td><td>Temperature written in empty cells, K (they hold no heat). Open outlets carry the heat of the material out; an open inlet brings material at the value of its patch in <code>0/T</code> (make it <code>fixedValue</code>); celFoam prints the net heat carried in</td></tr>
 </tbody>
 </table>
