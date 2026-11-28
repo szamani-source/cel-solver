@@ -180,5 +180,11 @@ fluxes; the gas is isothermal at the case temperature.
     the heat capacity and material volume used for the plastic heat are taken before
     the Lagrange step (`heatTransfer::beforeLagrange`); taking them after gave a
     2e-10 energy balance error in the hot silo, now 1e-14.
+  - Face values of R T and mu use w (a_P - a_N) + a_N on every face
+    (`poreGas::faceMean`). linearInterpolate's form on processor faces,
+    w a_P + (1 - w) a_N, is off by round-off when the cells agree, and the gas
+    coupling amplified that to 1e-9 in the 4-processor venting column of
+    test_gas_flow (limit 1e-10, CI on PR #96). With faceMean, runs without
+    variableGas match main bit for bit.
   - `hotSiloDischarge` moved to `tutorials/solidFluidThermal/` (decision 0140) with
     its README in the common layout; `tests/test_thermal_tutorials.sh` checks it.

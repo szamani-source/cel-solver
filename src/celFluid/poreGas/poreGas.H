@@ -658,6 +658,12 @@ public:
 
             //- The gas properties follow the temperature
             bool variableGas() const noexcept { return varT_; }
+
+            //- Face values of a cell field as w (a_P - a_N) + a_N on every
+            //  face, coupled ones too (linearInterpolate's coupled-patch form
+            //  w a_P + (1 - w) a_N is off by round-off when the two cells
+            //  agree, which parted 4-processor runs from serial)
+            tmp<surfaceScalarField> faceMean(const volScalarField& vf) const;
 };
 
 

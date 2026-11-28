@@ -1847,7 +1847,7 @@ void Foam::poreGas::solve(const scalar dt)
         const dimensionedScalar dp0(dimPressure, p0_);
         surfaceScalarField volFlux
         (
-            massFlux_/((fvc::interpolate(p) + dp0)/fvc::interpolate(RT_))
+            massFlux_/((fvc::interpolate(p) + dp0)/faceMean(RT_))
         );
         qGas_ = fvc::reconstruct(volFlux);
         qGas_.correctBoundaryConditions();
@@ -2018,3 +2018,31 @@ void Foam::poreGas::setGasTemperature
 }
 
 // ************************************************************************* //
+
+
+Foam::tmp<Foam::surfaceScalarField>
+Foam::poreGas::faceMean(const volScalarField& vf) const
+{
+    // WP T.7: linearInterpolate's internal form is already w (a_P - a_N) + a_N
+    tmp<surfaceScalarField> tf(linearInterpolate(vf));
+    surfaceScalarField& f = tf.ref();
+    const fvMesh& mesh = solid_.mesh();
+    const surfaceScalarField& w = mesh.weights();
+    forAll(f.boundaryField(), patchi)
+    {
+        const fvPatchScalarField& pvf = vf.boundaryField()[patchi];
+        if (!pvf.coupled())
+        {
+            continue;
+        }
+        const scalarField aP(pvf.patchInternalField());
+        const scalarField aN(pvf.patchNeighbourField());
+        const scalarField& wp = w.boundaryField()[patchi];
+        fvsPatchScalarField& fp = f.boundaryFieldRef()[patchi];
+        forAll(fp, i)
+        {
+            fp[i] = wp[i]*(aP[i] - aN[i]) + aN[i];
+        }
+    }
+    return tf;
+}

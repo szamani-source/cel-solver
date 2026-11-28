@@ -114,7 +114,7 @@ void Foam::poreGas::initFlow()
         const surfaceScalarField rhof
         (
             (linearInterpolate(p) + dimensionedScalar(dimPressure, p0_))
-           /linearInterpolate(RT_)
+           /faceMean(RT_)
         );
         massFlux_ = voidFaces()*rhof*(linearInterpolate(*UgPtr_) & mesh.Sf());
     }
@@ -242,7 +242,7 @@ void Foam::poreGas::predictMomentum(const scalar dt, const scalarField& pOld)
         const surfaceScalarField rhof
         (
             (linearInterpolate(p) + dimensionedScalar(dimPressure, p0_))
-           /linearInterpolate(RT_)
+           /faceMean(RT_)
         );
         phiOld_.reset(new surfaceScalarField("phiUgOld", massFlux_/rhof));
     }
@@ -274,7 +274,7 @@ void Foam::poreGas::predictMomentum(const scalar dt, const scalarField& pOld)
         tLap = fv::laplacianScheme<vector, scalar>::New(mesh, is);
     }
     // Viscosity per cell (WP T.7), linear to the faces
-    const surfaceScalarField muf("gasMuf", linearInterpolate(muG_));
+    const surfaceScalarField muf("gasMuf", faceMean(muG_));
 
     UEqnPtr_.reset
     (
@@ -338,7 +338,7 @@ void Foam::poreGas::flowFluxes()
     const surfaceScalarField rhof
     (
         (linearInterpolate(p) + dimensionedScalar(dimPressure, p0_))
-       /linearInterpolate(RT_)
+       /faceMean(RT_)
     );
     // Face flux of H/A with the time derivative's part from the old face
     // flux instead of the interpolated old velocity (ddtCorr): rho_f/dt
@@ -509,7 +509,7 @@ void Foam::poreGas::startInertia(const scalar dt)
     const surfaceScalarField rhof
     (
         (linearInterpolate(p) + dimensionedScalar(dimPressure, p0_))
-       /linearInterpolate(RT_)
+       /faceMean(RT_)
     );
     const surfaceVectorField nf(mesh.Sf()/mesh.magSf());
     const dimensionedScalar dtD(dimTime, dt);
@@ -620,7 +620,7 @@ void Foam::poreGas::endInertia(const scalar dt)
     const surfaceScalarField rhof
     (
         (linearInterpolate(p) + dimensionedScalar(dimPressure, p0_))
-       /linearInterpolate(RT_)
+       /faceMean(RT_)
     );
     qnOld_() = massFlux_/(rhof*mesh.magSf());
     voidFaceOld_() = voidFaces();
