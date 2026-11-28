@@ -83,6 +83,25 @@ Description
     none); the solid mixes T by mass with its small cut cells and gives
     covered cells ghost values. STL walls are adiabatic.
 
+    WP T.7: with the pore gas, variableGas yes (default no) makes the gas
+    an ideal gas at its own temperature (Tg, or T with equilibrium): rho_g
+    = (p0 + p)/(R Tg), mu(Tg) Sutherland, kGas scaled by Sutherland's law
+    for the conductivity of air (S = 194 K) from its value at the case
+    temperature (gasProperties T). After each heat step the gas pressure
+    of every cell follows its temperature at constant gas mass
+    (poreGas::setGasTemperature). The gas heat capacity stays c_g (the
+    pressure work is neglected, low Mach number).
+
+        variableGas    yes;         // gas density, viscosity, conductivity
+                                    // from the gas temperature (T.7)
+        plasticHeating 0.9;         // beta: share of the plastic work that
+                                    // heats the grains (T.7, default 0)
+
+    plasticHeating beta adds beta sigma : d(epsP) per unit material volume
+    in each step's Lagrange update (the stress after the update; for an
+    associated von Mises material sigma_y d(epsPEq)): the Taylor-Quinney
+    coefficient, about 0.9 for metals; for sand the frictional work.
+
     With no file, or model none, nothing is created and every v1 and v2
     result is unchanged bit for bit.
 
@@ -117,8 +136,9 @@ class heatTransfer
 
         eulerianSolid& solid_;
 
-        //- The pore gas, or null (WP T.4)
-        const poreGas* gas_;
+        //- The pore gas, or null (WP T.4); its gas properties follow the
+        //  temperature with variableGas (WP T.7)
+        poreGas* gas_;
 
         const fvMesh& mesh_;
 
@@ -181,6 +201,21 @@ class heatTransfer
         //- Sub-cycles used in the last step (conduction, gas advection)
         label nSub_;
         label nSubAdv_;
+
+        //- Gas properties from the gas temperature (WP T.7)
+        Switch variableGas_;
+
+        //- Share of the plastic work that heats the grains (WP T.7), the
+        //  plastic heat since the start [J] and the plastic strain before
+        //  the Lagrange step
+        scalar beta_;
+        scalar plasticHeat_;
+        symmTensorField epsPOld_;
+
+        //- Heat capacity [J/K] and material volume [m^3] per cell at the
+        //  start of the step (plasticHeating)
+        scalarField CPre_;
+        scalarField VMat_;
 
 
     // Private Member Functions
@@ -245,6 +280,9 @@ class heatTransfer
         //- Bed conductivity per cell from the current packing
         void correctK();
 
+        //- Gas conductivity per cell [W/(m K)] (WP T.7)
+        tmp<scalarField> kGasField() const;
+
 
 
 public:
@@ -255,14 +293,14 @@ public:
         (
             eulerianSolid& solid,
             const IOobject& io,
-            const poreGas* gas = nullptr
+            poreGas* gas = nullptr
         );
 
         //- Null without constant/thermalProperties or with model none
         static autoPtr<heatTransfer> New
         (
             eulerianSolid& solid,
-            const poreGas* gas = nullptr
+            poreGas* gas = nullptr
         );
 
         heatTransfer(const heatTransfer&) = delete;
@@ -290,8 +328,25 @@ public:
         //- Explicit conduction limit [s] (all processors)
         scalar stableDeltaT() const;
 
-        //- Call before the solid's remap: keeps T for the outlet faces
+        //- Call before the solid's Lagrange step: keeps the plastic strain
+        //  (WP T.7, plasticHeating)
+        void beforeLagrange();
+
+        //- Call before the solid's remap: adds the plastic heat of the
+        //  Lagrange step (WP T.7) and keeps T for the outlet faces
         void beforeRemap();
+
+        //- The gas temperature: Tg (twoTemperature) or T (WP T.7)
+        const volScalarField& gasTemperature() const
+        {
+            return twoT() ? Tg_() : T_;
+        }
+
+        //- The gas properties follow the gas temperature (WP T.7)
+        bool variableGas() const noexcept { return variableGas_; }
+
+        //- Plastic heat since the start [J] (all processors)
+        scalar plasticHeat() const noexcept { return plasticHeat_; }
 
         //- Call after the solid's remap (which carries T, mass weighted):
         //  counts the heat carried through outlets and inlets and sets

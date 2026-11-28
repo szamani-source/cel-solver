@@ -440,6 +440,18 @@ class poreGas
             //- Carried share of the grain mass, last step
             scalar liftShare_;
 
+        // Gas properties from the gas temperature (WP T.7, decision 0136)
+
+            //- R T per cell [J/kg] (boundary values: R times the gas
+            //  temperature's patch values) and the viscosity per cell
+            //  [Pa s]: uniform at the case temperature T unless the
+            //  temperature model sets them (thermalProperties variableGas)
+            volScalarField RT_;
+            volScalarField muG_;
+
+            //- The temperature model sets RT_ and muG_
+            bool varT_;
+
 
     // Private Member Functions (WP F.6, poreGasFlow.C)
 
@@ -628,6 +640,30 @@ public:
 
         //- Carried share of the grain mass at the last step (decision 0135)
         scalar liftShare() const noexcept { return liftShare_; }
+
+
+        // Gas properties from the gas temperature (WP T.7, decision 0136)
+
+            //- Set rho_g = (p0 + p)/(R Tg) and mu(Tg) (Sutherland) from the
+            //  gas temperature Tg. With rescale, first change p so that each
+            //  cell keeps its gas mass, (p0 + p)/(R Tg) constant: the
+            //  temperature model calls this after each heat step
+            void setGasTemperature(const volScalarField& Tg, const bool rescale);
+
+            //- R T per cell [J/kg] and its patch values
+            const volScalarField& RT() const noexcept { return RT_; }
+
+            //- Gas viscosity per cell [Pa s]
+            const volScalarField& muField() const noexcept { return muG_; }
+
+            //- The gas properties follow the temperature
+            bool variableGas() const noexcept { return varT_; }
+
+            //- Face values of a cell field as w (a_P - a_N) + a_N on every
+            //  face, coupled ones too (linearInterpolate's coupled-patch form
+            //  w a_P + (1 - w) a_N is off by round-off when the two cells
+            //  agree, which parted 4-processor runs from serial)
+            tmp<surfaceScalarField> faceMean(const volScalarField& vf) const;
 };
 
 

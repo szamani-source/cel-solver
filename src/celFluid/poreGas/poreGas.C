@@ -264,7 +264,38 @@ Foam::poreGas::poreGas(const eulerianSolid& solid, const IOobject& io)
     liftTime_(dict_.getOrDefault<scalar>("liftTime", 0.01)),
     liftSince_(-1),
     liftWarned_(false),
-    liftShare_(0)
+    liftShare_(0),
+    RT_
+    (
+        IOobject
+        (
+            "gasRT",
+            solid.mesh().time().timeName(),
+            solid.mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE,
+            IOobject::NO_REGISTER
+        ),
+        solid.mesh(),
+        dimensionedScalar(dimPressure/dimDensity, Rair*T_),
+        fvPatchFieldBase::calculatedType()
+    ),
+    muG_
+    (
+        IOobject
+        (
+            "gasMu",
+            solid.mesh().time().timeName(),
+            solid.mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE,
+            IOobject::NO_REGISTER
+        ),
+        solid.mesh(),
+        dimensionedScalar(dimDynamicViscosity, mu_),
+        fvPatchFieldBase::calculatedType()
+    ),
+    varT_(false)
 {
     if (rhoP_ <= 0 || d_ <= 0 || T_ <= 0 || p0_ <= 0)
     {
@@ -490,7 +521,10 @@ void Foam::poreGas::correctFractions()
             eM_[celli] =
                 max(1 - rho[celli]/(alpha[celli]*rhoP_), eMin_);
             k[celli] =
-                dragModel_->permeability(eM_[celli], d_, mu_, rhoG_);
+                dragModel_->permeability
+                (
+                    eM_[celli], d_, muG_[celli], p0_/RT_[celli]
+                );
         }
     }
 
@@ -522,6 +556,12 @@ Foam::scalar Foam::poreGas::gasMass() const
     // Reference and gauge parts summed apart: adding p0 cell by cell would
     // round each change in p to the last digit of p0
     const scalarField gasVol(tVol()*phiG);
+    if (varT_)
+    {
+        // WP T.7: R T per cell
+        const scalarField& RT = RT_.primitiveField();
+        return p0_*gSum(gasVol/RT) + gSum(gasVol*p/RT);
+    }
     return (p0_*gSum(gasVol) + gSum(gasVol*p))/(Rair*T_);
 }
 
@@ -539,7 +579,15 @@ void Foam::poreGas::faceCoefficients
     // the two cell values (corrected snGrad); times the open face fraction
     const fvMesh& mesh = solid_.mesh();
     const volScalarField& p = *pPtr_;
-    const scalar RT = Rair*T_;
+    // WP T.7: R T and the viscosity per cell; a face takes the linear
+    // mean of R T as linearInterpolate forms it (exactly the cells' value
+    // when they agree)
+    const scalarField& RTc = RT_.primitiveField();
+    const scalarField& muc = muG_.primitiveField();
+    auto mix = [](const scalar a, const scalar b, const scalar wf)
+    {
+        return wf*(a - b) + b;
+    };
     // WP F.8 (decision 0133): the face gas density from at least 1e-3 p0,
     // so a diverging iterate (gauge p below -p0) cannot make it negative
     const scalar pFloor = 1e-3*p0_;
@@ -562,8 +610,8 @@ void Foam::poreGas::faceCoefficients
     auto face =
         [&]
         (
-            const scalar eP, const scalar kP,
-            const scalar eN, const scalar kN,
+            const scalar eP, const scalar kP, const scalar muP,
+            const scalar eN, const scalar kN, const scalar muN,
             const scalar wf, const scalar rho, const scalar G,
             scalar& dS, scalar& dT
         )
@@ -575,10 +623,10 @@ void Foam::poreGas::faceCoefficients
             return;
         }
         const gasDragModel& drag = *lawPtr;
-        const scalar sP = drag.mobility(eP, G, d_, mu_, rho);
-        const scalar sN = drag.mobility(eN, G, d_, mu_, rho);
-        const scalar tP = drag.tangentMobility(eP, G, d_, mu_, rho);
-        const scalar tN = drag.tangentMobility(eN, G, d_, mu_, rho);
+        const scalar sP = drag.mobility(eP, G, d_, muP, rho);
+        const scalar sN = drag.mobility(eN, G, d_, muN, rho);
+        const scalar tP = drag.tangentMobility(eP, G, d_, muP, rho);
+        const scalar tN = drag.tangentMobility(eN, G, d_, muN, rho);
         dS = rho/(wf/sP + (1 - wf)/sN);
         dT = rho/(wf/tP + (1 - wf)/tN);
     };
@@ -591,7 +639,8 @@ void Foam::poreGas::faceCoefficients
     auto faceVoid =
         [&]
         (
-            const scalar eP, const scalar kP, const scalar fP,
+            const scalar eP, const scalar kP, const scalar muP,
+            const scalar RTP, const scalar fP,
             const scalar G, scalar& dS, scalar& dT, const scalar pV = 0
         )
     {
@@ -601,10 +650,10 @@ void Foam::poreGas::faceCoefficients
             dT = 0;
             return;
         }
-        const scalar rho = max(flow_ ? p0_ + pV : p0_, pFloor)/RT;
+        const scalar rho = max(flow_ ? p0_ + pV : p0_, pFloor)/RTP;
         const gasDragModel& drag = *lawPtr;
-        dS = rho*drag.mobility(eP, G, d_, mu_, rho)/fP;
-        dT = rho*drag.tangentMobility(eP, G, d_, mu_, rho)/fP;
+        dS = rho*drag.mobility(eP, G, d_, muP, rho)/fP;
+        dT = rho*drag.tangentMobility(eP, G, d_, muP, rho)/fP;
     };
     const scalarField& vd = void_.primitiveField();
     const bool fs = freeSurface_;
@@ -691,7 +740,8 @@ void Foam::poreGas::faceCoefficients
                     // momentum equation; none without (F.4)
                     DS[facei] =
                         flow_
-                      ? max(p0_ + wf*p[P] + (1 - wf)*p[N], pFloor)/RT
+                      ? max(p0_ + wf*p[P] + (1 - wf)*p[N], pFloor)
+                       /mix(RTc[P], RTc[N], wf)
                        *rAUfPtr_()[facei]
                       : 0;
                     DT[facei] = DS[facei];
@@ -707,7 +757,7 @@ void Foam::poreGas::faceCoefficients
                 const vector gI = inertia ? gI_[facei] : Zero;
                 faceVoid
                 (
-                    eM[C], k[C], fC,
+                    eM[C], k[C], muc[C], RTc[C], fC,
                     mag3(gradP[C] - gI, nf[facei], gn - (nf[facei] & gI)),
                     DS[facei], DT[facei], ownGas ? p[N] : p[P]
                 );
@@ -720,8 +770,9 @@ void Foam::poreGas::faceCoefficients
               - (nf[facei] & gI);
             face
             (
-                eM[P], k[P], eM[N], k[N], wf,
-                max(p0_ + wf*p[P] + (1 - wf)*p[N], pFloor)/RT,
+                eM[P], k[P], muc[P], eM[N], k[N], muc[N], wf,
+                max(p0_ + wf*p[P] + (1 - wf)*p[N], pFloor)
+               /mix(RTc[P], RTc[N], wf),
                 mag3(g, nf[facei], gn),
                 DS[facei], DT[facei]
             );
@@ -749,6 +800,8 @@ void Foam::poreGas::faceCoefficients
             const scalarField pN(pB.patchNeighbourField());
             const scalarField eN(eM_.boundaryField()[patchi].patchNeighbourField());
             const scalarField kN(k_.boundaryField()[patchi].patchNeighbourField());
+            const scalarField RTN(RT_.boundaryField()[patchi].patchNeighbourField());
+            const scalarField muN(muG_.boundaryField()[patchi].patchNeighbourField());
             const vectorField gN(gB.patchNeighbourField());
             const scalarField& wf = w.boundaryField()[patchi];
             const scalarField& dcB = dc.boundaryField()[patchi];
@@ -786,7 +839,8 @@ void Foam::poreGas::faceCoefficients
                     {
                         DS[i] =
                             flow_
-                          ? max(p0_ + wf[i]*p[P] + (1 - wf[i])*pN[i], pFloor)/RT
+                          ? max(p0_ + wf[i]*p[P] + (1 - wf[i])*pN[i], pFloor)
+                           /mix(RTc[P], RTN[i], wf[i])
                            *rAUfPtr_().boundaryField()[patchi][i]
                           : 0;
                         DT[i] = DS[i];
@@ -802,7 +856,7 @@ void Foam::poreGas::faceCoefficients
                         const scalar gn = (pN[i] - p[P])*dcB[i]/max(fC, SMALL);
                         faceVoid
                         (
-                            eN[i], kN[i], fC,
+                            eN[i], kN[i], muN[i], RTN[i], fC,
                             mag3(gN[i] - gI, n[i], gn - (n[i] & gI)),
                             DS[i], DT[i], p[P]
                         );
@@ -813,7 +867,7 @@ void Foam::poreGas::faceCoefficients
                         const scalar gn = (pN[i] - p[P])*dcB[i]/max(fC, SMALL);
                         faceVoid
                         (
-                            eM[P], k[P], fC,
+                            eM[P], k[P], muc[P], RTc[P], fC,
                             mag3(gradP[P] - gI, n[i], gn - (n[i] & gI)),
                             DS[i], DT[i], pN[i]
                         );
@@ -826,8 +880,9 @@ void Foam::poreGas::faceCoefficients
                     dcB[i]*(pN[i] - p[P]) + (cB[i] & (g + gI)) - (n[i] & gI);
                 face
                 (
-                    eM[P], k[P], eN[i], kN[i], wf[i],
-                    max(p0_ + wf[i]*p[P] + (1 - wf[i])*pN[i], pFloor)/RT,
+                    eM[P], k[P], muc[P], eN[i], kN[i], muN[i], wf[i],
+                    max(p0_ + wf[i]*p[P] + (1 - wf[i])*pN[i], pFloor)
+                   /mix(RTc[P], RTN[i], wf[i]),
                     mag3(g, n[i], gn),
                     DS[i], DT[i]
                 );
@@ -855,6 +910,7 @@ void Foam::poreGas::faceCoefficients
               : vectorField(DS.size(), Zero)
             );
             const scalarField gn(pB.snGrad());
+            const scalarField& RTB = RT_.boundaryField()[patchi];
             // Closed outlets are walls for the gas too (WP F.4)
             const word& pname = mesh.boundary()[patchi].name();
             const bool shut =
@@ -867,7 +923,7 @@ void Foam::poreGas::faceCoefficients
                     // Gas flow in the void (WP F.6): rho_g 1/A
                     DS[i] =
                         (!shut && flow_)
-                      ? max(p0_ + pB[i], pFloor)/RT
+                      ? max(p0_ + pB[i], pFloor)/RTB[i]
                        *rAUfPtr_().boundaryField()[patchi][i]
                       : 0;
                     DT[i] = DS[i];
@@ -875,8 +931,8 @@ void Foam::poreGas::faceCoefficients
                 }
                 face
                 (
-                    eM[P], k[P], eM[P], k[P], 1,
-                    max(p0_ + pB[i], pFloor)/RT,
+                    eM[P], k[P], muc[P], eM[P], k[P], muc[P], 1,
+                    max(p0_ + pB[i], pFloor)/RTB[i],
                     mag3(gradP[P] - gIB[i], n[i], gn[i] - (n[i] & gIB[i])),
                     DS[i], DT[i]
                 );
@@ -898,7 +954,9 @@ void Foam::poreGas::solve(const scalar dt)
 
     const fvMesh& mesh = solid_.mesh();
     volScalarField& p = *pPtr_;
-    const scalar RT = Rair*T_;
+    // R T per cell (WP T.7: from the gas temperature with variableGas)
+    const scalarField& RT = RT_.primitiveField();
+    const scalarField& muc = muG_.primitiveField();
 
     const scalarField& phiG = phiG_.primitiveField();
     const tmp<scalarField> tOpen(solid_.cellOpen());
@@ -916,14 +974,16 @@ void Foam::poreGas::solve(const scalar dt)
         const scalarField& kc = k_.primitiveField();
         forAll(S, celli)
         {
-            S[celli] = open[celli]*alpha[celli]*rhoG_*kc[celli]/(mu_*kappa_);
+            S[celli] =
+                open[celli]*alpha[celli]*(p0_/RT[celli])*kc[celli]
+               /(muc[celli]*kappa_);
         }
     }
     forAll(S, celli)
     {
         if (S[celli] <= 0)
         {
-            S[celli] = 1/RT;
+            S[celli] = 1/RT[celli];
         }
     }
     const scalarField pOld(p.primitiveField());
@@ -1192,10 +1252,16 @@ void Foam::poreGas::solve(const scalar dt)
               ? -dm[facei]/rhoP_
               : dt*phiL[facei] - dm[facei]/rhoP_;
             const scalar pd = G > 0 ? pOld[own[facei]] : pOld[nei[facei]];
-            vol[own[facei]] += G;
-            vol[nei[facei]] -= G;
-            gauge[own[facei]] += G*pd;
-            gauge[nei[facei]] -= G*pd;
+            // WP T.7: the gas crosses at the donor's density; each side's
+            // share is divided by its own R T below, so scale by R T over
+            // the donor's (exactly 1 at a uniform temperature)
+            const label dn = G > 0 ? own[facei] : nei[facei];
+            const scalar GO = G*(RT[own[facei]]/RT[dn]);
+            const scalar GN = G*(RT[nei[facei]]/RT[dn]);
+            vol[own[facei]] += GO;
+            vol[nei[facei]] -= GN;
+            gauge[own[facei]] += GO*pd;
+            gauge[nei[facei]] -= GN*pd;
         }
         forAll(mesh.boundary(), patchi)
         {
@@ -1242,9 +1308,13 @@ void Foam::poreGas::solve(const scalar dt)
                         continue;
                     }
                     const scalar pd = G > 0 ? pOld[fc[i]] : pB[i];
-                    vol[fc[i]] += G;
-                    gauge[fc[i]] += G*pd;
-                    carriedOut += (p0_*G + G*pd)/RT;
+                    // Donor R T: the cell's out, the boundary's in (WP T.7)
+                    const scalar RTd =
+                        G > 0 ? RT[fc[i]] : RT_.boundaryField()[patchi][i];
+                    const scalar GC = G*(RT[fc[i]]/RTd);
+                    vol[fc[i]] += GC;
+                    gauge[fc[i]] += GC*pd;
+                    carriedOut += (p0_*G + G*pd)/RTd;
                 }
                 continue;
             }
@@ -1261,6 +1331,10 @@ void Foam::poreGas::solve(const scalar dt)
                 fs ? void_.boundaryField()[patchi].patchNeighbourField()
                    : tmp<scalarField>::New(fc.size(), Zero)
             );
+            const scalarField RTN
+            (
+                RT_.boundaryField()[patchi].patchNeighbourField()
+            );
             forAll(fc, i)
             {
                 const scalar G =
@@ -1268,13 +1342,15 @@ void Foam::poreGas::solve(const scalar dt)
                   ? -pdm[i]/rhoP_
                   : dt*pPhi[i] - pdm[i]/rhoP_;
                 const scalar pd = G > 0 ? pOld[fc[i]] : pN[i];
-                vol[fc[i]] += G;
-                gauge[fc[i]] += G*pd;
+                const scalar GC =
+                    G*(RT[fc[i]]/(G > 0 ? RT[fc[i]] : RTN[i]));
+                vol[fc[i]] += GC;
+                gauge[fc[i]] += GC*pd;
             }
         }
         forAll(X, celli)
         {
-            X[celli] = (p0_*vol[celli] + gauge[celli])/RT;
+            X[celli] = (p0_*vol[celli] + gauge[celli])/RT[celli];
         }
     }
 
@@ -1345,7 +1421,6 @@ void Foam::poreGas::solve(const scalar dt)
         tLap = fv::laplacianScheme<scalar, scalar>::New(mesh, is);
     }
 
-    const scalar rhoG0 = rhoG_;
     label outer = 0;
     scalar change = GREAT, prevChange = GREAT, errorEst = GREAT;
     label nNewton = 0;
@@ -1403,9 +1478,12 @@ void Foam::poreGas::solve(const scalar dt)
             const scalarField& D = DfS.boundaryField()[patchi];
             scalarField& g = pB.gradient();
             const scalar Uin = iter.val()->value(mesh.time().value());
+            // WP T.7: U is the volume flux at p0 and the inflow's gas
+            // temperature (rho_g0 = p0/(R T) of the patch)
+            const scalarField& RTB = RT_.boundaryField()[patchi];
             forAll(g, i)
             {
-                g[i] = D[i] > 0 ? rhoG0*Uin/D[i] : 0;
+                g[i] = D[i] > 0 ? (p0_/RTB[i])*Uin/D[i] : 0;
             }
             pB.evaluate();
         }
@@ -1766,11 +1844,10 @@ void Foam::poreGas::solve(const scalar dt)
 
     // Superficial flux q = massFlux / (rho_g |Sf|), reconstructed to cells
     {
-        const dimensionedScalar dRT(dimPressure/dimDensity, RT);
         const dimensionedScalar dp0(dimPressure, p0_);
         surfaceScalarField volFlux
         (
-            massFlux_/((fvc::interpolate(p) + dp0)/dRT)
+            massFlux_/((fvc::interpolate(p) + dp0)/faceMean(RT_))
         );
         qGas_ = fvc::reconstruct(volFlux);
         qGas_.correctBoundaryConditions();
@@ -1875,4 +1952,97 @@ void Foam::poreGas::correctFacePressure()
 }
 
 
+
+void Foam::poreGas::setGasTemperature
+(
+    const volScalarField& Tg,
+    const bool rescale
+)
+{
+    // WP T.7 (decision 0136): rho_g = (p0 + p)/(R Tg), mu = mu(Tg)
+    varT_ = true;
+    volScalarField& p = *pPtr_;
+    scalarField& RT = RT_.primitiveFieldRef();
+    scalarField& mu = muG_.primitiveFieldRef();
+    const scalarField& T = Tg.primitiveField();
+    scalarField& pc = p.primitiveFieldRef();
+    const scalarField& vd = void_.primitiveField();
+    const bool fixVoid = freeSurface_ && !flow_;
+    bool changed = false;
+    forAll(RT, celli)
+    {
+        const scalar RTnew = Rair*T[celli];
+        if (RTnew == RT[celli])
+        {
+            continue;
+        }
+        changed = true;
+        // Each cell keeps its gas: (p0 + p)/(R T) unchanged (void cells of
+        // a poreGas case stay at the atmosphere's pressure)
+        if (rescale && !(fixVoid && vd[celli] > 0.5))
+        {
+            const scalar f = RTnew/RT[celli];
+            pc[celli] = (p0_ + pc[celli])*f - p0_;
+            // The last step's pressure too, so that the first guess of the
+            // next solve (extrapolated from the two) holds no jump
+            if (pOldOld_.size() == pc.size())
+            {
+                pOldOld_[celli] = (p0_ + pOldOld_[celli])*f - p0_;
+            }
+        }
+        RT[celli] = RTnew;
+        mu[celli] = sutherland(T[celli]);
+    }
+    forAll(RT_.boundaryField(), patchi)
+    {
+        fvPatchScalarField& RTB = RT_.boundaryFieldRef()[patchi];
+        fvPatchScalarField& muB = muG_.boundaryFieldRef()[patchi];
+        if (RTB.coupled())
+        {
+            continue;
+        }
+        const fvPatchScalarField& TB = Tg.boundaryField()[patchi];
+        forAll(RTB, i)
+        {
+            RTB[i] = Rair*TB[i];
+            muB[i] = sutherland(TB[i]);
+        }
+    }
+    RT_.correctBoundaryConditions();
+    muG_.correctBoundaryConditions();
+    if (rescale && returnReduce(changed, orOp<bool>()))
+    {
+        p.correctBoundaryConditions();
+        correctFacePressure();
+    }
+}
+
 // ************************************************************************* //
+
+
+Foam::tmp<Foam::surfaceScalarField>
+Foam::poreGas::faceMean(const volScalarField& vf) const
+{
+    // WP T.7: linearInterpolate's internal form is already w (a_P - a_N) + a_N
+    tmp<surfaceScalarField> tf(linearInterpolate(vf));
+    surfaceScalarField& f = tf.ref();
+    const fvMesh& mesh = solid_.mesh();
+    const surfaceScalarField& w = mesh.weights();
+    forAll(f.boundaryField(), patchi)
+    {
+        const fvPatchScalarField& pvf = vf.boundaryField()[patchi];
+        if (!pvf.coupled())
+        {
+            continue;
+        }
+        const scalarField aP(pvf.patchInternalField());
+        const scalarField aN(pvf.patchNeighbourField());
+        const scalarField& wp = w.boundaryField()[patchi];
+        fvsPatchScalarField& fp = f.boundaryFieldRef()[patchi];
+        forAll(fp, i)
+        {
+            fp[i] = wp[i]*(aP[i] - aN[i]) + aN[i];
+        }
+    }
+    return tf;
+}

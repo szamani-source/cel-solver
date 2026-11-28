@@ -1,5 +1,5 @@
 #!/bin/bash
-# WP T.8: tutorials/hotSiloDischarge runs (E 0.1 MPa, to 0.8 s): the energy
+# WP T.8: tutorials/solidFluidThermal/hotSiloDischarge runs (E 0.1 MPa, to 0.8 s): the energy
 # balance holds to 1e-12 of the thermal energy, the sand leaving the outlet
 # is the hot layer's 150 C, and no cell leaves the 20 to 150 C range of the
 # start. About 30 seconds.
@@ -9,7 +9,7 @@ work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 [ -n "${WM_PROJECT_DIR:-}" ] || { echo "FAIL: OpenFOAM environment not loaded"; exit 1; }
 
-cp -r "$root/tutorials/hotSiloDischarge" "$work/"
+cp -r "$root/tutorials/solidFluidThermal/hotSiloDischarge" "$work/"
 cd "$work/hotSiloDischarge"
 foamDictionary -entry endTime -set 0.8 system/controlDict > /dev/null
 foamDictionary -entry writeInterval -set 0.1 system/controlDict > /dev/null
